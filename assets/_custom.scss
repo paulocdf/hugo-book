@@ -730,21 +730,287 @@ body {
 }
 
 // ======================================
-// Sidebar menu polish
+// Modern sidebar
 // ======================================
+
+// Override base theme hover (opacity: 0.5 → none, we handle it below)
+aside nav ul a:hover {
+  opacity: 1 !important;
+}
+
 .book-menu {
-  a {
-    transition: color 0.15s ease;
-    padding: 2px 0;
+  // ---- Scroll shadows (top + bottom fade) ----
+  .book-menu-content {
+    // Mask-based scroll shadows: fade at top and bottom when scrollable
+    &::before,
+    &::after {
+      content: '';
+      position: sticky;
+      display: block;
+      left: 0;
+      right: 0;
+      height: 24px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    &::before {
+      top: 0;
+      background: linear-gradient(to bottom, var(--sidebar-bg) 30%, transparent);
+    }
+
+    &::after {
+      bottom: 0;
+      background: linear-gradient(to top, var(--sidebar-bg) 30%, transparent);
+    }
   }
 
+  // ---- Brand: site title in sidebar ----
+  .book-brand {
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border-subtle);
+
+    a {
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--body-font-color);
+      padding: 0 !important;
+      background: none !important;
+      border-radius: 0;
+
+      &:hover {
+        color: var(--accent-blue);
+        background: none !important;
+      }
+    }
+  }
+
+  // ---- Search input refinement ----
+  .book-search {
+    margin-bottom: 0.75rem;
+  }
+
+  // ---- All links: pill-hover pattern ----
+  a,
+  label {
+    color: var(--text-secondary);
+    cursor: pointer;
+    word-wrap: break-word;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+
+  a {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 7px;
+    font-size: 0.84rem;
+    line-height: 1.4;
+    position: relative;
+  }
+
+  // ---- Hover: subtle background ----
+  a:hover {
+    background: var(--surface-2);
+    color: var(--body-font-color);
+  }
+
+  // ---- Active page: gradient left border + tinted background ----
   a.active {
     color: var(--accent-blue);
-    font-weight: 500;
+    font-weight: 600;
+    background: var(--surface-2);
+    // Gradient left accent bar
+    &::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 4px;
+      bottom: 4px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: linear-gradient(180deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    }
   }
 
-  nav > ul > li {
-    margin: 0.6rem 0;
+  // ---- Sidebar icon styling ----
+  .sidebar-icon {
+    flex-shrink: 0;
+    opacity: 0.65;
+    transition: opacity 0.15s ease, stroke 0.15s ease;
+  }
+
+  a:hover .sidebar-icon,
+  a.active .sidebar-icon {
+    opacity: 1;
+  }
+
+  a.active .sidebar-icon {
+    stroke: var(--accent-blue);
+  }
+
+  // ---- Top-level items: section headers ----
+  nav > ul {
+    padding: 0;
+    margin: 0;
+
+    > li {
+      margin: 0;
+
+      // Spacing between top-level sections
+      & + li {
+        margin-top: 0.25rem;
+      }
+    }
+  }
+
+  // ---- Section items: auto-generated uppercase labels (TOP-LEVEL ONLY) ----
+  nav > ul > .sidebar-section {
+    margin-top: 1.1rem !important;
+
+    &:first-child {
+      margin-top: 0.25rem !important;
+    }
+
+    // The section link/label gets header styling
+    > label > a,
+    > a,
+    > span {
+      font-weight: 700;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      padding: 0.3rem 0.65rem;
+
+      &:hover {
+        color: var(--body-font-color);
+        background: transparent;
+      }
+
+      &.active {
+        color: var(--accent-blue);
+        background: transparent;
+
+        &::before {
+          display: none; // No left bar on section headers
+        }
+      }
+    }
+
+    // Nested items within a section
+    > ul {
+      margin-top: 0.15rem;
+      padding-inline-start: 0;
+      border-left: none;
+
+      > li {
+        margin: 1px 0;
+      }
+    }
+  }
+
+  // ---- Standalone items (non-section, like Tags) ----
+  .sidebar-item {
+    margin: 1px 0;
+  }
+
+  // ---- Nested sub-lists: indent guides ----
+  nav ul ul {
+    padding-inline-start: 0.5rem;
+    margin-left: 0.65rem;
+    border-left: 1px solid var(--border-subtle);
+
+    li {
+      margin: 1px 0;
+    }
+
+    a {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+      padding: 0.3rem 0.6rem;
+    }
+
+    a:hover {
+      color: var(--body-font-color);
+    }
+
+    a.active {
+      color: var(--accent-blue);
+    }
+  }
+
+  // Deep nested (3rd level+)
+  nav ul ul ul {
+    margin-left: 0.5rem;
+
+    a {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.5rem;
+    }
+  }
+
+  // ---- Expand/collapse arrows: animated rotation ----
+  input.toggle + label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    padding: 0;
+    border-radius: 7px;
+
+    &::after {
+      content: '';
+      display: inline-block;
+      width: 16px;
+      height: 16px;
+      flex-shrink: 0;
+      margin-right: 0.4rem;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='9 18 15 12 9 6'%3E%3C/polyline%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: center;
+      background-size: 14px;
+      transition: transform 0.2s ease;
+    }
+  }
+
+  input.toggle:checked + label::after {
+    transform: rotate(90deg);
+  }
+
+  // ---- Collapse/expand animation for nested lists ----
+  // Override _main.scss display:none with max-height animation
+  input.toggle + label + ul {
+    display: block !important;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.25s ease, opacity 0.2s ease, margin 0.25s ease;
+    margin: 0;
+  }
+
+  input.toggle:checked + label + ul {
+    display: block !important;
+    max-height: 500px; // Generous max for smooth animation
+    opacity: 1;
+    margin-top: 0.15rem;
+  }
+
+  // ---- Flat sections override ----
+  .book-section-flat {
+    margin: 0 !important;
+
+    > a,
+    > span,
+    > label {
+      font-weight: bolder;
+    }
+
+    > ul {
+      padding-inline-start: 0;
+    }
   }
 }
 
