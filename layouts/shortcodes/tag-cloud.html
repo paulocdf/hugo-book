@@ -1,0 +1,23 @@
+{{- $tags := dict -}}
+
+{{- range .Site.RegularPages -}}
+  {{- with .Params.tags -}}
+    {{- range . -}}
+      {{- $count := index $tags . | default 0 -}}
+      {{- $tags = merge $tags (dict . (add $count 1)) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{ if $tags }}
+<div class="tag-cloud">
+  {{- range $tag, $count := $tags -}}
+    <span class="tag-pill" data-count="{{ $count }}">
+      <span class="tag-name">{{ $tag }}</span>
+      <span class="tag-count">{{ $count }}</span>
+    </span>
+  {{- end -}}
+</div>
+{{ else }}
+<p>No tags yet. Add tags to your notes to see them here.</p>
+{{ end }}

@@ -1,0 +1,9 @@
+<!-- Prevent flash of wrong theme: apply saved preference before paint -->
+<script>
+  (function() {
+    var t = localStorage.getItem('dm-theme');
+    if (t === 'light' || t === 'dark') {
+      document.documentElement.setAttribute('data-theme', t);
+    }
+  })();
+</script>

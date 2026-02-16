@@ -1,3 +1,776 @@
-/* You can add custom styles here. */
+/* Digital Memory - Custom Styles */
 
-// @import "plugins/numbered";
+// ======================================
+// Theme toggle button
+// ======================================
+.theme-toggle {
+  position: fixed;
+  top: 1rem;
+  right: 1.5rem;
+  z-index: 100;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-medium);
+  background: var(--surface-2);
+  color: var(--body-font-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px var(--shadow-color);
+
+  &:hover {
+    background: var(--surface-3);
+    border-color: var(--accent-blue);
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px var(--shadow-color);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  .theme-icon {
+    position: absolute;
+    transition: opacity 0.25s ease, transform 0.3s ease;
+  }
+
+  // Dark mode: show sun icon (click to go light), hide moon
+  .theme-icon--sun {
+    opacity: 0;
+    transform: rotate(-90deg) scale(0.5);
+  }
+
+  .theme-icon--moon {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+// When in dark mode, show sun (to switch to light)
+:root[data-theme="dark"] .theme-toggle {
+  .theme-icon--sun {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
+  }
+
+  .theme-icon--moon {
+    opacity: 0;
+    transform: rotate(90deg) scale(0.5);
+  }
+}
+
+// Also handle OS dark preference when no data-theme is set
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) .theme-toggle {
+    .theme-icon--sun {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    .theme-icon--moon {
+      opacity: 0;
+      transform: rotate(90deg) scale(0.5);
+    }
+  }
+}
+
+// ======================================
+// Layout: full-width container, sidebar flush left
+// ======================================
+.container {
+  max-width: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--body-background);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+// Sidebar: flush to left edge, compact
+.book-menu {
+  .book-menu-content {
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border-subtle);
+    padding: 1rem 0.75rem;
+  }
+}
+
+// Main content: capped width for readability, generous padding
+.book-page {
+  max-width: 56rem;
+  padding: 1.5rem 2.5rem;
+}
+
+// ======================================
+// Landing page: centered layout, full-width graph
+// ======================================
+.book-page:has(.garden-hero) {
+  max-width: 100%;
+
+  .markdown {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    // All direct children fill the available width
+    > * {
+      width: 100%;
+    }
+  }
+}
+
+// TOC sidebar
+.book-toc {
+  .book-toc-content {
+    padding: 1rem 0.75rem;
+  }
+}
+
+// ======================================
+// Typography improvements
+// ======================================
+.markdown {
+  line-height: 1.7;
+
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+    margin-top: 2rem;
+    background: linear-gradient(135deg, var(--heading-from) 0%, var(--heading-to) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+    margin-top: 2rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: linear-gradient(135deg, var(--heading-from) 20%, var(--heading-to-alt) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  h3 {
+    font-size: 1.15rem;
+    margin-top: 1.5rem;
+    color: var(--heading-h3);
+  }
+
+  h4, h5, h6 {
+    color: var(--text-secondary);
+  }
+
+  // Inline code
+  code {
+    font-size: 0.85em;
+    padding: 0.15em 0.4em;
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
+    border-radius: 4px;
+    color: var(--code-text);
+  }
+
+  // Code blocks
+  pre {
+    border-radius: 8px;
+    border: 1px solid var(--code-border);
+    background: var(--pre-bg);
+    box-shadow: inset 0 1px 3px var(--shadow-color);
+
+    code {
+      padding: 0;
+      background: none;
+      border: none;
+      color: var(--body-font-color);
+      font-size: 0.85rem;
+    }
+  }
+
+  // Blockquotes
+  blockquote {
+    border-inline-start: 3px solid var(--accent-blue);
+    background: var(--surface-1);
+    border-radius: 0 6px 6px 0;
+    color: var(--text-secondary);
+  }
+
+  // Tables
+  table {
+    border-radius: 6px;
+
+    tr th {
+      background: var(--surface-2);
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    tr td {
+      border-color: var(--border-subtle);
+    }
+
+    tr:nth-child(2n) {
+      background: var(--surface-1);
+    }
+  }
+
+  // Horizontal rules
+  hr {
+    border: none;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border-medium), transparent);
+    margin: 2rem 0;
+  }
+
+  // Links
+  a {
+    transition: color 0.15s ease, border-color 0.15s ease;
+    text-decoration: none;
+    border-bottom: 1px solid var(--border-subtle);
+
+    &:hover {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+    }
+  }
+
+  // Lists
+  ul, ol {
+    li {
+      margin-bottom: 0.25rem;
+    }
+  }
+
+  // Images
+  img {
+    border-radius: 6px;
+    box-shadow: 0 2px 12px var(--shadow-color);
+  }
+}
+
+// ======================================
+// Hero section
+// ======================================
+.garden-hero {
+  text-align: center;
+  padding: 2.5rem 0 1.5rem;
+
+  .garden-title {
+    font-size: 2.4rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--body-font-color);
+    margin: 0 0 0.5rem;
+    line-height: 1.15;
+    background: linear-gradient(135deg, var(--body-font-color) 0%, var(--accent-blue) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .garden-subtitle {
+    font-size: 1.05rem;
+    color: var(--text-muted);
+    margin: 0;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+  }
+}
+
+// ======================================
+// Stats cards
+// ======================================
+.garden-stats {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin: 1.5rem 0;
+
+  .stat-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    padding: 10px 16px;
+    min-width: 110px;
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: var(--surface-3);
+      border-color: var(--border-medium);
+      transform: translateY(-1px);
+    }
+
+    .stat-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+
+      &.icon-books { background: rgba(100, 181, 246, 0.12); color: var(--accent-blue); }
+      &.icon-notes { background: rgba(255, 183, 77, 0.12); color: var(--accent-orange); }
+      &.icon-tags  { background: rgba(129, 199, 132, 0.12); color: var(--accent-green); }
+    }
+
+    .stat-content {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-faint);
+      line-height: 1;
+    }
+
+    .stat-value {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--body-font-color);
+      line-height: 1.4;
+    }
+  }
+}
+
+// ======================================
+// Section cards
+// ======================================
+.garden-sections {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin: 2rem auto;
+  max-width: 1000px;
+
+  .section-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 20px 24px;
+    transition: all 0.25s ease;
+
+    &:hover {
+      background: var(--surface-2);
+      border-color: var(--border-medium);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px var(--shadow-color);
+    }
+
+    // Category accent stripe on top
+    &.card-books  { border-top: 2px solid var(--accent-blue); }
+    &.card-topics { border-top: 2px solid var(--accent-green); }
+    &.card-inbox  { border-top: 2px solid var(--accent-orange); }
+
+    h3 {
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+      font-weight: 600;
+      font-size: 1.1rem;
+
+      a {
+        color: var(--body-font-color);
+        transition: color 0.2s ease;
+        border-bottom: none;
+
+        &:hover {
+          color: var(--accent-blue);
+        }
+
+        &:visited {
+          color: var(--body-font-color);
+        }
+      }
+    }
+
+    p {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin: 0 0 0.75rem;
+      line-height: 1.5;
+    }
+
+    ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+
+      li {
+        margin: 0;
+        padding: 5px 0;
+        border-top: 1px solid var(--border-subtle);
+
+        &:first-child {
+          border-top: none;
+        }
+
+        a {
+          font-size: 0.85rem;
+          color: var(--text-secondary);
+          transition: color 0.15s ease;
+          border-bottom: none;
+
+          &:hover {
+            color: var(--accent-blue);
+          }
+        }
+      }
+    }
+
+    em {
+      font-size: 0.8rem;
+      color: var(--text-faint);
+    }
+  }
+}
+
+// ======================================
+// Footer note
+// ======================================
+.garden-footer-note {
+  text-align: center;
+  padding: 1rem 0 2rem;
+
+  em {
+    font-size: 0.75rem;
+    color: var(--text-faint);
+  }
+}
+
+// ======================================
+// Graph container wrapper (full-width centerpiece on landing page)
+// ======================================
+.graph-container {
+  width: 100%;
+  margin: 1.5rem 0;
+}
+
+// ======================================
+// Search input polish
+// ======================================
+.book-search {
+  position: relative;
+
+  input {
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    transition: border-color 0.2s ease, background 0.2s ease;
+
+    &:focus {
+      border-color: var(--accent-blue);
+      background: var(--surface-3);
+      outline: none;
+
+      & ~ .book-search-kbd {
+        opacity: 0;
+      }
+    }
+
+    &::placeholder {
+      color: var(--text-faint);
+    }
+  }
+
+  .book-search-kbd {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.65rem;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-faint);
+    background: var(--surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: 4px;
+    padding: 1px 5px;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+    line-height: 1.4;
+  }
+
+  #book-search-results {
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border-medium);
+    border-radius: 8px;
+    margin-top: 4px;
+    padding: 0;
+    box-shadow: 0 8px 24px var(--shadow-color);
+    max-height: 60vh;
+    overflow-y: auto;
+
+    &:empty {
+      display: none;
+    }
+
+    li {
+      padding: 0;
+      margin: 0;
+
+      a {
+        display: block;
+        padding: 8px 12px;
+        color: var(--body-font-color);
+        font-size: 0.85rem;
+        transition: background 0.1s ease;
+        border-bottom: none;
+
+        &:hover {
+          background: var(--surface-2);
+          color: var(--accent-blue);
+          text-decoration: none;
+        }
+      }
+
+      small {
+        display: block;
+        font-size: 0.7rem;
+        color: var(--text-faint);
+        padding: 0 12px 6px;
+      }
+    }
+  }
+}
+
+// ======================================
+// Sidebar menu polish
+// ======================================
+.book-menu {
+  a {
+    transition: color 0.15s ease;
+    padding: 2px 0;
+  }
+
+  a.active {
+    color: var(--accent-blue);
+    font-weight: 500;
+  }
+
+  nav > ul > li {
+    margin: 0.6rem 0;
+  }
+}
+
+// ======================================
+// Table of contents sidebar
+// ======================================
+.book-toc {
+  .book-toc-content {
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  nav a {
+    color: var(--text-muted);
+    transition: color 0.15s ease;
+
+    &:hover {
+      color: var(--body-font-color);
+    }
+  }
+}
+
+// ======================================
+// Page footer
+// ======================================
+.book-footer {
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-faint);
+}
+
+// ======================================
+// Scrollbar styling (webkit)
+// ======================================
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 3px;
+
+  &:hover {
+    background: var(--text-faint);
+  }
+}
+
+// ======================================
+// Selection color
+// ======================================
+::selection {
+  background: rgba(132, 178, 255, 0.3);
+  color: var(--body-font-color);
+}
+
+// ======================================
+// Tag cloud
+// ======================================
+.tag-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 1rem 0;
+}
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  transition: all 0.2s ease;
+  text-decoration: none;
+
+  &:hover {
+    background: var(--surface-3);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    transform: translateY(-1px);
+    text-decoration: none;
+  }
+
+  &:visited {
+    color: var(--text-secondary);
+  }
+
+  .tag-count {
+    font-size: 0.65rem;
+    background: var(--surface-1);
+    padding: 1px 6px;
+    border-radius: 10px;
+    color: var(--text-faint);
+  }
+}
+
+// ======================================
+// Responsive
+// ======================================
+
+// Breadcrumbs
+.breadcrumbs {
+  margin-bottom: 1rem;
+  font-size: 0.8rem;
+
+  ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0;
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    color: var(--text-faint);
+
+    &:not(:last-child)::after {
+      content: '\203A'; // ›
+      margin: 0 0.5rem;
+      color: var(--text-faint);
+      font-size: 0.9rem;
+    }
+
+    a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.2s ease;
+
+      &:hover {
+        color: var(--accent-blue);
+      }
+    }
+
+    &[aria-current="page"] span {
+      color: var(--body-font-color);
+      font-weight: 500;
+    }
+  }
+}
+
+// Override theme's big-screen extra padding (we handle it above)
+@media screen and (min-width: 82rem) {
+  .book-page {
+    padding: 1.5rem 2.5rem;
+  }
+
+  .book-menu .book-menu-content,
+  .book-toc .book-toc-content {
+    padding: 1rem 0.75rem;
+  }
+}
+
+// Tablet: stack section cards vertically
+@media screen and (max-width: 768px) {
+  .garden-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .garden-hero {
+    padding: 1.5rem 0 1rem;
+
+    .garden-title {
+      font-size: 1.8rem;
+    }
+
+    .garden-subtitle {
+      font-size: 0.9rem;
+    }
+  }
+
+  .garden-stats {
+    .stat-card {
+      min-width: 90px;
+      padding: 8px 12px;
+    }
+  }
+
+  .book-page {
+    padding: 1rem;
+  }
+
+  .theme-toggle {
+    top: 0.5rem;
+    right: 0.75rem;
+    width: 36px;
+    height: 36px;
+  }
+}

@@ -1,0 +1,102 @@
+{{- $nodes := slice -}}
+{{- $edges := slice -}}
+{{- $edgeSet := slice -}}
+
+{{- $pages := .Site.RegularPages -}}
+
+{{- /* Filter out pages without titles and pages with graph_exclude */ -}}
+{{- $validPages := slice -}}
+{{- range $pages -}}
+  {{- if and .Title (ne .Title "") (not .Params.graph_exclude) -}}
+    {{- $validPages = $validPages | append . -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* Build edges from backlinks */ -}}
+{{- range $current := $validPages -}}
+  {{- range $other := $validPages -}}
+    {{- if ne $current.Title $other.Title -}}
+      {{- if (partial "util/is-backlink" (dict "First" $current "Second" $other)) -}}
+        {{- $keyParts := sort (slice $current.Title $other.Title) -}}
+        {{- $key := delimit $keyParts "|" -}}
+        {{- if not (in $edgeSet $key) -}}
+          {{- $edgeSet = $edgeSet | append $key -}}
+          {{- $edges = $edges | append (dict "Source" $current.Title "Target" $other.Title "Type" "backlink") -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* Build edges from shared tags */ -}}
+{{- range $i, $current := $validPages -}}
+  {{- $currentTags := $current.Params.tags | default slice -}}
+  {{- if gt (len $currentTags) 0 -}}
+    {{- range $j, $other := $validPages -}}
+      {{- if ne $current.Title $other.Title -}}
+        {{- $otherTags := $other.Params.tags | default slice -}}
+        {{- if gt (len $otherTags) 0 -}}
+          {{- $shared := intersect $currentTags $otherTags -}}
+          {{- if gt (len $shared) 0 -}}
+            {{- $keyParts := sort (slice $current.Title $other.Title) -}}
+            {{- $key := delimit $keyParts "|" -}}
+            {{- if not (in $edgeSet $key) -}}
+              {{- $edgeSet = $edgeSet | append $key -}}
+              {{- $edges = $edges | append (dict "Source" $current.Title "Target" $other.Title "Type" "tag") -}}
+            {{- end -}}
+          {{- end -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* Build nodes with neighbour counts */ -}}
+{{- range $current := $validPages -}}
+  {{- $neighbourCount := 0 -}}
+  {{- range $edges -}}
+    {{- if or (eq .Source $current.Title) (eq .Target $current.Title) -}}
+      {{- $neighbourCount = add $neighbourCount 1 -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $category := "default" -}}
+  {{- with $current.Params.category -}}
+    {{- $category = . -}}
+  {{- else -}}
+    {{- $section := $current.FirstSection -}}
+    {{- with $section -}}
+      {{- $category = .Title | lower -}}
+    {{- end -}}
+  {{- end -}}
+
+  {{- $tags := slice -}}
+  {{- with $current.Params.tags -}}
+    {{- $tags = . -}}
+  {{- end -}}
+
+  {{- $nodes = $nodes | append (dict "Id" $current.Title "Path" $current.RelPermalink "Label" $current.Title "NumberNeighbours" $neighbourCount "Category" $category "Tags" $tags) -}}
+{{- end -}}
+{
+   "nodes": [
+     {{- range $index, $node := $nodes -}}
+     {{- if gt $index 0 }},{{end}} {
+        "id": {{ $node.Id | jsonify }},
+        "path": {{ $node.Path | jsonify }},
+        "label": {{ $node.Label | jsonify }},
+        "number_neighbours": {{ $node.NumberNeighbours | jsonify }},
+        "category": {{ $node.Category | jsonify }},
+        "tags": {{ $node.Tags | jsonify }}
+        }
+     {{- end -}}
+   ],
+   "edges": [
+     {{- range $index, $edge := $edges -}}
+     {{- if gt $index 0 }},{{end}} {
+        "source": {{ $edge.Source | jsonify }},
+        "target": {{ $edge.Target | jsonify }},
+        "type": {{ $edge.Type | jsonify }}
+      }
+     {{- end -}}
+   ]
+}

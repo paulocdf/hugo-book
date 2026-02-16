@@ -1,0 +1,50 @@
+{{- $books := 0 -}}
+{{- $notes := 0 -}}
+{{- $tags := slice -}}
+
+{{- range .Site.RegularPages -}}
+  {{- $dir := "" -}}
+  {{- with .File -}}
+    {{- $dir = .Dir -}}
+  {{- end -}}
+
+  {{- if in $dir "books" -}}
+    {{- $books = add $books 1 -}}
+  {{- else if in $dir "inbox" -}}
+    {{- $notes = add $notes 1 -}}
+  {{- else if in $dir "topics" -}}
+    {{- $notes = add $notes 1 -}}
+  {{- end -}}
+
+  {{- with .Params.tags -}}
+    {{- range . -}}
+      {{- if not (in $tags .) -}}
+        {{- $tags = $tags | append . -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+
+<div class="garden-stats">
+  <div class="stat-card">
+    <span class="stat-icon icon-books">B</span>
+    <div class="stat-content">
+      <span class="stat-label">Books</span>
+      <span class="stat-value">{{ $books }}</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-icon icon-notes">N</span>
+    <div class="stat-content">
+      <span class="stat-label">Notes</span>
+      <span class="stat-value">{{ $notes }}</span>
+    </div>
+  </div>
+  <div class="stat-card">
+    <span class="stat-icon icon-tags">T</span>
+    <div class="stat-content">
+      <span class="stat-label">Tags</span>
+      <span class="stat-value">{{ len $tags }}</span>
+    </div>
+  </div>
+</div>

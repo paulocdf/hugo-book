@@ -38,29 +38,89 @@ $hint-colors: (
   --color-visited-link: #8440f1;
 
   --body-background: white;
-  --body-font-color: black;
+  --body-font-color: #374151;
 
   --icon-filter: none;
 
   --hint-color-info: #6bf;
   --hint-color-warning: #fd6;
   --hint-color-danger: #f66;
+
+  // Digital Memory custom tokens (light)
+  --surface-1: rgba(0, 0, 0, 0.02);
+  --surface-2: rgba(0, 0, 0, 0.04);
+  --surface-3: rgba(0, 0, 0, 0.06);
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-medium: rgba(0, 0, 0, 0.15);
+  --text-muted: rgba(0, 0, 0, 0.5);
+  --text-faint: rgba(0, 0, 0, 0.35);
+  --text-secondary: rgba(0, 0, 0, 0.7);
+  --accent-blue: #1976d2;
+  --accent-green: #388e3c;
+  --accent-orange: #e65100;
+  --accent-purple: #7b1fa2;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --sidebar-bg: #f5f6f8;
+  --code-bg: rgba(0, 0, 0, 0.04);
+  --code-border: rgba(0, 0, 0, 0.1);
+
+  // Heading gradients (light)
+  --heading-from: #1565c0;
+  --heading-to: #6a1b9a;
+  --heading-to-alt: #2e7d32;
+  --heading-h3: #37474f;
+
+  // Inline code text
+  --code-text: #c7254e;
+
+  // Code block background
+  --pre-bg: #f6f8fa;
 }
 
 @mixin theme-dark {
-  --gray-100: rgba(255, 255, 255, 0.1);
-  --gray-200: rgba(255, 255, 255, 0.2);
+  --gray-100: rgba(255, 255, 255, 0.07);
+  --gray-200: rgba(255, 255, 255, 0.12);
   --gray-500: rgba(255, 255, 255, 0.5);
 
   --color-link: #84b2ff;
   --color-visited-link: #b88dff;
 
-  --body-background: #343a40;
-  --body-font-color: #e9ecef;
+  --body-background: #161921;
+  --body-font-color: #c9cdd5;
 
   --icon-filter: brightness(0) invert(1);
 
   --hint-color-info: #6bf;
   --hint-color-warning: #fd6;
   --hint-color-danger: #f66;
+
+  // Digital Memory custom tokens
+  --surface-1: rgba(255, 255, 255, 0.03);
+  --surface-2: rgba(255, 255, 255, 0.05);
+  --surface-3: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.1);
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --text-faint: rgba(255, 255, 255, 0.35);
+  --text-secondary: rgba(255, 255, 255, 0.7);
+  --accent-blue: #64b5f6;
+  --accent-green: #81c784;
+  --accent-orange: #ffb74d;
+  --accent-purple: #ce93d8;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --sidebar-bg: #12151c;
+  --code-bg: rgba(255, 255, 255, 0.06);
+  --code-border: rgba(255, 255, 255, 0.08);
+
+  // Heading gradients (dark)
+  --heading-from: #90caf9;
+  --heading-to: #ce93d8;
+  --heading-to-alt: #a5d6a7;
+  --heading-h3: #b0bec5;
+
+  // Inline code text
+  --code-text: #e06c75;
+
+  // Code block background
+  --pre-bg: rgba(0, 0, 0, 0.2);
 }

@@ -1,0 +1,61 @@
+{{- $bookPages := slice -}}
+{{- $inboxPages := slice -}}
+{{- $topicPages := slice -}}
+
+{{- range .Site.RegularPages -}}
+  {{- $dir := "" -}}
+  {{- with .File -}}
+    {{- $dir = .Dir -}}
+  {{- end -}}
+  {{- if in $dir "books" -}}
+    {{- $bookPages = $bookPages | append . -}}
+  {{- else if in $dir "inbox" -}}
+    {{- $inboxPages = $inboxPages | append . -}}
+  {{- else if in $dir "topics" -}}
+    {{- $topicPages = $topicPages | append . -}}
+  {{- end -}}
+{{- end -}}
+
+<div class="garden-sections">
+
+<div class="section-card card-books">
+<h3><a href="{{ "docs/books/" | relURL }}">Books</a></h3>
+<p>Notes and highlights from books I've read.</p>
+{{- if $bookPages -}}
+<ul>
+{{- range $bookPages -}}
+  <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+{{- end -}}
+</ul>
+{{- end -}}
+</div>
+
+<div class="section-card card-topics">
+<h3><a href="{{ "docs/topics/" | relURL }}">Topics</a></h3>
+<p>Technical topics, concepts, and reference material.</p>
+{{- if $topicPages -}}
+<ul>
+{{- range $topicPages -}}
+  <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+{{- end -}}
+</ul>
+{{- else -}}
+<em>Start adding topics to grow your knowledge graph.</em>
+{{- end -}}
+</div>
+
+<div class="section-card card-inbox">
+<h3><a href="{{ "docs/inbox/" | relURL }}">Inbox</a></h3>
+<p>Quick notes and ideas waiting to be organized.</p>
+{{- if $inboxPages -}}
+<ul>
+{{- range $inboxPages -}}
+  <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
+{{- end -}}
+</ul>
+{{- else -}}
+<em>Your inbox is empty. Add some quick notes!</em>
+{{- end -}}
+</div>
+
+</div>

@@ -26,6 +26,23 @@
 
   document.addEventListener('keypress', focusSearchFieldOnKeyPress);
 
+  // Cmd+K / Ctrl+K to focus search
+  document.addEventListener('keydown', function(event) {
+    if ((event.metaKey || event.ctrlKey) && event.key === 'k') {
+      event.preventDefault();
+      input.focus();
+      input.select();
+    }
+    // Escape to blur search
+    if (event.key === 'Escape' && input === document.activeElement) {
+      input.blur();
+      input.value = '';
+      while (results.firstChild) {
+        results.removeChild(results.firstChild);
+      }
+    }
+  });
+
   /**
    * @param {Event} event
    */
