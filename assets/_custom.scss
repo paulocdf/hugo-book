@@ -462,6 +462,177 @@ body {
 }
 
 // ======================================
+// View toggle bar
+// ======================================
+.view-toggle-bar {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.view-toggle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--border-medium);
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  padding: 0;
+
+  &:hover {
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    transform: scale(1.08);
+    background: var(--surface-2);
+  }
+
+  &.active {
+    background: var(--accent-blue);
+    border-color: var(--accent-blue);
+    color: white;
+    box-shadow: 0 2px 8px var(--shadow-color);
+  }
+
+  svg {
+    pointer-events: none;
+  }
+}
+
+// ======================================
+// View containers
+// ======================================
+.view-container {
+  display: none;
+
+  &.active {
+    display: block;
+  }
+}
+
+#grid-wrapper.active {
+  display: grid;
+}
+
+// ======================================
+// Card grid view
+// ======================================
+#grid-wrapper {
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  padding: 1rem 0;
+  min-height: 200px;
+}
+
+.grid-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 1.1rem 1.2rem;
+  border-left: 4px solid var(--accent-blue);
+  transition: all 0.25s ease;
+  cursor: pointer;
+
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px var(--shadow-color);
+    border-color: var(--border-medium);
+    background: var(--surface-2);
+  }
+
+  &[data-category="books"] {
+    border-left-color: var(--accent-blue);
+  }
+  &[data-category="topics"] {
+    border-left-color: var(--accent-green);
+  }
+  &[data-category="inbox"] {
+    border-left-color: var(--accent-orange);
+  }
+}
+
+.grid-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+  margin-bottom: 0.5rem;
+  text-decoration: none;
+  display: block;
+  border-bottom: none;
+  line-height: 1.3;
+
+  &:hover {
+    color: var(--accent-blue);
+    border-bottom: none;
+  }
+}
+
+.grid-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.8rem;
+}
+
+.grid-card-category {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+
+  &.books {
+    background: rgba(100, 181, 246, 0.12);
+    color: var(--accent-blue);
+  }
+  &.topics {
+    background: rgba(129, 199, 132, 0.12);
+    color: var(--accent-green);
+  }
+  &.inbox {
+    background: rgba(255, 183, 77, 0.12);
+    color: var(--accent-orange);
+  }
+}
+
+.grid-card-connections {
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+.grid-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.grid-card-tag {
+  font-size: 0.7rem;
+  padding: 0.1rem 0.45rem;
+  background: var(--surface-2);
+  border-radius: 3px;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.grid-card-tag-more {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  font-style: italic;
+  padding: 0.1rem 0.3rem;
+}
+
+// ======================================
 // Graph container wrapper (full-width centerpiece on landing page)
 // ======================================
 .graph-container {
@@ -770,6 +941,15 @@ body {
   .theme-toggle {
     top: 0.5rem;
     right: 0.75rem;
+    width: 36px;
+    height: 36px;
+  }
+
+  #grid-wrapper {
+    grid-template-columns: 1fr;
+  }
+
+  .view-toggle-btn {
     width: 36px;
     height: 36px;
   }

@@ -119,3 +119,52 @@
     height: 400px;
   }
 }
+
+// ======================================
+// Radial sunburst view
+// ======================================
+#radial-wrapper {
+  position: relative;
+  width: 100%;
+  height: 550px;
+  border-radius: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+  box-shadow: 0 4px 24px var(--shadow-color);
+
+  svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  @media screen and (max-width: 600px) {
+    height: 400px;
+  }
+}
+
+.sunburst-arc {
+  cursor: pointer;
+  transition: fill-opacity 0.15s ease;
+}
+
+.sunburst-label {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  pointer-events: none;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sunburst-item-label {
+  font-size: 10px;
+  font-weight: 400;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  pointer-events: none;
+}
+
+.sunburst-center {
+  pointer-events: none;
+}
