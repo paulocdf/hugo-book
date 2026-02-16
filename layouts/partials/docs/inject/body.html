@@ -61,3 +61,39 @@
   });
 })();
 </script>
+
+<!-- Sidebar collapse/expand toggle -->
+<script>
+(function() {
+  var toggle = document.getElementById('sidebar-toggle');
+  if (!toggle) return;
+
+  function isCollapsed() {
+    return document.documentElement.classList.contains('sidebar-collapsed');
+  }
+
+  function setSidebar(collapsed) {
+    if (collapsed) {
+      document.documentElement.classList.add('sidebar-collapsed');
+      toggle.setAttribute('aria-label', 'Expand sidebar');
+    } else {
+      document.documentElement.classList.remove('sidebar-collapsed');
+      toggle.setAttribute('aria-label', 'Collapse sidebar');
+    }
+    try { localStorage.setItem('dm-sidebar-collapsed', collapsed ? '1' : '0'); } catch(e) {}
+  }
+
+  toggle.addEventListener('click', function() {
+    setSidebar(!isCollapsed());
+  });
+
+  // Keyboard shortcut: [ to toggle sidebar
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (e.key === '[' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      setSidebar(!isCollapsed());
+    }
+  });
+})();
+</script>

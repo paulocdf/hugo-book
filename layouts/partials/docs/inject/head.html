@@ -5,5 +5,9 @@
     if (t === 'light' || t === 'dark') {
       document.documentElement.setAttribute('data-theme', t);
     }
+    // Prevent flash of wrong sidebar state
+    if (localStorage.getItem('dm-sidebar-collapsed') === '1') {
+      document.documentElement.classList.add('sidebar-collapsed');
+    }
   })();
 </script>

@@ -12,6 +12,16 @@
       <div class="book-menu-content">
         {{ template "menu" . }} <!-- Left menu Content -->
       </div>
+      <button class="sidebar-toggle" id="sidebar-toggle" aria-label="Collapse sidebar" title="Toggle sidebar">
+        <svg class="icon-collapse" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="11 17 6 12 11 7"></polyline>
+          <polyline points="18 17 13 12 18 7"></polyline>
+        </svg>
+        <svg class="icon-expand" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="13 7 18 12 13 17"></polyline>
+          <polyline points="6 7 11 12 6 17"></polyline>
+        </svg>
+      </button>
     </aside>
 
     <div class="book-page">

@@ -895,6 +895,95 @@ body {
   }
 }
 
+// ======================================
+// Collapsible sidebar
+// ======================================
+
+// Tab button that sticks out from the right edge of the sidebar, near the bottom
+.sidebar-toggle {
+  position: fixed;
+  left: $menu-width;
+  bottom: 2rem;
+  z-index: 101;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 48px;
+  border: 1px solid var(--border-subtle);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0;
+  transition: left 0.3s ease, background 0.2s ease, border-color 0.2s ease, color 0.2s ease, width 0.2s ease;
+  box-shadow: 2px 0 8px var(--shadow-color);
+
+  &:hover {
+    background: var(--surface-3);
+    border-color: var(--accent-blue);
+    color: var(--accent-blue);
+    width: 28px;
+  }
+
+  // Icon states: show collapse icon by default, hide expand icon
+  .icon-collapse { display: block; }
+  .icon-expand { display: none; }
+}
+
+// Sidebar collapse transitions
+.book-menu {
+  transition: flex 0.3s ease, margin 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.book-menu .book-menu-content {
+  transition: transform 0.3s ease, opacity 0.3s ease, visibility 0.3s ease;
+}
+
+// Collapsed state
+html.sidebar-collapsed {
+  .book-menu {
+    flex: 0 0 0;
+    overflow: hidden;
+  }
+
+  .book-menu .book-menu-content {
+    transform: translateX(-$menu-width);
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  // Button slides to left edge, icon flips
+  .sidebar-toggle {
+    left: 0;
+
+    .icon-collapse { display: none; }
+    .icon-expand { display: block; }
+  }
+}
+
+// Hide collapse toggle on mobile (hamburger menu handles it)
+@media screen and (max-width: $mobile-breakpoint) {
+  .sidebar-toggle {
+    display: none !important;
+  }
+
+  // Reset sidebar state on mobile so it works normally with hamburger
+  html.sidebar-collapsed {
+    .book-menu {
+      flex: 0 0 $menu-width;
+      overflow: visible;
+    }
+
+    .book-menu .book-menu-content {
+      transform: none;
+      opacity: 1;
+      visibility: visible;
+    }
+  }
+}
+
 // Override theme's big-screen extra padding (we handle it above)
 @media screen and (min-width: 82rem) {
   .book-page {
