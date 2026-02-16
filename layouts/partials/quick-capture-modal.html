@@ -1,0 +1,56 @@
+<!-- Quick Capture Modal -->
+<div class="quick-capture-modal" id="quick-capture-modal" aria-hidden="true">
+  <div class="quick-capture-backdrop" id="quick-capture-backdrop"></div>
+  <div class="quick-capture-dialog">
+    <div class="quick-capture-header">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 20h9"></path>
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+        </svg>
+        Quick Capture
+      </h3>
+      <p>Jot down an idea — choose where it goes</p>
+    </div>
+    <div class="qc-destination">
+      <label class="qc-destination-label" for="qc-destination-select">Save to</label>
+      <div class="qc-destination-options" id="qc-destination-options">
+        <button type="button" class="qc-dest-btn active" data-path="content/docs/inbox" data-tag="inbox">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+          </svg>
+          Inbox
+        </button>
+        <button type="button" class="qc-dest-btn" data-path="content/docs/topics" data-tag="topic">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          Topics
+        </button>
+        <button type="button" class="qc-dest-btn" data-path="content/docs/books" data-tag="book-note">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          Books
+        </button>
+      </div>
+    </div>
+    <textarea id="quick-capture-input" class="quick-capture-input" placeholder="What's on your mind?" rows="5"></textarea>
+    <div class="quick-capture-actions">
+      <button type="button" class="qc-btn qc-btn-cancel" id="qc-cancel">Cancel</button>
+      <button type="button" class="qc-btn qc-btn-submit" id="qc-submit">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        Save
+      </button>
+    </div>
+    <div class="quick-capture-hint">
+      <kbd>Esc</kbd> to close &middot; <kbd>Cmd/Ctrl+Enter</kbd> to save
+    </div>
+  </div>
+</div>

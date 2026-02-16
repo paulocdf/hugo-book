@@ -984,6 +984,378 @@ html.sidebar-collapsed {
   }
 }
 
+// ======================================
+// Quick Capture FAB (Floating Action Button)
+// ======================================
+
+// Circular FAB: fixed bottom-right, always visible
+.quick-capture-fab {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border: none;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  box-shadow: 0 4px 20px rgba(25, 118, 210, 0.35);
+  padding: 0;
+
+  // Pulse ring animations: two staggered ripples radiating outward
+  &::before,
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 2px solid var(--accent-blue);
+    opacity: 0;
+    pointer-events: none;
+    animation: fab-pulse 3s ease-out infinite;
+  }
+
+  &::after {
+    animation-delay: 1.5s;
+  }
+
+  // Pause the pulse on hover (button is already highlighted)
+  &:hover::before,
+  &:hover::after {
+    animation-play-state: paused;
+    opacity: 0;
+  }
+
+  .fab-icon {
+    flex-shrink: 0;
+    transition: transform 0.2s ease;
+  }
+
+  // Tooltip label: hidden by default, appears on hover
+  .fab-tooltip {
+    position: absolute;
+    right: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    white-space: nowrap;
+    padding: 0.4rem 0.75rem;
+    border-radius: 6px;
+    background: var(--surface-3);
+    color: var(--body-font-color);
+    font-family: inherit;
+    font-size: 0.78rem;
+    font-weight: 600;
+    box-shadow: 0 2px 8px var(--shadow-color);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    transform: translateY(-50%) translateX(4px);
+
+    kbd {
+      display: inline-block;
+      padding: 1px 5px;
+      margin-left: 0.35rem;
+      font-family: inherit;
+      font-size: 0.65rem;
+      background: var(--surface-1);
+      border: 1px solid var(--border-subtle);
+      border-radius: 3px;
+      color: var(--text-secondary);
+    }
+  }
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 28px rgba(25, 118, 210, 0.45);
+    filter: brightness(1.08);
+
+    .fab-tooltip {
+      opacity: 1;
+      transform: translateY(-50%) translateX(0);
+    }
+
+    .fab-icon {
+      transform: rotate(-8deg);
+    }
+  }
+
+  &:active {
+    transform: scale(0.95);
+    box-shadow: 0 2px 10px rgba(25, 118, 210, 0.3);
+  }
+}
+
+// Pulse keyframes: ring expands outward and fades
+@keyframes fab-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.6;
+  }
+  70% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+// Responsive: smaller FAB on mobile, tighter position
+@media screen and (max-width: $mobile-breakpoint) {
+  .quick-capture-fab {
+    bottom: 1.25rem;
+    right: 1.25rem;
+    width: 48px;
+    height: 48px;
+
+    .fab-tooltip {
+      display: none; // No tooltip on mobile (tap target is clear enough)
+    }
+  }
+}
+
+// Modal overlay
+.quick-capture-modal {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  align-items: center;
+  justify-content: center;
+
+  &.active {
+    display: flex;
+  }
+}
+
+// Backdrop with blur
+.quick-capture-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+// Dialog card
+.quick-capture-dialog {
+  position: relative;
+  width: 90%;
+  max-width: 480px;
+  background: var(--sidebar-bg);
+  border: 1px solid var(--border-medium);
+  border-radius: 14px;
+  padding: 1.75rem;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+  animation: qc-slide-in 0.2s ease-out;
+}
+
+@keyframes qc-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+// Header
+.quick-capture-header {
+  margin-bottom: 1rem;
+
+  h3 {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 0.35rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--body-font-color);
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+
+    svg {
+      // SVG won't get the gradient text treatment, so color it explicitly
+      -webkit-text-fill-color: initial;
+      stroke: var(--accent-blue);
+    }
+  }
+
+  p {
+    margin: 0;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+}
+
+// Destination selector
+.qc-destination {
+  margin-bottom: 0.85rem;
+}
+
+.qc-destination-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+
+.qc-destination-options {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.qc-dest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: opacity 0.15s ease;
+  }
+
+  &:hover {
+    background: var(--surface-2);
+    border-color: var(--border-medium);
+    color: var(--body-font-color);
+
+    svg { opacity: 1; }
+  }
+
+  &.active {
+    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    border-color: transparent;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.25);
+
+    svg {
+      opacity: 1;
+      stroke: #fff;
+    }
+  }
+}
+
+// Textarea
+.quick-capture-input {
+  width: 100%;
+  min-height: 120px;
+  padding: 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--body-font-color);
+  font-family: inherit;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  resize: vertical;
+  transition: border-color 0.2s ease, background 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    background: var(--surface-2);
+  }
+
+  &::placeholder {
+    color: var(--text-faint);
+  }
+}
+
+// Action buttons row
+.quick-capture-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1rem;
+}
+
+.qc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.55rem 1.1rem;
+  border: none;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.qc-btn-cancel {
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+
+  &:hover {
+    background: var(--surface-3);
+    border-color: var(--border-medium);
+  }
+}
+
+.qc-btn-submit {
+  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(25, 118, 210, 0.25);
+
+  &:hover {
+    box-shadow: 0 4px 16px rgba(25, 118, 210, 0.35);
+    filter: brightness(1.08);
+    transform: translateY(-1px);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+}
+
+// Keyboard hints at bottom of dialog
+.quick-capture-hint {
+  text-align: center;
+  margin-top: 0.85rem;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+
+  kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    font-family: inherit;
+    font-size: 0.65rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    color: var(--text-secondary);
+  }
+}
+
 // Override theme's big-screen extra padding (we handle it above)
 @media screen and (min-width: 82rem) {
   .book-page {
