@@ -11,3 +11,21 @@
     }
   })();
 </script>
+
+<!-- Firebase initialization -->
+<script>
+  (function() {
+    if (typeof firebase === 'undefined') return;
+    firebase.initializeApp({
+      apiKey: "AIzaSyC_wfs6Ev6vMEr4imhEJ22H0MxSn8AOr_k",
+      authDomain: "digital-memory-0.firebaseapp.com",
+      projectId: "digital-memory-0",
+      storageBucket: "digital-memory-0.firebasestorage.app",
+      messagingSenderId: "722285589293",
+      appId: "1:722285589293:web:94a32fd0c444b422fed9a4"
+    });
+    window.dmAuth = firebase.auth();
+    window.dmDb = firebase.firestore();
+    window.dmGoogleProvider = new firebase.auth.GoogleAuthProvider();
+  })();
+</script>

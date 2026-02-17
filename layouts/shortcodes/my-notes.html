@@ -1,0 +1,218 @@
+<!-- My Notes: dynamic page that fetches user's notes from Firestore -->
+<div class="my-notes" id="my-notes">
+  <!-- Signed-out state -->
+  <div class="my-notes-signin" id="my-notes-signin">
+    <div class="my-notes-signin-card">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="my-notes-signin-icon">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+      </svg>
+      <h3>Sign in to view your notes</h3>
+      <p>Your notes are private and only visible to you.</p>
+      <button type="button" class="my-notes-google-btn" id="my-notes-signin-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <!-- Signed-in state -->
+  <div class="my-notes-content" id="my-notes-content" style="display: none;">
+    <!-- Header with user info and filters -->
+    <div class="my-notes-header">
+      <div class="my-notes-user">
+        <img class="my-notes-avatar" id="my-notes-avatar" src="" alt="" />
+        <span class="my-notes-username" id="my-notes-username"></span>
+        <button type="button" class="my-notes-signout" id="my-notes-signout-btn" title="Sign out">
+          Sign out
+        </button>
+      </div>
+      <div class="my-notes-filters">
+        <button type="button" class="my-notes-filter active" data-filter="all">All</button>
+        <button type="button" class="my-notes-filter" data-filter="note">Notes</button>
+        <button type="button" class="my-notes-filter" data-filter="code">Snippets</button>
+      </div>
+    </div>
+
+    <!-- Notes list -->
+    <div class="my-notes-list" id="my-notes-list">
+      <div class="my-notes-loading" id="my-notes-loading">Loading your notes...</div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="my-notes-empty" id="my-notes-empty" style="display: none;">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+      </svg>
+      <p>No notes yet. Use <kbd>E</kbd> to quick capture your first note!</p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  if (typeof firebase === 'undefined' || !window.dmAuth || !window.dmDb) return;
+
+  var signinView = document.getElementById('my-notes-signin');
+  var contentView = document.getElementById('my-notes-content');
+  var signinBtn = document.getElementById('my-notes-signin-btn');
+  var signoutBtn = document.getElementById('my-notes-signout-btn');
+  var avatarEl = document.getElementById('my-notes-avatar');
+  var usernameEl = document.getElementById('my-notes-username');
+  var listEl = document.getElementById('my-notes-list');
+  var loadingEl = document.getElementById('my-notes-loading');
+  var emptyEl = document.getElementById('my-notes-empty');
+  var filterButtons = document.querySelectorAll('.my-notes-filter');
+
+  var currentFilter = 'all';
+  var allNotes = [];
+  var unsubscribe = null;
+
+  // Auth state
+  window.dmAuth.onAuthStateChanged(function(user) {
+    if (user) {
+      signinView.style.display = 'none';
+      contentView.style.display = '';
+      avatarEl.src = user.photoURL || '';
+      avatarEl.alt = user.displayName || '';
+      usernameEl.textContent = user.displayName || user.email || '';
+      subscribeToNotes(user.uid);
+    } else {
+      signinView.style.display = '';
+      contentView.style.display = 'none';
+      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+      allNotes = [];
+    }
+  });
+
+  signinBtn.addEventListener('click', function() {
+    window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+      console.error('Sign-in error:', err);
+    });
+  });
+
+  signoutBtn.addEventListener('click', function() {
+    window.dmAuth.signOut();
+  });
+
+  // Filter buttons
+  filterButtons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      filterButtons.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      currentFilter = btn.getAttribute('data-filter');
+      renderNotes();
+    });
+  });
+
+  // Subscribe to Firestore notes (real-time)
+  function subscribeToNotes(userId) {
+    if (unsubscribe) unsubscribe();
+    loadingEl.style.display = '';
+    emptyEl.style.display = 'none';
+
+    unsubscribe = window.dmDb.collection('notes')
+      .where('userId', '==', userId)
+      .orderBy('createdAt', 'desc')
+      .onSnapshot(function(snapshot) {
+        allNotes = [];
+        snapshot.forEach(function(doc) {
+          var data = doc.data();
+          data.id = doc.id;
+          allNotes.push(data);
+        });
+        loadingEl.style.display = 'none';
+        renderNotes();
+      }, function(err) {
+        console.error('Firestore read error:', err);
+        loadingEl.style.display = 'none';
+        listEl.innerHTML = '<div class="my-notes-error">Failed to load notes. Please try again.</div>';
+      });
+  }
+
+  // Render notes
+  function renderNotes() {
+    var filtered = allNotes;
+    if (currentFilter !== 'all') {
+      filtered = allNotes.filter(function(n) { return n.mode === currentFilter; });
+    }
+
+    if (filtered.length === 0) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = '';
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+    var html = '';
+
+    filtered.forEach(function(note) {
+      var date = note.createdAt ? note.createdAt.toDate() : new Date();
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var dateStr = months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear()
+                  + ' at ' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+
+      var modeLabel = note.mode === 'code'
+        ? '<span class="my-notes-tag my-notes-tag--code">' + escapeHtml(note.language || 'code') + '</span>'
+        : '<span class="my-notes-tag">' + escapeHtml(note.destination || 'note') + '</span>';
+
+      var preview = note.content || '';
+      if (preview.length > 200) preview = preview.substring(0, 200) + '...';
+
+      if (note.mode === 'code') {
+        preview = '<pre class="my-notes-code-preview"><code>' + escapeHtml(preview) + '</code></pre>';
+      } else {
+        preview = '<div class="my-notes-text-preview">' + escapeHtml(preview) + '</div>';
+      }
+
+      html += '<div class="my-notes-card" data-id="' + note.id + '">'
+            + '<div class="my-notes-card-header">'
+            + '<h4 class="my-notes-card-title">' + escapeHtml(note.title || 'Untitled') + '</h4>'
+            + '<button type="button" class="my-notes-delete" data-id="' + note.id + '" title="Delete note">'
+            + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            + '<polyline points="3 6 5 6 21 6"></polyline>'
+            + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>'
+            + '</svg>'
+            + '</button>'
+            + '</div>'
+            + '<div class="my-notes-card-meta">'
+            + '<span class="my-notes-date">' + dateStr + '</span>'
+            + modeLabel
+            + '</div>'
+            + preview
+            + '</div>';
+    });
+
+    listEl.innerHTML = html;
+
+    // Bind delete buttons
+    listEl.querySelectorAll('.my-notes-delete').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var noteId = btn.getAttribute('data-id');
+        if (confirm('Delete this note?')) {
+          window.dmDb.collection('notes').doc(noteId).delete().catch(function(err) {
+            console.error('Delete error:', err);
+            alert('Failed to delete note.');
+          });
+        }
+      });
+    });
+  }
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+})();
+</script>

@@ -136,6 +136,18 @@
   var toolbar = document.getElementById('qc-toolbar');
   var toolbarButtons = toolbar ? toolbar.querySelectorAll('.qc-toolbar-btn') : [];
 
+  // Auth elements
+  var signinBtn = document.getElementById('qc-signin');
+  var signoutBtn = document.getElementById('qc-signout');
+  var authUserEl = document.getElementById('qc-auth-user');
+  var authAvatarEl = document.getElementById('qc-auth-avatar');
+  var authNameEl = document.getElementById('qc-auth-name');
+
+  // Feedback elements
+  var feedbackEl = document.getElementById('qc-feedback');
+  var feedbackIconEl = document.getElementById('qc-feedback-icon');
+  var feedbackTextEl = document.getElementById('qc-feedback-text');
+
   // State
   var currentMode = 'note'; // 'note' or 'code'
   var selectedLang = 'kotlin';
@@ -144,6 +156,73 @@
     tag: 'inbox'
   };
   var previewTimer = null;
+  var isSaving = false;
+
+  // =========================================================================
+  // Firebase Auth
+  // =========================================================================
+  function updateAuthUI(user) {
+    if (user) {
+      signinBtn.style.display = 'none';
+      authUserEl.style.display = '';
+      authAvatarEl.src = user.photoURL || '';
+      authAvatarEl.alt = user.displayName || '';
+      authNameEl.textContent = user.displayName || user.email || '';
+    } else {
+      signinBtn.style.display = '';
+      authUserEl.style.display = 'none';
+    }
+  }
+
+  // Listen for auth state changes
+  if (window.dmAuth) {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      updateAuthUI(user);
+    });
+  }
+
+  if (signinBtn) {
+    signinBtn.addEventListener('click', function() {
+      if (!window.dmAuth || !window.dmGoogleProvider) return;
+      window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+        console.error('Sign-in error:', err);
+        showFeedback('error', 'Sign-in failed. Please try again.');
+      });
+    });
+  }
+
+  if (signoutBtn) {
+    signoutBtn.addEventListener('click', function() {
+      if (window.dmAuth) window.dmAuth.signOut();
+    });
+  }
+
+  // =========================================================================
+  // Feedback (success / error overlay)
+  // =========================================================================
+  function showFeedback(type, message) {
+    if (!feedbackEl) return;
+    feedbackEl.className = 'qc-feedback qc-feedback--' + type;
+    feedbackEl.style.display = '';
+
+    if (type === 'success') {
+      feedbackIconEl.innerHTML = '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+    } else {
+      feedbackIconEl.innerHTML = '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+    }
+    feedbackTextEl.textContent = message;
+
+    if (type === 'success') {
+      setTimeout(function() {
+        feedbackEl.style.display = 'none';
+        closeModal();
+      }, 1200);
+    } else {
+      setTimeout(function() {
+        feedbackEl.style.display = 'none';
+      }, 3000);
+    }
+  }
 
   // Slug helper: lowercase, replace non-alphanum with hyphens, collapse, trim
   function slugify(str) {
@@ -574,83 +653,71 @@
     modal.setAttribute('aria-hidden', 'true');
     titleInput.value = '';
     input.value = '';
+    isSaving = false;
+    if (feedbackEl) feedbackEl.style.display = 'none';
   }
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
   function submit() {
+    if (isSaving) return;
+
     var text = input.value.trim();
     if (!text) {
       input.focus();
       return;
     }
 
-    var now = new Date();
-    var y = now.getFullYear();
-    var mo = pad(now.getMonth() + 1);
-    var d = pad(now.getDate());
-    var h = pad(now.getHours());
-    var mi = pad(now.getMinutes());
-    var s = pad(now.getSeconds());
-
-    var timestamp = y + '-' + mo + '-' + d + '-' + h + mi + s;
-    var isoDate = y + '-' + mo + '-' + d + 'T' + h + ':' + mi + ':' + s;
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    var displayDate = months[now.getMonth()] + ' ' + now.getDate() + ', ' + y;
-
-    var userTitle = titleInput.value.trim();
-    var url;
-
-    if (currentMode === 'code') {
-      // Code snippet mode
-      var langLabel = selectedLang.charAt(0).toUpperCase() + selectedLang.slice(1);
-      var title = userTitle || (langLabel + ' Snippet - ' + displayDate);
-      var fileSlug = userTitle ? slugify(userTitle) + '-' + timestamp : 'snippet-' + timestamp;
-      var filename = fileSlug + '.md';
-
-      var content = [
-        '---',
-        'title: "' + title.replace(/"/g, '\\"') + '"',
-        'date: ' + isoDate,
-        'tags: [snippet, ' + selectedLang + ']',
-        '---',
-        '',
-        '```' + selectedLang,
-        text,
-        '```',
-        ''
-      ].join('\n');
-
-      url = 'https://github.com/paulocdf/digital-memory/new/main/content/docs/snippets/' + selectedLang
-          + '?filename=' + encodeURIComponent(filename)
-          + '&value=' + encodeURIComponent(content);
-    } else {
-      // Note mode (original behavior)
-      var headingDate = y + '-' + mo + '-' + d + ' ' + h + ':' + mi;
-      var title = userTitle || ('Quick Note - ' + displayDate);
-      var fileSlug = userTitle ? slugify(userTitle) + '-' + timestamp : 'quick-note-' + timestamp;
-      var filename = fileSlug + '.md';
-
-      var content = [
-        '---',
-        'title: "' + title.replace(/"/g, '\\"') + '"',
-        'date: ' + isoDate,
-        'tags: [' + selectedDest.tag + ']',
-        '---',
-        '',
-        '## ' + headingDate,
-        '',
-        text,
-        ''
-      ].join('\n');
-
-      url = 'https://github.com/paulocdf/digital-memory/new/main/' + selectedDest.path
-          + '?filename=' + encodeURIComponent(filename)
-          + '&value=' + encodeURIComponent(content);
+    // Check auth
+    if (!window.dmAuth || !window.dmAuth.currentUser) {
+      showFeedback('error', 'Please sign in with Google to save notes.');
+      return;
     }
 
-    window.open(url, '_blank');
-    closeModal();
+    isSaving = true;
+    submitBtn.disabled = true;
+
+    var user = window.dmAuth.currentUser;
+    var now = new Date();
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var displayDate = months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear();
+
+    var userTitle = titleInput.value.trim();
+    var noteData = {
+      userId: user.uid,
+      userEmail: user.email,
+      userName: user.displayName || '',
+      content: text,
+      mode: currentMode,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    if (currentMode === 'code') {
+      var langLabel = selectedLang.charAt(0).toUpperCase() + selectedLang.slice(1);
+      noteData.title = userTitle || (langLabel + ' Snippet - ' + displayDate);
+      noteData.language = selectedLang;
+      noteData.tags = ['snippet', selectedLang];
+      noteData.destination = 'snippets';
+    } else {
+      noteData.title = userTitle || ('Quick Note - ' + displayDate);
+      noteData.destination = selectedDest.tag;
+      noteData.tags = [selectedDest.tag];
+      noteData.language = null;
+    }
+
+    window.dmDb.collection('notes').add(noteData)
+      .then(function() {
+        isSaving = false;
+        submitBtn.disabled = false;
+        showFeedback('success', 'Note saved!');
+      })
+      .catch(function(err) {
+        console.error('Firestore write error:', err);
+        isSaving = false;
+        submitBtn.disabled = false;
+        showFeedback('error', 'Failed to save. Please try again.');
+      });
   }
 
   btn.addEventListener('click', openModal);

@@ -2058,6 +2058,143 @@ html.sidebar-collapsed {
   }
 }
 
+// Quick Capture — header layout with auth
+.qc-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+// Quick Capture — Auth UI
+.qc-auth {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.qc-auth-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: var(--surface-2);
+    border-color: var(--border-medium);
+    color: var(--body-font-color);
+  }
+}
+
+.qc-auth-user {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.qc-auth-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+}
+
+.qc-auth-name {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qc-auth-signout {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: all 0.12s ease;
+
+  &:hover {
+    background: var(--surface-2);
+    color: var(--text-secondary);
+  }
+}
+
+// Quick Capture — Feedback overlay
+.qc-feedback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: var(--surface-bg);
+  border-radius: 12px;
+  z-index: 10;
+  animation: qc-feedback-in 0.2s ease;
+}
+
+.qc-feedback--success {
+  .qc-feedback-icon {
+    color: #34a853;
+  }
+  .qc-feedback-text {
+    color: #34a853;
+  }
+}
+
+.qc-feedback--error {
+  .qc-feedback-icon {
+    color: #ea4335;
+  }
+  .qc-feedback-text {
+    color: #ea4335;
+  }
+}
+
+.qc-feedback-icon {
+  line-height: 0;
+}
+
+.qc-feedback-text {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+@keyframes qc-feedback-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 // Override theme's big-screen extra padding (we handle it above)
 @media screen and (min-width: 82rem) {
   .book-page {
@@ -2417,5 +2554,292 @@ html.sidebar-collapsed {
         top: -1px;
       }
     }
+  }
+}
+
+// =============================================================================
+// My Notes — dynamic notes page (Firestore-backed)
+// =============================================================================
+
+// Sign-in view
+.my-notes-signin {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+}
+
+.my-notes-signin-card {
+  text-align: center;
+  padding: 2.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: var(--surface-1);
+  max-width: 360px;
+
+  .my-notes-signin-icon {
+    color: var(--text-faint);
+    margin-bottom: 1rem;
+  }
+
+  h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.1rem;
+    color: var(--body-font-color);
+  }
+
+  p {
+    margin: 0 0 1.5rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+  }
+}
+
+.my-notes-google-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1.25rem;
+  border: 1px solid var(--border-medium);
+  border-radius: 8px;
+  background: var(--surface-bg);
+  color: var(--body-font-color);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--surface-1);
+    box-shadow: 0 2px 8px var(--shadow-color);
+  }
+}
+
+// Header with user info + filters
+.my-notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.my-notes-user {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.my-notes-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+}
+
+.my-notes-username {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--body-font-color);
+}
+
+.my-notes-signout {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-faint);
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.12s ease;
+
+  &:hover {
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    border-color: var(--border-medium);
+  }
+}
+
+.my-notes-filters {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.my-notes-filter {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+
+  &:hover {
+    background: var(--surface-1);
+  }
+
+  &.active {
+    background: var(--accent-blue);
+    color: #fff;
+    border-color: var(--accent-blue);
+  }
+}
+
+// Notes list
+.my-notes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.my-notes-loading,
+.my-notes-error {
+  text-align: center;
+  padding: 2rem;
+  font-size: 0.85rem;
+  color: var(--text-faint);
+}
+
+.my-notes-error {
+  color: #ea4335;
+}
+
+.my-notes-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-faint);
+
+  svg {
+    margin-bottom: 0.75rem;
+  }
+
+  p {
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    font-family: inherit;
+    font-size: 0.75rem;
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    color: var(--text-secondary);
+  }
+}
+
+// Note cards
+.my-notes-card {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  background: var(--surface-1);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    border-color: var(--border-medium);
+    box-shadow: 0 2px 8px var(--shadow-color);
+  }
+}
+
+.my-notes-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.my-notes-card-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+  line-height: 1.3;
+}
+
+.my-notes-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.12s ease;
+
+  &:hover {
+    background: rgba(234, 67, 53, 0.1);
+    color: #ea4335;
+  }
+}
+
+.my-notes-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.35rem;
+  margin-bottom: 0.6rem;
+}
+
+.my-notes-date {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
+.my-notes-tag {
+  display: inline-block;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 500;
+  border-radius: 4px;
+  background: var(--surface-2);
+  color: var(--text-secondary);
+  text-transform: capitalize;
+}
+
+.my-notes-tag--code {
+  background: rgba(25, 118, 210, 0.1);
+  color: var(--accent-blue);
+}
+
+.my-notes-text-preview {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.my-notes-code-preview {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 6px;
+  background: var(--pre-bg);
+  border: 1px solid var(--code-border);
+  overflow-x: auto;
+
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.78rem;
+    line-height: 1.5;
+    color: var(--body-font-color);
+    background: none;
+    border: none;
+    padding: 0;
   }
 }
