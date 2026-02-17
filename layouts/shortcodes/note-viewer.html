@@ -297,6 +297,13 @@
       }
     });
 
+    // Enable interactive checkboxes
+    if (window.dmEnableCheckboxes) {
+      window.dmEnableCheckboxes(bodyEl, note, function(updated) {
+        // Checkbox already toggled visually; no re-render needed
+      });
+    }
+
     // Fire event so dynamic ToC can be built
     window.dispatchEvent(new CustomEvent('dm-content-rendered'));
 

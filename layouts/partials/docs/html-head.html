@@ -82,6 +82,60 @@
     gfm: true,
     breaks: false
   });
+
+  /**
+   * Enable interactive checkboxes in rendered markdown.
+   * Removes `disabled` from task list checkboxes and wires up click handlers
+   * that toggle `- [ ]` / `- [x]` in the raw note content, then persist.
+   *
+   * @param {Element} bodyEl — container with rendered HTML
+   * @param {Object}  note   — note object with .id and .content
+   * @param {Function} onUpdate(updatedNote) — called after successful save
+   */
+  window.dmEnableCheckboxes = function(bodyEl, note, onUpdate) {
+    if (!bodyEl || !note) return;
+    var checkboxes = bodyEl.querySelectorAll('li > input[type="checkbox"][disabled]');
+    if (!checkboxes.length) return;
+
+    checkboxes.forEach(function(cb, idx) {
+      cb.removeAttribute('disabled');
+      cb.style.cursor = 'pointer';
+
+      cb.addEventListener('change', function() {
+        var raw = note.content || '';
+        var cbIndex = 0;
+        var newContent = raw.replace(/^([-*]\s+\[)([ xX])(\]\s+)/gm, function(match, pre, check, post) {
+          if (cbIndex === idx) {
+            cbIndex++;
+            return pre + (check === ' ' ? 'x' : ' ') + post;
+          }
+          cbIndex++;
+          return match;
+        });
+
+        if (newContent === raw) return; // nothing changed
+
+        note.content = newContent;
+        note.updatedAt = Date.now();
+
+        // Persist to Firestore + IndexedDB
+        if (window.dmDb && window.dmSync) {
+          window.dmDb.collection('notes').doc(note.id).update({
+            content: newContent,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function() {
+            return window.dmSync.putNote(note);
+          }).then(function() {
+            if (onUpdate) onUpdate(note);
+          }).catch(function(err) {
+            console.error('Checkbox save error:', err);
+            // Revert the checkbox visually
+            cb.checked = !cb.checked;
+          });
+        }
+      });
+    });
+  };
 })();
 </script>
 
