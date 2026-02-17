@@ -1312,7 +1312,10 @@
     });
 
     if (!headingMap.length) return;
-    update();
+    // Defer initial highlight so the browser has computed layout positions
+    requestAnimationFrame(function() {
+      requestAnimationFrame(update);
+    });
   }
 
   function update() {
@@ -1326,20 +1329,25 @@
       progressBar.style.setProperty('--progress', (progress * 100) + '%');
     }
 
-    // Scroll spy
+    // Scroll spy — find the heading closest to (but above) the current scroll position
     var scrollPos = window.scrollY || document.documentElement.scrollTop;
     var offset = 80;
     var activeHeading = null;
 
-    for (var i = headingMap.length - 1; i >= 0; i--) {
-      if (headingMap[i].el.offsetTop <= scrollPos + offset) {
-        activeHeading = headingMap[i];
-        break;
+    // If at or near the top of the page, always highlight the first heading
+    if (scrollPos <= offset) {
+      activeHeading = headingMap.length > 0 ? headingMap[0] : null;
+    } else {
+      for (var i = headingMap.length - 1; i >= 0; i--) {
+        if (headingMap[i].el.offsetTop <= scrollPos + offset) {
+          activeHeading = headingMap[i];
+          break;
+        }
       }
-    }
 
-    if (!activeHeading && headingMap.length > 0) {
-      activeHeading = headingMap[0];
+      if (!activeHeading && headingMap.length > 0) {
+        activeHeading = headingMap[0];
+      }
     }
 
     tocLinks.forEach(function(link) {
