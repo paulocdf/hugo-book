@@ -1658,6 +1658,16 @@ html.sidebar-collapsed {
   padding: 1.75rem;
   box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
   animation: qc-slide-in 0.2s ease-out;
+  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  // Expanded layout for Code mode
+  &.code-mode {
+    max-width: 680px;
+
+    .quick-capture-input {
+      min-height: 220px;
+    }
+  }
 }
 
 @keyframes qc-slide-in {
@@ -1895,7 +1905,7 @@ html.sidebar-collapsed {
   font-size: 0.9rem;
   line-height: 1.6;
   resize: vertical;
-  transition: border-color 0.2s ease, background 0.2s ease;
+  transition: border-color 0.2s ease, background 0.2s ease, min-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:focus {
     outline: none;

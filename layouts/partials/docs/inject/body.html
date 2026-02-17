@@ -130,6 +130,7 @@
   var langRow = document.getElementById('qc-language-row');
   var previewWrapper = document.getElementById('qc-preview-wrapper');
   var previewPanel = document.getElementById('qc-preview-panel');
+  var dialog = modal.querySelector('.quick-capture-dialog');
 
   // State
   var currentMode = 'note'; // 'note' or 'code'
@@ -317,6 +318,7 @@
         langRow.style.display = '';
         previewWrapper.style.display = '';
         input.classList.add('code-mode');
+        dialog.classList.add('code-mode');
         input.placeholder = 'Paste or type your code here...';
         updatePreview();
       } else {
@@ -324,6 +326,7 @@
         langRow.style.display = 'none';
         previewWrapper.style.display = 'none';
         input.classList.remove('code-mode');
+        dialog.classList.remove('code-mode');
         input.placeholder = "What's on your mind?";
       }
     });
@@ -361,6 +364,7 @@
     langButtons.forEach(function(b) { b.classList.remove('active'); });
     langButtons[0].classList.add('active');
     input.classList.remove('code-mode');
+    dialog.classList.remove('code-mode');
     input.placeholder = "What's on your mind?";
 
     modal.classList.add('active');
