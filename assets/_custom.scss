@@ -3228,3 +3228,111 @@ html.sidebar-collapsed {
   border-radius: 6px;
   margin-bottom: 0.5rem;
 }
+
+// Clickable cursor for diagrams that have rendered SVGs
+.dm-diagram-rendered,
+.dm-diagram {
+  &:has(svg) {
+    cursor: zoom-in;
+  }
+}
+
+// ===================================
+// Diagram Lightbox (pan + zoom)
+// ===================================
+
+.dm-lightbox {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.92);
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.dm-lightbox-open {
+  display: flex;
+}
+
+.dm-lightbox-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  background: rgba(0, 0, 0, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.dm-lightbox-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 0.6rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.4);
+  }
+
+  &:active {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+.dm-lightbox-close {
+  margin-left: auto;
+  font-size: 1.3rem;
+  font-weight: 400;
+}
+
+.dm-lightbox-zoom-label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 3rem;
+  text-align: center;
+}
+
+.dm-lightbox-canvas {
+  flex: 1;
+  overflow: hidden;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.dm-lightbox-svg-wrap {
+  transform-origin: center center;
+  background: #fff;
+  border-radius: 8px;
+  padding: 2rem;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
+  max-width: 90vw;
+  max-height: 85vh;
+
+  svg {
+    display: block;
+    max-width: 100%;
+    max-height: 80vh;
+    height: auto;
+  }
+}

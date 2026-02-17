@@ -261,6 +261,195 @@
     });
   };
 
+  // --- Diagram Lightbox (pan + zoom) ---
+  (function() {
+    var overlay, svgWrap, currentTransform;
+    var MIN_SCALE = 0.25, MAX_SCALE = 5, ZOOM_STEP = 0.25;
+
+    function createOverlay() {
+      if (overlay) return;
+      overlay = document.createElement('div');
+      overlay.className = 'dm-lightbox';
+      overlay.innerHTML =
+        '<div class="dm-lightbox-toolbar">' +
+          '<button class="dm-lightbox-btn" data-action="zoom-in" title="Zoom in">+</button>' +
+          '<span class="dm-lightbox-zoom-label">100%</span>' +
+          '<button class="dm-lightbox-btn" data-action="zoom-out" title="Zoom out">&minus;</button>' +
+          '<button class="dm-lightbox-btn" data-action="reset" title="Reset view">Reset</button>' +
+          '<button class="dm-lightbox-btn dm-lightbox-close" data-action="close" title="Close (Esc)">&times;</button>' +
+        '</div>' +
+        '<div class="dm-lightbox-canvas">' +
+          '<div class="dm-lightbox-svg-wrap"></div>' +
+        '</div>';
+      document.body.appendChild(overlay);
+
+      svgWrap = overlay.querySelector('.dm-lightbox-svg-wrap');
+      var canvas = overlay.querySelector('.dm-lightbox-canvas');
+
+      // Button actions
+      overlay.querySelector('.dm-lightbox-toolbar').addEventListener('click', function(e) {
+        var btn = e.target.closest('[data-action]');
+        if (!btn) return;
+        var action = btn.getAttribute('data-action');
+        if (action === 'close') closeLightbox();
+        else if (action === 'zoom-in') zoom(ZOOM_STEP);
+        else if (action === 'zoom-out') zoom(-ZOOM_STEP);
+        else if (action === 'reset') resetTransform();
+      });
+
+      // Close on backdrop click
+      canvas.addEventListener('click', function(e) {
+        if (e.target === canvas) closeLightbox();
+      });
+
+      // Close on Escape
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay.classList.contains('dm-lightbox-open')) {
+          closeLightbox();
+        }
+      });
+
+      // Mouse wheel zoom
+      canvas.addEventListener('wheel', function(e) {
+        e.preventDefault();
+        var delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
+        zoom(delta);
+      }, { passive: false });
+
+      // Pan with mouse drag
+      var dragging = false, startX, startY, startTx, startTy;
+
+      svgWrap.addEventListener('mousedown', function(e) {
+        if (e.button !== 0) return;
+        dragging = true;
+        startX = e.clientX; startY = e.clientY;
+        startTx = currentTransform.x; startTy = currentTransform.y;
+        svgWrap.style.cursor = 'grabbing';
+        e.preventDefault();
+      });
+
+      document.addEventListener('mousemove', function(e) {
+        if (!dragging) return;
+        currentTransform.x = startTx + (e.clientX - startX);
+        currentTransform.y = startTy + (e.clientY - startY);
+        applyTransform();
+      });
+
+      document.addEventListener('mouseup', function() {
+        if (dragging) {
+          dragging = false;
+          svgWrap.style.cursor = 'grab';
+        }
+      });
+
+      // Touch: pinch-to-zoom + pan
+      var lastTouchDist = 0, lastTouchCenter = null;
+      canvas.addEventListener('touchstart', function(e) {
+        if (e.touches.length === 2) {
+          lastTouchDist = touchDist(e.touches);
+          lastTouchCenter = touchCenter(e.touches);
+          e.preventDefault();
+        } else if (e.touches.length === 1) {
+          dragging = true;
+          startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+          startTx = currentTransform.x; startTy = currentTransform.y;
+        }
+      }, { passive: false });
+
+      canvas.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 2 && lastTouchDist) {
+          e.preventDefault();
+          var newDist = touchDist(e.touches);
+          var ratio = newDist / lastTouchDist;
+          currentTransform.scale = clampScale(currentTransform.scale * ratio);
+          lastTouchDist = newDist;
+          applyTransform();
+        } else if (e.touches.length === 1 && dragging) {
+          currentTransform.x = startTx + (e.touches[0].clientX - startX);
+          currentTransform.y = startTy + (e.touches[0].clientY - startY);
+          applyTransform();
+        }
+      }, { passive: false });
+
+      canvas.addEventListener('touchend', function() {
+        dragging = false;
+        lastTouchDist = 0;
+      });
+    }
+
+    function touchDist(touches) {
+      var dx = touches[0].clientX - touches[1].clientX;
+      var dy = touches[0].clientY - touches[1].clientY;
+      return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    function touchCenter(touches) {
+      return {
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2
+      };
+    }
+
+    function clampScale(s) {
+      return Math.max(MIN_SCALE, Math.min(MAX_SCALE, s));
+    }
+
+    function resetTransform() {
+      currentTransform = { x: 0, y: 0, scale: 1 };
+      applyTransform();
+    }
+
+    function zoom(delta) {
+      currentTransform.scale = clampScale(currentTransform.scale + delta);
+      applyTransform();
+    }
+
+    function applyTransform() {
+      svgWrap.style.transform = 'translate(' + currentTransform.x + 'px, ' + currentTransform.y + 'px) scale(' + currentTransform.scale + ')';
+      var label = overlay.querySelector('.dm-lightbox-zoom-label');
+      if (label) label.textContent = Math.round(currentTransform.scale * 100) + '%';
+    }
+
+    function openLightbox(svgHtml) {
+      createOverlay();
+      svgWrap.innerHTML = svgHtml;
+      // Remove fixed dimensions from the lightbox SVG so it fills the viewport
+      var svgEl = svgWrap.querySelector('svg');
+      if (svgEl) {
+        svgEl.removeAttribute('width');
+        svgEl.removeAttribute('height');
+        var s = svgEl.getAttribute('style') || '';
+        s = s.replace(/width:\s*[^;]+;?/gi, '').replace(/height:\s*[^;]+;?/gi, '');
+        if (s.trim()) svgEl.setAttribute('style', s); else svgEl.removeAttribute('style');
+      }
+      resetTransform();
+      overlay.classList.add('dm-lightbox-open');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      if (!overlay) return;
+      overlay.classList.remove('dm-lightbox-open');
+      document.body.style.overflow = '';
+      svgWrap.innerHTML = '';
+    }
+
+    // Expose globally so click handlers can use it
+    window.dmDiagramLightbox = { open: openLightbox, close: closeLightbox };
+
+    // Delegate click on rendered diagrams
+    document.addEventListener('click', function(e) {
+      var diagram = e.target.closest('.dm-diagram-rendered');
+      if (!diagram) {
+        // Also handle mermaid diagrams
+        diagram = e.target.closest('.dm-diagram');
+        if (!diagram || !diagram.querySelector('svg')) return;
+      }
+      var svg = diagram.querySelector('svg');
+      if (svg) openLightbox(svg.outerHTML);
+    });
+  })();
+
   /**
    * Enable interactive checkboxes in rendered markdown.
    * Removes `disabled` from task list checkboxes and wires up click handlers
