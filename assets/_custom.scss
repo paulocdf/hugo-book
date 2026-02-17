@@ -2201,7 +2201,7 @@ html.sidebar-collapsed {
 // Quick Capture — live code preview panel
 // =============================================================================
 .qc-preview-wrapper {
-  display: none; // hidden in Note mode, shown in Code mode via JS
+  // visibility controlled via inline style + JS (same pattern as #qc-language-row)
   margin-top: 0.5rem;
   margin-bottom: 0.25rem;
 }
