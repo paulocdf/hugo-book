@@ -79,6 +79,15 @@
     <input type="text" id="qc-title-input" class="qc-title-input" placeholder="Title (optional, auto-generated if empty)" maxlength="120" />
 
     <textarea id="quick-capture-input" class="quick-capture-input" placeholder="What's on your mind?" rows="5"></textarea>
+
+    <!-- Live code preview (Code mode only) -->
+    <div class="qc-preview-wrapper" id="qc-preview-wrapper">
+      <span class="qc-preview-label">Preview</span>
+      <div class="qc-preview-panel" id="qc-preview-panel">
+        <div class="qc-preview-empty">Start typing to see highlighted preview...</div>
+      </div>
+    </div>
+
     <div class="quick-capture-actions">
       <button type="button" class="qc-btn qc-btn-cancel" id="qc-cancel">Cancel</button>
       <button type="button" class="qc-btn qc-btn-submit" id="qc-submit">

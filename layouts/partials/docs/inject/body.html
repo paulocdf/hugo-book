@@ -128,6 +128,8 @@
   var langButtons = document.querySelectorAll('.qc-lang-btn');
   var destRow = document.getElementById('qc-destination-row');
   var langRow = document.getElementById('qc-language-row');
+  var previewWrapper = document.getElementById('qc-preview-wrapper');
+  var previewPanel = document.getElementById('qc-preview-panel');
 
   // State
   var currentMode = 'note'; // 'note' or 'code'
@@ -136,6 +138,7 @@
     path: 'content/docs/inbox',
     tag: 'inbox'
   };
+  var previewTimer = null;
 
   // Slug helper: lowercase, replace non-alphanum with hyphens, collapse, trim
   function slugify(str) {
@@ -144,6 +147,161 @@
       .replace(/^-+|-+$/g, '')
       .substring(0, 60);
   }
+
+  // =========================================================================
+  // Mini syntax highlighter — outputs <span> with Chroma-compatible classes
+  // Covers keywords, strings, comments, numbers, and functions for our 8 langs.
+  // =========================================================================
+  var langKeywords = {
+    kotlin: /\b(fun|val|var|class|object|interface|if|else|when|for|while|do|return|break|continue|import|package|is|as|in|null|true|false|this|super|throw|try|catch|finally|typealias|companion|data|sealed|enum|open|abstract|override|private|public|protected|internal|inline|suspend|lateinit|by|init|constructor|get|set|it)\b/g,
+    bash: /\b(if|then|else|elif|fi|for|while|do|done|case|esac|function|return|in|select|until|local|export|source|alias|unalias|readonly|declare|typeset|set|unset|shift|trap|exec|eval|exit|echo|printf|read|test|true|false)\b/g,
+    sql: /\b(SELECT|FROM|WHERE|INSERT|INTO|UPDATE|SET|DELETE|CREATE|DROP|ALTER|TABLE|INDEX|VIEW|JOIN|INNER|LEFT|RIGHT|OUTER|CROSS|ON|AND|OR|NOT|IN|IS|NULL|AS|ORDER|BY|GROUP|HAVING|LIMIT|OFFSET|UNION|ALL|EXISTS|BETWEEN|LIKE|DISTINCT|COUNT|SUM|AVG|MIN|MAX|CASE|WHEN|THEN|ELSE|END|VALUES|PRIMARY|KEY|FOREIGN|REFERENCES|DEFAULT|CONSTRAINT|UNIQUE|CHECK|CASCADE|TRIGGER|FUNCTION|PROCEDURE|BEGIN|COMMIT|ROLLBACK|GRANT|REVOKE|WITH|RECURSIVE|RETURNING|COALESCE|CAST|NULLIF|select|from|where|insert|into|update|set|delete|create|drop|alter|table|index|view|join|inner|left|right|outer|cross|on|and|or|not|in|is|null|as|order|by|group|having|limit|offset|union|all|exists|between|like|distinct|count|sum|avg|min|max|case|when|then|else|end|values|primary|key|foreign|references|default|constraint|unique|check|cascade|trigger|function|procedure|begin|commit|rollback|grant|revoke|with|recursive|returning|coalesce|cast|nullif)\b/g,
+    ruby: /\b(def|end|class|module|if|elsif|else|unless|while|until|for|do|begin|rescue|ensure|raise|return|yield|require|include|extend|attr_accessor|attr_reader|attr_writer|puts|print|nil|true|false|self|super|then|and|or|not|in|case|when|lambda|proc|block_given)\b/g,
+    python: /\b(def|class|if|elif|else|for|while|return|import|from|as|try|except|finally|raise|with|yield|lambda|pass|break|continue|and|or|not|in|is|None|True|False|self|print|async|await|global|nonlocal|assert|del)\b/g,
+    go: /\b(func|package|import|var|const|type|struct|interface|map|chan|range|if|else|for|switch|case|default|select|break|continue|return|go|defer|fallthrough|nil|true|false|make|new|len|cap|append|copy|delete|close|panic|recover|error|string|int|int8|int16|int32|int64|uint|float32|float64|bool|byte|rune)\b/g,
+    javascript: /\b(function|var|let|const|if|else|for|while|do|switch|case|default|break|continue|return|class|extends|new|this|super|import|export|from|as|try|catch|finally|throw|async|await|yield|typeof|instanceof|in|of|delete|void|null|undefined|true|false|console|window|document|NaN|Infinity|require|module|Promise|Map|Set|Symbol|Array|Object|RegExp)\b/g,
+    yaml: /\b(true|false|null|yes|no|on|off)\b/g
+  };
+
+  var langComments = {
+    kotlin:     { line: '//', block: ['/\\*', '\\*/'] },
+    bash:       { line: '#', block: null },
+    sql:        { line: '--', block: ['/\\*', '\\*/'] },
+    ruby:       { line: '#', block: ['=begin', '=end'] },
+    python:     { line: '#', block: null },
+    go:         { line: '//', block: ['/\\*', '\\*/'] },
+    javascript: { line: '//', block: ['/\\*', '\\*/'] },
+    yaml:       { line: '#', block: null }
+  };
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function highlightCode(code, lang) {
+    if (!code) return '';
+
+    // Tokenize: we process the string linearly to avoid overlapping matches.
+    // Tokens: { start, end, cls }
+    var tokens = [];
+    var src = code;
+
+    // 1) Strings (double-quoted, single-quoted, backtick for JS)
+    var strPatterns = lang === 'python'
+      ? [/"""[\s\S]*?"""/g, /'''[\s\S]*?'''/g, /"(?:[^"\\]|\\.)*"/g, /'(?:[^'\\]|\\.)*'/g]
+      : lang === 'javascript'
+      ? [/"(?:[^"\\]|\\.)*"/g, /'(?:[^'\\]|\\.)*'/g, /`(?:[^`\\]|\\.)*`/g]
+      : [/"(?:[^"\\]|\\.)*"/g, /'(?:[^'\\]|\\.)*'/g];
+
+    strPatterns.forEach(function(re) {
+      var m;
+      while ((m = re.exec(src)) !== null) {
+        tokens.push({ start: m.index, end: m.index + m[0].length, cls: 's' });
+      }
+    });
+
+    // 2) Comments
+    var cmt = langComments[lang];
+    if (cmt) {
+      if (cmt.line) {
+        var lineRe = new RegExp(cmt.line.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '.*', 'gm');
+        var m;
+        while ((m = lineRe.exec(src)) !== null) {
+          tokens.push({ start: m.index, end: m.index + m[0].length, cls: 'c1' });
+        }
+      }
+      if (cmt.block) {
+        var blockRe = new RegExp(cmt.block[0] + '[\\s\\S]*?' + cmt.block[1], 'g');
+        var m;
+        while ((m = blockRe.exec(src)) !== null) {
+          tokens.push({ start: m.index, end: m.index + m[0].length, cls: 'cm' });
+        }
+      }
+    }
+
+    // 3) Numbers
+    var numRe = /\b(?:0[xX][0-9a-fA-F]+|0[bB][01]+|0[oO][0-7]+|\d+\.?\d*(?:[eE][+-]?\d+)?)\b/g;
+    var m;
+    while ((m = numRe.exec(src)) !== null) {
+      tokens.push({ start: m.index, end: m.index + m[0].length, cls: 'mi' });
+    }
+
+    // Sort tokens by start, then by length descending (longer wins)
+    tokens.sort(function(a, b) { return a.start - b.start || (b.end - b.start) - (a.end - a.start); });
+
+    // Remove overlapping tokens (first one wins)
+    var filtered = [];
+    var lastEnd = 0;
+    tokens.forEach(function(t) {
+      if (t.start >= lastEnd) {
+        filtered.push(t);
+        lastEnd = t.end;
+      }
+    });
+
+    // Build output: interleave plain text (with keyword highlighting) and tokens
+    var out = '';
+    var pos = 0;
+
+    function highlightKeywords(text) {
+      var kwRe = langKeywords[lang];
+      if (!kwRe) return escapeHtml(text);
+      // Reset regex
+      kwRe.lastIndex = 0;
+      var result = '';
+      var last = 0;
+      var km;
+      while ((km = kwRe.exec(text)) !== null) {
+        result += escapeHtml(text.slice(last, km.index));
+        result += '<span class="k">' + escapeHtml(km[0]) + '</span>';
+        last = km.index + km[0].length;
+      }
+      result += escapeHtml(text.slice(last));
+
+      // Also highlight function calls: word followed by (
+      result = result.replace(/\b([a-zA-Z_]\w*)(\()/g, function(match, name, paren) {
+        // Don't re-wrap already-wrapped keywords
+        if (match.indexOf('<span') !== -1) return match;
+        return '<span class="nf">' + name + '</span>' + paren;
+      });
+
+      return result;
+    }
+
+    filtered.forEach(function(t) {
+      if (t.start > pos) {
+        out += highlightKeywords(src.slice(pos, t.start));
+      }
+      out += '<span class="' + t.cls + '">' + escapeHtml(src.slice(t.start, t.end)) + '</span>';
+      pos = t.end;
+    });
+    if (pos < src.length) {
+      out += highlightKeywords(src.slice(pos));
+    }
+
+    return out;
+  }
+
+  function updatePreview() {
+    if (currentMode !== 'code' || !previewPanel) return;
+    var code = input.value;
+    if (!code.trim()) {
+      previewPanel.innerHTML = '<div class="qc-preview-empty">Start typing to see highlighted preview...</div>';
+      return;
+    }
+    var highlighted = highlightCode(code, selectedLang);
+    previewPanel.innerHTML = '<pre class="chroma"><code>' + highlighted + '</code></pre>';
+  }
+
+  function schedulePreview() {
+    if (previewTimer) clearTimeout(previewTimer);
+    previewTimer = setTimeout(updatePreview, 150);
+  }
+
+  // Listen for input on textarea
+  input.addEventListener('input', function() {
+    if (currentMode === 'code') schedulePreview();
+  });
 
   // Mode toggle
   modeButtons.forEach(function(mbtn) {
@@ -157,11 +315,14 @@
       if (mode === 'code') {
         destRow.style.display = 'none';
         langRow.style.display = '';
+        previewWrapper.style.display = '';
         input.classList.add('code-mode');
         input.placeholder = 'Paste or type your code here...';
+        updatePreview();
       } else {
         destRow.style.display = '';
         langRow.style.display = 'none';
+        previewWrapper.style.display = 'none';
         input.classList.remove('code-mode');
         input.placeholder = "What's on your mind?";
       }
@@ -184,6 +345,7 @@
       langButtons.forEach(function(b) { b.classList.remove('active'); });
       lbtn.classList.add('active');
       selectedLang = lbtn.getAttribute('data-lang');
+      updatePreview();
     });
   });
 
@@ -195,6 +357,7 @@
     modeButtons[0].classList.add('active');
     destRow.style.display = '';
     langRow.style.display = 'none';
+    previewWrapper.style.display = 'none';
     langButtons.forEach(function(b) { b.classList.remove('active'); });
     langButtons[0].classList.add('active');
     input.classList.remove('code-mode');
@@ -204,6 +367,7 @@
     modal.setAttribute('aria-hidden', 'false');
     titleInput.value = '';
     input.value = '';
+    if (previewPanel) previewPanel.innerHTML = '<div class="qc-preview-empty">Start typing to see highlighted preview...</div>';
     titleInput.focus();
   }
 

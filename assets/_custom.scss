@@ -195,6 +195,22 @@ body {
     }
   }
 
+  // Hugo Chroma syntax highlighting wrapper
+  .highlight {
+    margin: 1rem 0;
+
+    pre {
+      margin: 0;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+
+    // Reset code inside Chroma — token colors come from .chroma classes
+    pre code {
+      color: inherit;
+    }
+  }
+
   // Blockquotes
   blockquote {
     border-inline-start: 3px solid var(--accent-blue);
@@ -2030,5 +2046,210 @@ html.sidebar-collapsed {
   .view-toggle-btn {
     width: 36px;
     height: 36px;
+  }
+}
+
+// =============================================================================
+// Chroma syntax highlighting — light theme (GitHub style)
+// =============================================================================
+[data-theme="light"] {
+  .chroma { background-color: var(--pre-bg); }
+  .chroma .err { color: #a61717; background-color: #e3d2d2; }
+  .chroma .lnlinks { outline: none; text-decoration: none; color: inherit; }
+  .chroma .lntd { vertical-align: top; padding: 0; margin: 0; border: 0; }
+  .chroma .lntable { border-spacing: 0; padding: 0; margin: 0; border: 0; }
+  .chroma .hl { background-color: #e5e5e5; }
+  .chroma .lnt,
+  .chroma .ln { white-space: pre; user-select: none; margin-right: 0.4em; padding: 0 0.4em; color: #7f7f7f; }
+  .chroma .line { display: flex; }
+  .chroma .k { color: #000; font-weight: bold; }
+  .chroma .kc { color: #000; font-weight: bold; }
+  .chroma .kd { color: #000; font-weight: bold; }
+  .chroma .kn { color: #000; font-weight: bold; }
+  .chroma .kp { color: #000; font-weight: bold; }
+  .chroma .kr { color: #000; font-weight: bold; }
+  .chroma .kt { color: #458; font-weight: bold; }
+  .chroma .na { color: #008080; }
+  .chroma .nb { color: #0086b3; }
+  .chroma .bp { color: #999; }
+  .chroma .nc { color: #458; font-weight: bold; }
+  .chroma .no { color: #008080; }
+  .chroma .nd { color: #3c5d5d; font-weight: bold; }
+  .chroma .ni { color: #800080; }
+  .chroma .ne { color: #900; font-weight: bold; }
+  .chroma .nf { color: #900; font-weight: bold; }
+  .chroma .nl { color: #900; font-weight: bold; }
+  .chroma .nn { color: #555; }
+  .chroma .nt { color: #000080; }
+  .chroma .nv { color: #008080; }
+  .chroma .vc { color: #008080; }
+  .chroma .vg { color: #008080; }
+  .chroma .vi { color: #008080; }
+  .chroma .s { color: #d14; }
+  .chroma .sa { color: #d14; }
+  .chroma .sb { color: #d14; }
+  .chroma .sc { color: #d14; }
+  .chroma .dl { color: #d14; }
+  .chroma .sd { color: #d14; }
+  .chroma .s2 { color: #d14; }
+  .chroma .se { color: #d14; }
+  .chroma .sh { color: #d14; }
+  .chroma .si { color: #d14; }
+  .chroma .sx { color: #d14; }
+  .chroma .sr { color: #009926; }
+  .chroma .s1 { color: #d14; }
+  .chroma .ss { color: #990073; }
+  .chroma .m { color: #099; }
+  .chroma .mb { color: #099; }
+  .chroma .mf { color: #099; }
+  .chroma .mh { color: #099; }
+  .chroma .mi { color: #099; }
+  .chroma .il { color: #099; }
+  .chroma .mo { color: #099; }
+  .chroma .o { color: #000; font-weight: bold; }
+  .chroma .ow { color: #000; font-weight: bold; }
+  .chroma .c { color: #998; font-style: italic; }
+  .chroma .ch { color: #998; font-style: italic; }
+  .chroma .cm { color: #998; font-style: italic; }
+  .chroma .c1 { color: #998; font-style: italic; }
+  .chroma .cs { color: #999; font-weight: bold; font-style: italic; }
+  .chroma .cp { color: #999; font-weight: bold; font-style: italic; }
+  .chroma .cpf { color: #999; font-weight: bold; font-style: italic; }
+  .chroma .gd { color: #000; background-color: #fdd; }
+  .chroma .ge { color: #000; font-style: italic; }
+  .chroma .gr { color: #a00; }
+  .chroma .gh { color: #999; }
+  .chroma .gi { color: #000; background-color: #dfd; }
+  .chroma .go { color: #888; }
+  .chroma .gp { color: #555; }
+  .chroma .gs { font-weight: bold; }
+  .chroma .gu { color: #aaa; }
+  .chroma .gt { color: #a00; }
+  .chroma .gl { text-decoration: underline; }
+  .chroma .w { color: #bbb; }
+}
+
+// =============================================================================
+// Chroma syntax highlighting — dark theme (Dracula style)
+// =============================================================================
+[data-theme="dark"] {
+  .chroma { color: #f8f8f2; background-color: var(--pre-bg); }
+  .chroma .lnlinks { outline: none; text-decoration: none; color: inherit; }
+  .chroma .lntd { vertical-align: top; padding: 0; margin: 0; border: 0; }
+  .chroma .lntable { border-spacing: 0; padding: 0; margin: 0; border: 0; }
+  .chroma .hl { background-color: #3d3f4a; }
+  .chroma .lnt,
+  .chroma .ln { white-space: pre; user-select: none; margin-right: 0.4em; padding: 0 0.4em; color: #7f7f7f; }
+  .chroma .line { display: flex; }
+  .chroma .k { color: #ff79c6; }
+  .chroma .kc { color: #ff79c6; }
+  .chroma .kd { color: #8be9fd; font-style: italic; }
+  .chroma .kn { color: #ff79c6; }
+  .chroma .kp { color: #ff79c6; }
+  .chroma .kr { color: #ff79c6; }
+  .chroma .kt { color: #8be9fd; }
+  .chroma .na { color: #50fa7b; }
+  .chroma .nb { color: #8be9fd; font-style: italic; }
+  .chroma .nc { color: #50fa7b; }
+  .chroma .nf { color: #50fa7b; }
+  .chroma .nl { color: #8be9fd; font-style: italic; }
+  .chroma .nt { color: #ff79c6; }
+  .chroma .nv { color: #8be9fd; font-style: italic; }
+  .chroma .vc { color: #8be9fd; font-style: italic; }
+  .chroma .vg { color: #8be9fd; font-style: italic; }
+  .chroma .vi { color: #8be9fd; font-style: italic; }
+  .chroma .s { color: #f1fa8c; }
+  .chroma .sa { color: #f1fa8c; }
+  .chroma .sb { color: #f1fa8c; }
+  .chroma .sc { color: #f1fa8c; }
+  .chroma .dl { color: #f1fa8c; }
+  .chroma .sd { color: #f1fa8c; }
+  .chroma .s2 { color: #f1fa8c; }
+  .chroma .se { color: #f1fa8c; }
+  .chroma .sh { color: #f1fa8c; }
+  .chroma .si { color: #f1fa8c; }
+  .chroma .sx { color: #f1fa8c; }
+  .chroma .sr { color: #f1fa8c; }
+  .chroma .s1 { color: #f1fa8c; }
+  .chroma .ss { color: #f1fa8c; }
+  .chroma .m { color: #bd93f9; }
+  .chroma .mb { color: #bd93f9; }
+  .chroma .mf { color: #bd93f9; }
+  .chroma .mh { color: #bd93f9; }
+  .chroma .mi { color: #bd93f9; }
+  .chroma .il { color: #bd93f9; }
+  .chroma .mo { color: #bd93f9; }
+  .chroma .o { color: #ff79c6; }
+  .chroma .ow { color: #ff79c6; }
+  .chroma .c { color: #6272a4; }
+  .chroma .ch { color: #6272a4; }
+  .chroma .cm { color: #6272a4; }
+  .chroma .c1 { color: #6272a4; }
+  .chroma .cs { color: #6272a4; }
+  .chroma .cp { color: #ff79c6; }
+  .chroma .cpf { color: #ff79c6; }
+  .chroma .gd { color: #f55; }
+  .chroma .ge { text-decoration: underline; }
+  .chroma .gh { font-weight: bold; }
+  .chroma .gi { color: #50fa7b; font-weight: bold; }
+  .chroma .go { color: #44475a; }
+  .chroma .gu { font-weight: bold; }
+  .chroma .gl { text-decoration: underline; }
+}
+
+// =============================================================================
+// Quick Capture — live code preview panel
+// =============================================================================
+.qc-preview-wrapper {
+  display: none; // hidden in Note mode, shown in Code mode via JS
+  margin-top: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.qc-preview-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+}
+
+.qc-preview-panel {
+  max-height: 180px;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid var(--code-border);
+  background: var(--pre-bg);
+  box-shadow: inset 0 1px 3px var(--shadow-color);
+
+  pre {
+    margin: 0;
+    padding: 0.75rem;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    overflow-x: auto;
+  }
+
+  code {
+    font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    tab-size: 2;
+    -moz-tab-size: 2;
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--body-font-color);
+  }
+
+  .qc-preview-empty {
+    padding: 1.5rem;
+    text-align: center;
+    font-size: 0.8rem;
+    color: var(--text-faint);
+    font-style: italic;
   }
 }
