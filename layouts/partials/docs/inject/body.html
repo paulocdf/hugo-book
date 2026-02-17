@@ -131,6 +131,8 @@
   var previewWrapper = document.getElementById('qc-preview-wrapper');
   var previewPanel = document.getElementById('qc-preview-panel');
   var dialog = modal.querySelector('.quick-capture-dialog');
+  var toolbar = document.getElementById('qc-toolbar');
+  var toolbarButtons = toolbar ? toolbar.querySelectorAll('.qc-toolbar-btn') : [];
 
   // State
   var currentMode = 'note'; // 'note' or 'code'
@@ -148,6 +150,97 @@
       .replace(/^-+|-+$/g, '')
       .substring(0, 60);
   }
+
+  // =========================================================================
+  // Markdown formatting toolbar helpers
+  // =========================================================================
+
+  // Wrap selected text with before/after markers (bold, italic, code)
+  function wrapSelection(before, after) {
+    var start = input.selectionStart;
+    var end = input.selectionEnd;
+    var text = input.value;
+    var selected = text.slice(start, end);
+
+    // If no selection, insert markers with cursor between them
+    if (start === end) {
+      var inserted = before + after;
+      input.value = text.slice(0, start) + inserted + text.slice(end);
+      input.selectionStart = input.selectionEnd = start + before.length;
+    } else {
+      input.value = text.slice(0, start) + before + selected + after + text.slice(end);
+      input.selectionStart = start + before.length;
+      input.selectionEnd = end + before.length;
+    }
+    input.focus();
+  }
+
+  // Prefix each selected line (or current line) with a string
+  function prefixLines(prefix) {
+    var start = input.selectionStart;
+    var end = input.selectionEnd;
+    var text = input.value;
+
+    // Find the start of the first selected line
+    var lineStart = text.lastIndexOf('\n', start - 1) + 1;
+    // Find the end of the last selected line
+    var lineEnd = text.indexOf('\n', end);
+    if (lineEnd === -1) lineEnd = text.length;
+
+    var block = text.slice(lineStart, lineEnd);
+    var lines = block.split('\n');
+    var prefixed = lines.map(function(line) { return prefix + line; }).join('\n');
+
+    input.value = text.slice(0, lineStart) + prefixed + text.slice(lineEnd);
+
+    // Place cursor at end of modified block
+    var newEnd = lineStart + prefixed.length;
+    input.selectionStart = lineStart;
+    input.selectionEnd = newEnd;
+    input.focus();
+  }
+
+  // Insert link markdown: [text](url) or [](url) if no selection
+  function insertLink() {
+    var start = input.selectionStart;
+    var end = input.selectionEnd;
+    var text = input.value;
+    var selected = text.slice(start, end);
+
+    if (selected) {
+      var inserted = '[' + selected + '](url)';
+      input.value = text.slice(0, start) + inserted + text.slice(end);
+      // Select "url" so user can type over it
+      input.selectionStart = start + selected.length + 2;
+      input.selectionEnd = start + selected.length + 5;
+    } else {
+      input.value = text.slice(0, start) + '[](url)' + text.slice(end);
+      // Place cursor inside [] for link text
+      input.selectionStart = input.selectionEnd = start + 1;
+    }
+    input.focus();
+  }
+
+  function applyFormat(format) {
+    switch (format) {
+      case 'bold':    wrapSelection('**', '**'); break;
+      case 'italic':  wrapSelection('*', '*'); break;
+      case 'code':    wrapSelection('`', '`'); break;
+      case 'heading': prefixLines('## '); break;
+      case 'bullet':  prefixLines('- '); break;
+      case 'todo':    prefixLines('- [ ] '); break;
+      case 'link':    insertLink(); break;
+    }
+  }
+
+  // Toolbar button click handlers
+  toolbarButtons.forEach(function(tbtn) {
+    tbtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      var format = tbtn.getAttribute('data-format');
+      applyFormat(format);
+    });
+  });
 
   // =========================================================================
   // Mini syntax highlighter — outputs <span> with Chroma-compatible classes
@@ -317,6 +410,7 @@
         destRow.style.display = 'none';
         langRow.style.display = '';
         previewWrapper.style.display = '';
+        if (toolbar) toolbar.style.display = 'none';
         input.classList.add('code-mode');
         dialog.classList.add('code-mode');
         input.placeholder = 'Paste or type your code here...';
@@ -325,6 +419,7 @@
         destRow.style.display = '';
         langRow.style.display = 'none';
         previewWrapper.style.display = 'none';
+        if (toolbar) toolbar.style.display = '';
         input.classList.remove('code-mode');
         dialog.classList.remove('code-mode');
         input.placeholder = "What's on your mind?";
@@ -361,6 +456,7 @@
     destRow.style.display = '';
     langRow.style.display = 'none';
     previewWrapper.style.display = 'none';
+    if (toolbar) toolbar.style.display = '';
     langButtons.forEach(function(b) { b.classList.remove('active'); });
     langButtons[0].classList.add('active');
     input.classList.remove('code-mode');
@@ -483,6 +579,26 @@
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       submit();
+    }
+
+    // Formatting shortcuts (Note mode only, when textarea is focused)
+    if (currentMode === 'note' && e.target === input && (e.metaKey || e.ctrlKey)) {
+      if (e.key === 'b') {
+        e.preventDefault();
+        applyFormat('bold');
+      } else if (e.key === 'i') {
+        e.preventDefault();
+        applyFormat('italic');
+      } else if (e.key === 'e') {
+        e.preventDefault();
+        applyFormat('code');
+      } else if (e.shiftKey && (e.key === 'T' || e.key === 't')) {
+        e.preventDefault();
+        applyFormat('todo');
+      } else if (e.shiftKey && (e.key === 'H' || e.key === 'h')) {
+        e.preventDefault();
+        applyFormat('heading');
+      }
     }
   });
 })();
