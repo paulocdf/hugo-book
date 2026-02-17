@@ -955,6 +955,55 @@
 (function() {
   'use strict';
 
+  var SIDEBAR_CACHE_KEY = 'dm-sidebar-html';
+
+  // Immediately restore cached sidebar HTML to prevent flicker on navigation
+  (function restoreSidebarCache() {
+    try {
+      var cached = sessionStorage.getItem(SIDEBAR_CACHE_KEY);
+      if (!cached) return;
+      var menuNav = document.querySelector('.book-menu-content nav');
+      if (!menuNav) return;
+      var ul = menuNav.querySelector('ul');
+      if (!ul) return;
+
+      ul.innerHTML = cached;
+
+      // Update active states to match current page
+      var links = ul.querySelectorAll('a[href]');
+      var pathname = window.location.pathname;
+      var search = window.location.search;
+      var params = new URLSearchParams(search);
+      var viewId = params.get('id');
+      links.forEach(function(a) {
+        a.classList.remove('active');
+        var href = a.getAttribute('href');
+        if (!href) return;
+        // Check if this is the current view page
+        if (viewId && href.indexOf('id=' + viewId) !== -1) {
+          a.classList.add('active');
+        }
+        // Check if this is the current section page
+        else if (!viewId && (pathname === href || pathname === href.replace(/\/$/, ''))) {
+          a.classList.add('active');
+        }
+      });
+
+      // Also update inbox accent: only active when on inbox page
+      var inboxItem = ul.querySelector('.sidebar-inbox');
+      if (inboxItem) {
+        var inboxLink = inboxItem.querySelector('a');
+        if (inboxLink) {
+          if (pathname.indexOf('/docs/inbox') !== -1) {
+            inboxLink.classList.add('active');
+          } else {
+            inboxLink.classList.remove('active');
+          }
+        }
+      }
+    } catch (e) { /* sessionStorage may be unavailable */ }
+  })();
+
   var ICONS = {
     books: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>',
     topics: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>',
@@ -1131,6 +1180,9 @@
 
     // Replace sidebar content
     existingUl.innerHTML = html;
+
+    // Cache sidebar HTML for instant restore on next navigation
+    try { sessionStorage.setItem(SIDEBAR_CACHE_KEY, html); } catch (e) {}
   }
 
   function renderAuthPrompt() {
@@ -1139,6 +1191,9 @@
 
     var existingUl = menuNav.querySelector('ul');
     if (!existingUl) return;
+
+    // Clear cached sidebar since user signed out
+    try { sessionStorage.removeItem(SIDEBAR_CACHE_KEY); } catch (e) {}
 
     var base = getBaseUrl();
     var html = '';
