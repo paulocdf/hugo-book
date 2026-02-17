@@ -1662,10 +1662,10 @@ html.sidebar-collapsed {
 
   // Expanded layout for Code mode
   &.code-mode {
-    max-width: 680px;
+    max-width: 760px;
 
     .quick-capture-input {
-      min-height: 220px;
+      min-height: 280px;
     }
   }
 }
