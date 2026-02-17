@@ -3309,30 +3309,43 @@ html.sidebar-collapsed {
 .dm-lightbox-canvas {
   flex: 1;
   overflow: hidden;
-  cursor: grab;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
+}
+
+// The white card — stays fixed in the center, acts as a viewport window
+.dm-lightbox-svg-wrap {
+  background: #fff;
+  border-radius: 8px;
+  width: 85vw;
+  height: 80vh;
+  overflow: hidden;
+  position: relative;
+  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
+  cursor: grab;
 
   &:active {
     cursor: grabbing;
   }
 }
 
-.dm-lightbox-svg-wrap {
-  transform-origin: center center;
-  background: #fff;
-  border-radius: 8px;
+// Inner container that receives pan/zoom transform
+.dm-lightbox-inner {
+  transform-origin: 0 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 2rem;
-  box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
-  width: 85vw;
-  max-height: 85vh;
-  overflow: auto;
 
   svg {
     display: block;
-    width: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
     height: auto;
   }
 }
