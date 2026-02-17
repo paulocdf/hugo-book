@@ -779,25 +779,25 @@
       }
     }
 
-    // Inbox append mode: append to existing single note instead of creating a new one
+    // Inbox append mode: prepend to existing single note (newest on top)
     if (noteData.destination === 'inbox' && inboxMode === 'append' && window.dmSync) {
       window.dmSync.getNotesByDestination('inbox').then(function(inboxNotes) {
         if (inboxNotes && inboxNotes.length > 0) {
-          // Append to existing inbox note
+          // Prepend to existing inbox note (newest content on top)
           inboxNotes.sort(function(a, b) { return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); });
           var existing = inboxNotes[0];
           var separator = '\n\n---\n\n';
           var heading = userTitle ? ('## ' + userTitle + '\n\n') : '';
-          var appended = existing.content + separator + heading + text;
+          var prepended = heading + text + separator + existing.content;
 
           var updateData = {
-            content: appended,
+            content: prepended,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           };
 
           window.dmDb.collection('notes').doc(existing.id).update(updateData)
             .then(function() {
-              existing.content = appended;
+              existing.content = prepended;
               existing.updatedAt = Date.now();
               return window.dmSync.putNote(existing);
             })

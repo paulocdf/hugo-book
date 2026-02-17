@@ -304,18 +304,34 @@
   if (window.dmAuth) {
     window.dmAuth.onAuthStateChanged(function(user) {
       if (user) {
-        // Sync on login
-        syncNotes(user.uid).then(function() {
-          startBackgroundSync(user.uid);
+        // Check if this is a different user than last cached session
+        idbGet(STORE_META, 'currentUserId').then(function(meta) {
+          var cachedUserId = meta ? meta.value : null;
+          var proceed = cachedUserId === user.uid
+            ? Promise.resolve()
+            : idbClear(STORE_NOTES).then(function() { return idbClear(STORE_META); });
+
+          return proceed.then(function() {
+            return idbPut(STORE_META, { key: 'currentUserId', value: user.uid });
+          }).then(function() {
+            return syncNotes(user.uid);
+          }).then(function() {
+            startBackgroundSync(user.uid);
+          });
         }).catch(function(err) {
           console.warn('[dm-sync] Initial sync failed, using cached data if available');
-          // Still dispatch so UI renders from whatever cache exists
           window.dispatchEvent(new CustomEvent('dm-sync-complete'));
         });
       } else {
         stopBackgroundSync();
-        // Don't clear cache on auth state change during page load
-        // Only clear explicitly on sign-out action
+        // Clear cache on sign-out so no data leaks to another user
+        idbClear(STORE_NOTES).then(function() {
+          return idbClear(STORE_META);
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+        }).catch(function(err) {
+          console.warn('[dm-sync] Error clearing cache on sign-out:', err);
+        });
       }
     });
   }
