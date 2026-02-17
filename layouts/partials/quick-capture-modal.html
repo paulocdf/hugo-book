@@ -78,59 +78,62 @@
     <!-- Optional title field -->
     <input type="text" id="qc-title-input" class="qc-title-input" placeholder="Title (optional, auto-generated if empty)" maxlength="120" />
 
-    <!-- Markdown formatting toolbar (Note mode only) -->
-    <div class="qc-toolbar" id="qc-toolbar">
-      <button type="button" class="qc-toolbar-btn" data-format="bold" title="Bold (Cmd+B)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-          <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-        </svg>
-      </button>
-      <button type="button" class="qc-toolbar-btn" data-format="italic" title="Italic (Cmd+I)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="4" x2="10" y2="4"></line>
-          <line x1="14" y1="20" x2="5" y2="20"></line>
-          <line x1="15" y1="4" x2="9" y2="20"></line>
-        </svg>
-      </button>
-      <button type="button" class="qc-toolbar-btn" data-format="code" title="Inline code (Cmd+E)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <polyline points="16 18 22 12 16 6"></polyline>
-          <polyline points="8 6 2 12 8 18"></polyline>
-        </svg>
-      </button>
-      <span class="qc-toolbar-sep"></span>
-      <button type="button" class="qc-toolbar-btn" data-format="heading" title="Heading (Cmd+Shift+H)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-          <text x="3" y="18" font-size="16" font-weight="700" font-family="inherit">H</text>
-        </svg>
-      </button>
-      <button type="button" class="qc-toolbar-btn" data-format="bullet" title="Bullet list">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="8" y1="6" x2="21" y2="6"></line>
-          <line x1="8" y1="12" x2="21" y2="12"></line>
-          <line x1="8" y1="18" x2="21" y2="18"></line>
-          <line x1="3" y1="6" x2="3.01" y2="6"></line>
-          <line x1="3" y1="12" x2="3.01" y2="12"></line>
-          <line x1="3" y1="18" x2="3.01" y2="18"></line>
-        </svg>
-      </button>
-      <button type="button" class="qc-toolbar-btn" data-format="todo" title="Todo checkbox (Cmd+Shift+T)">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="5" width="14" height="14" rx="2" ry="2"></rect>
-          <polyline points="8 11 11 14 17 8"></polyline>
-        </svg>
-      </button>
-      <span class="qc-toolbar-sep"></span>
-      <button type="button" class="qc-toolbar-btn" data-format="link" title="Link">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-        </svg>
-      </button>
-    </div>
+    <!-- Editor box: toolbar + textarea as a unified container -->
+    <div class="qc-editor-box" id="qc-editor-box">
+      <!-- Markdown formatting toolbar (Note mode only) -->
+      <div class="qc-toolbar" id="qc-toolbar">
+        <button type="button" class="qc-toolbar-btn" data-format="bold" title="Bold (Cmd+B)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+            <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+          </svg>
+        </button>
+        <button type="button" class="qc-toolbar-btn" data-format="italic" title="Italic (Cmd+I)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="4" x2="10" y2="4"></line>
+            <line x1="14" y1="20" x2="5" y2="20"></line>
+            <line x1="15" y1="4" x2="9" y2="20"></line>
+          </svg>
+        </button>
+        <button type="button" class="qc-toolbar-btn" data-format="code" title="Inline code (Cmd+E)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+        </button>
+        <span class="qc-toolbar-sep"></span>
+        <button type="button" class="qc-toolbar-btn" data-format="heading" title="Heading (Cmd+Shift+H)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <text x="3" y="18" font-size="16" font-weight="700" font-family="inherit">H</text>
+          </svg>
+        </button>
+        <button type="button" class="qc-toolbar-btn" data-format="bullet" title="Bullet list">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+        </button>
+        <button type="button" class="qc-toolbar-btn" data-format="todo" title="Todo checkbox (Cmd+Shift+T)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="5" width="14" height="14" rx="2" ry="2"></rect>
+            <polyline points="8 11 11 14 17 8"></polyline>
+          </svg>
+        </button>
+        <span class="qc-toolbar-sep"></span>
+        <button type="button" class="qc-toolbar-btn" data-format="link" title="Link">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+        </button>
+      </div>
 
-    <textarea id="quick-capture-input" class="quick-capture-input" placeholder="What's on your mind?" rows="5"></textarea>
+      <textarea id="quick-capture-input" class="quick-capture-input" placeholder="What's on your mind?" rows="5"></textarea>
+    </div>
 
     <!-- Live note preview (Note mode only) -->
     <div class="qc-preview-wrapper qc-note-preview-wrapper" id="qc-note-preview-wrapper" style="display: none;">
