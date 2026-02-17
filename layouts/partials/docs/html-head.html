@@ -413,14 +413,28 @@
     function openLightbox(svgHtml) {
       createOverlay();
       svgWrap.innerHTML = svgHtml;
-      // Remove fixed dimensions from the lightbox SVG so it fills the viewport
+      // Remove fixed dimensions from the lightbox SVG so it scales via viewBox
       var svgEl = svgWrap.querySelector('svg');
       if (svgEl) {
+        // Capture original dimensions before stripping (for viewBox fallback)
+        var origW = parseFloat(svgEl.getAttribute('width')) || 0;
+        var origH = parseFloat(svgEl.getAttribute('height')) || 0;
         svgEl.removeAttribute('width');
         svgEl.removeAttribute('height');
         var s = svgEl.getAttribute('style') || '';
+        // Also capture dimensions from inline style
+        var styleW = s.match(/width:\s*([\d.]+)/i);
+        var styleH = s.match(/height:\s*([\d.]+)/i);
+        if (!origW && styleW) origW = parseFloat(styleW[1]);
+        if (!origH && styleH) origH = parseFloat(styleH[1]);
         s = s.replace(/width:\s*[^;]+;?/gi, '').replace(/height:\s*[^;]+;?/gi, '');
         if (s.trim()) svgEl.setAttribute('style', s); else svgEl.removeAttribute('style');
+        // Ensure viewBox exists for proper scaling
+        if (!svgEl.getAttribute('viewBox')) {
+          var w = origW || (svgEl.getBBox ? svgEl.getBBox().width : 800) || 800;
+          var h = origH || (svgEl.getBBox ? svgEl.getBBox().height : 600) || 600;
+          svgEl.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+        }
       }
       resetTransform();
       overlay.classList.add('dm-lightbox-open');

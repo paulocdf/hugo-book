@@ -3326,13 +3326,13 @@ html.sidebar-collapsed {
   border-radius: 8px;
   padding: 2rem;
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
-  max-width: 90vw;
+  width: 85vw;
   max-height: 85vh;
+  overflow: auto;
 
   svg {
     display: block;
-    max-width: 100%;
-    max-height: 80vh;
+    width: 100%;
     height: auto;
   }
 }
