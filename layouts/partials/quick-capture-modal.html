@@ -10,10 +10,32 @@
         </svg>
         Quick Capture
       </h3>
-      <p>Jot down an idea — choose where it goes</p>
+      <p>Jot down an idea or save a code snippet</p>
     </div>
-    <div class="qc-destination">
-      <label class="qc-destination-label" for="qc-destination-select">Save to</label>
+
+    <!-- Mode toggle: Note | Code -->
+    <div class="qc-mode-toggle" id="qc-mode-toggle">
+      <button type="button" class="qc-mode-btn active" data-mode="note">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+        </svg>
+        Note
+      </button>
+      <button type="button" class="qc-mode-btn" data-mode="code">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+        Code
+      </button>
+    </div>
+
+    <!-- Note mode: destination selector -->
+    <div class="qc-destination" id="qc-destination-row">
+      <label class="qc-destination-label">Save to</label>
       <div class="qc-destination-options" id="qc-destination-options">
         <button type="button" class="qc-dest-btn active" data-path="content/docs/inbox" data-tag="inbox">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -37,6 +59,25 @@
         </button>
       </div>
     </div>
+
+    <!-- Code mode: language selector -->
+    <div class="qc-language" id="qc-language-row" style="display: none;">
+      <label class="qc-destination-label">Language</label>
+      <div class="qc-language-options" id="qc-language-options">
+        <button type="button" class="qc-lang-btn active" data-lang="kotlin">Kotlin</button>
+        <button type="button" class="qc-lang-btn" data-lang="bash">Bash</button>
+        <button type="button" class="qc-lang-btn" data-lang="sql">SQL</button>
+        <button type="button" class="qc-lang-btn" data-lang="ruby">Ruby</button>
+        <button type="button" class="qc-lang-btn" data-lang="python">Python</button>
+        <button type="button" class="qc-lang-btn" data-lang="go">Go</button>
+        <button type="button" class="qc-lang-btn" data-lang="javascript">JS</button>
+        <button type="button" class="qc-lang-btn" data-lang="yaml">YAML</button>
+      </div>
+    </div>
+
+    <!-- Optional title field -->
+    <input type="text" id="qc-title-input" class="qc-title-input" placeholder="Title (optional, auto-generated if empty)" maxlength="120" />
+
     <textarea id="quick-capture-input" class="quick-capture-input" placeholder="What's on your mind?" rows="5"></textarea>
     <div class="quick-capture-actions">
       <button type="button" class="qc-btn qc-btn-cancel" id="qc-cancel">Cancel</button>

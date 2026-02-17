@@ -120,15 +120,53 @@
 
   var backdrop = document.getElementById('quick-capture-backdrop');
   var input = document.getElementById('quick-capture-input');
+  var titleInput = document.getElementById('qc-title-input');
   var cancelBtn = document.getElementById('qc-cancel');
   var submitBtn = document.getElementById('qc-submit');
   var destButtons = document.querySelectorAll('.qc-dest-btn');
+  var modeButtons = document.querySelectorAll('.qc-mode-btn');
+  var langButtons = document.querySelectorAll('.qc-lang-btn');
+  var destRow = document.getElementById('qc-destination-row');
+  var langRow = document.getElementById('qc-language-row');
 
-  // Track selected destination
+  // State
+  var currentMode = 'note'; // 'note' or 'code'
+  var selectedLang = 'kotlin';
   var selectedDest = {
     path: 'content/docs/inbox',
     tag: 'inbox'
   };
+
+  // Slug helper: lowercase, replace non-alphanum with hyphens, collapse, trim
+  function slugify(str) {
+    return str.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .substring(0, 60);
+  }
+
+  // Mode toggle
+  modeButtons.forEach(function(mbtn) {
+    mbtn.addEventListener('click', function() {
+      var mode = mbtn.getAttribute('data-mode');
+      if (mode === currentMode) return;
+      currentMode = mode;
+      modeButtons.forEach(function(b) { b.classList.remove('active'); });
+      mbtn.classList.add('active');
+
+      if (mode === 'code') {
+        destRow.style.display = 'none';
+        langRow.style.display = '';
+        input.classList.add('code-mode');
+        input.placeholder = 'Paste or type your code here...';
+      } else {
+        destRow.style.display = '';
+        langRow.style.display = 'none';
+        input.classList.remove('code-mode');
+        input.placeholder = "What's on your mind?";
+      }
+    });
+  });
 
   // Destination button click handling
   destButtons.forEach(function(dbtn) {
@@ -140,16 +178,39 @@
     });
   });
 
+  // Language button click handling
+  langButtons.forEach(function(lbtn) {
+    lbtn.addEventListener('click', function() {
+      langButtons.forEach(function(b) { b.classList.remove('active'); });
+      lbtn.classList.add('active');
+      selectedLang = lbtn.getAttribute('data-lang');
+    });
+  });
+
   function openModal() {
+    // Reset state
+    currentMode = 'note';
+    selectedLang = 'kotlin';
+    modeButtons.forEach(function(b) { b.classList.remove('active'); });
+    modeButtons[0].classList.add('active');
+    destRow.style.display = '';
+    langRow.style.display = 'none';
+    langButtons.forEach(function(b) { b.classList.remove('active'); });
+    langButtons[0].classList.add('active');
+    input.classList.remove('code-mode');
+    input.placeholder = "What's on your mind?";
+
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
+    titleInput.value = '';
     input.value = '';
-    input.focus();
+    titleInput.focus();
   }
 
   function closeModal() {
     modal.classList.remove('active');
     modal.setAttribute('aria-hidden', 'true');
+    titleInput.value = '';
     input.value = '';
   }
 
@@ -174,25 +235,57 @@
     var isoDate = y + '-' + mo + '-' + d + 'T' + h + ':' + mi + ':' + s;
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var displayDate = months[now.getMonth()] + ' ' + now.getDate() + ', ' + y;
-    var headingDate = y + '-' + mo + '-' + d + ' ' + h + ':' + mi;
 
-    var filename = 'quick-note-' + timestamp + '.md';
-    var content = [
-      '---',
-      'title: "Quick Note - ' + displayDate + '"',
-      'date: ' + isoDate,
-      'tags: [' + selectedDest.tag + ']',
-      '---',
-      '',
-      '## ' + headingDate,
-      '',
-      text,
-      ''
-    ].join('\n');
+    var userTitle = titleInput.value.trim();
+    var url;
 
-    var url = 'https://github.com/paulocdf/digital-memory/new/main/' + selectedDest.path
-            + '?filename=' + encodeURIComponent(filename)
-            + '&value=' + encodeURIComponent(content);
+    if (currentMode === 'code') {
+      // Code snippet mode
+      var langLabel = selectedLang.charAt(0).toUpperCase() + selectedLang.slice(1);
+      var title = userTitle || (langLabel + ' Snippet - ' + displayDate);
+      var fileSlug = userTitle ? slugify(userTitle) + '-' + timestamp : 'snippet-' + timestamp;
+      var filename = fileSlug + '.md';
+
+      var content = [
+        '---',
+        'title: "' + title.replace(/"/g, '\\"') + '"',
+        'date: ' + isoDate,
+        'tags: [snippet, ' + selectedLang + ']',
+        '---',
+        '',
+        '```' + selectedLang,
+        text,
+        '```',
+        ''
+      ].join('\n');
+
+      url = 'https://github.com/paulocdf/digital-memory/new/main/content/docs/snippets/' + selectedLang
+          + '?filename=' + encodeURIComponent(filename)
+          + '&value=' + encodeURIComponent(content);
+    } else {
+      // Note mode (original behavior)
+      var headingDate = y + '-' + mo + '-' + d + ' ' + h + ':' + mi;
+      var title = userTitle || ('Quick Note - ' + displayDate);
+      var fileSlug = userTitle ? slugify(userTitle) + '-' + timestamp : 'quick-note-' + timestamp;
+      var filename = fileSlug + '.md';
+
+      var content = [
+        '---',
+        'title: "' + title.replace(/"/g, '\\"') + '"',
+        'date: ' + isoDate,
+        'tags: [' + selectedDest.tag + ']',
+        '---',
+        '',
+        '## ' + headingDate,
+        '',
+        text,
+        ''
+      ].join('\n');
+
+      url = 'https://github.com/paulocdf/digital-memory/new/main/' + selectedDest.path
+          + '?filename=' + encodeURIComponent(filename)
+          + '&value=' + encodeURIComponent(content);
+    }
 
     window.open(url, '_blank');
     closeModal();
