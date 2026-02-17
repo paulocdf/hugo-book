@@ -178,6 +178,29 @@
     }).then(function(svg) {
       el.innerHTML = svg;
       el.classList.add('dm-diagram-rendered');
+
+      // Make SVG responsive: remove fixed width/height so it scales via viewBox
+      var svgEl = el.querySelector('svg');
+      if (svgEl) {
+        svgEl.removeAttribute('width');
+        svgEl.removeAttribute('height');
+        // Remove inline width/height from style attribute
+        var inlineStyle = svgEl.getAttribute('style') || '';
+        inlineStyle = inlineStyle
+          .replace(/width:\s*[^;]+;?/gi, '')
+          .replace(/height:\s*[^;]+;?/gi, '');
+        if (inlineStyle.trim()) {
+          svgEl.setAttribute('style', inlineStyle);
+        } else {
+          svgEl.removeAttribute('style');
+        }
+        // Ensure viewBox is present for proper scaling
+        if (!svgEl.getAttribute('viewBox')) {
+          var w = svgEl.getBBox ? svgEl.getBBox().width : 800;
+          var h = svgEl.getBBox ? svgEl.getBBox().height : 600;
+          svgEl.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+        }
+      }
     }).catch(function(err) {
       console.error('Kroki render error (' + type + '):', err);
       el.innerHTML = '<div class="dm-diagram-error">Failed to render ' + type + ' diagram</div>' +

@@ -3176,7 +3176,7 @@ html.sidebar-collapsed {
 
 .dm-diagram {
   margin: 1.5rem 0;
-  padding: 1rem;
+  padding: 1.5rem;
   border-radius: 8px;
   background: var(--gray-100);
   text-align: center;
@@ -3185,6 +3185,31 @@ html.sidebar-collapsed {
   svg {
     max-width: 100%;
     height: auto;
+  }
+}
+
+// Kroki-rendered diagrams (PlantUML, D2, GraphViz, etc.)
+// SVG is made responsive (viewBox-based) so it scales to fill container
+.dm-diagram-rendered {
+  background: #fff;
+  border: 1px solid var(--gray-200);
+  padding: 1.5rem 2rem;
+
+  svg {
+    max-width: 100%;
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+  }
+}
+
+// Dark mode: keep white background for Kroki diagrams (they render with
+// their own colors/fills that assume a light background)
+@media (prefers-color-scheme: dark) {
+  .dm-diagram-rendered {
+    background: #fafafa;
+    border-color: var(--gray-300);
   }
 }
 
@@ -3202,8 +3227,4 @@ html.sidebar-collapsed {
   background: rgba(229, 62, 62, 0.08);
   border-radius: 6px;
   margin-bottom: 0.5rem;
-}
-
-.dm-diagram-rendered {
-  background: transparent;
 }
