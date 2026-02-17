@@ -301,6 +301,77 @@ body {
     font-weight: 400;
     letter-spacing: 0.01em;
   }
+
+  .garden-auth {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: center;
+  }
+}
+
+// Landing page auth UI
+.garden-auth-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: var(--surface-2);
+    border-color: var(--border-medium);
+    color: var(--body-font-color);
+    box-shadow: 0 2px 8px var(--shadow-color);
+  }
+}
+
+.garden-auth-user {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.garden-auth-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-subtle);
+}
+
+.garden-auth-name {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--body-font-color);
+}
+
+.garden-auth-signout {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-faint);
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: all 0.12s ease;
+
+  &:hover {
+    background: var(--surface-2);
+    color: var(--text-secondary);
+    border-color: var(--border-medium);
+  }
 }
 
 // ======================================

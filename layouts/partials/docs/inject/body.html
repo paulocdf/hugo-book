@@ -769,6 +769,46 @@
 })();
 </script>
 
+<!-- Landing page auth (garden-hero) -->
+<script>
+(function() {
+  if (typeof firebase === 'undefined' || !window.dmAuth) return;
+
+  var gardenSignin = document.getElementById('garden-signin');
+  var gardenSignout = document.getElementById('garden-signout');
+  var gardenAuthUser = document.getElementById('garden-auth-user');
+  var gardenAvatar = document.getElementById('garden-auth-avatar');
+  var gardenName = document.getElementById('garden-auth-name');
+
+  // Only run on pages that have the landing page auth elements
+  if (!gardenSignin) return;
+
+  window.dmAuth.onAuthStateChanged(function(user) {
+    if (user) {
+      gardenSignin.style.display = 'none';
+      gardenAuthUser.style.display = '';
+      gardenAvatar.src = user.photoURL || '';
+      gardenAvatar.alt = user.displayName || '';
+      gardenName.textContent = user.displayName || user.email || '';
+    } else {
+      gardenSignin.style.display = '';
+      gardenAuthUser.style.display = 'none';
+    }
+  });
+
+  gardenSignin.addEventListener('click', function() {
+    if (!window.dmGoogleProvider) return;
+    window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+      console.error('Landing page sign-in error:', err);
+    });
+  });
+
+  gardenSignout.addEventListener('click', function() {
+    window.dmAuth.signOut();
+  });
+})();
+</script>
+
 <!-- ToC scroll spy, reading progress, and auto-hide -->
 <script>
 (function() {
