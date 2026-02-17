@@ -1,0 +1,161 @@
+{{/* Section Notes: displays Firestore notes filtered by destination */}}
+{{/* Usage: section-notes destination="inbox" */}}
+{{ $destination := .Get "destination" | default "inbox" }}
+
+<div class="section-notes" id="section-notes" data-destination="{{ $destination }}">
+  <div class="section-notes-list" id="section-notes-list">
+    <div class="section-notes-loading" id="section-notes-loading" style="display: none;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;">
+        <line x1="12" y1="2" x2="12" y2="6"></line>
+        <line x1="12" y1="18" x2="12" y2="22"></line>
+        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+        <line x1="2" y1="12" x2="6" y2="12"></line>
+        <line x1="18" y1="12" x2="22" y2="12"></line>
+        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+      </svg>
+      Loading notes...
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  if (typeof firebase === 'undefined' || !window.dmAuth || !window.dmDb) return;
+
+  var container = document.getElementById('section-notes');
+  var listEl = document.getElementById('section-notes-list');
+  var loadingEl = document.getElementById('section-notes-loading');
+  var destination = container.getAttribute('data-destination');
+
+  var unsubscribe = null;
+
+  window.dmAuth.onAuthStateChanged(function(user) {
+    if (user) {
+      subscribeToNotes(user.uid);
+    } else {
+      if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+      listEl.innerHTML = '<div class="section-notes-signin-hint">'
+        + '<button type="button" class="garden-auth-signin" id="section-notes-signin">'
+        + '<svg width="16" height="16" viewBox="0 0 24 24">'
+        + '<path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>'
+        + '<path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>'
+        + '<path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>'
+        + '<path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>'
+        + '</svg>'
+        + 'Sign in to see your notes'
+        + '</button>'
+        + '</div>';
+      document.getElementById('section-notes-signin').addEventListener('click', function() {
+        window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+          console.error('Sign-in error:', err);
+        });
+      });
+    }
+  });
+
+  function subscribeToNotes(userId) {
+    if (unsubscribe) unsubscribe();
+    loadingEl.style.display = '';
+
+    unsubscribe = window.dmDb.collection('notes')
+      .where('userId', '==', userId)
+      .where('destination', '==', destination)
+      .onSnapshot(function(snapshot) {
+        var notes = [];
+        snapshot.forEach(function(doc) {
+          var data = doc.data();
+          data.id = doc.id;
+          notes.push(data);
+        });
+
+        // Sort client-side by createdAt descending (avoids needing another composite index)
+        notes.sort(function(a, b) {
+          var aTime = a.createdAt ? a.createdAt.toMillis() : 0;
+          var bTime = b.createdAt ? b.createdAt.toMillis() : 0;
+          return bTime - aTime;
+        });
+
+        loadingEl.style.display = 'none';
+        renderNotes(notes);
+      }, function(err) {
+        console.error('Firestore read error:', err);
+        loadingEl.style.display = 'none';
+        listEl.innerHTML = '<div class="section-notes-error">Failed to load notes.</div>';
+      });
+  }
+
+  function renderNotes(notes) {
+    if (notes.length === 0) {
+      listEl.innerHTML = '';
+      return;
+    }
+
+    var html = '';
+    notes.forEach(function(note) {
+      var date = note.createdAt ? note.createdAt.toDate() : new Date();
+      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      var dateStr = months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
+
+      var tagsHtml = '';
+      if (note.tags && note.tags.length) {
+        note.tags.forEach(function(t) {
+          tagsHtml += '<span class="section-notes-tag">' + escapeHtml(t) + '</span>';
+        });
+      }
+
+      var preview = note.content || '';
+      if (note.mode === 'code') {
+        var lang = note.language || '';
+        var codePreview = preview.length > 300 ? preview.substring(0, 300) + '...' : preview;
+        preview = '<pre class="section-notes-code"><code>' + escapeHtml(codePreview) + '</code></pre>';
+      } else {
+        // Render as simple text preview — preserve newlines
+        var textPreview = preview.length > 400 ? preview.substring(0, 400) + '...' : preview;
+        preview = '<div class="section-notes-text">' + escapeHtml(textPreview) + '</div>';
+      }
+
+      html += '<div class="section-notes-card" data-id="' + note.id + '">'
+            + '<div class="section-notes-card-header">'
+            + '<div>'
+            + '<h4 class="section-notes-card-title">' + escapeHtml(note.title || 'Untitled') + '</h4>'
+            + '<div class="section-notes-card-meta">'
+            + '<span class="section-notes-date">' + dateStr + '</span>'
+            + tagsHtml
+            + '</div>'
+            + '</div>'
+            + '<button type="button" class="section-notes-delete" data-id="' + note.id + '" title="Delete note">'
+            + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            + '<polyline points="3 6 5 6 21 6"></polyline>'
+            + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>'
+            + '</svg>'
+            + '</button>'
+            + '</div>'
+            + preview
+            + '</div>';
+    });
+
+    listEl.innerHTML = html;
+
+    // Bind delete buttons
+    listEl.querySelectorAll('.section-notes-delete').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var noteId = btn.getAttribute('data-id');
+        if (confirm('Delete this note?')) {
+          window.dmDb.collection('notes').doc(noteId).delete().catch(function(err) {
+            console.error('Delete error:', err);
+            alert('Failed to delete note.');
+          });
+        }
+      });
+    });
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+})();
+</script>
