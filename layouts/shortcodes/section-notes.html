@@ -147,21 +147,34 @@
 .section-notes-card-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   flex-shrink: 0;
 }
 .section-notes-delete,
 .section-notes-edit {
-  background: none; border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
   cursor: pointer;
-  padding: 4px; border-radius: 4px;
-  transition: color 0.2s, background 0.2s;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
   flex-shrink: 0;
+  color: var(--gray-400);
 }
-.section-notes-delete { color: var(--gray-400); }
-.section-notes-delete:hover { color: #e53e3e; background: rgba(229,62,62,0.1); }
-.section-notes-edit { color: var(--gray-400); }
-.section-notes-edit:hover { color: var(--color-link); background: rgba(0,105,255,0.08); }
+.section-notes-edit:hover {
+  color: var(--color-link);
+  background: rgba(0, 105, 255, 0.06);
+  border-color: rgba(0, 105, 255, 0.2);
+}
+.section-notes-delete:hover {
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.06);
+  border-color: rgba(229, 62, 62, 0.2);
+}
 </style>
 
 <script>
