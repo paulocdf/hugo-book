@@ -226,6 +226,11 @@
         });
       }
 
+      // Render diagrams (Mermaid, PlantUML, D2, etc.)
+      if (window.dmRenderDiagrams) {
+        window.dmRenderDiagrams(bodyEl);
+      }
+
       showState('content');
 
       // Fire event so dynamic ToC can be built

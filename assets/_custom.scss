@@ -3169,3 +3169,41 @@ html.sidebar-collapsed {
     padding: 0;
   }
 }
+
+// ===================================
+// Diagram rendering (Mermaid + Kroki)
+// ===================================
+
+.dm-diagram {
+  margin: 1.5rem 0;
+  padding: 1rem;
+  border-radius: 8px;
+  background: var(--gray-100);
+  text-align: center;
+  overflow-x: auto;
+
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+.dm-diagram-loading {
+  padding: 2rem 1rem;
+  color: var(--gray-500);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.dm-diagram-error {
+  padding: 0.75rem 1rem;
+  color: #e53e3e;
+  font-size: 0.85rem;
+  background: rgba(229, 62, 62, 0.08);
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.dm-diagram-rendered {
+  background: transparent;
+}

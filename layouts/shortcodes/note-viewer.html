@@ -304,6 +304,11 @@
       });
     }
 
+    // Render diagrams (Mermaid, PlantUML, D2, etc.)
+    if (window.dmRenderDiagrams) {
+      window.dmRenderDiagrams(bodyEl);
+    }
+
     // Fire event so dynamic ToC can be built
     window.dispatchEvent(new CustomEvent('dm-content-rendered'));
 

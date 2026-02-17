@@ -77,11 +77,166 @@
       '</h' + depth + '>\n';
   };
 
+  // --- Diagram support ---
+  // Diagram languages rendered client-side
+  var MERMAID_LANG = 'mermaid';
+  // Diagram languages rendered via Kroki API
+  var KROKI_LANGS = ['plantuml', 'd2', 'graphviz', 'ditaa', 'erd', 'nomnoml', 'svgbob', 'excalidraw', 'c4plantuml', 'dbml'];
+
+  // Override code renderer to detect diagram fences and emit placeholders
+  var originalCode = renderer.code ? renderer.code.bind(renderer) : null;
+  renderer.code = function(data) {
+    var lang = (data.lang || '').toLowerCase().trim();
+    var text = data.text || '';
+    if (lang === MERMAID_LANG || KROKI_LANGS.indexOf(lang) !== -1) {
+      // Emit a placeholder div instead of <pre><code>
+      // Use base64 to safely embed source in data attribute
+      var encoded = btoa(unescape(encodeURIComponent(text)));
+      return '<div class="dm-diagram" data-type="' + lang + '" data-source="' + encoded + '">' +
+        '<div class="dm-diagram-loading">Loading ' + lang + ' diagram\u2026</div>' +
+        '</div>';
+    }
+    // Fall back to default rendering
+    if (originalCode) return originalCode(data);
+    return '<pre><code class="language-' + lang + '">' + text.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code></pre>';
+  };
+
   marked.setOptions({
     renderer: renderer,
     gfm: true,
     breaks: false
   });
+
+  // Mermaid lazy-loader
+  var mermaidReady = null; // Promise, set once
+  function loadMermaid() {
+    if (mermaidReady) return mermaidReady;
+    mermaidReady = new Promise(function(resolve, reject) {
+      if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({
+          startOnLoad: false,
+          flowchart: { useMaxWidth: true },
+          theme: 'dark',
+          themeVariables: {
+            darkMode: true,
+            background: '#161921',
+            primaryColor: '#1e3a5f',
+            primaryTextColor: '#e1e4e8',
+            primaryBorderColor: '#64b5f6',
+            lineColor: '#4a5568',
+            secondaryColor: '#1a2332',
+            tertiaryColor: '#1e222d'
+          }
+        });
+        resolve();
+        return;
+      }
+      var script = document.createElement('script');
+      script.src = (document.querySelector('link[rel="manifest"]')
+        ? document.querySelector('link[rel="manifest"]').getAttribute('href').replace('/manifest.json', '')
+        : '') + '/mermaid.min.js';
+      script.onload = function() {
+        if (typeof mermaid !== 'undefined') {
+          mermaid.initialize({
+            startOnLoad: false,
+            flowchart: { useMaxWidth: true },
+            theme: 'dark',
+            themeVariables: {
+              darkMode: true,
+              background: '#161921',
+              primaryColor: '#1e3a5f',
+              primaryTextColor: '#e1e4e8',
+              primaryBorderColor: '#64b5f6',
+              lineColor: '#4a5568',
+              secondaryColor: '#1a2332',
+              tertiaryColor: '#1e222d'
+            }
+          });
+        }
+        resolve();
+      };
+      script.onerror = function() { reject(new Error('Failed to load mermaid.js')); };
+      document.head.appendChild(script);
+    });
+    return mermaidReady;
+  }
+
+  // Render a Kroki diagram via POST
+  function renderKroki(el, type, source) {
+    // Map language aliases to Kroki diagram types
+    var krokiType = type;
+    if (type === 'c4plantuml') krokiType = 'c4plantuml';
+    if (type === 'graphviz') krokiType = 'graphviz';
+
+    fetch('https://kroki.io/' + krokiType + '/svg', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: source
+    }).then(function(res) {
+      if (!res.ok) throw new Error('Kroki returned ' + res.status);
+      return res.text();
+    }).then(function(svg) {
+      el.innerHTML = svg;
+      el.classList.add('dm-diagram-rendered');
+    }).catch(function(err) {
+      console.error('Kroki render error (' + type + '):', err);
+      el.innerHTML = '<div class="dm-diagram-error">Failed to render ' + type + ' diagram</div>' +
+        '<pre><code>' + source.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code></pre>';
+    });
+  }
+
+  /**
+   * Scan a container for .dm-diagram placeholders and render them.
+   * Call this after marked.parse() + hljs highlighting.
+   *
+   * @param {Element} containerEl — the rendered content container
+   */
+  window.dmRenderDiagrams = function(containerEl) {
+    if (!containerEl) return;
+    var diagrams = containerEl.querySelectorAll('.dm-diagram');
+    if (!diagrams.length) return;
+
+    var hasMermaid = false;
+    var krokiDiagrams = [];
+
+    diagrams.forEach(function(el) {
+      var type = el.getAttribute('data-type');
+      var encoded = el.getAttribute('data-source');
+      if (!type || !encoded) return;
+      var source = decodeURIComponent(escape(atob(encoded)));
+      if (type === MERMAID_LANG) {
+        hasMermaid = true;
+        // Set up for mermaid.run()
+        el.classList.add('mermaid');
+        el.textContent = source;
+        el.removeAttribute('data-source');
+      } else {
+        krokiDiagrams.push({ el: el, type: type, source: source });
+      }
+    });
+
+    // Render Mermaid diagrams
+    if (hasMermaid) {
+      loadMermaid().then(function() {
+        if (typeof mermaid !== 'undefined') {
+          // mermaid v10+ uses mermaid.run(), v9 uses mermaid.init()
+          var nodes = containerEl.querySelectorAll('.mermaid');
+          if (mermaid.run) {
+            mermaid.run({ nodes: nodes });
+          } else if (mermaid.init) {
+            mermaid.init(undefined, nodes);
+          }
+        }
+      }).catch(function(err) {
+        console.error('Mermaid load error:', err);
+      });
+    }
+
+    // Render Kroki diagrams
+    krokiDiagrams.forEach(function(d) {
+      renderKroki(d.el, d.type, d.source);
+    });
+  };
 
   /**
    * Enable interactive checkboxes in rendered markdown.
