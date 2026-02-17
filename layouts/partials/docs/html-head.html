@@ -265,9 +265,16 @@
   // The white card (.dm-lightbox-svg-wrap) stays fixed in the center.
   // The SVG content pans and zooms INSIDE it via an inner container
   // (.dm-lightbox-inner) that receives the CSS transform.
+  //
+  // Zoom-toward-point math: when zooming, the point under the cursor
+  // (or pinch center) stays fixed. This uses transform-origin: 0 0
+  // with manual translate/scale, adjusting translate on each zoom so
+  // the cursor-relative point doesn't shift.
   (function() {
     var overlay, svgWrap, innerWrap, currentTransform;
-    var MIN_SCALE = 0.5, MAX_SCALE = 8, ZOOM_STEP = 0.25;
+    var MIN_SCALE = 0.3, MAX_SCALE = 10;
+    var WHEEL_FACTOR = 1.12;   // multiplicative: each wheel tick = 12% zoom
+    var BUTTON_FACTOR = 1.35;  // +/- buttons: 35% per click
 
     function createOverlay() {
       if (overlay) return;
@@ -275,10 +282,10 @@
       overlay.className = 'dm-lightbox';
       overlay.innerHTML =
         '<div class="dm-lightbox-toolbar">' +
-          '<button class="dm-lightbox-btn" data-action="zoom-in" title="Zoom in">+</button>' +
+          '<button class="dm-lightbox-btn" data-action="zoom-in" title="Zoom in (+)">+</button>' +
           '<span class="dm-lightbox-zoom-label">100%</span>' +
-          '<button class="dm-lightbox-btn" data-action="zoom-out" title="Zoom out">&minus;</button>' +
-          '<button class="dm-lightbox-btn" data-action="reset" title="Reset view">Reset</button>' +
+          '<button class="dm-lightbox-btn" data-action="zoom-out" title="Zoom out (&minus;)">&minus;</button>' +
+          '<button class="dm-lightbox-btn" data-action="fit" title="Fit to view">Fit</button>' +
           '<button class="dm-lightbox-btn dm-lightbox-close" data-action="close" title="Close (Esc)">&times;</button>' +
         '</div>' +
         '<div class="dm-lightbox-canvas">' +
@@ -292,37 +299,43 @@
       innerWrap = overlay.querySelector('.dm-lightbox-inner');
       var canvas = overlay.querySelector('.dm-lightbox-canvas');
 
-      // Button actions
+      // -- Button actions --
       overlay.querySelector('.dm-lightbox-toolbar').addEventListener('click', function(e) {
         var btn = e.target.closest('[data-action]');
         if (!btn) return;
         var action = btn.getAttribute('data-action');
         if (action === 'close') closeLightbox();
-        else if (action === 'zoom-in') zoom(ZOOM_STEP);
-        else if (action === 'zoom-out') zoom(-ZOOM_STEP);
-        else if (action === 'reset') resetTransform();
+        else if (action === 'zoom-in') zoomAtCenter(BUTTON_FACTOR);
+        else if (action === 'zoom-out') zoomAtCenter(1 / BUTTON_FACTOR);
+        else if (action === 'fit') fitToView();
       });
 
-      // Close on backdrop click (only the dark area outside the card)
+      // -- Keyboard shortcuts --
+      document.addEventListener('keydown', function(e) {
+        if (!overlay || !overlay.classList.contains('dm-lightbox-open')) return;
+        if (e.key === 'Escape') closeLightbox();
+        else if (e.key === '+' || e.key === '=') zoomAtCenter(BUTTON_FACTOR);
+        else if (e.key === '-' || e.key === '_') zoomAtCenter(1 / BUTTON_FACTOR);
+        else if (e.key === '0') fitToView();
+      });
+
+      // -- Close on backdrop click --
       canvas.addEventListener('click', function(e) {
         if (e.target === canvas) closeLightbox();
       });
 
-      // Close on Escape
-      document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && overlay.classList.contains('dm-lightbox-open')) {
-          closeLightbox();
-        }
-      });
-
-      // Mouse wheel zoom — zooms toward cursor position
+      // -- Mouse wheel zoom toward cursor --
       svgWrap.addEventListener('wheel', function(e) {
         e.preventDefault();
-        var delta = e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP;
-        zoom(delta);
+        var factor = e.deltaY < 0 ? WHEEL_FACTOR : (1 / WHEEL_FACTOR);
+        // Get cursor position relative to the svg-wrap
+        var rect = svgWrap.getBoundingClientRect();
+        var px = e.clientX - rect.left;
+        var py = e.clientY - rect.top;
+        zoomAtPoint(factor, px, py);
       }, { passive: false });
 
-      // Pan with mouse drag inside the card
+      // -- Pan with mouse drag --
       var dragging = false, startX, startY, startTx, startTy;
 
       svgWrap.addEventListener('mousedown', function(e) {
@@ -330,7 +343,7 @@
         dragging = true;
         startX = e.clientX; startY = e.clientY;
         startTx = currentTransform.x; startTy = currentTransform.y;
-        svgWrap.style.cursor = 'grabbing';
+        svgWrap.classList.add('dm-lightbox-dragging');
         e.preventDefault();
       });
 
@@ -344,15 +357,20 @@
       document.addEventListener('mouseup', function() {
         if (dragging) {
           dragging = false;
-          svgWrap.style.cursor = '';
+          svgWrap.classList.remove('dm-lightbox-dragging');
         }
       });
 
-      // Touch: pinch-to-zoom + single-finger pan
-      var lastTouchDist = 0;
+      // -- Touch: pinch-to-zoom toward center + single-finger pan --
+      var lastTouchDist = 0, lastTouchCx = 0, lastTouchCy = 0;
+
       svgWrap.addEventListener('touchstart', function(e) {
         if (e.touches.length === 2) {
           lastTouchDist = touchDist(e.touches);
+          var c = touchCenter(e.touches);
+          var rect = svgWrap.getBoundingClientRect();
+          lastTouchCx = c.x - rect.left;
+          lastTouchCy = c.y - rect.top;
           e.preventDefault();
         } else if (e.touches.length === 1) {
           dragging = true;
@@ -365,10 +383,15 @@
         if (e.touches.length === 2 && lastTouchDist) {
           e.preventDefault();
           var newDist = touchDist(e.touches);
-          var ratio = newDist / lastTouchDist;
-          currentTransform.scale = clampScale(currentTransform.scale * ratio);
+          var factor = newDist / lastTouchDist;
+          var c = touchCenter(e.touches);
+          var rect = svgWrap.getBoundingClientRect();
+          var cx = c.x - rect.left;
+          var cy = c.y - rect.top;
+          zoomAtPoint(factor, cx, cy);
           lastTouchDist = newDist;
-          applyTransform();
+          lastTouchCx = cx;
+          lastTouchCy = cy;
         } else if (e.touches.length === 1 && dragging) {
           currentTransform.x = startTx + (e.touches[0].clientX - startX);
           currentTransform.y = startTy + (e.touches[0].clientY - startY);
@@ -380,6 +403,15 @@
         dragging = false;
         lastTouchDist = 0;
       });
+
+      // -- Double-click to zoom in at point --
+      svgWrap.addEventListener('dblclick', function(e) {
+        var rect = svgWrap.getBoundingClientRect();
+        var px = e.clientX - rect.left;
+        var py = e.clientY - rect.top;
+        zoomAtPoint(BUTTON_FACTOR, px, py);
+        e.preventDefault();
+      });
     }
 
     function touchDist(touches) {
@@ -388,17 +420,51 @@
       return Math.sqrt(dx * dx + dy * dy);
     }
 
+    function touchCenter(touches) {
+      return {
+        x: (touches[0].clientX + touches[1].clientX) / 2,
+        y: (touches[0].clientY + touches[1].clientY) / 2
+      };
+    }
+
     function clampScale(s) {
       return Math.max(MIN_SCALE, Math.min(MAX_SCALE, s));
     }
 
-    function resetTransform() {
-      currentTransform = { x: 0, y: 0, scale: 1 };
+    /**
+     * Zoom toward a specific point (px, py) in svg-wrap coordinates.
+     * The point under (px, py) stays fixed after the zoom.
+     *
+     * Math: before zoom, the content point at (px, py) in wrap space maps to
+     *   contentX = (px - tx) / oldScale
+     *   contentY = (py - ty) / oldScale
+     * After zoom, we want the same content point to stay at (px, py):
+     *   px = newTx + contentX * newScale
+     * Solving: newTx = px - contentX * newScale
+     *        = px - ((px - tx) / oldScale) * newScale
+     */
+    function zoomAtPoint(factor, px, py) {
+      var oldScale = currentTransform.scale;
+      var newScale = clampScale(oldScale * factor);
+      if (newScale === oldScale) return;
+
+      var ratio = newScale / oldScale;
+      currentTransform.x = px - (px - currentTransform.x) * ratio;
+      currentTransform.y = py - (py - currentTransform.y) * ratio;
+      currentTransform.scale = newScale;
       applyTransform();
     }
 
-    function zoom(delta) {
-      currentTransform.scale = clampScale(currentTransform.scale + delta);
+    /** Zoom at the center of the viewport (for +/- buttons and keyboard) */
+    function zoomAtCenter(factor) {
+      if (!svgWrap) return;
+      var rect = svgWrap.getBoundingClientRect();
+      zoomAtPoint(factor, rect.width / 2, rect.height / 2);
+    }
+
+    /** Fit the diagram to fill the viewport */
+    function fitToView() {
+      currentTransform = { x: 0, y: 0, scale: 1 };
       applyTransform();
     }
 
@@ -431,7 +497,8 @@
           svgEl.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
         }
       }
-      resetTransform();
+      currentTransform = { x: 0, y: 0, scale: 1 };
+      applyTransform();
       overlay.classList.add('dm-lightbox-open');
       document.body.style.overflow = 'hidden';
     }

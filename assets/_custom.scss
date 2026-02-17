@@ -3326,7 +3326,7 @@ html.sidebar-collapsed {
   box-shadow: 0 4px 32px rgba(0, 0, 0, 0.4);
   cursor: grab;
 
-  &:active {
+  &.dm-lightbox-dragging {
     cursor: grabbing;
   }
 }
