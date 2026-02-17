@@ -1,0 +1,324 @@
+<!-- dm-sync: IndexedDB cache layer + Firestore sync engine -->
+<script>
+(function() {
+  'use strict';
+
+  var DB_NAME = 'dm-notes';
+  var DB_VERSION = 1;
+  var STORE_NOTES = 'notes';
+  var STORE_META = 'meta';
+  var SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  var _db = null;
+  var _syncTimer = null;
+  var _syncing = false;
+
+  // ─── IndexedDB Wrapper ───
+
+  function openDB() {
+    return new Promise(function(resolve, reject) {
+      if (_db) { resolve(_db); return; }
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function(e) {
+        var db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NOTES)) {
+          var store = db.createObjectStore(STORE_NOTES, { keyPath: 'id' });
+          store.createIndex('destination', 'destination', { unique: false });
+          store.createIndex('language', 'language', { unique: false });
+          store.createIndex('bookTitle', 'bookTitle', { unique: false });
+          store.createIndex('updatedAt', 'updatedAt', { unique: false });
+        }
+        if (!db.objectStoreNames.contains(STORE_META)) {
+          db.createObjectStore(STORE_META, { keyPath: 'key' });
+        }
+      };
+      req.onsuccess = function(e) {
+        _db = e.target.result;
+        resolve(_db);
+      };
+      req.onerror = function(e) {
+        console.error('IndexedDB open error:', e.target.error);
+        reject(e.target.error);
+      };
+    });
+  }
+
+  function idbPut(storeName, data) {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).put(data);
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function idbGet(storeName, key) {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(storeName, 'readonly');
+        var req = tx.objectStore(storeName).get(key);
+        req.onsuccess = function() { resolve(req.result); };
+        req.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function idbGetAll(storeName) {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(storeName, 'readonly');
+        var req = tx.objectStore(storeName).getAll();
+        req.onsuccess = function() { resolve(req.result || []); };
+        req.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function idbDelete(storeName, key) {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).delete(key);
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function idbClear(storeName) {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(storeName, 'readwrite');
+        tx.objectStore(storeName).clear();
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function idbPutBatch(storeName, items) {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(storeName, 'readwrite');
+        var store = tx.objectStore(storeName);
+        items.forEach(function(item) { store.put(item); });
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  // ─── Firestore Document Serializer ───
+
+  function serializeNote(doc) {
+    var data = doc.data();
+    var createdAt = data.createdAt ? data.createdAt.toMillis() : 0;
+    var updatedAt = data.updatedAt ? data.updatedAt.toMillis() : 0;
+    return {
+      id: doc.id,
+      title: data.title || '',
+      content: data.content || '',
+      mode: data.mode || 'note',
+      destination: data.destination || 'inbox',
+      language: data.language || null,
+      bookTitle: data.bookTitle || null,
+      tags: data.tags || [],
+      userId: data.userId || '',
+      userEmail: data.userEmail || '',
+      userName: data.userName || '',
+      createdAt: createdAt,
+      updatedAt: updatedAt
+    };
+  }
+
+  // ─── Sync Engine ───
+
+  function syncNotes(userId) {
+    if (_syncing) return Promise.resolve();
+    if (!window.dmDb) return Promise.reject(new Error('Firestore not available'));
+    _syncing = true;
+
+    console.log('[dm-sync] Starting sync...');
+    var startTime = Date.now();
+
+    // Full sync: fetch all notes for user, diff with local
+    return window.dmDb.collection('notes')
+      .where('userId', '==', userId)
+      .get()
+      .then(function(snapshot) {
+        var remoteNotes = [];
+        snapshot.forEach(function(doc) {
+          remoteNotes.push(serializeNote(doc));
+        });
+
+        return idbGetAll(STORE_NOTES).then(function(localNotes) {
+          var localMap = {};
+          localNotes.forEach(function(n) { localMap[n.id] = n; });
+
+          var remoteMap = {};
+          remoteNotes.forEach(function(n) { remoteMap[n.id] = n; });
+
+          // Find notes to upsert (new or updated)
+          var toUpsert = [];
+          remoteNotes.forEach(function(rn) {
+            var ln = localMap[rn.id];
+            if (!ln || ln.updatedAt !== rn.updatedAt) {
+              toUpsert.push(rn);
+            }
+          });
+
+          // Find notes to delete locally (exist locally but not remotely)
+          var toDelete = [];
+          localNotes.forEach(function(ln) {
+            if (!remoteMap[ln.id]) {
+              toDelete.push(ln.id);
+            }
+          });
+
+          var promises = [];
+          if (toUpsert.length > 0) {
+            promises.push(idbPutBatch(STORE_NOTES, toUpsert));
+          }
+          toDelete.forEach(function(id) {
+            promises.push(idbDelete(STORE_NOTES, id));
+          });
+
+          return Promise.all(promises).then(function() {
+            return idbPut(STORE_META, { key: 'lastSyncTime', value: Date.now() });
+          }).then(function() {
+            var elapsed = Date.now() - startTime;
+            console.log('[dm-sync] Sync complete in ' + elapsed + 'ms. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
+            _syncing = false;
+            // Dispatch event so UI components can re-render
+            window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+            return { upserted: toUpsert.length, deleted: toDelete.length };
+          });
+        });
+      })
+      .catch(function(err) {
+        console.error('[dm-sync] Sync error:', err);
+        _syncing = false;
+        throw err;
+      });
+  }
+
+  function startBackgroundSync(userId) {
+    stopBackgroundSync();
+    _syncTimer = setInterval(function() {
+      syncNotes(userId).catch(function(err) {
+        console.warn('[dm-sync] Background sync failed:', err);
+      });
+    }, SYNC_INTERVAL);
+  }
+
+  function stopBackgroundSync() {
+    if (_syncTimer) {
+      clearInterval(_syncTimer);
+      _syncTimer = null;
+    }
+  }
+
+  // ─── Public API ───
+
+  window.dmSync = {
+    // IndexedDB operations
+    getNote: function(id) { return idbGet(STORE_NOTES, id); },
+    getAllNotes: function() { return idbGetAll(STORE_NOTES); },
+    putNote: function(note) {
+      return idbPut(STORE_NOTES, note).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    },
+    deleteNote: function(id) {
+      return idbDelete(STORE_NOTES, id).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    },
+
+    // Query helpers
+    getNotesByDestination: function(destination) {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        return notes.filter(function(n) { return n.destination === destination; });
+      });
+    },
+    getNotesByLanguage: function(language) {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        return notes.filter(function(n) { return n.language === language; });
+      });
+    },
+    getNotesByBookTitle: function(bookTitle) {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        return notes.filter(function(n) { return n.bookTitle === bookTitle; });
+      });
+    },
+    getBookTitles: function() {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        var titles = {};
+        notes.forEach(function(n) {
+          if (n.destination === 'book-note' && n.bookTitle) {
+            titles[n.bookTitle] = true;
+          }
+        });
+        return Object.keys(titles).sort();
+      });
+    },
+    getSnippetLanguages: function() {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        var langs = {};
+        notes.forEach(function(n) {
+          if (n.destination === 'snippets' && n.language) {
+            langs[n.language] = true;
+          }
+        });
+        return Object.keys(langs).sort();
+      });
+    },
+
+    // Sync operations
+    sync: function(userId) { return syncNotes(userId); },
+    startBackgroundSync: startBackgroundSync,
+    stopBackgroundSync: stopBackgroundSync,
+
+    // Check if cache has data
+    hasCachedData: function() {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        return notes.length > 0;
+      });
+    },
+
+    // Clear cache (on logout)
+    clearCache: function() {
+      stopBackgroundSync();
+      return Promise.all([
+        idbClear(STORE_NOTES),
+        idbClear(STORE_META)
+      ]).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    }
+  };
+
+  // ─── Auto-sync on Auth State Change ───
+
+  if (window.dmAuth) {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        // Sync on login
+        syncNotes(user.uid).then(function() {
+          startBackgroundSync(user.uid);
+        }).catch(function(err) {
+          console.warn('[dm-sync] Initial sync failed, using cached data if available');
+          // Still dispatch so UI renders from whatever cache exists
+          window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+        });
+      } else {
+        stopBackgroundSync();
+        // Don't clear cache on auth state change during page load
+        // Only clear explicitly on sign-out action
+      }
+    });
+  }
+
+})();
+</script>

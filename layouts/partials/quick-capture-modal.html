@@ -91,6 +91,36 @@
       </div>
     </div>
 
+    <!-- Book title field (visible only when Books destination is selected) -->
+    <div class="qc-book-title" id="qc-book-title-row" style="display: none;">
+      <label class="qc-destination-label">Book</label>
+      <input type="text" id="qc-book-title-input" class="qc-book-title-input" placeholder="Book title (e.g., Learning Go)" maxlength="120" list="qc-book-title-list" />
+      <datalist id="qc-book-title-list"></datalist>
+    </div>
+
+    <!-- Inbox mode toggle: Append or New note (visible only when Inbox is selected) -->
+    <div class="qc-inbox-mode" id="qc-inbox-mode-row" style="display: none;">
+      <label class="qc-destination-label">Mode</label>
+      <div class="qc-inbox-mode-options">
+        <button type="button" class="qc-inbox-mode-btn active" data-inbox-mode="append">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <polyline points="19 12 12 19 5 12"></polyline>
+          </svg>
+          Append to Inbox
+        </button>
+        <button type="button" class="qc-inbox-mode-btn" data-inbox-mode="new">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="12" y1="18" x2="12" y2="12"></line>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg>
+          New Note
+        </button>
+      </div>
+    </div>
+
     <!-- Code mode: language selector -->
     <div class="qc-language" id="qc-language-row" style="display: none;">
       <label class="qc-destination-label">Language</label>

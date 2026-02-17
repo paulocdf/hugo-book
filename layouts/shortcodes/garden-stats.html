@@ -1,50 +1,56 @@
-{{- $books := 0 -}}
-{{- $notes := 0 -}}
-{{- $tags := slice -}}
-
-{{- range .Site.RegularPages -}}
-  {{- $dir := "" -}}
-  {{- with .File -}}
-    {{- $dir = .Dir -}}
-  {{- end -}}
-
-  {{- if in $dir "books" -}}
-    {{- $books = add $books 1 -}}
-  {{- else if in $dir "inbox" -}}
-    {{- $notes = add $notes 1 -}}
-  {{- else if in $dir "topics" -}}
-    {{- $notes = add $notes 1 -}}
-  {{- end -}}
-
-  {{- with .Params.tags -}}
-    {{- range . -}}
-      {{- if not (in $tags .) -}}
-        {{- $tags = $tags | append . -}}
-      {{- end -}}
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
-
+<!-- Garden Stats: dynamically counts notes from IndexedDB -->
 <div class="garden-stats">
   <div class="stat-card">
     <span class="stat-icon icon-books">B</span>
     <div class="stat-content">
       <span class="stat-label">Books</span>
-      <span class="stat-value">{{ $books }}</span>
+      <span class="stat-value" id="stat-books">--</span>
     </div>
   </div>
   <div class="stat-card">
     <span class="stat-icon icon-notes">N</span>
     <div class="stat-content">
       <span class="stat-label">Notes</span>
-      <span class="stat-value">{{ $notes }}</span>
+      <span class="stat-value" id="stat-notes">--</span>
     </div>
   </div>
   <div class="stat-card">
     <span class="stat-icon icon-tags">T</span>
     <div class="stat-content">
       <span class="stat-label">Tags</span>
-      <span class="stat-value">{{ len $tags }}</span>
+      <span class="stat-value" id="stat-tags">--</span>
     </div>
   </div>
 </div>
+
+<script>
+(function() {
+  function updateStats() {
+    if (!window.dmSync) return;
+    window.dmSync.getAllNotes().then(function(notes) {
+      if (!notes) return;
+      var books = 0, otherNotes = 0, tagSet = {};
+      notes.forEach(function(n) {
+        if (n.destination === 'book-note') books++;
+        else otherNotes++;
+        (n.tags || []).forEach(function(t) { tagSet[t] = true; });
+      });
+      var booksEl = document.getElementById('stat-books');
+      var notesEl = document.getElementById('stat-notes');
+      var tagsEl = document.getElementById('stat-tags');
+      if (booksEl) booksEl.textContent = books;
+      if (notesEl) notesEl.textContent = otherNotes;
+      if (tagsEl) tagsEl.textContent = Object.keys(tagSet).length;
+    });
+  }
+
+  // Update on sync and on load
+  window.addEventListener('dm-sync-complete', updateStats);
+
+  if (window.dmAuth) {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) updateStats();
+    });
+  }
+})();
+</script>

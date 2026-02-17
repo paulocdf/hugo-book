@@ -49,6 +49,42 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
+<!-- Markdown renderer + Syntax highlighting (client-side) -->
+<script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.min.css" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css" media="(prefers-color-scheme: light)">
+<script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js"></script>
+
+<!-- Configure marked.js to match Hugo's heading rendering -->
+<script>
+(function() {
+  if (typeof marked === 'undefined') return;
+
+  var renderer = new marked.Renderer();
+
+  // Match Hugo's render-heading.html: add id + anchor link
+  renderer.heading = function(data) {
+    var text = data.text || '';
+    var depth = data.depth || 1;
+    var slug = text.toLowerCase()
+      .replace(/<[^>]+>/g, '')
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
+    return '<h' + depth + ' id="' + slug + '">\n  ' +
+      text + '\n  <a class="anchor" href="#' + slug + '">#</a>\n' +
+      '</h' + depth + '>\n';
+  };
+
+  marked.setOptions({
+    renderer: renderer,
+    gfm: true,
+    breaks: false
+  });
+})();
+</script>
+
 <!-- RSS -->
 {{- with .OutputFormats.Get "rss" -}}
   {{ printf `<link rel="%s" type="%s" href="%s" title="%s" />` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}

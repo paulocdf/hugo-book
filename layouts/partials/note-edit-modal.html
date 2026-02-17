@@ -1,0 +1,771 @@
+<!-- Shared Edit Note Modal — included once via inject/body.html -->
+<!-- Exposes: window.dmEditModal.open(note, options), window.dmEditModal.close() -->
+<div class="note-edit-modal" id="note-edit-modal" style="display: none;">
+  <div class="note-edit-backdrop" id="note-edit-backdrop"></div>
+  <div class="note-edit-dialog">
+    <div class="note-edit-header">
+      <h3>Edit Note</h3>
+      <button type="button" class="note-edit-close" id="note-edit-close">&times;</button>
+    </div>
+    <input type="text" id="note-edit-title" class="note-edit-title-input" placeholder="Title">
+
+    <!-- Tags editing -->
+    <div class="note-edit-tags" id="note-edit-tags-row">
+      <div class="note-edit-tags-list" id="note-edit-tags-list"></div>
+      <input type="text" id="note-edit-tag-input" class="note-edit-tag-input" placeholder="Add tag + Enter">
+    </div>
+
+    <!-- Editor + Preview row (side-by-side on wide screens) -->
+    <div class="note-edit-editor-preview-row" id="note-edit-editor-preview-row">
+      <!-- Editor box: toolbar + textarea -->
+      <div class="note-edit-editor-box" id="note-edit-editor-box">
+        <div class="note-edit-toolbar" id="note-edit-toolbar">
+        <button type="button" class="qc-toolbar-btn" data-format="bold" title="Bold (Cmd+B)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+            <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
+          </svg>
+        </button>
+        <button type="button" class="qc-toolbar-btn" data-format="italic" title="Italic (Cmd+I)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="19" y1="4" x2="10" y2="4"></line>
+            <line x1="14" y1="20" x2="5" y2="20"></line>
+            <line x1="15" y1="4" x2="9" y2="20"></line>
+          </svg>
+        </button>
+        <button type="button" class="qc-toolbar-btn" data-format="code" title="Inline code (Cmd+E)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+        </button>
+        <span class="qc-toolbar-sep"></span>
+        <button type="button" class="qc-toolbar-btn" data-format="heading" title="Heading (Cmd+Shift+H)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+            <text x="3" y="18" font-size="16" font-weight="700" font-family="inherit">H</text>
+          </svg>
+        </button>
+        <button type="button" class="qc-toolbar-btn" data-format="bullet" title="Bullet list">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6" x2="21" y2="6"></line>
+            <line x1="8" y1="12" x2="21" y2="12"></line>
+            <line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line>
+            <line x1="3" y1="12" x2="3.01" y2="12"></line>
+            <line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+        </button>
+        <button type="button" class="qc-toolbar-btn" data-format="todo" title="Todo checkbox (Cmd+Shift+T)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="5" width="14" height="14" rx="2" ry="2"></rect>
+            <polyline points="8 11 11 14 17 8"></polyline>
+          </svg>
+        </button>
+        <span class="qc-toolbar-sep"></span>
+        <button type="button" class="qc-toolbar-btn" data-format="link" title="Link">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+          </svg>
+        </button>
+        <span class="qc-toolbar-sep"></span>
+        <button type="button" class="qc-toolbar-btn note-edit-preview-btn" id="note-edit-preview-toggle" title="Toggle preview">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+            <circle cx="12" cy="12" r="3"></circle>
+          </svg>
+        </button>
+      </div>
+      <textarea id="note-edit-content" class="note-edit-textarea" rows="20" placeholder="Write your note..."></textarea>
+    </div>
+
+    <!-- Live preview panel -->
+    <div class="note-edit-preview-wrapper" id="note-edit-preview-wrapper" style="display: none;">
+      <span class="note-edit-preview-label">Preview</span>
+      <div class="note-edit-preview-panel markdown" id="note-edit-preview-panel"></div>
+    </div>
+    </div><!-- end .note-edit-editor-preview-row -->
+
+    <div class="note-edit-actions">
+      <button type="button" class="note-edit-btn-cancel" id="note-edit-cancel">Cancel</button>
+      <button type="button" class="note-edit-btn-save" id="note-edit-save">Save Changes</button>
+    </div>
+    <div class="note-edit-hint">
+      <kbd>Esc</kbd> close &middot; <kbd>Cmd+Enter</kbd> save &middot; <kbd>Cmd+B</kbd> bold &middot; <kbd>Cmd+I</kbd> italic &middot; <kbd>Cmd+E</kbd> code
+    </div>
+
+    <!-- Success/error feedback overlay -->
+    <div class="note-edit-feedback" id="note-edit-feedback" style="display: none;"></div>
+  </div>
+</div>
+
+<style>
+/* ============================
+   Edit modal — shared styles
+   ============================ */
+.note-edit-modal {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.note-edit-backdrop {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.note-edit-dialog {
+  position: relative;
+  background: var(--body-background);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 94%;
+  max-width: 1200px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+  animation: note-edit-in 0.2s ease-out;
+  overflow-y: auto;
+}
+@keyframes note-edit-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.note-edit-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.note-edit-header h3 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+.note-edit-close {
+  background: none; border: none; font-size: 1.5rem;
+  cursor: pointer; color: var(--body-font-color); padding: 4px 8px;
+  border-radius: 6px; transition: background 0.15s;
+}
+.note-edit-close:hover { background: var(--gray-100); }
+.note-edit-title-input {
+  width: 100%;
+  padding: 10px 14px;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.note-edit-title-input:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+
+/* Tags editing */
+.note-edit-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 0.75rem;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  min-height: 36px;
+  background: var(--body-background);
+  transition: border-color 0.2s;
+}
+.note-edit-tags:focus-within {
+  border-color: var(--color-link);
+}
+.note-edit-tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.note-edit-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.note-edit-tag-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.note-edit-tag-remove:hover {
+  background: rgba(255,255,255,0.45);
+}
+.note-edit-tag-input {
+  flex: 1;
+  min-width: 80px;
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  color: var(--body-font-color);
+  font-size: 0.82rem;
+  outline: none;
+}
+.note-edit-tag-input::placeholder {
+  color: var(--gray-400);
+}
+
+/* Editor box: toolbar + textarea */
+.note-edit-editor-box {
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.note-edit-editor-box:focus-within {
+  border-color: var(--color-link);
+}
+.note-edit-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.3rem 0.35rem;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--gray-100);
+}
+.note-edit-preview-btn.active {
+  background: var(--color-link);
+  color: #fff;
+}
+.note-edit-preview-btn.active:hover {
+  background: var(--color-link);
+  color: #fff;
+  filter: brightness(1.1);
+}
+.note-edit-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: none;
+  border-radius: 0;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 400px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  box-sizing: border-box;
+}
+.note-edit-textarea:focus { outline: none; }
+.note-edit-textarea::placeholder { color: var(--gray-400); }
+
+/* Live preview panel */
+.note-edit-preview-wrapper {
+  margin-top: 0.5rem;
+}
+.note-edit-preview-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+}
+.note-edit-preview-panel {
+  max-height: 50vh;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid var(--gray-200);
+  background: var(--body-background);
+  padding: 0.75rem 1rem;
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+.note-edit-preview-panel:empty::before {
+  content: 'Start typing to see preview...';
+  color: var(--gray-400);
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+/* Side-by-side layout on wider screens when preview is visible */
+.note-edit-editor-preview-row {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+@media screen and (min-width: 800px) {
+  .note-edit-editor-preview-row.side-by-side {
+    flex-direction: row;
+    gap: 1rem;
+  }
+  .note-edit-editor-preview-row.side-by-side .note-edit-editor-box {
+    flex: 1;
+    min-width: 0;
+  }
+  .note-edit-editor-preview-row.side-by-side .note-edit-preview-wrapper {
+    flex: 1;
+    min-width: 0;
+    margin-top: 0;
+    display: flex !important;
+    flex-direction: column;
+  }
+  .note-edit-editor-preview-row.side-by-side .note-edit-preview-panel {
+    flex: 1;
+    max-height: none;
+  }
+  .note-edit-editor-preview-row.side-by-side .note-edit-textarea {
+    min-height: 350px;
+  }
+}
+
+/* Actions */
+.note-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 1rem;
+}
+.note-edit-btn-cancel,
+.note-edit-btn-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.note-edit-btn-cancel:hover { background: var(--gray-100); }
+.note-edit-btn-save {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+.note-edit-btn-save:hover {
+  background: var(--color-link);
+  color: #fff;
+}
+
+/* Keyboard hints */
+.note-edit-hint {
+  text-align: center;
+  margin-top: 0.75rem;
+  font-size: 0.7rem;
+  color: var(--gray-400);
+}
+.note-edit-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  font-family: inherit;
+  font-size: 0.65rem;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: 3px;
+  color: var(--gray-500);
+}
+
+/* Feedback overlay */
+.note-edit-feedback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: var(--body-background);
+  border-radius: 14px;
+  z-index: 10;
+  animation: note-edit-feedback-in 0.2s ease;
+}
+.note-edit-feedback--success { color: #34a853; }
+.note-edit-feedback--error { color: #ea4335; }
+.note-edit-feedback-icon { line-height: 0; }
+.note-edit-feedback-text { font-size: 0.95rem; font-weight: 600; }
+@keyframes note-edit-feedback-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Responsive */
+@media screen and (max-width: 600px) {
+  .note-edit-dialog {
+    width: 96%;
+    padding: 1rem;
+    max-height: 94vh;
+    max-width: none;
+  }
+  .note-edit-textarea {
+    min-height: 200px;
+  }
+  .note-edit-preview-panel {
+    max-height: 40vh;
+  }
+  .note-edit-hint {
+    display: none;
+  }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============================
+  // Edit modal — shared module
+  // Exposes: window.dmEditModal = { open(note, options), close() }
+  // options.onSave(updatedNote) — called after successful save
+  // ============================
+
+  var editModal = document.getElementById('note-edit-modal');
+  if (!editModal) return;
+
+  var editBackdrop = document.getElementById('note-edit-backdrop');
+  var editClose = document.getElementById('note-edit-close');
+  var editCancel = document.getElementById('note-edit-cancel');
+  var editSave = document.getElementById('note-edit-save');
+  var editTitleInput = document.getElementById('note-edit-title');
+  var editContentInput = document.getElementById('note-edit-content');
+  var editTagsList = document.getElementById('note-edit-tags-list');
+  var editTagInput = document.getElementById('note-edit-tag-input');
+  var editToolbar = document.getElementById('note-edit-toolbar');
+  var editPreviewToggle = document.getElementById('note-edit-preview-toggle');
+  var editPreviewWrapper = document.getElementById('note-edit-preview-wrapper');
+  var editPreviewPanel = document.getElementById('note-edit-preview-panel');
+  var editEditorPreviewRow = document.getElementById('note-edit-editor-preview-row');
+  var editFeedback = document.getElementById('note-edit-feedback');
+
+  var currentNote = null;
+  var editTags = [];
+  var previewVisible = false;
+  var previewTimer = null;
+  var onSaveCallback = null;
+
+  // ============================
+  // Toolbar helpers
+  // ============================
+  function editWrapSelection(before, after) {
+    var start = editContentInput.selectionStart;
+    var end = editContentInput.selectionEnd;
+    var text = editContentInput.value;
+    var selected = text.slice(start, end);
+    if (start === end) {
+      var inserted = before + after;
+      editContentInput.value = text.slice(0, start) + inserted + text.slice(end);
+      editContentInput.selectionStart = editContentInput.selectionEnd = start + before.length;
+    } else {
+      editContentInput.value = text.slice(0, start) + before + selected + after + text.slice(end);
+      editContentInput.selectionStart = start + before.length;
+      editContentInput.selectionEnd = end + before.length;
+    }
+    editContentInput.focus();
+    scheduleEditPreview();
+  }
+
+  function editPrefixLines(prefix) {
+    var start = editContentInput.selectionStart;
+    var end = editContentInput.selectionEnd;
+    var text = editContentInput.value;
+    var lineStart = text.lastIndexOf('\n', start - 1) + 1;
+    var lineEnd = text.indexOf('\n', end);
+    if (lineEnd === -1) lineEnd = text.length;
+    var block = text.slice(lineStart, lineEnd);
+    var lines = block.split('\n');
+    var prefixed = lines.map(function(line) { return prefix + line; }).join('\n');
+    editContentInput.value = text.slice(0, lineStart) + prefixed + text.slice(lineEnd);
+    var newEnd = lineStart + prefixed.length;
+    editContentInput.selectionStart = lineStart;
+    editContentInput.selectionEnd = newEnd;
+    editContentInput.focus();
+    scheduleEditPreview();
+  }
+
+  function editInsertLink() {
+    var start = editContentInput.selectionStart;
+    var end = editContentInput.selectionEnd;
+    var text = editContentInput.value;
+    var selected = text.slice(start, end);
+    if (selected) {
+      var inserted = '[' + selected + '](url)';
+      editContentInput.value = text.slice(0, start) + inserted + text.slice(end);
+      editContentInput.selectionStart = start + selected.length + 2;
+      editContentInput.selectionEnd = start + selected.length + 5;
+    } else {
+      editContentInput.value = text.slice(0, start) + '[](url)' + text.slice(end);
+      editContentInput.selectionStart = editContentInput.selectionEnd = start + 1;
+    }
+    editContentInput.focus();
+    scheduleEditPreview();
+  }
+
+  function editApplyFormat(format) {
+    switch (format) {
+      case 'bold':    editWrapSelection('**', '**'); break;
+      case 'italic':  editWrapSelection('*', '*'); break;
+      case 'code':    editWrapSelection('`', '`'); break;
+      case 'heading': editPrefixLines('## '); break;
+      case 'bullet':  editPrefixLines('- '); break;
+      case 'todo':    editPrefixLines('- [ ] '); break;
+      case 'link':    editInsertLink(); break;
+    }
+  }
+
+  // Toolbar button click handlers
+  var toolbarButtons = editToolbar.querySelectorAll('.qc-toolbar-btn[data-format]');
+  toolbarButtons.forEach(function(btn) {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      var format = btn.getAttribute('data-format');
+      editApplyFormat(format);
+    });
+  });
+
+  // ============================
+  // Live preview
+  // ============================
+  function updateEditPreview() {
+    if (!previewVisible) return;
+    var content = editContentInput.value || '';
+    if (typeof marked !== 'undefined') {
+      editPreviewPanel.innerHTML = marked.parse(content);
+      editPreviewPanel.querySelectorAll('pre code').forEach(function(block) {
+        if (typeof hljs !== 'undefined') {
+          hljs.highlightElement(block);
+        }
+      });
+    } else {
+      editPreviewPanel.textContent = content;
+    }
+  }
+
+  function scheduleEditPreview() {
+    if (previewTimer) clearTimeout(previewTimer);
+    previewTimer = setTimeout(updateEditPreview, 150);
+  }
+
+  editContentInput.addEventListener('input', scheduleEditPreview);
+
+  editPreviewToggle.addEventListener('click', function(e) {
+    e.preventDefault();
+    previewVisible = !previewVisible;
+    editPreviewWrapper.style.display = previewVisible ? '' : 'none';
+    editPreviewToggle.classList.toggle('active', previewVisible);
+    editEditorPreviewRow.classList.toggle('side-by-side', previewVisible);
+    if (previewVisible) {
+      updateEditPreview();
+    }
+  });
+
+  // ============================
+  // Tags editing
+  // ============================
+  function renderEditTags() {
+    editTagsList.innerHTML = '';
+    editTags.forEach(function(tag, idx) {
+      var chip = document.createElement('span');
+      chip.className = 'note-edit-tag-chip';
+      chip.textContent = tag;
+      var removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'note-edit-tag-remove';
+      removeBtn.innerHTML = '&times;';
+      removeBtn.title = 'Remove tag';
+      removeBtn.addEventListener('click', function() {
+        editTags.splice(idx, 1);
+        renderEditTags();
+      });
+      chip.appendChild(removeBtn);
+      editTagsList.appendChild(chip);
+    });
+  }
+
+  editTagInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var val = editTagInput.value.trim().toLowerCase();
+      if (val && editTags.indexOf(val) === -1) {
+        editTags.push(val);
+        renderEditTags();
+      }
+      editTagInput.value = '';
+    }
+    if (e.key === 'Backspace' && !editTagInput.value && editTags.length > 0) {
+      editTags.pop();
+      renderEditTags();
+    }
+  });
+
+  // ============================
+  // Keyboard shortcuts
+  // ============================
+  editContentInput.addEventListener('keydown', function(e) {
+    var isMac = navigator.platform.indexOf('Mac') > -1;
+    var mod = isMac ? e.metaKey : e.ctrlKey;
+
+    if (mod && !e.shiftKey) {
+      if (e.key === 'b') { e.preventDefault(); editApplyFormat('bold'); }
+      else if (e.key === 'i') { e.preventDefault(); editApplyFormat('italic'); }
+      else if (e.key === 'e') { e.preventDefault(); editApplyFormat('code'); }
+    }
+    if (mod && e.shiftKey) {
+      if (e.key === 'H' || e.key === 'h') { e.preventDefault(); editApplyFormat('heading'); }
+      else if (e.key === 'T' || e.key === 't') { e.preventDefault(); editApplyFormat('todo'); }
+    }
+  });
+
+  editModal.addEventListener('keydown', function(e) {
+    var isMac = navigator.platform.indexOf('Mac') > -1;
+    var mod = isMac ? e.metaKey : e.ctrlKey;
+
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeEditModal();
+    }
+    if (mod && e.key === 'Enter') {
+      e.preventDefault();
+      editSave.click();
+    }
+  });
+
+  // ============================
+  // Feedback overlay
+  // ============================
+  function showEditFeedback(type, message) {
+    var iconSvg = type === 'success'
+      ? '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
+      : '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+
+    editFeedback.className = 'note-edit-feedback note-edit-feedback--' + type;
+    editFeedback.innerHTML =
+      '<span class="note-edit-feedback-icon">' + iconSvg + '</span>' +
+      '<span class="note-edit-feedback-text">' + message + '</span>';
+    editFeedback.style.display = '';
+
+    var delay = type === 'success' ? 1200 : 3000;
+    setTimeout(function() {
+      editFeedback.style.display = 'none';
+      if (type === 'success') {
+        closeEditModal();
+      }
+    }, delay);
+  }
+
+  // ============================
+  // Open / Close / Save
+  // ============================
+  function openEditModal(note, options) {
+    if (!note) return;
+    currentNote = note;
+    onSaveCallback = (options && options.onSave) ? options.onSave : null;
+
+    editTitleInput.value = note.title || '';
+    editContentInput.value = note.content || '';
+    // Initialize tags
+    editTags = (note.tags && note.tags.length) ? note.tags.slice() : [];
+    renderEditTags();
+    // Enable preview by default
+    previewVisible = true;
+    editPreviewWrapper.style.display = '';
+    editPreviewToggle.classList.add('active');
+    editEditorPreviewRow.classList.add('side-by-side');
+    // Reset feedback
+    editFeedback.style.display = 'none';
+    // Reset save button
+    editSave.disabled = false;
+    editSave.textContent = 'Save Changes';
+    // Show modal
+    editModal.style.display = '';
+    // Render preview with current content
+    updateEditPreview();
+    // Focus title
+    setTimeout(function() { editTitleInput.focus(); }, 50);
+  }
+
+  function closeEditModal() {
+    editModal.style.display = 'none';
+    editSave.disabled = false;
+    editSave.textContent = 'Save Changes';
+    currentNote = null;
+    onSaveCallback = null;
+  }
+
+  editBackdrop.addEventListener('click', closeEditModal);
+  editClose.addEventListener('click', closeEditModal);
+  editCancel.addEventListener('click', closeEditModal);
+
+  editSave.addEventListener('click', function() {
+    if (!currentNote || !window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) return;
+
+    var newTitle = editTitleInput.value.trim();
+    var newContent = editContentInput.value.trim();
+    if (!newContent) return;
+
+    editSave.disabled = true;
+    editSave.textContent = 'Saving...';
+
+    var updateData = {
+      title: newTitle,
+      content: newContent,
+      tags: editTags,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    window.dmDb.collection('notes').doc(currentNote.id).update(updateData)
+      .then(function() {
+        // Update local note object
+        currentNote.title = newTitle;
+        currentNote.content = newContent;
+        currentNote.tags = editTags.slice();
+        currentNote.updatedAt = Date.now();
+        return window.dmSync.putNote(currentNote);
+      })
+      .then(function() {
+        // Call the onSave callback with the updated note
+        if (onSaveCallback) {
+          onSaveCallback(currentNote);
+        }
+        // Fire sync event so sidebar and search re-index
+        window.dispatchEvent(new CustomEvent('dm-sync-complete', { detail: { source: 'edit-modal' } }));
+        // Show success feedback
+        showEditFeedback('success', 'Changes saved!');
+        editSave.disabled = false;
+        editSave.textContent = 'Save Changes';
+      })
+      .catch(function(err) {
+        console.error('Error updating note:', err);
+        editSave.disabled = false;
+        editSave.textContent = 'Save Changes';
+        showEditFeedback('error', 'Failed to save. Please try again.');
+      });
+  });
+
+  // Expose public API
+  window.dmEditModal = {
+    open: openEditModal,
+    close: closeEditModal
+  };
+})();
+</script>

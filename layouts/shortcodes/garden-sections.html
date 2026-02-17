@@ -1,61 +1,117 @@
-{{- $bookPages := slice -}}
-{{- $inboxPages := slice -}}
-{{- $topicPages := slice -}}
-
-{{- range .Site.RegularPages -}}
-  {{- $dir := "" -}}
-  {{- with .File -}}
-    {{- $dir = .Dir -}}
-  {{- end -}}
-  {{- if in $dir "books" -}}
-    {{- $bookPages = $bookPages | append . -}}
-  {{- else if in $dir "inbox" -}}
-    {{- $inboxPages = $inboxPages | append . -}}
-  {{- else if in $dir "topics" -}}
-    {{- $topicPages = $topicPages | append . -}}
-  {{- end -}}
-{{- end -}}
-
+<!-- Garden Sections: dynamically populated from IndexedDB -->
 <div class="garden-sections">
+
+<div class="section-card card-inbox">
+<h3><a href="{{ "docs/inbox/" | relURL }}">Inbox</a></h3>
+<p>Quick notes and ideas waiting to be organized.</p>
+<div id="garden-section-inbox"><em>Loading...</em></div>
+</div>
 
 <div class="section-card card-books">
 <h3><a href="{{ "docs/books/" | relURL }}">Books</a></h3>
 <p>Notes and highlights from books I've read.</p>
-{{- if $bookPages -}}
-<ul>
-{{- range $bookPages -}}
-  <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
-{{- end -}}
-</ul>
-{{- end -}}
+<ul id="garden-section-books"><li><em>Loading...</em></li></ul>
 </div>
 
 <div class="section-card card-topics">
 <h3><a href="{{ "docs/topics/" | relURL }}">Topics</a></h3>
 <p>Technical topics, concepts, and reference material.</p>
-{{- if $topicPages -}}
-<ul>
-{{- range $topicPages -}}
-  <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
-{{- end -}}
-</ul>
-{{- else -}}
-<em>Start adding topics to grow your knowledge graph.</em>
-{{- end -}}
-</div>
-
-<div class="section-card card-inbox">
-<h3><a href="{{ "docs/inbox/" | relURL }}">Inbox</a></h3>
-<p>Quick notes and ideas waiting to be organized.</p>
-{{- if $inboxPages -}}
-<ul>
-{{- range $inboxPages -}}
-  <li><a href="{{ .RelPermalink }}">{{ .Title }}</a></li>
-{{- end -}}
-</ul>
-{{- else -}}
-<em>Your inbox is empty. Add some quick notes!</em>
-{{- end -}}
+<ul id="garden-section-topics"><li><em>Loading...</em></li></ul>
 </div>
 
 </div>
+
+<script>
+(function() {
+  var MAX_BOOKS = 10;
+  var MAX_TOPICS = 5;
+
+  function getBaseUrl() {
+    var manifest = document.querySelector('link[rel="manifest"]');
+    if (manifest) return manifest.getAttribute('href').replace('/manifest.json', '');
+    return '';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function updateSections() {
+    if (!window.dmSync) return;
+    var baseUrl = getBaseUrl();
+
+    window.dmSync.getAllNotes().then(function(notes) {
+      if (!notes) return;
+
+      var books = [], topics = [], inbox = [];
+      notes.forEach(function(n) {
+        if (n.destination === 'book-note') books.push(n);
+        else if (n.destination === 'topic') topics.push(n);
+        else if (n.destination === 'inbox') inbox.push(n);
+      });
+
+      function renderList(elId, items, max, sectionPath, emptyMsg) {
+        var el = document.getElementById(elId);
+        if (!el) return;
+        if (!items.length) {
+          el.innerHTML = '<li><em>' + emptyMsg + '</em></li>';
+          return;
+        }
+        var shown = items.slice(0, max);
+        var html = shown.map(function(n) {
+          var url = baseUrl + '/docs/view/?id=' + encodeURIComponent(n.id);
+          return '<li><a href="' + url + '">' + escapeHtml(n.title || 'Untitled') + '</a></li>';
+        }).join('');
+        if (items.length > max) {
+          html += '<li class="garden-section-viewall"><a href="' + baseUrl + sectionPath + '">View all ' + items.length + '</a></li>';
+        }
+        el.innerHTML = html;
+      }
+
+      // Render inbox as a content preview (single-note model)
+      function renderInboxPreview() {
+        var el = document.getElementById('garden-section-inbox');
+        if (!el) return;
+        if (!inbox.length) {
+          el.innerHTML = '<em>Your inbox is empty. Add some quick notes!</em>';
+          return;
+        }
+        inbox.sort(function(a, b) { return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); });
+        var note = inbox[0];
+        var content = note.content || '';
+        content = content.replace(/^\s*#\s+.+\n*/, '');
+        var preview = content.length > 200 ? content.substring(0, 200) + '...' : content;
+        el.innerHTML = '<p style="font-size: 0.85rem; color: var(--gray-500); line-height: 1.5; margin: 0;">' + escapeHtml(preview) + '</p>';
+      }
+
+      // Sort by most recently updated
+      books.sort(function(a, b) { return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); });
+      topics.sort(function(a, b) { return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); });
+
+      renderInboxPreview();
+      renderList('garden-section-books', books, MAX_BOOKS, '/docs/books/', 'No book notes yet.');
+      renderList('garden-section-topics', topics, MAX_TOPICS, '/docs/topics/', 'Start adding topics to grow your knowledge graph.');
+    });
+  }
+
+  window.addEventListener('dm-sync-complete', updateSections);
+
+  if (window.dmAuth) {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        updateSections();
+      } else {
+        ['garden-section-books', 'garden-section-topics'].forEach(function(id) {
+          var el = document.getElementById(id);
+          if (el) el.innerHTML = '<li><em>Sign in to see your notes.</em></li>';
+        });
+        var inboxEl = document.getElementById('garden-section-inbox');
+        if (inboxEl) inboxEl.innerHTML = '<em>Sign in to see your notes.</em>';
+      }
+    });
+  }
+})();
+</script>

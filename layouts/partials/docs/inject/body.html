@@ -109,6 +109,8 @@
 
 {{ partial "quick-capture-modal.html" . }}
 
+{{ partial "note-edit-modal" . }}
+
 {{ partial "search-modal.html" . }}
 
 <!-- Quick Capture modal logic -->
@@ -128,6 +130,11 @@
   var langButtons = document.querySelectorAll('.qc-lang-btn');
   var destRow = document.getElementById('qc-destination-row');
   var langRow = document.getElementById('qc-language-row');
+  var bookTitleRow = document.getElementById('qc-book-title-row');
+  var bookTitleInput = document.getElementById('qc-book-title-input');
+  var bookTitleDatalist = document.getElementById('qc-book-title-list');
+  var inboxModeRow = document.getElementById('qc-inbox-mode-row');
+  var inboxModeButtons = document.querySelectorAll('.qc-inbox-mode-btn');
   var previewWrapper = document.getElementById('qc-preview-wrapper');
   var previewPanel = document.getElementById('qc-preview-panel');
   var notePreviewWrapper = document.getElementById('qc-note-preview-wrapper');
@@ -151,6 +158,7 @@
   // State
   var currentMode = 'note'; // 'note' or 'code'
   var selectedLang = 'kotlin';
+  var inboxMode = 'append'; // 'append' or 'new'
   var selectedDest = {
     path: 'content/docs/inbox',
     tag: 'inbox'
@@ -585,6 +593,8 @@
         previewWrapper.style.display = '';
         notePreviewWrapper.style.display = 'none';
         if (toolbar) toolbar.style.display = 'none';
+        if (inboxModeRow) inboxModeRow.style.display = 'none';
+        if (bookTitleRow) bookTitleRow.style.display = 'none';
         input.classList.add('code-mode');
         dialog.classList.add('code-mode');
         input.placeholder = 'Paste or type your code here...';
@@ -594,6 +604,9 @@
         langRow.style.display = 'none';
         previewWrapper.style.display = 'none';
         if (toolbar) toolbar.style.display = '';
+        // Restore inbox mode / book title visibility based on current destination
+        if (inboxModeRow) inboxModeRow.style.display = selectedDest.tag === 'inbox' ? '' : 'none';
+        if (bookTitleRow) bookTitleRow.style.display = selectedDest.tag === 'book-note' ? '' : 'none';
         input.classList.remove('code-mode');
         dialog.classList.remove('code-mode');
         input.placeholder = "What's on your mind?";
@@ -609,6 +622,30 @@
       dbtn.classList.add('active');
       selectedDest.path = dbtn.getAttribute('data-path');
       selectedDest.tag = dbtn.getAttribute('data-tag');
+
+      // Show/hide book title input
+      if (selectedDest.tag === 'book-note' && bookTitleRow) {
+        bookTitleRow.style.display = '';
+        populateBookTitleDatalist();
+      } else if (bookTitleRow) {
+        bookTitleRow.style.display = 'none';
+      }
+
+      // Show/hide inbox mode toggle
+      if (selectedDest.tag === 'inbox' && inboxModeRow) {
+        inboxModeRow.style.display = '';
+      } else if (inboxModeRow) {
+        inboxModeRow.style.display = 'none';
+      }
+    });
+  });
+
+  // Inbox mode button click handling
+  inboxModeButtons.forEach(function(ibtn) {
+    ibtn.addEventListener('click', function() {
+      inboxModeButtons.forEach(function(b) { b.classList.remove('active'); });
+      ibtn.classList.add('active');
+      inboxMode = ibtn.getAttribute('data-inbox-mode');
     });
   });
 
@@ -622,6 +659,24 @@
     });
   });
 
+  // Populate the book title datalist with existing book titles from IndexedDB
+  function populateBookTitleDatalist() {
+    if (!bookTitleDatalist || !window.dmSync) return;
+    window.dmSync.getAllNotes().then(function(notes) {
+      var titles = {};
+      notes.forEach(function(n) {
+        if (n.destination === 'book-note' && n.bookTitle) {
+          titles[n.bookTitle] = true;
+        }
+      });
+      var html = '';
+      Object.keys(titles).sort().forEach(function(t) {
+        html += '<option value="' + t.replace(/"/g, '&quot;') + '">';
+      });
+      bookTitleDatalist.innerHTML = html;
+    });
+  }
+
   function openModal() {
     // Reset state
     currentMode = 'note';
@@ -630,11 +685,23 @@
     modeButtons[0].classList.add('active');
     destRow.style.display = '';
     langRow.style.display = 'none';
+    if (bookTitleRow) bookTitleRow.style.display = 'none';
+    if (bookTitleInput) bookTitleInput.value = '';
+    // Reset inbox mode toggle — show it since default dest is Inbox
+    inboxMode = 'append';
+    if (inboxModeRow) inboxModeRow.style.display = '';
+    inboxModeButtons.forEach(function(b) { b.classList.remove('active'); });
+    if (inboxModeButtons.length) inboxModeButtons[0].classList.add('active');
     previewWrapper.style.display = 'none';
     notePreviewWrapper.style.display = 'none';
     if (toolbar) toolbar.style.display = '';
     langButtons.forEach(function(b) { b.classList.remove('active'); });
     langButtons[0].classList.add('active');
+    // Reset destination to Inbox
+    destButtons.forEach(function(b) { b.classList.remove('active'); });
+    destButtons[0].classList.add('active');
+    selectedDest.path = destButtons[0].getAttribute('data-path');
+    selectedDest.tag = destButtons[0].getAttribute('data-tag');
     input.classList.remove('code-mode');
     dialog.classList.remove('code-mode');
     input.placeholder = "What's on your mind?";
@@ -653,6 +720,7 @@
     modal.setAttribute('aria-hidden', 'true');
     titleInput.value = '';
     input.value = '';
+    if (bookTitleInput) bookTitleInput.value = '';
     isSaving = false;
     if (feedbackEl) feedbackEl.style.display = 'none';
   }
@@ -704,13 +772,86 @@
       noteData.destination = selectedDest.tag;
       noteData.tags = [selectedDest.tag];
       noteData.language = null;
+
+      // Include bookTitle for book notes
+      if (selectedDest.tag === 'book-note' && bookTitleInput) {
+        noteData.bookTitle = bookTitleInput.value.trim() || null;
+      }
     }
 
+    // Inbox append mode: append to existing single note instead of creating a new one
+    if (noteData.destination === 'inbox' && inboxMode === 'append' && window.dmSync) {
+      window.dmSync.getNotesByDestination('inbox').then(function(inboxNotes) {
+        if (inboxNotes && inboxNotes.length > 0) {
+          // Append to existing inbox note
+          inboxNotes.sort(function(a, b) { return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); });
+          var existing = inboxNotes[0];
+          var separator = '\n\n---\n\n';
+          var heading = userTitle ? ('## ' + userTitle + '\n\n') : '';
+          var appended = existing.content + separator + heading + text;
+
+          var updateData = {
+            content: appended,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+
+          window.dmDb.collection('notes').doc(existing.id).update(updateData)
+            .then(function() {
+              existing.content = appended;
+              existing.updatedAt = Date.now();
+              return window.dmSync.putNote(existing);
+            })
+            .then(function() {
+              isSaving = false;
+              submitBtn.disabled = false;
+              showFeedback('success', 'Added to Inbox!');
+              window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+            })
+            .catch(function(err) {
+              console.error('Firestore append error:', err);
+              isSaving = false;
+              submitBtn.disabled = false;
+              showFeedback('error', 'Failed to save. Please try again.');
+            });
+        } else {
+          // No inbox note exists yet — create one
+          noteData.title = 'Inbox';
+          var heading = userTitle ? ('## ' + userTitle + '\n\n') : '';
+          noteData.content = heading + text;
+          createNewNote(noteData);
+        }
+      }).catch(function(err) {
+        console.error('Error checking inbox notes:', err);
+        isSaving = false;
+        submitBtn.disabled = false;
+        showFeedback('error', 'Failed to save. Please try again.');
+      });
+      return;
+    }
+
+    // All other destinations: create a new note
+    createNewNote(noteData);
+  }
+
+  function createNewNote(noteData) {
     window.dmDb.collection('notes').add(noteData)
-      .then(function() {
+      .then(function(docRef) {
+        // Dual-write: also save to IndexedDB cache
+        if (window.dmSync) {
+          var localNote = Object.assign({}, noteData, {
+            id: docRef.id,
+            createdAt: Date.now(),
+            updatedAt: Date.now()
+          });
+          window.dmSync.putNote(localNote).catch(function(err) {
+            console.error('IndexedDB cache write error:', err);
+          });
+        }
         isSaving = false;
         submitBtn.disabled = false;
         showFeedback('success', 'Note saved!');
+        // Fire sync event so sidebar updates
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
       })
       .catch(function(err) {
         console.error('Firestore write error:', err);
@@ -809,37 +950,370 @@
 })();
 </script>
 
-<!-- ToC scroll spy, reading progress, and auto-hide -->
+<!-- Dynamic sidebar: populates sidebar entries from IndexedDB cache -->
 <script>
 (function() {
+  'use strict';
+
+  var ICONS = {
+    books: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>',
+    topics: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>',
+    inbox: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>',
+    snippets: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
+    tags: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>'
+  };
+
+  function getBaseUrl() {
+    var manifest = document.querySelector('link[rel="manifest"]');
+    if (manifest) return manifest.getAttribute('href').replace('/manifest.json', '');
+    return '';
+  }
+
+  function viewUrl(noteId) {
+    return getBaseUrl() + '/docs/view/?id=' + encodeURIComponent(noteId);
+  }
+
+  function sectionUrl(section) {
+    return getBaseUrl() + '/docs/' + section + '/';
+  }
+
+  function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function randomId() {
+    return 'dmsb-' + Math.random().toString(36).substr(2, 9);
+  }
+
+  // Check if current page matches a URL
+  function isActive(url) {
+    return window.location.pathname === url || window.location.pathname === url.replace(/\/$/, '');
+  }
+
+  function isViewPage(noteId) {
+    var params = new URLSearchParams(window.location.search);
+    return params.get('id') === noteId;
+  }
+
+  function buildSectionHtml(title, icon, sectionPath, children, isOpen) {
+    var checkId = randomId();
+    var checked = isOpen ? ' checked' : '';
+    var html = '<li class="sidebar-section" data-section="' + escapeHtml(title.toLowerCase()) + '">';
+    html += '<input type="checkbox" id="' + checkId + '" class="toggle"' + checked + ' />';
+    html += '<label for="' + checkId + '" class="flex justify-between">';
+    html += '<a href="' + sectionPath + '">' + icon + escapeHtml(title) + '</a>';
+    html += '</label>';
+    html += '<ul>' + children + '</ul>';
+    html += '</li>';
+    return html;
+  }
+
+  function buildNoteItem(note) {
+    var active = isViewPage(note.id) ? ' class="active"' : '';
+    return '<li class="sidebar-item" data-section="' + escapeHtml((note.title || '').toLowerCase()) + '">' +
+      '<a href="' + viewUrl(note.id) + '"' + active + '>' + escapeHtml(note.title || 'Untitled') + '</a>' +
+      '</li>';
+  }
+
+  function buildSubSection(title, notes, isOpen) {
+    var checkId = randomId();
+    var checked = isOpen ? ' checked' : '';
+    var children = '';
+    notes.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    notes.forEach(function(n) { children += buildNoteItem(n); });
+
+    var html = '<li class="sidebar-section" data-section="' + escapeHtml(title.toLowerCase()) + '">';
+    html += '<input type="checkbox" id="' + checkId + '" class="toggle"' + checked + ' />';
+    html += '<label for="' + checkId + '" class="flex justify-between">';
+    html += '<a role="button">' + escapeHtml(title) + '</a>';
+    html += '</label>';
+    html += '<ul>' + children + '</ul>';
+    html += '</li>';
+    return html;
+  }
+
+  function sortByCreatedAt(notes) {
+    return notes.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+  }
+
+  var SIDEBAR_MAX = 10;
+
+  function renderDynamicSidebar(allNotes) {
+    var menuNav = document.querySelector('.book-menu-content nav');
+    if (!menuNav) return;
+
+    // Find the existing <ul> that contains sections
+    var existingUl = menuNav.querySelector('ul');
+    if (!existingUl) return;
+
+    // Categorize notes (inbox excluded — it's a single scrollable page)
+    var bookNotes = {};      // grouped by bookTitle
+    var topicNotes = [];
+    var snippetNotes = {};   // grouped by language
+
+    allNotes.forEach(function(n) {
+      if (n.destination === 'book-note') {
+        var bt = n.bookTitle || 'Uncategorized';
+        if (!bookNotes[bt]) bookNotes[bt] = [];
+        bookNotes[bt].push(n);
+      } else if (n.destination === 'topic') {
+        topicNotes.push(n);
+      } else if (n.destination === 'snippets') {
+        var lang = n.language || 'other';
+        if (!snippetNotes[lang]) snippetNotes[lang] = [];
+        snippetNotes[lang].push(n);
+      }
+    });
+
+    // Check which note is currently being viewed
+    var currentNoteId = new URLSearchParams(window.location.search).get('id');
+    var currentNote = currentNoteId ? allNotes.find(function(n) { return n.id === currentNoteId; }) : null;
+
+    // Build Books section — flat list, one entry per book (no sub-grouping)
+    var booksChildren = '';
+    // Flatten all book notes, sorted by most recently updated
+    var allBookNotes = [];
+    Object.keys(bookNotes).sort().forEach(function(bt) {
+      sortByCreatedAt(bookNotes[bt]);
+      bookNotes[bt].forEach(function(n) { allBookNotes.push(n); });
+    });
+    allBookNotes.sort(function(a, b) { return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); });
+    var shownBooks = allBookNotes.slice(0, SIDEBAR_MAX);
+    shownBooks.forEach(function(n) { booksChildren += buildNoteItem(n); });
+    if (allBookNotes.length > SIDEBAR_MAX) {
+      booksChildren += '<li class="sidebar-item sidebar-viewall"><a href="' + sectionUrl('books') + '">View all ' + allBookNotes.length + '</a></li>';
+    }
+
+    // Build Topics section
+    var topicsChildren = '';
+    sortByCreatedAt(topicNotes);
+    var shownTopics = topicNotes.slice(0, SIDEBAR_MAX);
+    shownTopics.forEach(function(n) { topicsChildren += buildNoteItem(n); });
+    if (topicNotes.length > SIDEBAR_MAX) {
+      topicsChildren += '<li class="sidebar-item sidebar-viewall"><a href="' + sectionUrl('topics') + '">View all ' + topicNotes.length + '</a></li>';
+    }
+
+    // Build Inbox section — no children, inbox is a single scrollable page
+    var inboxActive = window.location.pathname.indexOf('/docs/inbox') !== -1 ? ' class="active"' : '';
+
+    // Build Snippets section — sub-sections by language, each limited to top 10
+    var snippetsChildren = '';
+    Object.keys(snippetNotes).sort().forEach(function(lang) {
+      var langTitle = lang.charAt(0).toUpperCase() + lang.slice(1);
+      var subOpen = currentNote && currentNote.language === lang;
+      var langNotes = snippetNotes[lang];
+      langNotes.sort(function(a, b) { return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); });
+      snippetsChildren += buildSubSection(langTitle, langNotes.slice(0, SIDEBAR_MAX), subOpen);
+    });
+
+    // All sections expanded by default
+    var booksOpen = true;
+    var topicsOpen = true;
+    var snippetsOpen = true;
+
+    // Build the full sidebar HTML
+    var html = '';
+    // Inbox first — accented, single page, no sub-entries
+    html += '<li class="sidebar-item sidebar-inbox" data-section="inbox">' +
+      '<a href="' + sectionUrl('inbox') + '"' + inboxActive + '>' + ICONS.inbox + 'Inbox</a>' +
+      '</li>';
+    html += buildSectionHtml('Books', ICONS.books, sectionUrl('books'), booksChildren, booksOpen);
+    html += buildSectionHtml('Topics', ICONS.topics, sectionUrl('topics'), topicsChildren, topicsOpen);
+    html += buildSectionHtml('Snippets', ICONS.snippets, sectionUrl('snippets'), snippetsChildren, snippetsOpen);
+
+    // Add Tags entry (static)
+    var tagsActive = window.location.pathname.indexOf('/docs/tags') !== -1 ? ' class="active"' : '';
+    html += '<li class="sidebar-item" data-section="tags">' +
+      '<a href="' + sectionUrl('tags') + '"' + tagsActive + '>' + ICONS.tags + 'Tags</a>' +
+      '</li>';
+
+    // Replace sidebar content
+    existingUl.innerHTML = html;
+  }
+
+  function renderAuthPrompt() {
+    var menuNav = document.querySelector('.book-menu-content nav');
+    if (!menuNav) return;
+
+    var existingUl = menuNav.querySelector('ul');
+    if (!existingUl) return;
+
+    var base = getBaseUrl();
+    var html = '';
+
+    // Show section headers without children
+    html += buildSectionHtml('Books', ICONS.books, sectionUrl('books'), '', false);
+    html += buildSectionHtml('Topics', ICONS.topics, sectionUrl('topics'), '', false);
+    // Inbox: simple link, no sub-entries
+    html += '<li class="sidebar-item" data-section="inbox">' +
+      '<a href="' + sectionUrl('inbox') + '">' + ICONS.inbox + 'Inbox</a>' +
+      '</li>';
+    html += buildSectionHtml('Snippets', ICONS.snippets, sectionUrl('snippets'), '', false);
+
+    var tagsActive = window.location.pathname.indexOf('/docs/tags') !== -1 ? ' class="active"' : '';
+    html += '<li class="sidebar-item" data-section="tags">' +
+      '<a href="' + sectionUrl('tags') + '"' + tagsActive + '>' + ICONS.tags + 'Tags</a>' +
+      '</li>';
+
+    existingUl.innerHTML = html;
+  }
+
+  // Listen for sync completion
+  window.addEventListener('dm-sync-complete', function() {
+    if (!window.dmSync) return;
+    window.dmSync.getAllNotes().then(function(notes) {
+      if (notes.length > 0) {
+        renderDynamicSidebar(notes);
+      }
+    });
+  });
+
+  // Auth state change
+  if (window.dmAuth) {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        // Try to render from cache immediately
+        if (window.dmSync) {
+          window.dmSync.getAllNotes().then(function(notes) {
+            if (notes.length > 0) {
+              renderDynamicSidebar(notes);
+            }
+            // Sync will fire dm-sync-complete which will re-render
+          });
+        }
+      } else {
+        renderAuthPrompt();
+      }
+    });
+  }
+})();
+</script>
+
+<!-- Dynamic ToC builder + scroll spy -->
+<script>
+(function() {
+  'use strict';
+
   var toc = document.querySelector('.book-toc');
   if (!toc) return;
 
-  var tocNav = toc.querySelector('nav#TableOfContents');
-  var tocLinks = tocNav ? tocNav.querySelectorAll('a') : [];
-  var progressBar = document.getElementById('toc-progress-bar');
+  var tocContent = toc.querySelector('.book-toc-content');
+  if (!tocContent) return;
 
-  // Auto-hide ToC if fewer than 2 headings
-  if (tocLinks.length < 2) {
-    toc.style.display = 'none';
-    return;
+  var progressBar = document.getElementById('toc-progress-bar');
+  var rafId = null;
+  var headingMap = [];
+  var tocLinks = [];
+
+  // Slugify heading text to create IDs
+  function slugify(text) {
+    return text.toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
   }
 
-  // Build a map of heading IDs to ToC link elements
-  var headingMap = [];
-  tocLinks.forEach(function(link) {
-    var href = link.getAttribute('href');
-    if (!href || href.charAt(0) !== '#') return;
-    var id = decodeURIComponent(href.substring(1));
-    var heading = document.getElementById(id);
-    if (heading) {
-      headingMap.push({ el: heading, link: link });
+  // Build ToC from rendered DOM headings
+  function buildDynamicToc() {
+    // Find the content area where marked.js renders
+    var contentArea = document.querySelector('.note-viewer-body') ||
+                      document.querySelector('.single-note-body') ||
+                      document.querySelector('.section-notes-list') ||
+                      document.querySelector('article.markdown');
+    if (!contentArea) return;
+
+    var headings = contentArea.querySelectorAll('h1, h2, h3, h4');
+    if (headings.length < 2) {
+      toc.style.display = 'none';
+      return;
     }
-  });
 
-  if (!headingMap.length) return;
+    // Ensure headings have IDs
+    headings.forEach(function(h) {
+      if (!h.id) {
+        h.id = slugify(h.textContent);
+      }
+    });
 
-  var rafId = null;
+    // Determine the minimum heading level present
+    var minLevel = 6;
+    headings.forEach(function(h) {
+      var level = parseInt(h.tagName.charAt(1));
+      if (level < minLevel) minLevel = level;
+    });
+
+    // Build nested list HTML
+    var html = '<nav id="TableOfContents"><ul>';
+    var prevLevel = minLevel;
+
+    headings.forEach(function(h) {
+      var level = parseInt(h.tagName.charAt(1));
+      var text = h.textContent;
+      var id = h.id;
+
+      // Handle nesting
+      if (level > prevLevel) {
+        for (var i = 0; i < level - prevLevel; i++) {
+          html += '<ul>';
+        }
+      } else if (level < prevLevel) {
+        for (var i = 0; i < prevLevel - level; i++) {
+          html += '</li></ul>';
+        }
+        html += '</li>';
+      } else if (html !== '<nav id="TableOfContents"><ul>') {
+        html += '</li>';
+      }
+
+      html += '<li><a href="#' + id + '">' + text + '</a>';
+      prevLevel = level;
+    });
+
+    // Close remaining tags
+    for (var i = 0; i < prevLevel - minLevel; i++) {
+      html += '</li></ul>';
+    }
+    html += '</li></ul></nav>';
+
+    // Inject into ToC container (after progress bar and header)
+    var existingNav = tocContent.querySelector('nav#TableOfContents');
+    if (existingNav) {
+      existingNav.remove();
+    }
+    tocContent.insertAdjacentHTML('beforeend', html);
+
+    toc.style.display = '';
+
+    // Re-initialize scroll spy
+    initScrollSpy();
+  }
+
+  function initScrollSpy() {
+    headingMap = [];
+    var tocNav = tocContent.querySelector('nav#TableOfContents');
+    tocLinks = tocNav ? Array.from(tocNav.querySelectorAll('a')) : [];
+
+    if (tocLinks.length < 2) {
+      toc.style.display = 'none';
+      return;
+    }
+
+    tocLinks.forEach(function(link) {
+      var href = link.getAttribute('href');
+      if (!href || href.charAt(0) !== '#') return;
+      var id = decodeURIComponent(href.substring(1));
+      var heading = document.getElementById(id);
+      if (heading) {
+        headingMap.push({ el: heading, link: link });
+      }
+    });
+
+    if (!headingMap.length) return;
+    update();
+  }
 
   function update() {
     rafId = null;
@@ -852,7 +1326,7 @@
       progressBar.style.setProperty('--progress', (progress * 100) + '%');
     }
 
-    // Scroll spy: find the heading closest to the top of the viewport
+    // Scroll spy
     var scrollPos = window.scrollY || document.documentElement.scrollTop;
     var offset = 80;
     var activeHeading = null;
@@ -864,12 +1338,10 @@
       }
     }
 
-    // If scrolled to the very top, activate first heading
     if (!activeHeading && headingMap.length > 0) {
       activeHeading = headingMap[0];
     }
 
-    // Update active class
     tocLinks.forEach(function(link) {
       link.classList.remove('active');
       link.parentElement.classList.remove('toc-active');
@@ -888,7 +1360,21 @@
   }
 
   window.addEventListener('scroll', onScroll, { passive: true });
-  update();
+
+  // Listen for dynamically rendered content
+  window.addEventListener('dm-content-rendered', function() {
+    buildDynamicToc();
+  });
+
+  // Also try building from Hugo's static ToC on page load
+  var existingNav = tocContent.querySelector('nav#TableOfContents');
+  var existingLinks = existingNav ? existingNav.querySelectorAll('a') : [];
+  if (existingLinks.length >= 2) {
+    initScrollSpy();
+  } else {
+    // No static ToC — hide until dynamic content arrives
+    toc.style.display = 'none';
+  }
 })();
 </script>
 

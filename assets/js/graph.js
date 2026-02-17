@@ -83,20 +83,117 @@
   init();
 
   // =========================================================================
+  // Build graph data from IndexedDB notes
+  // =========================================================================
+  function getBaseUrl() {
+    var manifest = document.querySelector('link[rel="manifest"]');
+    if (manifest) return manifest.getAttribute('href').replace('/manifest.json', '');
+    return '';
+  }
+
+  function destinationToCategory(dest) {
+    if (dest === 'book-note') return 'books';
+    if (dest === 'topic') return 'topics';
+    if (dest === 'inbox') return 'inbox';
+    if (dest === 'snippets') return 'snippets';
+    return 'default';
+  }
+
+  function buildGraphFromNotes(notes) {
+    var baseUrl = getBaseUrl();
+    var nodes = [];
+    var edges = [];
+    var edgeSet = {};
+
+    // Build nodes
+    notes.forEach(function(note) {
+      if (!note.title) return;
+      nodes.push({
+        id: note.id,
+        path: baseUrl + '/docs/view/?id=' + encodeURIComponent(note.id),
+        label: note.title,
+        number_neighbours: 0,
+        category: destinationToCategory(note.destination),
+        tags: note.tags || []
+      });
+    });
+
+    // Build edges from shared tags
+    for (var i = 0; i < nodes.length; i++) {
+      var tagsA = nodes[i].tags;
+      if (!tagsA || !tagsA.length) continue;
+      for (var j = i + 1; j < nodes.length; j++) {
+        var tagsB = nodes[j].tags;
+        if (!tagsB || !tagsB.length) continue;
+        // Check for shared tags
+        var shared = false;
+        for (var ti = 0; ti < tagsA.length; ti++) {
+          if (tagsB.indexOf(tagsA[ti]) !== -1) { shared = true; break; }
+        }
+        if (shared) {
+          var key = nodes[i].id < nodes[j].id
+            ? nodes[i].id + '|' + nodes[j].id
+            : nodes[j].id + '|' + nodes[i].id;
+          if (!edgeSet[key]) {
+            edgeSet[key] = true;
+            edges.push({ source: nodes[i].id, target: nodes[j].id, type: 'tag' });
+          }
+        }
+      }
+    }
+
+    // Count neighbours
+    edges.forEach(function(edge) {
+      nodes.forEach(function(node) {
+        if (node.id === edge.source || node.id === edge.target) {
+          node.number_neighbours++;
+        }
+      });
+    });
+
+    return { nodes: nodes, edges: edges };
+  }
+
+  // =========================================================================
   // Initialization
   // =========================================================================
   function init() {
     createTooltip();
     attachToggleListeners();
 
-    fetch(CONFIG.GRAPH_DATA_URL)
-      .then(res => res.json())
-      .then(graphData => {
-        cachedData = graphData;
-        // Apply saved view
-        switchView(currentView);
-      })
-      .catch(err => console.error('Graph data load error:', err));
+    // Try loading from IndexedDB first (dynamic data)
+    function loadFromIndexedDB() {
+      if (!window.dmSync) return Promise.reject('no dmSync');
+      return window.dmSync.getAllNotes().then(function(notes) {
+        if (!notes || !notes.length) return Promise.reject('no notes');
+        return buildGraphFromNotes(notes);
+      });
+    }
+
+    function onDataReady(graphData) {
+      cachedData = graphData;
+      graphRendered = false;
+      gridRendered = false;
+      radialRendered = false;
+      currentNodeId = -1;
+      nodesSize = {};
+      switchView(currentView);
+    }
+
+    loadFromIndexedDB()
+      .then(onDataReady)
+      .catch(function() {
+        // Fallback to static JSON (may be empty after migration)
+        fetch(CONFIG.GRAPH_DATA_URL)
+          .then(function(res) { return res.json(); })
+          .then(onDataReady)
+          .catch(function(err) { console.error('Graph data load error:', err); });
+      });
+
+    // Re-render when notes sync completes
+    window.addEventListener('dm-sync-complete', function() {
+      loadFromIndexedDB().then(onDataReady).catch(function() {});
+    });
 
     // Re-render active view when theme changes
     var observer = new MutationObserver(function(mutations) {

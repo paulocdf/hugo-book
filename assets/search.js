@@ -28,6 +28,27 @@
 
   let activeIndex = -1;
   let initialized = false;
+  let useFirestore = false;
+
+  // ── Helper: get base URL ─────────────────────────────
+  function getBaseUrl() {
+    var manifest = document.querySelector('link[rel="manifest"]');
+    if (manifest) return manifest.getAttribute('href').replace('/manifest.json', '');
+    return '';
+  }
+
+  function viewUrl(noteId) {
+    return getBaseUrl() + '/docs/view/?id=' + encodeURIComponent(noteId);
+  }
+
+  // ── Helper: derive section label from note ───────────
+  function noteSection(note) {
+    if (note.destination === 'book-note') return 'Books' + (note.bookTitle ? ' / ' + note.bookTitle : '');
+    if (note.destination === 'inbox') return 'Inbox';
+    if (note.destination === 'topic') return 'Topics';
+    if (note.destination === 'snippets') return 'Snippets' + (note.language ? ' / ' + note.language.charAt(0).toUpperCase() + note.language.slice(1) : '');
+    return '';
+  }
 
   // ── Index initialization ──────────────────────────────
   function initIndex() {
@@ -36,6 +57,34 @@
 
     if (spinner) spinner.classList.remove('hidden');
 
+    // Try IndexedDB (dynamic notes) first
+    if (window.dmSync) {
+      return window.dmSync.getAllNotes().then(function(notes) {
+        if (notes && notes.length > 0) {
+          useFirestore = true;
+          var pages = notes.map(function(note, idx) {
+            return {
+              id: idx,
+              href: viewUrl(note.id),
+              title: note.title || 'Untitled',
+              section: noteSection(note),
+              content: note.content || ''
+            };
+          });
+          window.bookSearchIndex = FlexSearch.create('balance', indexConfig);
+          window.bookSearchIndex.add(pages);
+        } else {
+          // No cached notes — user may not be signed in
+          useFirestore = false;
+        }
+      }).catch(function() {
+        useFirestore = false;
+      }).finally(function() {
+        if (spinner) spinner.classList.add('hidden');
+      });
+    }
+
+    // Fallback: static Hugo search data
     return fetch(searchDataURL)
       .then(function(r) { return r.json(); })
       .then(function(pages) {
@@ -46,6 +95,28 @@
         if (spinner) spinner.classList.add('hidden');
       });
   }
+
+  // ── Re-index when sync completes ─────────────────────
+  window.addEventListener('dm-sync-complete', function() {
+    if (!window.dmSync) return;
+    window.dmSync.getAllNotes().then(function(notes) {
+      if (notes && notes.length > 0) {
+        useFirestore = true;
+        var pages = notes.map(function(note, idx) {
+          return {
+            id: idx,
+            href: viewUrl(note.id),
+            title: note.title || 'Untitled',
+            section: noteSection(note),
+            content: note.content || ''
+          };
+        });
+        window.bookSearchIndex = FlexSearch.create('balance', indexConfig);
+        window.bookSearchIndex.add(pages);
+        initialized = true;
+      }
+    });
+  });
 
   // ── Modal open / close ────────────────────────────────
   function openModal() {
@@ -58,6 +129,10 @@
 
     initIndex().then(function() {
       input.focus();
+      // If no index available, show sign-in message
+      if (!window.bookSearchIndex) {
+        showSignInPrompt();
+      }
     });
   }
 
@@ -74,13 +149,31 @@
     return modal.classList.contains('active');
   }
 
+  // ── Sign-in prompt ───────────────────────────────────
+  function showSignInPrompt() {
+    var li = document.createElement('li');
+    li.className = 'search-modal-empty';
+    li.textContent = 'Sign in to search your notes';
+    results.appendChild(li);
+  }
+
   // ── Search ────────────────────────────────────────────
   function search() {
     clearResults();
     activeIndex = -1;
 
     var query = input.value.trim();
-    if (!query || !window.bookSearchIndex) return;
+    if (!query) {
+      if (!window.bookSearchIndex) {
+        showSignInPrompt();
+      }
+      return;
+    }
+
+    if (!window.bookSearchIndex) {
+      showSignInPrompt();
+      return;
+    }
 
     var hits = window.bookSearchIndex.search(query, 10);
 

@@ -1,14 +1,14 @@
-<!-- One-time import tool: loads existing .md notes into Firestore -->
+<!-- Import tool: initial import completed. This page now provides Firestore management utilities. -->
+
 <div class="my-notes" id="import-tool">
   <div class="my-notes-signin" id="import-signin">
     <div class="my-notes-signin-card">
       <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="my-notes-signin-icon">
-        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-        <polyline points="7 10 12 15 17 10"></polyline>
-        <line x1="12" y1="15" x2="12" y2="3"></line>
+        <path d="M9 11l3 3L22 4"></path>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
       </svg>
-      <h3>Sign in to import notes</h3>
-      <p>Sign in with Google, then click Import to load your existing notes into Firestore.</p>
+      <h3>Notes Already Imported</h3>
+      <p>All notes have been imported to Firestore. Sign in to manage your notes or delete all data.</p>
       <button type="button" class="my-notes-google-btn" id="import-signin-btn">
         <svg width="18" height="18" viewBox="0 0 24 24">
           <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
@@ -28,19 +28,23 @@
         <span class="my-notes-username" id="import-username"></span>
       </div>
       <div>
-        <button type="button" class="my-notes-google-btn" id="import-btn" style="background: #34a853; color: #fff; border-color: #34a853;">
+        <button type="button" class="my-notes-google-btn" id="delete-all-btn" style="background: #c62828; color: #fff; border-color: #c62828;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
-          Import 8 Notes
+          Delete All Notes
         </button>
       </div>
     </div>
 
-    <div id="import-log" style="margin-top: 1rem;"></div>
-    <div class="my-notes-list" id="import-preview" style="margin-top: 1rem;"></div>
+    <div id="import-log" style="margin-top: 1rem;">
+      <div style="padding:1rem;background:#e8f5e9;border-radius:8px;color:#2e7d32;text-align:center;">
+        All notes have been imported to Firestore. Use Quick Capture to add new notes.
+      </div>
+    </div>
+
+    <div id="import-stats" style="margin-top: 1rem;"></div>
   </div>
 </div>
 
@@ -53,77 +57,9 @@
   var signinBtn = document.getElementById('import-signin-btn');
   var avatarEl = document.getElementById('import-avatar');
   var usernameEl = document.getElementById('import-username');
-  var importBtn = document.getElementById('import-btn');
+  var deleteAllBtn = document.getElementById('delete-all-btn');
   var logEl = document.getElementById('import-log');
-  var previewEl = document.getElementById('import-preview');
-
-  // All 8 notes to import
-  var notesToImport = [
-    {
-      title: "Kubernetes in Action",
-      mode: "note",
-      destination: "books",
-      tags: ["kubernetes", "containers", "docker", "devops"],
-      language: null,
-      content: "# Book: Kubernetes in Action\n\n## Chapter 1\n\n### Difference between Virtual Machines and Containers\n\nUsing VMs to isolate groups of applications vs. isolating individual apps with containers:\n\nWhen you run three VMs on a host, you have three completely separate operating systems running on and sharing the same bare-metal hardware. Underneath those VMs is the host\u2019s OS and a hypervisor, which divides the physical hardware resources into smaller sets of virtual resources that can be used by the operating system inside each VM. Applications running inside those VMs perform system calls to the guest OS\u2019 kernel in the VM, and the kernel then performs x86 instructions on the host\u2019s physical CPU through the hypervisor.\n\nNote: Two types of hypervisors exist. Type 1 hypervisors don\u2019t use a host OS, while Type 2 do.\n\n**Containers**, on the other hand, all perform system calls on the exact same kernel running in the host OS. This single kernel is the only one performing x86 instructions on the host\u2019s CPU. The CPU doesn\u2019t need to do any kind of virtualization the way it does with VMs.\n\nThe main benefit of virtual machines is the full isolation they provide, because each VM runs its own Linux kernel, while containers all call out to the same kernel, which can clearly pose a security risk. If you have a limited amount of hardware resources, VMs may only be an option when you have a small number of processes that you want to isolate. To run greater numbers of isolated processes on the same machine, containers are a much better choice because of their low overhead. Remember, each VM runs its own set of system services, while containers don\u2019t, because they all run in the same OS. That also means that to run a container, nothing needs to be booted up, as is the case in VMs. A process run in a container starts up immediately.\n\nWhat mechanisms make container isolation possible?\n - Linux Namespaces. Each process sees its own personal view of the system (files, processes, network interfaces, hostnames)\n - Linux Control Groups (cgroups). Limit the amount of resources the process can consumer (CPU, memory, network bandwidth)\n\n### Introducing the Docker container platform\n\nWhile container technologies have been around for a long time, they\u2019ve become more widely known with the rise of the Docker container platform. Docker was the first container system that made containers easily portable across different machines. It simplified the process of packaging up not only the application but also all its libraries and other dependencies, even the whole OS file system, into a simple, portable package that can be used to provision the application to any other machine running Docker.\n\nWhen you run an application packaged with Docker, it sees the exact filesystem contents that you\u2019ve bundled with it. It sees the same files whether it\u2019s running on your development machine or a production machine, even if it the production server is running a completely different Linux OS.\n\nThree main concepts in Docker comprise this scenario:\n\nImages\u2014A Docker-based container image is something you package your application and its environment into. It contains the filesystem that will be available to the application and other metadata, such as the path to the executable that should be executed when the image is run.\nRegistries\u2014A Docker Registry is a repository that stores your Docker images and facilitates easy sharing of those images between different people and computers.\nContainers\u2014A Docker-based container is a regular Linux container created from a Docker-based container image. A running container is a process running on the host running Docker, but it\u2019s completely isolated from both the host and all other processes running on it.\n\nDocker was the first container platform that made containers mainstream. The actual isolation of containers is done at the Linux kernel level using kernel features such as Linux Namespaces and cgroups. Docker only makes it easy to use those features.\n\n## Kubernetes\n\nKubernetes is a software system that allows you to easily deploy and manage containerized applications on top of it. It relies on the features of Linux containers to run heterogeneous applications without having to know any internal details of these applications and without having to manually deploy these applications on each host.\n\nDeploying applications through Kubernetes is always the same, whether your cluster contains only a couple of nodes or thousands of them. The size of the cluster makes no difference at all.\n\nKubernetes helps developers focus on the Core App Features:\nKubernetes can be thought of as an operating system for the cluster. It relieves application developers from having to implement certain infrastructure-related services into their apps; instead they rely on Kubernetes to provide these services. This includes things such as service discovery, scaling, load-balancing, self-healing, and even leader election.\n\nAt the hardware level, a Kubernetes cluster is composed of many nodes, which can be split into two types:\n\nThe master node, which hosts the Kubernetes Control Plane that controls and manages the whole Kubernetes system\nWorker nodes that run the actual applications you deploy\n\nThe Control Plane components are:\n- The Kubernetes API Server, which you and the other Control Plane components communicate with\n- The Scheduler, which schedules your apps (assigns a worker node to each deployable component of your application)\n- The Controller Manager, which performs cluster-level functions, such as replicating components, keeping track of worker nodes, handling node failures, and so on\n- etcd, a reliable distributed data store that persistently stores the cluster configuration.\n\n### Summary\n\nMonolithic apps are easier to deploy, but harder to maintain over time and sometimes impossible to scale.\nMicroservices-based application architectures allow easier development of each component, but are harder to deploy and configure to work as a single system.\nLinux containers provide much the same benefits as virtual machines, but are far more lightweight and allow for much better hardware utilization.\nDocker improved on existing Linux container technologies by allowing easier and faster provisioning of containerized apps together with their OS environments.\nKubernetes exposes the whole datacenter as a single computational resource for running applications.\n\n## Chapter 2. First steps with Docker and Kubernetes\n\n### 2.2.1. Running a local single-node Kubernetes cluster with Minikube\n\nMinikube -> Minikube is a tool that sets up a single-node cluster that\u2019s great for both testing Kubernetes and developing apps locally.\n\n-> brew install Minikube\n-> kubectl cluster-info\n\nWhat is a worker node?\nIn Kubernetes, a worker node is a machine that runs containerized applications. It is a part of the Kubernetes cluster and is managed by the master node.\n\nWhat is a pod?\nA pod is a group of one or more tightly related containers that will always run together on the same worker node and in the same Linux namespace(s). Each pod is like a separate logical machine with its own IP, hostname, processes, and so on, running a single application.\n\nWhat are services?\nWhen a service is created, it gets a static IP, which never changes during the lifetime of the service. Instead of connecting to pods directly, clients should connect to the service through its constant IP address."
-    },
-    {
-      title: "Learning Go",
-      mode: "note",
-      destination: "books",
-      tags: ["go", "golang", "programming"],
-      language: null,
-      content: "# Book: Learning Go\n\nGo Run -> Use go run when you want to treat a Go program like a script and run the source code immediately.\nGo Build -> build a binary for later use\n\n### Getting Third-Party Go Tools\nGo developers don\u2019t rely on a centrally hosted service, like Maven Central for Java or the NPM registry for JavaScript. Instead, they share projects via their source code repositories. The go install command takes an argument, which is the location of the source code repository of the project you want to install, followed by an @ and the version of the tool you want.\n\n### Formatting your code\nGo defines a standard way of formatting code. Go programs use tabs to indent, and it is a syntax error if the opening brace is not on the same line as the declaration or command that begins the block.\n\n```\n#Format\ngo fmt\n\n# Enhanced format (sometimes wrong)\ngoimports\n\n# Usage\ngoimports -l -w .\n```\n\nTHE SEMICOLON INSERTION RULE\nGo requires a semicolon at the end of every statement. However, Go developers never put the semicolons in themselves; the Go lexer inserts them automatically.\n\n`golangci-lint` -> enforce style\n\n### Chapter 2. Primitive Types and Declarations\n\nLiterals are untyped because Go is a practical language.\n\nGo doesn\u2019t provide a way to specify that a value calculated at runtime is immutable. There are no immutable arrays, slices, maps, or structs.\n\nHere\u2019s what an untyped constant declaration looks like:\n\nconst x = 10\n\nHere\u2019s what a typed constant declaration looks like:\n\nconst typedX int = 10\n\n### Chapter 3. Composite Types\n\nGo considers the size of the array to be part of the type of the array. This makes an array that\u2019s declared to be [3]int a different type from an array that\u2019s declared to be [4]int.\n\n### Slices\nWorking with slices looks quite a bit like working with arrays, but there are subtle differences.\n\nvar x = []int{10, 20, 30}\n\nTip: Using [...] makes an array. Using [] makes a slice.\n\nThe Go runtime is compiled into every Go binary. This is different from languages that use a virtual machine.\n\nStructs\nGo doesn\u2019t have classes, because it doesn\u2019t have inheritance.\n\nClosures\nFunctions declared inside of functions are special; they are closures. They are able to access and modify variables declared in the outer function."
-    },
-    {
-      title: "Elastic Search",
-      mode: "note",
-      destination: "books",
-      tags: ["elasticsearch", "search", "databases"],
-      language: null,
-      content: "# Elastic Search\n\n## Chapter 1\n\n```json\n{\"a\": \"teste\"}\n\ntexto sem codigo\n\nvar a = \"coisa\"\n```\n\n```Shell\nrequire 'redcarpet'\nmarkdown = Redcarpet.new(\"Hello World!\")\nputs markdown.to_html\n\nvar a  = \"coisa\"\n\na++;\n```\n\n```Java\npublic class HelloWorld {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, world!\");\n    }\n}\n```\n\nSeems to be using Linguist: https://github.com/github-linguist/linguist\n\nHere is a simple flow chart:\n\n```mermaid\ngraph TD;\n    A-->B;\n    A-->C;\n    B-->D;\n    C-->D;\n```\n\n## References"
-    },
-    {
-      title: "Crucial Conversations",
-      mode: "note",
-      destination: "books",
-      tags: ["communication", "soft-skills", "leadership"],
-      language: null,
-      content: "# Book: Crucial Conversations\n\nCrucial Conversation: A discussion between two or more people where (1) stakes are high, (2) opinions vary, and (3) emotions run strong."
-    },
-    {
-      title: "SOLID Principles",
-      mode: "note",
-      destination: "inbox",
-      tags: ["solid", "design-patterns", "best-practices"],
-      language: null,
-      content: "# SOLID Principles\n\nThe first five principles of object-oriented design.\n\nReference: [SOLID - The First Five Principles of Object-Oriented Design](https://www.digitalocean.com/community/conceptual_articles/s-o-l-i-d-the-first-five-principles-of-object-oriented-design)"
-    },
-    {
-      title: "PostgreSQL Notes",
-      mode: "note",
-      destination: "inbox",
-      tags: ["postgresql", "databases", "sql"],
-      language: null,
-      content: "# PostgreSQL DB\n\n## See running queries\n\n```sql\nSELECT pid, age(clock_timestamp(), query_start), usename, query\nFROM pg_stat_activity\nWHERE query != '<IDLE>' AND query NOT ILIKE '%pg_stat_activity%'\nORDER BY query_start desc;\n```\n\n## Old migrations\n\n```sql\n-- Validate if the total retries matches between trackers and new partitioned table\n\n-- Record Trackers\nselect account_id, sum(\n        CASE\n            WHEN attempt_disposition = 'INTERNAL'                       THEN 0\n            WHEN attempt_disposition = 'DO_NOT_CALL_RECORD_RESCHEDULED' THEN 0\n            ELSE 1\n        END\n    ) as \"nr calls\" FROM list_manager.record_trackers rt\n  inner join list_api.records r on rt.record_id = r.id\n  inner join list_api.record_lists rl on r.record_list_id = rl.id\ngroup by 1 order by 2 desc;\n\n-- Campaign Record Retries\nselect account_id, sum(total_retries) as \"nr calls\" from list_manager.campaign_records_retries\ngroup by 1 order by 2 desc;\n```\n\n```sql\n-- Determine what records do not exist in the Records_V2 table\nSELECT r_v1.account_id, r_v1.id, r_v1.deleted, r_v2.account_id as \"r_v2 account_id\", r_v2.id as \"r_v2 id\", r_v2.deleted as \"r_v2 deleted\"\nFROM (\n    SELECT r.*, rl.account_id\n    FROM list_api.records r\n    INNER JOIN list_api.record_lists rl ON r.record_list_id = rl.id\n  ) as r_v1\nFULL OUTER JOIN list_api.records_v2 AS r_v2 ON r_v1.id = r_v2.id\nWHERE r_v2.id is NULL\n    OR r_v1.deleted != r_v2.deleted\n```\n\n## Table partitioning migration example\n\n```sql\n-- CREATE PARTITION TABLES FROM DATA\nDO\n$do$\nDECLARE\n    temprow record;\nBEGIN\n    FOR temprow IN\n        SELECT\n               account_id,\n               concat('list_api.records_v2_account_', account_id) as t_record\n        FROM list_api.record_lists\n        GROUP BY 1\n        LOOP\n            EXECUTE 'CREATE TABLE ' || temprow.t_record || ' PARTITION OF list_api.records_v2 FOR VALUES IN (''' || temprow.account_id || ''')';\n        END LOOP;\nEND\n$do$;\n\n-- POPULATE DATA\nINSERT INTO list_api.records_v2 (...)\nSELECT r.id, rl.external_uuid, r.phone_number, ...\nFROM list_api.records r INNER JOIN list_api.record_lists rl on r.record_list_id = rl.id\nON CONFLICT (id, record_list_uuid, account_id)\nDO UPDATE SET deleted = excluded.deleted, ...;\n```\n\n## Transaction Routing\n\nDatasource: https://vladmihalcea.com/read-write-read-only-transaction-routing-spring/\n\nNotes:\n> In my previous company we were using pgpool which stands as a middleware between your client and postgres servers, and serves also as load balancer. The configuration in our app (python/django application) was the same as it was with one postgres server (we had master with r/w and multiple r/o replicas), and the app was not \"aware\" about underlying postgres servers. That worked pretty well for us. Before that we were using pgbouncer which didn't work well for us."
-    },
-    {
-      title: "RabbitMQ Notes",
-      mode: "note",
-      destination: "inbox",
-      tags: ["rabbitmq", "messaging", "distributed-systems"],
-      language: null,
-      content: "# RabbitMQ\n\nThe fact that you have a Java consumer that works correctly points to either amqplib-easy, amqplib or your code as the culprit. Also, note that using a single queue in RabbitMQ is an anti-pattern as queues are the unit of concurrency in the broker. [Link](https://stackoverflow.com/questions/47081053/how-to-handle-100-messages-per-second-with-amqp-node)"
-    },
-    {
-      title: "Kotlin Snippet - Feb 17, 2026",
-      mode: "code",
-      destination: "snippets",
-      tags: ["snippet", "kotlin"],
-      language: "kotlin",
-      content: "fun stopRecordingConsultation(interaction: Interaction, agentInitiated: Boolean): Interaction {\n        val updatedRecordings = interaction.recordings.map { recording ->\n            if (recording.type == Interaction.Recording.Type.CONSULTATION && recording.state == Interaction.Recording.State.ACTIVE) {\n                recording.copy(agentInitiated = agentInitiated)\n            } else {\n                recording\n            }\n        }"
-    }
-  ];
+  var statsEl = document.getElementById('import-stats');
 
   window.dmAuth.onAuthStateChanged(function(user) {
     if (user) {
@@ -131,7 +67,7 @@
       contentView.style.display = '';
       avatarEl.src = user.photoURL || '';
       usernameEl.textContent = user.displayName || user.email || '';
-      showPreview();
+      showStats(user);
     } else {
       signinView.style.display = '';
       contentView.style.display = 'none';
@@ -144,63 +80,77 @@
     });
   });
 
-  function showPreview() {
-    var html = '';
-    notesToImport.forEach(function(note, i) {
-      var preview = note.content.substring(0, 120) + (note.content.length > 120 ? '...' : '');
-      var tagsHtml = note.tags.map(function(t) {
-        return '<span class="my-notes-tag">' + t + '</span>';
-      }).join(' ');
-      html += '<div class="my-notes-card">'
-        + '<div class="my-notes-card-header">'
-        + '<h4 class="my-notes-card-title">' + note.title + '</h4>'
-        + '<span class="my-notes-tag ' + (note.mode === 'code' ? 'my-notes-tag--code' : '') + '">' + note.destination + '</span>'
-        + '</div>'
-        + '<div class="my-notes-card-meta">' + tagsHtml + '</div>'
-        + '<div class="my-notes-text-preview" style="margin-top:0.5rem">' + preview.replace(/</g, '&lt;') + '</div>'
-        + '</div>';
-    });
-    previewEl.innerHTML = html;
-  }
-
-  importBtn.addEventListener('click', function() {
-    var user = window.dmAuth.currentUser;
-    if (!user) { alert('Please sign in first.'); return; }
-
-    importBtn.disabled = true;
-    importBtn.textContent = 'Importing...';
-    logEl.innerHTML = '';
-
-    var batch = window.dmDb.batch();
-    var now = firebase.firestore.FieldValue.serverTimestamp();
-
-    notesToImport.forEach(function(note) {
-      var ref = window.dmDb.collection('notes').doc();
-      batch.set(ref, {
-        userId: user.uid,
-        userEmail: user.email,
-        userName: user.displayName || '',
-        title: note.title,
-        content: note.content,
-        mode: note.mode,
-        language: note.language,
-        destination: note.destination,
-        tags: note.tags,
-        createdAt: now,
-        updatedAt: now
-      });
-    });
-
-    batch.commit()
-      .then(function() {
-        logEl.innerHTML = '<div style="padding:1rem;background:#e8f5e9;border-radius:8px;color:#2e7d32;font-weight:600;text-align:center;">Successfully imported ' + notesToImport.length + ' notes! You can now visit <a href="/digital-memory/docs/my-notes/">My Notes</a> to see them.</div>';
-        importBtn.textContent = 'Done!';
+  function showStats(user) {
+    window.dmDb.collection('notes')
+      .where('userId', '==', user.uid)
+      .get()
+      .then(function(snapshot) {
+        var counts = {};
+        snapshot.forEach(function(doc) {
+          var dest = doc.data().destination || 'unknown';
+          counts[dest] = (counts[dest] || 0) + 1;
+        });
+        var html = '<div style="padding:1rem;background:var(--body-background);border:1px solid var(--gray-200);border-radius:8px;">'
+          + '<strong>' + snapshot.size + ' notes in Firestore:</strong><br/>';
+        Object.keys(counts).sort().forEach(function(dest) {
+          html += '<span style="margin-right:1rem;">' + dest + ': ' + counts[dest] + '</span>';
+        });
+        html += '</div>';
+        statsEl.innerHTML = html;
       })
       .catch(function(err) {
-        console.error('Import error:', err);
-        logEl.innerHTML = '<div style="padding:1rem;background:#ffebee;border-radius:8px;color:#c62828;">Import failed: ' + err.message + '</div>';
-        importBtn.disabled = false;
-        importBtn.textContent = 'Retry Import';
+        console.error('Stats error:', err);
+      });
+  }
+
+  deleteAllBtn.addEventListener('click', function() {
+    var user = window.dmAuth.currentUser;
+    if (!user) { alert('Please sign in first.'); return; }
+    if (!confirm('Delete ALL notes from Firestore? This cannot be undone.')) return;
+
+    deleteAllBtn.disabled = true;
+    deleteAllBtn.textContent = 'Deleting...';
+    logEl.innerHTML = '';
+
+    window.dmDb.collection('notes')
+      .where('userId', '==', user.uid)
+      .get()
+      .then(function(snapshot) {
+        if (snapshot.empty) {
+          logEl.innerHTML = '<div style="padding:1rem;background:#fff3e0;border-radius:8px;color:#e65100;font-weight:600;text-align:center;">No notes found to delete.</div>';
+          deleteAllBtn.disabled = false;
+          deleteAllBtn.textContent = 'Delete All Notes';
+          return;
+        }
+        var batches = [];
+        var batch = window.dmDb.batch();
+        var count = 0;
+        snapshot.forEach(function(doc) {
+          batch.delete(doc.ref);
+          count++;
+          if (count % 500 === 0) {
+            batches.push(batch);
+            batch = window.dmDb.batch();
+          }
+        });
+        batches.push(batch);
+
+        return Promise.all(batches.map(function(b) { return b.commit(); }))
+          .then(function() {
+            logEl.innerHTML = '<div style="padding:1rem;background:#e8f5e9;border-radius:8px;color:#2e7d32;font-weight:600;text-align:center;">Deleted ' + count + ' notes.</div>';
+            deleteAllBtn.textContent = 'Delete All Notes';
+            deleteAllBtn.disabled = false;
+            statsEl.innerHTML = '';
+            if (window.dmSync) {
+              window.dmSync.clearCache();
+            }
+          });
+      })
+      .catch(function(err) {
+        console.error('Delete error:', err);
+        logEl.innerHTML = '<div style="padding:1rem;background:#ffebee;border-radius:8px;color:#c62828;">Delete failed: ' + err.message + '</div>';
+        deleteAllBtn.disabled = false;
+        deleteAllBtn.textContent = 'Delete All Notes';
       });
   });
 })();
