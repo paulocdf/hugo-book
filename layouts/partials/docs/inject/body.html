@@ -130,6 +130,8 @@
   var langRow = document.getElementById('qc-language-row');
   var previewWrapper = document.getElementById('qc-preview-wrapper');
   var previewPanel = document.getElementById('qc-preview-panel');
+  var notePreviewWrapper = document.getElementById('qc-note-preview-wrapper');
+  var notePreviewPanel = document.getElementById('qc-note-preview-panel');
   var dialog = modal.querySelector('.quick-capture-dialog');
   var toolbar = document.getElementById('qc-toolbar');
   var toolbarButtons = toolbar ? toolbar.querySelectorAll('.qc-toolbar-btn') : [];
@@ -239,8 +241,99 @@
       e.preventDefault();
       var format = tbtn.getAttribute('data-format');
       applyFormat(format);
+      scheduleNotePreview();
     });
   });
+
+  // =========================================================================
+  // Mini Markdown → HTML renderer for Note mode preview
+  // Supports: headings, bold, italic, inline code, links, bullets, todos,
+  //           paragraphs, and blank-line separation.
+  // =========================================================================
+  function renderMarkdown(src) {
+    if (!src) return '';
+    var lines = src.split('\n');
+    var html = '';
+    var inList = false; // track if we are inside a <ul>
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+
+      // Headings: ## text
+      var headingMatch = line.match(/^(#{1,6})\s+(.*)/);
+      if (headingMatch) {
+        if (inList) { html += '</ul>'; inList = false; }
+        var level = headingMatch[1].length;
+        html += '<h' + level + '>' + inlineMarkdown(escapeHtml(headingMatch[2])) + '</h' + level + '>';
+        continue;
+      }
+
+      // Todo items: - [ ] text  or  - [x] text
+      var todoMatch = line.match(/^[-*]\s+\[([ xX])\]\s+(.*)/);
+      if (todoMatch) {
+        if (!inList) { html += '<ul class="qc-md-list">'; inList = true; }
+        var checked = todoMatch[1] !== ' ';
+        html += '<li class="qc-md-todo">'
+          + '<input type="checkbox" disabled' + (checked ? ' checked' : '') + '> '
+          + inlineMarkdown(escapeHtml(todoMatch[2]))
+          + '</li>';
+        continue;
+      }
+
+      // Bullet / list items: - text or * text
+      var bulletMatch = line.match(/^[-*]\s+(.*)/);
+      if (bulletMatch) {
+        if (!inList) { html += '<ul class="qc-md-list">'; inList = true; }
+        html += '<li>' + inlineMarkdown(escapeHtml(bulletMatch[1])) + '</li>';
+        continue;
+      }
+
+      // Close any open list before non-list content
+      if (inList) { html += '</ul>'; inList = false; }
+
+      // Blank lines
+      if (!line.trim()) {
+        continue;
+      }
+
+      // Normal paragraph
+      html += '<p>' + inlineMarkdown(escapeHtml(line)) + '</p>';
+    }
+
+    if (inList) html += '</ul>';
+    return html;
+  }
+
+  // Inline markdown: bold, italic, inline code, links
+  function inlineMarkdown(text) {
+    // Inline code: `code`
+    text = text.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // Bold: **text**
+    text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Italic: *text*  (but not inside **)
+    text = text.replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>');
+    // Links: [text](url)
+    text = text.replace(/\[([^\]]*)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    return text;
+  }
+
+  function updateNotePreview() {
+    if (currentMode !== 'note' || !notePreviewPanel) return;
+    var text = input.value;
+    if (!text.trim()) {
+      notePreviewPanel.innerHTML = '<div class="qc-preview-empty">Start typing to see a preview...</div>';
+      notePreviewWrapper.style.display = 'none';
+      return;
+    }
+    notePreviewWrapper.style.display = '';
+    notePreviewPanel.innerHTML = renderMarkdown(text);
+  }
+
+  var notePreviewTimer = null;
+  function scheduleNotePreview() {
+    if (notePreviewTimer) clearTimeout(notePreviewTimer);
+    notePreviewTimer = setTimeout(updateNotePreview, 150);
+  }
 
   // =========================================================================
   // Mini syntax highlighter — outputs <span> with Chroma-compatible classes
@@ -395,6 +488,7 @@
   // Listen for input on textarea
   input.addEventListener('input', function() {
     if (currentMode === 'code') schedulePreview();
+    if (currentMode === 'note') scheduleNotePreview();
   });
 
   // Mode toggle
@@ -410,6 +504,7 @@
         destRow.style.display = 'none';
         langRow.style.display = '';
         previewWrapper.style.display = '';
+        notePreviewWrapper.style.display = 'none';
         if (toolbar) toolbar.style.display = 'none';
         input.classList.add('code-mode');
         dialog.classList.add('code-mode');
@@ -423,6 +518,7 @@
         input.classList.remove('code-mode');
         dialog.classList.remove('code-mode');
         input.placeholder = "What's on your mind?";
+        updateNotePreview();
       }
     });
   });
@@ -456,6 +552,7 @@
     destRow.style.display = '';
     langRow.style.display = 'none';
     previewWrapper.style.display = 'none';
+    notePreviewWrapper.style.display = 'none';
     if (toolbar) toolbar.style.display = '';
     langButtons.forEach(function(b) { b.classList.remove('active'); });
     langButtons[0].classList.add('active');
@@ -468,6 +565,7 @@
     titleInput.value = '';
     input.value = '';
     if (previewPanel) previewPanel.innerHTML = '<div class="qc-preview-empty">Start typing to see highlighted preview...</div>';
+    if (notePreviewPanel) notePreviewPanel.innerHTML = '<div class="qc-preview-empty">Start typing to see a preview...</div>';
     titleInput.focus();
   }
 
