@@ -3225,11 +3225,6 @@ html.sidebar-collapsed {
   color: var(--text-faint);
 }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 .section-notes-error {
   padding: 1rem;
   font-size: 0.82rem;

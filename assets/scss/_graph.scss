@@ -1,3 +1,5 @@
+$graph-font-stack: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
 #graph-wrapper {
   position: relative;
   width: 100%;
@@ -27,7 +29,7 @@
     cursor: pointer;
     user-select: none;
     pointer-events: all;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: $graph-font-stack;
   }
 }
 
@@ -42,7 +44,7 @@
   max-width: 240px;
   z-index: 100;
   box-shadow: 0 8px 32px var(--shadow-color);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
 
   .graph-tooltip-title {
     font-size: 0.875rem;
@@ -98,7 +100,7 @@
     gap: 6px;
     font-size: 0.75rem;
     color: var(--text-muted);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-family: $graph-font-stack;
 
     .legend-dot {
       width: 10px;
@@ -152,7 +154,7 @@
 .sunburst-label {
   font-size: 12px;
   font-weight: 600;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
   pointer-events: none;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -161,7 +163,7 @@
 .sunburst-item-label {
   font-size: 10px;
   font-weight: 400;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
   pointer-events: none;
 }
 
@@ -221,7 +223,7 @@
   letter-spacing: 0.06em;
   color: var(--text-muted);
   margin-bottom: 16px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
   text-align: center;
 }
 
@@ -232,7 +234,7 @@
   justify-content: center;
   min-height: 400px;
   color: var(--text-muted);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
   text-align: center;
   gap: 12px;
 
@@ -264,7 +266,7 @@
 
 .time-stat-card {
   text-align: center;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
 
   .time-stat-value {
     font-size: 1.8rem;
@@ -294,13 +296,13 @@
 
 .time-bar-label {
   font-size: 11px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
   pointer-events: none;
 }
 
 .time-axis {
   font-size: 11px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
 
   line, path {
     stroke: var(--border-subtle);
@@ -348,7 +350,7 @@
   color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 500;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
   letter-spacing: 0.02em;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -396,7 +398,7 @@
   background: var(--body-background);
   color: var(--body-font-color);
   font-size: 0.75rem;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
   outline: none;
   transition: border-color 0.2s ease;
   width: 130px;
@@ -410,7 +412,7 @@
 .time-filter-date-sep {
   color: var(--text-muted);
   font-size: 0.75rem;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
 }
 
 .time-filter-apply-btn {
@@ -421,7 +423,7 @@
   color: white;
   font-size: 0.72rem;
   font-weight: 600;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: $graph-font-stack;
   cursor: pointer;
   transition: all 0.2s ease;
 

@@ -1279,10 +1279,19 @@
   'use strict';
 
   var SIDEBAR_CACHE_KEY = 'dm-sidebar-html';
+  var SIDEBAR_CACHE_VERSION_KEY = 'dm-sidebar-version';
+  var SIDEBAR_VERSION = '{{ now.Unix }}'; // changes on each Hugo build
 
   // Immediately restore cached sidebar HTML to prevent flicker on navigation
   (function restoreSidebarCache() {
     try {
+      // Invalidate cache if version changed (new deploy)
+      var cachedVersion = sessionStorage.getItem(SIDEBAR_CACHE_VERSION_KEY);
+      if (cachedVersion !== SIDEBAR_VERSION) {
+        sessionStorage.removeItem(SIDEBAR_CACHE_KEY);
+        sessionStorage.setItem(SIDEBAR_CACHE_VERSION_KEY, SIDEBAR_VERSION);
+        return;
+      }
       var cached = sessionStorage.getItem(SIDEBAR_CACHE_KEY);
       if (!cached) return;
       var menuNav = document.querySelector('.book-menu-content nav');
@@ -1621,10 +1630,22 @@
       return;
     }
 
-    // Ensure headings have IDs
+    // Ensure headings have IDs (deduplicate slugs)
+    var usedIds = {};
     headings.forEach(function(h) {
       if (!h.id) {
-        h.id = slugify(h.textContent);
+        var base = slugify(h.textContent);
+        if (!base) base = 'heading';
+        var id = base;
+        if (usedIds[id]) {
+          var n = 1;
+          while (usedIds[id + '-' + n]) n++;
+          id = id + '-' + n;
+        }
+        usedIds[id] = true;
+        h.id = id;
+      } else {
+        usedIds[h.id] = true;
       }
     });
 
