@@ -12,7 +12,7 @@
   </div>
 
   <div class="todo-list-body" id="todo-list-body">
-    <!-- Add todo form — two rows -->
+    <!-- Add todo form — two rows: inputs + icon bar with chips -->
     <div class="todo-add-form" id="todo-add-form">
       <div class="todo-add-row-main">
         <input type="text" id="todo-add-title" class="todo-add-title" placeholder="New task...">
@@ -21,13 +21,21 @@
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </button>
       </div>
-      <div class="todo-add-row-date">
-        <span class="todo-add-date-label">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+      <div class="todo-add-row-icons" id="todo-add-row-icons">
+        <button type="button" class="todo-add-icon-btn" id="todo-add-date-icon" title="Schedule date" aria-label="Schedule date">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </button>
+        <span class="todo-add-chip" id="todo-add-date-chip" style="display:none;">
+          <span class="todo-add-chip-text" id="todo-add-date-chip-text"></span>
+          <button type="button" class="todo-add-chip-clear" id="todo-add-date-chip-clear" aria-label="Clear date">&times;</button>
         </span>
-        <button type="button" class="todo-date-shortcut" data-offset="0" title="Today">Today</button>
-        <button type="button" class="todo-date-shortcut" data-offset="1" title="Tomorrow">Tmrw</button>
-        <input type="date" id="todo-add-date" class="todo-add-date" title="Pick a date">
+        <button type="button" class="todo-add-icon-btn" id="todo-add-reminder-icon" title="Set reminder" aria-label="Set reminder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        </button>
+        <span class="todo-add-chip" id="todo-add-reminder-chip" style="display:none;">
+          <span class="todo-add-chip-text" id="todo-add-reminder-chip-text"></span>
+          <button type="button" class="todo-add-chip-clear" id="todo-add-reminder-chip-clear" aria-label="Clear reminder">&times;</button>
+        </span>
       </div>
     </div>
 
@@ -108,16 +116,153 @@
   gap: 8px;
   align-items: center;
 }
-.todo-add-row-date {
+/* Icon bar row with chips */
+.todo-add-row-icons {
   display: flex;
   align-items: center;
   gap: 6px;
   padding-left: 2px;
+  position: relative;
 }
-.todo-add-date-label {
+.todo-add-icon-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
   color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 0;
+  flex-shrink: 0;
+  position: relative;
+}
+.todo-add-icon-btn:hover {
+  color: var(--color-link);
+  border-color: var(--color-link);
+}
+.todo-add-icon-btn.active {
+  color: var(--color-link);
+  border-color: var(--color-link);
+  background: rgba(0, 105, 255, 0.06);
+}
+/* Chip tags next to icons */
+.todo-add-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px 2px 8px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: rgba(0, 105, 255, 0.08);
+  color: var(--color-link);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.todo-add-chip-text {
+  pointer-events: none;
+}
+.todo-add-chip-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-link);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.todo-add-chip-clear:hover {
+  background: rgba(0, 105, 255, 0.15);
+}
+/* Add-form popover (reuses reminder popover styles but positioned for the icon bar) */
+.todo-add-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  width: 220px;
+  margin-top: 4px;
+  padding: 10px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px var(--shadow-color, rgba(0,0,0,0.1));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: todo-popover-in 0.15s ease-out;
+}
+.todo-add-popover-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+.todo-add-popover-shortcut {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.todo-add-popover-shortcut:hover {
+  background: var(--gray-100);
+  border-color: var(--color-link);
+}
+.todo-add-popover-custom {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.todo-add-popover-input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+}
+.todo-add-popover-input:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+.todo-add-popover-set {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-link);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--color-link);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.todo-add-popover-set:hover {
+  background: var(--color-link);
+  color: #fff;
 }
 .todo-add-title {
   flex: 1;
@@ -151,41 +296,6 @@
 .todo-add-estimate::placeholder {
   color: var(--gray-400);
   font-size: 0.8rem;
-}
-/* Date picker — inline in second row */
-.todo-add-date {
-  width: 120px;
-  padding: 4px 6px;
-  border: 1px solid var(--gray-200);
-  border-radius: 6px;
-  font-size: 0.75rem;
-  background: var(--body-background);
-  color: var(--body-font-color);
-  transition: border-color 0.2s;
-}
-.todo-add-date:focus {
-  outline: none;
-  border-color: var(--color-link);
-}
-.todo-date-shortcut {
-  padding: 2px 8px;
-  border: 1px solid var(--gray-200);
-  border-radius: 4px;
-  background: var(--body-background);
-  color: var(--gray-500);
-  font-size: 0.68rem;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-}
-.todo-date-shortcut:hover {
-  border-color: var(--color-link);
-  color: var(--color-link);
-}
-.todo-date-shortcut.active {
-  background: var(--color-link);
-  color: #fff;
-  border-color: var(--color-link);
 }
 /* Day group headers */
 .todo-day-group {
@@ -586,12 +696,8 @@
   .todo-add-estimate {
     flex: 1;
   }
-  .todo-add-row-date {
+  .todo-add-row-icons {
     flex-wrap: wrap;
-  }
-  .todo-add-date {
-    width: auto;
-    flex: 1;
   }
   .todo-item-actions {
     opacity: 1;
@@ -601,7 +707,145 @@
     padding: 5px 8px;
     gap: 6px;
   }
+  .todo-reminder-popover {
+    right: auto;
+    left: 0;
+  }
+  .todo-add-popover {
+    left: 0;
+    right: auto;
+    width: min(220px, calc(100vw - 2rem));
+  }
 }
+
+/* Reminder bell icon */
+.todo-item-action-btn.reminder-bell {
+  position: relative;
+}
+.todo-item-action-btn.reminder-bell.has-reminder {
+  color: var(--color-link);
+  opacity: 1;
+}
+.todo-item-action-btn.reminder-bell.has-reminder:hover {
+  background: rgba(0, 105, 255, 0.08);
+  color: var(--color-link);
+}
+
+/* Reminder info text under task title */
+.todo-item-reminder {
+  font-size: 0.68rem;
+  color: var(--color-link);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.todo-item-reminder.overdue {
+  color: var(--color-danger);
+}
+
+/* Reminder popover — positioned relative to .todo-item */
+.todo-reminder-popover {
+  position: absolute;
+  z-index: 20;
+  width: 220px;
+  padding: 10px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px var(--shadow-color, rgba(0,0,0,0.1));
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  animation: todo-popover-in 0.15s ease-out;
+}
+@keyframes todo-popover-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.todo-reminder-popover-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+.todo-reminder-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.todo-reminder-shortcut-btn {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.todo-reminder-shortcut-btn:hover {
+  background: var(--gray-100);
+  border-color: var(--color-link);
+}
+.todo-reminder-custom {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.todo-reminder-datetime {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+}
+.todo-reminder-datetime:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+.todo-reminder-set-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-link);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--color-link);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.todo-reminder-set-btn:hover {
+  background: var(--color-link);
+  color: #fff;
+}
+.todo-reminder-clear-btn {
+  display: block;
+  width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--color-danger, #e53e3e);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--color-danger, #e53e3e);
+  font-size: 0.75rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.todo-reminder-clear-btn:hover {
+  background: var(--color-danger-bg, rgba(229, 62, 62, 0.06));
+}
+
+
 </style>
 
 <script>
@@ -617,8 +861,16 @@
 
   var addTitleInput = document.getElementById('todo-add-title');
   var addEstimateInput = document.getElementById('todo-add-estimate');
-  var addDateInput = document.getElementById('todo-add-date');
   var addBtn = document.getElementById('todo-add-btn');
+  var addIconRow = document.getElementById('todo-add-row-icons');
+  var addDateIcon = document.getElementById('todo-add-date-icon');
+  var addDateChip = document.getElementById('todo-add-date-chip');
+  var addDateChipText = document.getElementById('todo-add-date-chip-text');
+  var addDateChipClear = document.getElementById('todo-add-date-chip-clear');
+  var addReminderIcon = document.getElementById('todo-add-reminder-icon');
+  var addReminderChip = document.getElementById('todo-add-reminder-chip');
+  var addReminderChipText = document.getElementById('todo-add-reminder-chip-text');
+  var addReminderChipClear = document.getElementById('todo-add-reminder-chip-clear');
 
   if (!container || !itemsEl) return;
 
@@ -635,6 +887,45 @@
     var d = new Date();
     d.setDate(d.getDate() + offset);
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function getReminderMs(type) {
+    var now = new Date();
+    if (type === '30') {
+      return now.getTime() + 30 * 60 * 1000;
+    } else if (type === '60') {
+      return now.getTime() + 60 * 60 * 1000;
+    } else if (type === 'tomorrow9') {
+      var tmrw = new Date(now);
+      tmrw.setDate(tmrw.getDate() + 1);
+      tmrw.setHours(9, 0, 0, 0);
+      return tmrw.getTime();
+    }
+    return null;
+  }
+
+  function toDatetimeLocalStr(ms) {
+    var d = new Date(ms);
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+      'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function formatReminderTime(ms) {
+    var d = new Date(ms);
+    var now = new Date();
+    var pad = function(n) { return String(n).padStart(2, '0'); };
+    var time = pad(d.getHours()) + ':' + pad(d.getMinutes());
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var dayStr = months[d.getMonth()] + ' ' + d.getDate();
+    if (d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()) {
+      return 'Today ' + time;
+    }
+    var tmrw = new Date(now); tmrw.setDate(tmrw.getDate() + 1);
+    if (d.getFullYear() === tmrw.getFullYear() && d.getMonth() === tmrw.getMonth() && d.getDate() === tmrw.getDate()) {
+      return 'Tmrw ' + time;
+    }
+    return dayStr + ' ' + time;
   }
 
   function formatDayHeader(dateStr) {
@@ -659,40 +950,217 @@
     return { label: dayName + ', ' + monthDay, cssClass: '', badge: '' };
   }
 
-  // ─── Date shortcut buttons ───
-  function initDateShortcuts() {
-    var shortcuts = document.querySelectorAll('.todo-date-shortcut');
-    shortcuts.forEach(function(btn) {
-      btn.addEventListener('click', function() {
-        var offset = parseInt(btn.getAttribute('data-offset'), 10);
-        var dateStr = getDateOffset(offset);
-        if (addDateInput.value === dateStr) {
-          // Toggle off
-          addDateInput.value = '';
-          btn.classList.remove('active');
-        } else {
-          addDateInput.value = dateStr;
-          // Update active states
-          shortcuts.forEach(function(b) { b.classList.remove('active'); });
-          btn.classList.add('active');
+  // ─── Add-form state (internal, not DOM inputs) ───
+  var _addFormDate = getTodayStr();   // default to today
+  var _addFormReminderMs = null;
+  var _addFormPopover = null;         // currently open popover element
+
+  // ─── Chip display helpers ───
+  function formatDateChip(dateStr) {
+    var today = getTodayStr();
+    var tomorrow = getDateOffset(1);
+    if (dateStr === today) return 'Today';
+    if (dateStr === tomorrow) return 'Tomorrow';
+    var parts = dateStr.split('-');
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getMonth()] + ' ' + d.getDate();
+  }
+
+  function updateDateChip() {
+    if (_addFormDate) {
+      addDateChipText.textContent = formatDateChip(_addFormDate);
+      addDateChip.style.display = '';
+      addDateIcon.classList.add('active');
+    } else {
+      addDateChip.style.display = 'none';
+      addDateIcon.classList.remove('active');
+    }
+  }
+
+  function formatReminderChip(ms) {
+    return formatReminderTime(ms);
+  }
+
+  function updateReminderChip() {
+    if (_addFormReminderMs) {
+      addReminderChipText.textContent = formatReminderChip(_addFormReminderMs);
+      addReminderChip.style.display = '';
+      addReminderIcon.classList.add('active');
+    } else {
+      addReminderChip.style.display = 'none';
+      addReminderIcon.classList.remove('active');
+    }
+  }
+
+  // ─── Unified popover for add-form icons ───
+  function closeAddFormPopover() {
+    if (_addFormPopover) {
+      _addFormPopover.remove();
+      _addFormPopover = null;
+    }
+  }
+
+  function showAddFormDatePopover() {
+    closeAddFormPopover();
+    closeReminderPopover(); // close any task-row popover too
+
+    var pop = document.createElement('div');
+    pop.className = 'todo-add-popover';
+
+    var html = '<div class="todo-add-popover-title">Schedule</div>';
+    html += '<button type="button" class="todo-add-popover-shortcut" data-date-offset="0">Today</button>';
+    html += '<button type="button" class="todo-add-popover-shortcut" data-date-offset="1">Tomorrow</button>';
+    html += '<div class="todo-add-popover-custom">';
+    html += '<input type="date" class="todo-add-popover-input" value="' + (_addFormDate || '') + '">';
+    html += '<button type="button" class="todo-add-popover-set" title="Set date">';
+    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    html += '</button>';
+    html += '</div>';
+
+    pop.innerHTML = html;
+    addIconRow.appendChild(pop);
+    _addFormPopover = pop;
+
+    // Shortcut buttons
+    pop.querySelectorAll('[data-date-offset]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var offset = parseInt(btn.getAttribute('data-date-offset'), 10);
+        _addFormDate = getDateOffset(offset);
+        updateDateChip();
+        closeAddFormPopover();
+      });
+    });
+
+    // Custom date set
+    var customInput = pop.querySelector('.todo-add-popover-input');
+    var setBtn = pop.querySelector('.todo-add-popover-set');
+    setBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!customInput.value) return;
+      _addFormDate = customInput.value;
+      updateDateChip();
+      closeAddFormPopover();
+    });
+    customInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); setBtn.click(); }
+    });
+
+    setupPopoverDismiss(pop);
+  }
+
+  function showAddFormReminderPopover() {
+    closeAddFormPopover();
+    closeReminderPopover();
+
+    var pop = document.createElement('div');
+    pop.className = 'todo-add-popover';
+
+    var html = '<div class="todo-add-popover-title">Remind me</div>';
+    html += '<button type="button" class="todo-add-popover-shortcut" data-rtype="30">In 30 minutes</button>';
+    html += '<button type="button" class="todo-add-popover-shortcut" data-rtype="60">In 1 hour</button>';
+    html += '<button type="button" class="todo-add-popover-shortcut" data-rtype="tomorrow9">Tomorrow 9 AM</button>';
+    html += '<div class="todo-add-popover-custom">';
+    html += '<input type="datetime-local" class="todo-add-popover-input" value="' + (_addFormReminderMs ? toDatetimeLocalStr(_addFormReminderMs) : '') + '">';
+    html += '<button type="button" class="todo-add-popover-set" title="Set reminder">';
+    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    html += '</button>';
+    html += '</div>';
+
+    pop.innerHTML = html;
+    addIconRow.appendChild(pop);
+    _addFormPopover = pop;
+
+    // Shortcut buttons
+    pop.querySelectorAll('[data-rtype]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var type = btn.getAttribute('data-rtype');
+        var ms = getReminderMs(type);
+        if (ms) {
+          _addFormReminderMs = ms;
+          updateReminderChip();
+          closeAddFormPopover();
         }
       });
     });
-    // Sync shortcut highlight when date input changes manually
-    addDateInput.addEventListener('change', function() {
-      shortcuts.forEach(function(btn) {
-        var offset = parseInt(btn.getAttribute('data-offset'), 10);
-        btn.classList.toggle('active', addDateInput.value === getDateOffset(offset));
-      });
+
+    // Custom datetime set
+    var customInput = pop.querySelector('.todo-add-popover-input');
+    var setBtn = pop.querySelector('.todo-add-popover-set');
+    setBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!customInput.value) return;
+      var ms = new Date(customInput.value).getTime();
+      if (isNaN(ms) || ms <= Date.now()) {
+        customInput.style.borderColor = 'var(--color-danger)';
+        return;
+      }
+      _addFormReminderMs = ms;
+      updateReminderChip();
+      closeAddFormPopover();
     });
-    // Default to today
-    addDateInput.value = getTodayStr();
-    shortcuts.forEach(function(btn) {
-      var offset = parseInt(btn.getAttribute('data-offset'), 10);
-      if (getDateOffset(offset) === getTodayStr()) btn.classList.add('active');
+    customInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); setBtn.click(); }
     });
+
+    setupPopoverDismiss(pop);
   }
-  initDateShortcuts();
+
+  function setupPopoverDismiss(pop) {
+    function onDocClick(e) {
+      if (pop && !pop.contains(e.target) && e.target !== addDateIcon && e.target !== addReminderIcon) {
+        closeAddFormPopover();
+        document.removeEventListener('click', onDocClick, true);
+      }
+    }
+    setTimeout(function() {
+      document.addEventListener('click', onDocClick, true);
+    }, 0);
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        closeAddFormPopover();
+        document.removeEventListener('keydown', onKey);
+      }
+    }
+    document.addEventListener('keydown', onKey);
+  }
+
+  // ─── Wire up add-form icon buttons and chip clears ───
+  addDateIcon.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (_addFormPopover && _addFormPopover.parentNode === addIconRow && _addFormPopover.querySelector('[data-date-offset]')) {
+      closeAddFormPopover();
+    } else {
+      showAddFormDatePopover();
+    }
+  });
+
+  addReminderIcon.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (_addFormPopover && _addFormPopover.parentNode === addIconRow && _addFormPopover.querySelector('[data-rtype]')) {
+      closeAddFormPopover();
+    } else {
+      showAddFormReminderPopover();
+    }
+  });
+
+  addDateChipClear.addEventListener('click', function(e) {
+    e.stopPropagation();
+    _addFormDate = null;
+    updateDateChip();
+  });
+
+  addReminderChipClear.addEventListener('click', function(e) {
+    e.stopPropagation();
+    _addFormReminderMs = null;
+    updateReminderChip();
+  });
+
+  // Initialize chips — default to Today
+  updateDateChip();
+  updateReminderChip();
 
   // ─── Toast notifications ───
   function showTodoError(msg) {
@@ -762,10 +1230,31 @@
       html += '<span class="todo-item-category">' + escapeHtml(todo.category) + '</span>';
     }
 
+    // Reminder info
+    if (todo.reminderAt && !todo.reminderFired && !todo.done) {
+      var isOverdue = todo.reminderAt < Date.now();
+      html += '<span class="todo-item-reminder' + (isOverdue ? ' overdue' : '') + '">';
+      html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>';
+      html += formatReminderTime(todo.reminderAt);
+      html += '</span>';
+    }
+
     html += '</div></div>';
 
     // Action buttons
     html += '<div class="todo-item-actions">';
+    if (!todo.done) {
+      var hasReminder = todo.reminderAt && !todo.reminderFired;
+      html += '<button type="button" class="todo-item-action-btn reminder-bell' + (hasReminder ? ' has-reminder' : '') + '" data-reminder-id="' + todo.id + '" title="' + (hasReminder ? 'Edit reminder' : 'Set reminder') + '" aria-label="Set reminder">';
+      if (hasReminder) {
+        // Filled bell
+        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>';
+      } else {
+        // Outline bell
+        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>';
+      }
+      html += '</button>';
+    }
     if (!isSubtask && !todo.done) {
       html += '<button type="button" class="todo-item-action-btn add-subtask" data-parent-id="' + todo.id + '" title="Add subtask" aria-label="Add subtask">';
       html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
@@ -1039,6 +1528,15 @@
       });
     });
 
+    // Reminder bell button
+    itemsEl.querySelectorAll('.reminder-bell[data-reminder-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-reminder-id');
+        showReminderPopover(btn, todoId);
+      });
+    });
+
     // Clear all completed button
     var clearAllBtn = document.getElementById('todo-clear-all');
     if (clearAllBtn) {
@@ -1103,7 +1601,7 @@
       // Subtasks inherit parent's scheduledDate
       var parent = allTodos.find(function(t) { return t.id === parentId; });
       var scheduledDate = parent ? parent.scheduledDate : null;
-      createTodo(title, est, parentId, scheduledDate);
+      createTodo(title, est, parentId, scheduledDate, null);
       row.remove();
     }
 
@@ -1118,6 +1616,131 @@
     subAddBtn.addEventListener('click', addSubtask);
   }
 
+  // ─── Reminder popover ───
+  var _activePopover = null;
+
+  function closeReminderPopover() {
+    if (_activePopover) {
+      _activePopover.remove();
+      _activePopover = null;
+    }
+  }
+
+  function showReminderPopover(anchorBtn, todoId) {
+    // Close any existing popover (both types)
+    closeReminderPopover();
+    closeAddFormPopover();
+
+    var todo = allTodos.find(function(t) { return t.id === todoId; });
+    if (!todo) return;
+
+    var hasReminder = todo.reminderAt && !todo.reminderFired;
+
+    var popover = document.createElement('div');
+    popover.className = 'todo-reminder-popover';
+
+    var html = '<div class="todo-reminder-popover-title">Remind me</div>';
+    html += '<div class="todo-reminder-shortcuts">';
+    html += '<button type="button" class="todo-reminder-shortcut-btn" data-rtype="30">In 30 minutes</button>';
+    html += '<button type="button" class="todo-reminder-shortcut-btn" data-rtype="60">In 1 hour</button>';
+    html += '<button type="button" class="todo-reminder-shortcut-btn" data-rtype="tomorrow9">Tomorrow 9 AM</button>';
+    html += '</div>';
+    html += '<div class="todo-reminder-custom">';
+    html += '<input type="datetime-local" class="todo-reminder-datetime" value="' + (hasReminder ? toDatetimeLocalStr(todo.reminderAt) : '') + '">';
+    html += '<button type="button" class="todo-reminder-set-btn" title="Set custom time">';
+    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    html += '</button>';
+    html += '</div>';
+    if (hasReminder) {
+      html += '<button type="button" class="todo-reminder-clear-btn">Clear reminder</button>';
+    }
+
+    popover.innerHTML = html;
+
+    // Append to .todo-item (not button) so inputs are interactive
+    var todoItem = anchorBtn.closest('.todo-item');
+    if (!todoItem) { todoItem = anchorBtn.parentNode; }
+    todoItem.style.position = 'relative';
+
+    // Calculate position: align to the right edge of the actions area, below the button
+    var btnRect = anchorBtn.getBoundingClientRect();
+    var parentRect = todoItem.getBoundingClientRect();
+    popover.style.top = (btnRect.bottom - parentRect.top + 4) + 'px';
+    popover.style.right = Math.max(0, parentRect.right - btnRect.right) + 'px';
+
+    todoItem.appendChild(popover);
+    _activePopover = popover;
+
+    // Shortcut buttons
+    popover.querySelectorAll('.todo-reminder-shortcut-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var type = btn.getAttribute('data-rtype');
+        var ms = getReminderMs(type);
+        if (ms && window.dmSync) {
+          window.dmSync.setReminder(todoId, ms).then(function() {
+            closeReminderPopover();
+            loadTodos();
+          });
+        }
+      });
+    });
+
+    // Custom datetime set button
+    var customInput = popover.querySelector('.todo-reminder-datetime');
+    var setBtn = popover.querySelector('.todo-reminder-set-btn');
+    setBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!customInput.value) return;
+      var ms = new Date(customInput.value).getTime();
+      if (isNaN(ms) || ms <= Date.now()) {
+        customInput.style.borderColor = 'var(--color-danger)';
+        return;
+      }
+      if (window.dmSync) {
+        window.dmSync.setReminder(todoId, ms).then(function() {
+          closeReminderPopover();
+          loadTodos();
+        });
+      }
+    });
+
+    // Clear reminder button
+    var clearBtn = popover.querySelector('.todo-reminder-clear-btn');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (window.dmSync) {
+          window.dmSync.clearReminder(todoId).then(function() {
+            closeReminderPopover();
+            loadTodos();
+          });
+        }
+      });
+    }
+
+    // Close on outside click
+    function onDocClick(e) {
+      if (popover && !popover.contains(e.target) && e.target !== anchorBtn) {
+        closeReminderPopover();
+        document.removeEventListener('click', onDocClick, true);
+      }
+    }
+    // Delay to avoid immediate close from the current click
+    setTimeout(function() {
+      document.addEventListener('click', onDocClick, true);
+    }, 0);
+
+    // Close on Escape
+    function onKeyDown(e) {
+      if (e.key === 'Escape') {
+        closeReminderPopover();
+        document.removeEventListener('keydown', onKeyDown);
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+  }
+
   // ─── CRUD operations ───
   function getNextOrder(parentId) {
     var siblings = allTodos.filter(function(t) {
@@ -1130,7 +1753,7 @@
     return maxOrder + 1;
   }
 
-  function createTodo(title, estimatedMin, parentId, scheduledDate, onDone) {
+  function createTodo(title, estimatedMin, parentId, scheduledDate, reminderAtMs, onDone) {
     if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
       showTodoError('Not signed in — please sign in to add tasks');
       if (onDone) onDone();
@@ -1139,6 +1762,11 @@
 
     var user = window.dmAuth.currentUser;
     var order = getNextOrder(parentId || null);
+
+    // Request notification permission early if setting a reminder
+    if (reminderAtMs && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch(e) {}
+    }
 
     var todoData = {
       userId: user.uid,
@@ -1150,6 +1778,8 @@
       parentId: parentId || null,
       order: order,
       scheduledDate: scheduledDate || null,
+      reminderAt: reminderAtMs ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
+      reminderFired: false,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       completedAt: null
@@ -1159,6 +1789,8 @@
       .then(function(docRef) {
         var localTodo = Object.assign({}, todoData, {
           id: docRef.id,
+          reminderAt: reminderAtMs || null,
+          reminderFired: false,
           createdAt: Date.now(),
           updatedAt: Date.now()
         });
@@ -1364,14 +1996,18 @@
     var title = addTitleInput.value.trim();
     if (!title) { addTitleInput.focus(); return; }
     var est = parseInt(addEstimateInput.value, 10) || 25;
-    var scheduledDate = addDateInput.value || null;
+    var scheduledDate = _addFormDate || null;
+    var reminderAtMs = _addFormReminderMs && _addFormReminderMs > Date.now() ? _addFormReminderMs : null;
     addBtn.disabled = true;
-    createTodo(title, est, null, scheduledDate, function() {
+    createTodo(title, est, null, scheduledDate, reminderAtMs, function() {
       addBtn.disabled = false;
     });
     addTitleInput.value = '';
     addEstimateInput.value = '';
-    // Keep date input as-is so user can add multiple tasks to same day
+    // Clear reminder but keep date so user can add multiple tasks to same day
+    _addFormReminderMs = null;
+    updateReminderChip();
+    closeAddFormPopover();
     addTitleInput.focus();
   }
 
@@ -1380,9 +2016,6 @@
     if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
   });
   addEstimateInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
-  });
-  addDateInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
   });
 

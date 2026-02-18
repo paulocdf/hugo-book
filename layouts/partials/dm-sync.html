@@ -1,10 +1,111 @@
 <!-- dm-sync: IndexedDB cache layer + Firestore sync engine -->
+
+<!-- Reminder banner container -->
+<div id="dm-reminder-banner-container"></div>
+<style>
+#dm-reminder-banner-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100000;
+  display: flex;
+  flex-direction: column;
+}
+.dm-reminder-banner {
+  background: var(--color-link, #0055bb);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transform: translateY(-100%);
+  opacity: 0;
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+}
+.dm-reminder-banner.dm-banner--in {
+  transform: translateY(0);
+  opacity: 1;
+}
+.dm-reminder-banner.dm-banner--out {
+  transform: translateY(-100%);
+  opacity: 0;
+}
+.dm-reminder-banner-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  animation: dm-bell-ring 0.8s ease-in-out 0.4s;
+  transform-origin: top center;
+}
+@keyframes dm-bell-ring {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(10deg); }
+  60% { transform: rotate(-8deg); }
+  75% { transform: rotate(4deg); }
+}
+.dm-reminder-banner-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+.dm-reminder-banner-label {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.dm-reminder-banner-text {
+  font-size: 0.8125rem;
+  opacity: 0.9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dm-reminder-banner-ack {
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.2);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 5px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.dm-reminder-banner-ack:hover {
+  background: rgba(255,255,255,0.35);
+}
+
+@media (max-width: 600px) {
+  .dm-reminder-banner {
+    padding: 0.5rem 0.75rem;
+    gap: 0.5rem;
+  }
+  .dm-reminder-banner-body {
+    flex-direction: column;
+    gap: 0;
+  }
+  .dm-reminder-banner-ack {
+    padding: 0.2rem 0.6rem;
+  }
+}
+</style>
+
 <script>
 (function() {
   'use strict';
 
   var DB_NAME = 'dm-notes';
-  var DB_VERSION = 2;
+  var DB_VERSION = 3;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -21,6 +122,7 @@
       var req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = function(e) {
         var db = e.target.result;
+        var tx = e.target.transaction;
         if (!db.objectStoreNames.contains(STORE_NOTES)) {
           var store = db.createObjectStore(STORE_NOTES, { keyPath: 'id' });
           store.createIndex('destination', 'destination', { unique: false });
@@ -37,6 +139,13 @@
           todoStore.createIndex('done', 'done', { unique: false });
           todoStore.createIndex('order', 'order', { unique: false });
           todoStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+          todoStore.createIndex('reminderAt', 'reminderAt', { unique: false });
+        } else {
+          // Upgrading existing todos store — add reminderAt index if missing
+          var existingStore = tx.objectStore(STORE_TODOS);
+          if (!existingStore.indexNames.contains('reminderAt')) {
+            existingStore.createIndex('reminderAt', 'reminderAt', { unique: false });
+          }
         }
       };
       req.onsuccess = function(e) {
@@ -145,6 +254,7 @@
     var createdAt = data.createdAt ? data.createdAt.toMillis() : 0;
     var updatedAt = data.updatedAt ? data.updatedAt.toMillis() : 0;
     var completedAt = data.completedAt ? data.completedAt.toMillis() : null;
+    var reminderAt = data.reminderAt ? data.reminderAt.toMillis() : null;
     return {
       id: doc.id,
       userId: data.userId || '',
@@ -156,6 +266,8 @@
       parentId: data.parentId || null,
       order: data.order || 0,
       scheduledDate: data.scheduledDate || null,
+      reminderAt: reminderAt,
+      reminderFired: !!data.reminderFired,
       createdAt: createdAt,
       updatedAt: updatedAt,
       completedAt: completedAt
@@ -310,6 +422,187 @@
     }
   }
 
+  // ─── Reminder Timer Engine ───
+
+  var _reminderTimers = {}; // todoId -> timeoutId
+  var MAX_TIMEOUT = 2147483647; // 2^31 - 1 ms (~24.8 days)
+
+  // ─── Notification Chime (Web Audio API) ───
+
+  function playReminderChime() {
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var notes = [
+        { freq: 830, start: 0, dur: 0.12 },
+        { freq: 1050, start: 0.13, dur: 0.12 },
+        { freq: 1250, start: 0.26, dur: 0.18 }
+      ];
+      notes.forEach(function(n) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = n.freq;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + n.start);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.start + n.dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + n.start);
+        osc.stop(ctx.currentTime + n.start + n.dur + 0.05);
+      });
+      // Close context after sound finishes
+      setTimeout(function() { ctx.close(); }, 600);
+    } catch(e) {
+      // Audio not available — silent fallback
+    }
+  }
+
+  // ─── Persistent Reminder Banner ───
+
+  function showReminderBanner(title, text) {
+    var container = document.getElementById('dm-reminder-banner-container');
+    if (!container) return;
+
+    var banner = document.createElement('div');
+    banner.className = 'dm-reminder-banner';
+    banner.innerHTML =
+      '<svg class="dm-reminder-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>' +
+        '<path d="M13.73 21a2 2 0 0 1-3.46 0"/>' +
+      '</svg>' +
+      '<div class="dm-reminder-banner-body">' +
+        '<span class="dm-reminder-banner-label"></span>' +
+        '<span class="dm-reminder-banner-text"></span>' +
+      '</div>' +
+      '<button class="dm-reminder-banner-ack">Acknowledge</button>';
+
+    // Set text content safely (no innerHTML for user data)
+    banner.querySelector('.dm-reminder-banner-label').textContent = title;
+    banner.querySelector('.dm-reminder-banner-text').textContent = text;
+
+    container.appendChild(banner);
+
+    // Slide down
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        banner.classList.add('dm-banner--in');
+      });
+    });
+
+    // Acknowledge = dismiss
+    banner.querySelector('.dm-reminder-banner-ack').addEventListener('click', function() {
+      banner.classList.remove('dm-banner--in');
+      banner.classList.add('dm-banner--out');
+      setTimeout(function() {
+        if (banner.parentNode) banner.parentNode.removeChild(banner);
+      }, 450);
+    });
+  }
+
+  function clearReminderTimer(todoId) {
+    if (_reminderTimers[todoId]) {
+      clearTimeout(_reminderTimers[todoId]);
+      delete _reminderTimers[todoId];
+    }
+  }
+
+  function clearAllReminderTimers() {
+    Object.keys(_reminderTimers).forEach(function(id) {
+      clearTimeout(_reminderTimers[id]);
+    });
+    _reminderTimers = {};
+  }
+
+  function buildReminderBody(todo) {
+    var parts = [todo.title];
+    if (todo.estimatedMin) parts.push(todo.estimatedMin + 'min');
+    if (todo.scheduledDate) {
+      var today = new Date(); today.setHours(0,0,0,0);
+      var d = new Date(todo.scheduledDate + 'T00:00:00');
+      var diff = Math.round((d - today) / 86400000);
+      if (diff === 0) parts.push('Today');
+      else if (diff === 1) parts.push('Tomorrow');
+      else parts.push(todo.scheduledDate);
+    }
+    return parts.join(' \u2014 '); // em dash
+  }
+
+  function fireReminder(todo) {
+    var body = buildReminderBody(todo);
+
+    // Show persistent banner + play chime
+    playReminderChime();
+    showReminderBanner('Reminder:', body);
+
+    // Mark as fired — dual write
+    todo.reminderFired = true;
+    todo.updatedAt = Date.now();
+    var promises = [];
+    if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
+      promises.push(
+        window.dmDb.collection('todos').doc(todo.id).update({
+          reminderFired: true,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(function(err) {
+          console.warn('[dm-sync] Failed to update reminder fired in Firestore:', err);
+        })
+      );
+    }
+    promises.push(idbPut(STORE_TODOS, todo));
+    Promise.all(promises).then(function() {
+      window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+    });
+  }
+
+  function scheduleReminder(todo) {
+    clearReminderTimer(todo.id);
+
+    if (!todo.reminderAt || todo.reminderFired || todo.done) return;
+
+    var now = Date.now();
+    var delay = todo.reminderAt - now;
+
+    if (delay <= 0) {
+      // Overdue — fire immediately
+      fireReminder(todo);
+      return;
+    }
+
+    // Cap at MAX_TIMEOUT; for longer delays, re-schedule instead of firing early
+    var actualDelay = Math.min(delay, MAX_TIMEOUT);
+    _reminderTimers[todo.id] = setTimeout(function() {
+      delete _reminderTimers[todo.id];
+      // Re-check in case it was cancelled or fired
+      idbGet(STORE_TODOS, todo.id).then(function(latest) {
+        if (latest && !latest.reminderFired && !latest.done && latest.reminderAt) {
+          // If reminder time is still in the future (delay was capped), re-schedule
+          if (latest.reminderAt > Date.now()) {
+            scheduleReminder(latest);
+          } else {
+            fireReminder(latest);
+          }
+        }
+      });
+    }, actualDelay);
+  }
+
+  function scheduleAllReminders() {
+    clearAllReminderTimers();
+    idbGetAll(STORE_TODOS).then(function(todos) {
+      todos.forEach(function(t) {
+        if (t.reminderAt && !t.reminderFired && !t.done) {
+          scheduleReminder(t);
+        }
+      });
+    }).catch(function(err) {
+      console.warn('[dm-sync] Failed to schedule reminders:', err);
+    });
+  }
+
+  // Re-evaluate timers when todos change
+  window.addEventListener('dm-todos-updated', function() {
+    scheduleAllReminders();
+  });
+
   // ─── Public API ───
 
   window.dmSync = {
@@ -348,6 +641,54 @@
     getTopLevelTodos: function() {
       return idbGetAll(STORE_TODOS).then(function(todos) {
         return todos.filter(function(t) { return !t.parentId; });
+      });
+    },
+    setReminder: function(todoId, reminderAtMs) {
+      return idbGet(STORE_TODOS, todoId).then(function(todo) {
+        if (!todo) return;
+        todo.reminderAt = reminderAtMs;
+        todo.reminderFired = false;
+        todo.updatedAt = Date.now();
+        var promises = [idbPut(STORE_TODOS, todo)];
+        if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
+          promises.push(
+            window.dmDb.collection('todos').doc(todoId).update({
+              reminderAt: firebase.firestore.Timestamp.fromMillis(reminderAtMs),
+              reminderFired: false,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(function(err) {
+              console.warn('[dm-sync] Firestore setReminder failed (offline?):', err);
+            })
+          );
+        }
+        return Promise.all(promises).then(function() {
+          scheduleReminder(todo);
+          window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+        });
+      });
+    },
+    clearReminder: function(todoId) {
+      clearReminderTimer(todoId);
+      return idbGet(STORE_TODOS, todoId).then(function(todo) {
+        if (!todo) return;
+        todo.reminderAt = null;
+        todo.reminderFired = false;
+        todo.updatedAt = Date.now();
+        var promises = [idbPut(STORE_TODOS, todo)];
+        if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
+          promises.push(
+            window.dmDb.collection('todos').doc(todoId).update({
+              reminderAt: null,
+              reminderFired: false,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }).catch(function(err) {
+              console.warn('[dm-sync] Firestore clearReminder failed (offline?):', err);
+            })
+          );
+        }
+        return Promise.all(promises).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+        });
       });
     },
 
@@ -415,7 +756,10 @@
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
         window.dispatchEvent(new CustomEvent('dm-todos-updated'));
       });
-    }
+    },
+
+    // Reminder banner (for use by other partials)
+    showReminderBanner: showReminderBanner
   };
 
   // ─── Auto-sync on Auth State Change ───
@@ -436,6 +780,7 @@
             return syncAll(user.uid);
           }).then(function() {
             startBackgroundSync(user.uid);
+            scheduleAllReminders();
           });
         }).catch(function(err) {
           console.warn('[dm-sync] Initial sync failed, using cached data if available');
@@ -443,6 +788,7 @@
         });
       } else {
         stopBackgroundSync();
+        clearAllReminderTimers();
         // Clear cache on sign-out so no data leaks to another user
         Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META)])
           .then(function() {

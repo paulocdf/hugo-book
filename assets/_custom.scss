@@ -1867,14 +1867,14 @@ html.sidebar-collapsed {
   }
 }
 
-// Destination selector
-.qc-destination {
-  margin-bottom: 0.85rem;
+// Destination selector (contextual row)
+.qc-context-row {
+  margin-bottom: 0.6rem;
 }
 
 // Book title input (visible when Books destination is selected)
 .qc-book-title {
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.6rem;
 }
 
 .qc-book-title-input {
@@ -1903,7 +1903,7 @@ html.sidebar-collapsed {
 
 // Inbox mode toggle (Append / New note)
 .qc-inbox-mode {
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.6rem;
 }
 
 .qc-inbox-mode-options {
@@ -1956,7 +1956,7 @@ html.sidebar-collapsed {
 
 // Language selector (Code mode)
 .qc-language {
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.6rem;
 }
 
 .qc-language-options {
@@ -1994,6 +1994,185 @@ html.sidebar-collapsed {
   }
 }
 
+// Todo mode fields (Quick Capture)
+.qc-todo-fields {
+  margin-bottom: 0.6rem;
+}
+
+.qc-todo-row-main {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.qc-todo-title-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--body-font-color);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: border-color 0.2s ease, background 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    background: var(--surface-2);
+  }
+
+  &::placeholder {
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+}
+
+.qc-todo-estimate-input {
+  width: 60px;
+  padding: 0.5rem 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--body-font-color);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-align: center;
+  transition: border-color 0.2s ease;
+  -moz-appearance: textfield;
+
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+    background: var(--surface-2);
+  }
+
+  &::placeholder {
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+}
+
+.qc-todo-row-icons {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.qc-todo-icon-btn {
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--surface-2);
+    border-color: var(--border-medium);
+    color: var(--body-font-color);
+  }
+}
+
+.qc-todo-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  font-size: 0.72rem;
+  color: var(--body-font-color);
+  white-space: nowrap;
+}
+
+.qc-todo-chip-text {
+  font-weight: 500;
+}
+
+.qc-todo-chip-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  line-height: 1;
+  padding: 0 0.1rem;
+  transition: color 0.15s;
+
+  &:hover {
+    color: var(--color-danger, #e53935);
+  }
+}
+
+// Todo mode popover (date/reminder pickers in Quick Capture)
+.qc-todo-popover {
+  position: absolute;
+  z-index: 100001;
+  background: var(--body-background, #fff);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.qc-todo-popover-shortcut {
+  display: block;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  color: var(--body-font-color);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+
+  &:hover {
+    background: var(--surface-2);
+  }
+}
+
+.qc-todo-popover input[type="date"],
+.qc-todo-popover input[type="datetime-local"] {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  background: var(--surface-1);
+  color: var(--body-font-color);
+  font-family: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent-blue);
+  }
+}
+
 // Title input
 .qc-title-input {
   width: 100%;
@@ -2020,14 +2199,9 @@ html.sidebar-collapsed {
   }
 }
 
+// Destination label (used in conditional sub-rows)
 .qc-destination-label {
-  display: block;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-bottom: 0.4rem;
+  display: none;
 }
 
 .qc-destination-options {

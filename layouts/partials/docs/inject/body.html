@@ -157,8 +157,21 @@
   var feedbackIconEl = document.getElementById('qc-feedback-icon');
   var feedbackTextEl = document.getElementById('qc-feedback-text');
 
+  // Todo mode elements
+  var todoFieldsEl = document.getElementById('qc-todo-fields');
+  var todoTitleInput = document.getElementById('qc-todo-title');
+  var todoEstimateInput = document.getElementById('qc-todo-estimate');
+  var todoDateBtn = document.getElementById('qc-todo-date-btn');
+  var todoDateChip = document.getElementById('qc-todo-date-chip');
+  var todoDateChipText = document.getElementById('qc-todo-date-chip-text');
+  var todoDateClear = document.getElementById('qc-todo-date-clear');
+  var todoReminderBtn = document.getElementById('qc-todo-reminder-btn');
+  var todoReminderChip = document.getElementById('qc-todo-reminder-chip');
+  var todoReminderChipText = document.getElementById('qc-todo-reminder-chip-text');
+  var todoReminderClear = document.getElementById('qc-todo-reminder-clear');
+
   // State
-  var currentMode = 'note'; // 'note' or 'code'
+  var currentMode = 'note'; // 'note', 'code', or 'todo'
   var selectedLang = 'kotlin';
   var inboxMode = 'append'; // 'append' or 'new'
   var selectedDest = {
@@ -167,6 +180,11 @@
   };
   var previewTimer = null;
   var isSaving = false;
+
+  // Todo mode state
+  var _qcTodoDate = null; // YYYY-MM-DD string
+  var _qcTodoReminderMs = null; // timestamp in ms
+  var _qcTodoPopover = null; // currently open popover element
 
   // =========================================================================
   // Firebase Auth
@@ -589,29 +607,46 @@
       modeButtons.forEach(function(b) { b.classList.remove('active'); });
       mbtn.classList.add('active');
 
+      // Hide everything first
+      destRow.style.display = 'none';
+      langRow.style.display = 'none';
+      if (inboxModeRow) inboxModeRow.style.display = 'none';
+      if (bookTitleRow) bookTitleRow.style.display = 'none';
+      previewWrapper.style.display = 'none';
+      notePreviewWrapper.style.display = 'none';
+      if (todoFieldsEl) todoFieldsEl.style.display = 'none';
+
       if (mode === 'code') {
-        destRow.style.display = 'none';
         langRow.style.display = '';
         previewWrapper.style.display = '';
-        notePreviewWrapper.style.display = 'none';
         if (toolbar) toolbar.style.display = 'none';
-        if (inboxModeRow) inboxModeRow.style.display = 'none';
-        if (bookTitleRow) bookTitleRow.style.display = 'none';
         input.classList.add('code-mode');
         dialog.classList.add('code-mode');
         input.placeholder = 'Paste or type your code here...';
+        // Show note fields
+        titleInput.style.display = '';
+        document.getElementById('qc-editor-box').style.display = '';
         updatePreview();
+      } else if (mode === 'todo') {
+        if (todoFieldsEl) todoFieldsEl.style.display = '';
+        if (toolbar) toolbar.style.display = 'none';
+        // Hide note/code-specific fields
+        titleInput.style.display = 'none';
+        document.getElementById('qc-editor-box').style.display = 'none';
+        input.classList.remove('code-mode');
+        dialog.classList.remove('code-mode');
       } else {
+        // note mode
         destRow.style.display = '';
-        langRow.style.display = 'none';
-        previewWrapper.style.display = 'none';
         if (toolbar) toolbar.style.display = '';
-        // Restore inbox mode / book title visibility based on current destination
         if (inboxModeRow) inboxModeRow.style.display = selectedDest.tag === 'inbox' ? '' : 'none';
         if (bookTitleRow) bookTitleRow.style.display = selectedDest.tag === 'book-note' ? '' : 'none';
         input.classList.remove('code-mode');
         dialog.classList.remove('code-mode');
         input.placeholder = "What's on your mind?";
+        // Show note fields
+        titleInput.style.display = '';
+        document.getElementById('qc-editor-box').style.display = '';
         updateNotePreview();
       }
     });
@@ -679,6 +714,181 @@
     });
   }
 
+  // =========================================================================
+  // Todo mode: date/reminder popovers and chips
+  // =========================================================================
+
+  function closeQcTodoPopover() {
+    if (_qcTodoPopover && _qcTodoPopover.parentNode) {
+      _qcTodoPopover.parentNode.removeChild(_qcTodoPopover);
+    }
+    _qcTodoPopover = null;
+  }
+
+  function formatQcDateChip(dateStr) {
+    var today = new Date(); today.setHours(0,0,0,0);
+    var d = new Date(dateStr + 'T00:00:00');
+    var diff = Math.round((d - today) / 86400000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Tomorrow';
+    var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    if (diff > 1 && diff < 7) return days[d.getDay()];
+    return months[d.getMonth()] + ' ' + d.getDate();
+  }
+
+  function formatQcReminderChip(ms) {
+    var d = new Date(ms);
+    var now = new Date();
+    var diffMin = Math.round((ms - now.getTime()) / 60000);
+    if (diffMin > 0 && diffMin <= 90) return 'In ' + diffMin + ' min';
+    var today = new Date(); today.setHours(0,0,0,0);
+    var target = new Date(ms); target.setHours(0,0,0,0);
+    var dayDiff = Math.round((target - today) / 86400000);
+    var timeStr = d.getHours() + ':' + (d.getMinutes() < 10 ? '0' : '') + d.getMinutes();
+    if (dayDiff === 0) return 'Today ' + timeStr;
+    if (dayDiff === 1) return 'Tmrw ' + timeStr;
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getMonth()] + ' ' + d.getDate() + ' ' + timeStr;
+  }
+
+  function updateQcDateChip() {
+    if (_qcTodoDate) {
+      todoDateChipText.textContent = formatQcDateChip(_qcTodoDate);
+      todoDateChip.style.display = '';
+    } else {
+      todoDateChip.style.display = 'none';
+    }
+  }
+
+  function updateQcReminderChip() {
+    if (_qcTodoReminderMs) {
+      todoReminderChipText.textContent = formatQcReminderChip(_qcTodoReminderMs);
+      todoReminderChip.style.display = '';
+    } else {
+      todoReminderChip.style.display = 'none';
+    }
+  }
+
+  function showQcDatePopover() {
+    closeQcTodoPopover();
+    var pop = document.createElement('div');
+    pop.className = 'qc-todo-popover';
+
+    var today = new Date();
+    var todayStr = today.getFullYear() + '-' + pad(today.getMonth()+1) + '-' + pad(today.getDate());
+    var tmrw = new Date(today); tmrw.setDate(tmrw.getDate()+1);
+    var tmrwStr = tmrw.getFullYear() + '-' + pad(tmrw.getMonth()+1) + '-' + pad(tmrw.getDate());
+
+    pop.innerHTML =
+      '<button type="button" class="qc-todo-popover-shortcut" data-val="' + todayStr + '">Today</button>' +
+      '<button type="button" class="qc-todo-popover-shortcut" data-val="' + tmrwStr + '">Tomorrow</button>' +
+      '<input type="date" class="qc-todo-popover-date" min="' + todayStr + '" />';
+
+    pop.querySelectorAll('.qc-todo-popover-shortcut').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _qcTodoDate = btn.getAttribute('data-val');
+        updateQcDateChip();
+        closeQcTodoPopover();
+      });
+    });
+    pop.querySelector('.qc-todo-popover-date').addEventListener('change', function() {
+      if (this.value) {
+        _qcTodoDate = this.value;
+        updateQcDateChip();
+        closeQcTodoPopover();
+      }
+    });
+
+    // Position below the button
+    var rect = todoDateBtn.getBoundingClientRect();
+    var dialogRect = dialog.getBoundingClientRect();
+    pop.style.position = 'absolute';
+    pop.style.top = (rect.bottom - dialogRect.top + 4) + 'px';
+    pop.style.left = (rect.left - dialogRect.left) + 'px';
+
+    dialog.appendChild(pop);
+    _qcTodoPopover = pop;
+  }
+
+  function showQcReminderPopover() {
+    closeQcTodoPopover();
+    var pop = document.createElement('div');
+    pop.className = 'qc-todo-popover';
+
+    var now = new Date();
+    var in30 = new Date(now.getTime() + 30*60000);
+    var in60 = new Date(now.getTime() + 60*60000);
+    var tmrw9 = new Date(now); tmrw9.setDate(tmrw9.getDate()+1); tmrw9.setHours(9,0,0,0);
+
+    pop.innerHTML =
+      '<button type="button" class="qc-todo-popover-shortcut" data-ms="' + in30.getTime() + '">In 30 min</button>' +
+      '<button type="button" class="qc-todo-popover-shortcut" data-ms="' + in60.getTime() + '">In 1 hour</button>' +
+      '<button type="button" class="qc-todo-popover-shortcut" data-ms="' + tmrw9.getTime() + '">Tomorrow 9 AM</button>' +
+      '<input type="datetime-local" class="qc-todo-popover-datetime" />';
+
+    pop.querySelectorAll('.qc-todo-popover-shortcut').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _qcTodoReminderMs = parseInt(btn.getAttribute('data-ms'), 10);
+        updateQcReminderChip();
+        closeQcTodoPopover();
+      });
+    });
+    pop.querySelector('.qc-todo-popover-datetime').addEventListener('change', function() {
+      if (this.value) {
+        _qcTodoReminderMs = new Date(this.value).getTime();
+        updateQcReminderChip();
+        closeQcTodoPopover();
+      }
+    });
+
+    var rect = todoReminderBtn.getBoundingClientRect();
+    var dialogRect = dialog.getBoundingClientRect();
+    pop.style.position = 'absolute';
+    pop.style.top = (rect.bottom - dialogRect.top + 4) + 'px';
+    pop.style.left = (rect.left - dialogRect.left) + 'px';
+
+    dialog.appendChild(pop);
+    _qcTodoPopover = pop;
+  }
+
+  // Wire up todo icon buttons
+  if (todoDateBtn) {
+    todoDateBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (_qcTodoPopover) { closeQcTodoPopover(); return; }
+      showQcDatePopover();
+    });
+  }
+  if (todoReminderBtn) {
+    todoReminderBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (_qcTodoPopover) { closeQcTodoPopover(); return; }
+      showQcReminderPopover();
+    });
+  }
+  if (todoDateClear) {
+    todoDateClear.addEventListener('click', function() {
+      _qcTodoDate = null;
+      updateQcDateChip();
+    });
+  }
+  if (todoReminderClear) {
+    todoReminderClear.addEventListener('click', function() {
+      _qcTodoReminderMs = null;
+      updateQcReminderChip();
+    });
+  }
+
+  // Dismiss popover on outside click
+  document.addEventListener('click', function(e) {
+    if (_qcTodoPopover && !_qcTodoPopover.contains(e.target) &&
+        e.target !== todoDateBtn && e.target !== todoReminderBtn &&
+        !todoDateBtn.contains(e.target) && !todoReminderBtn.contains(e.target)) {
+      closeQcTodoPopover();
+    }
+  });
+
   function openModal() {
     // Reset state
     currentMode = 'note';
@@ -708,6 +918,20 @@
     dialog.classList.remove('code-mode');
     input.placeholder = "What's on your mind?";
 
+    // Reset todo state
+    if (todoFieldsEl) todoFieldsEl.style.display = 'none';
+    if (todoTitleInput) todoTitleInput.value = '';
+    if (todoEstimateInput) todoEstimateInput.value = '';
+    _qcTodoDate = null;
+    _qcTodoReminderMs = null;
+    updateQcDateChip();
+    updateQcReminderChip();
+    closeQcTodoPopover();
+
+    // Show note/code fields (default: note mode)
+    titleInput.style.display = '';
+    document.getElementById('qc-editor-box').style.display = '';
+
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
     titleInput.value = '';
@@ -723,6 +947,11 @@
     titleInput.value = '';
     input.value = '';
     if (bookTitleInput) bookTitleInput.value = '';
+    if (todoTitleInput) todoTitleInput.value = '';
+    if (todoEstimateInput) todoEstimateInput.value = '';
+    _qcTodoDate = null;
+    _qcTodoReminderMs = null;
+    closeQcTodoPopover();
     isSaving = false;
     if (feedbackEl) feedbackEl.style.display = 'none';
   }
@@ -731,6 +960,12 @@
 
   function submit() {
     if (isSaving) return;
+
+    // Todo mode — different submit path
+    if (currentMode === 'todo') {
+      submitTodo();
+      return;
+    }
 
     var text = input.value.trim();
     if (!text) {
@@ -860,6 +1095,75 @@
         isSaving = false;
         submitBtn.disabled = false;
         showFeedback('error', 'Failed to save. Please try again.');
+      });
+  }
+
+  function submitTodo() {
+    var title = todoTitleInput ? todoTitleInput.value.trim() : '';
+    if (!title) {
+      if (todoTitleInput) todoTitleInput.focus();
+      return;
+    }
+
+    if (!window.dmAuth || !window.dmAuth.currentUser) {
+      showFeedback('error', 'Please sign in with Google to save tasks.');
+      return;
+    }
+
+    if (!window.dmDb) {
+      showFeedback('error', 'Database not ready. Try again.');
+      return;
+    }
+
+    isSaving = true;
+    submitBtn.disabled = true;
+
+    var user = window.dmAuth.currentUser;
+    var est = todoEstimateInput ? (parseInt(todoEstimateInput.value, 10) || 25) : 25;
+    var scheduledDate = _qcTodoDate || null;
+    var reminderAtMs = (_qcTodoReminderMs && _qcTodoReminderMs > Date.now()) ? _qcTodoReminderMs : null;
+
+    var todoData = {
+      userId: user.uid,
+      title: title,
+      estimatedMin: est,
+      actualMin: null,
+      category: null,
+      done: false,
+      parentId: null,
+      order: Date.now(),
+      scheduledDate: scheduledDate,
+      reminderAt: reminderAtMs ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
+      reminderFired: false,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      completedAt: null
+    };
+
+    window.dmDb.collection('todos').add(todoData)
+      .then(function(docRef) {
+        var localTodo = Object.assign({}, todoData, {
+          id: docRef.id,
+          reminderAt: reminderAtMs || null,
+          reminderFired: false,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        });
+        if (window.dmSync) {
+          return window.dmSync.putTodo(localTodo);
+        }
+      })
+      .then(function() {
+        isSaving = false;
+        submitBtn.disabled = false;
+        showFeedback('success', 'Task added!');
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+      })
+      .catch(function(err) {
+        console.error('Firestore todo write error:', err);
+        isSaving = false;
+        submitBtn.disabled = false;
+        showFeedback('error', 'Failed to add task. Please try again.');
       });
   }
 

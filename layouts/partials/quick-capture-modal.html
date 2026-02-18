@@ -44,7 +44,7 @@
       <div class="qc-feedback-text" id="qc-feedback-text"></div>
     </div>
 
-    <!-- Mode toggle: Note | Code -->
+    <!-- Mode toggle: Note | Code | Todo -->
     <div class="qc-mode-toggle" id="qc-mode-toggle">
       <button type="button" class="qc-mode-btn active" data-mode="note">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -62,11 +62,18 @@
         </svg>
         Code
       </button>
+      <button type="button" class="qc-mode-btn" data-mode="todo">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="5" width="14" height="14" rx="2" ry="2"></rect>
+          <polyline points="8 11 11 14 17 8"></polyline>
+        </svg>
+        Todo
+      </button>
     </div>
 
+    <!-- Contextual row: changes based on mode -->
     <!-- Note mode: destination selector -->
-    <div class="qc-destination" id="qc-destination-row">
-      <label class="qc-destination-label">Save to</label>
+    <div class="qc-context-row" id="qc-destination-row">
       <div class="qc-destination-options" id="qc-destination-options">
         <button type="button" class="qc-dest-btn active" data-path="content/docs/inbox" data-tag="inbox">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -91,16 +98,28 @@
       </div>
     </div>
 
+    <!-- Code mode: language selector -->
+    <div class="qc-context-row" id="qc-language-row" style="display: none;">
+      <div class="qc-language-options" id="qc-language-options">
+        <button type="button" class="qc-lang-btn active" data-lang="kotlin">Kotlin</button>
+        <button type="button" class="qc-lang-btn" data-lang="bash">Bash</button>
+        <button type="button" class="qc-lang-btn" data-lang="sql">SQL</button>
+        <button type="button" class="qc-lang-btn" data-lang="ruby">Ruby</button>
+        <button type="button" class="qc-lang-btn" data-lang="python">Python</button>
+        <button type="button" class="qc-lang-btn" data-lang="go">Go</button>
+        <button type="button" class="qc-lang-btn" data-lang="javascript">JS</button>
+        <button type="button" class="qc-lang-btn" data-lang="yaml">YAML</button>
+      </div>
+    </div>
+
     <!-- Book title field (visible only when Books destination is selected) -->
     <div class="qc-book-title" id="qc-book-title-row" style="display: none;">
-      <label class="qc-destination-label">Book</label>
       <input type="text" id="qc-book-title-input" class="qc-book-title-input" placeholder="Book title (e.g., Learning Go)" maxlength="120" list="qc-book-title-list" />
       <datalist id="qc-book-title-list"></datalist>
     </div>
 
     <!-- Inbox mode toggle: Append or New note (visible only when Inbox is selected) -->
     <div class="qc-inbox-mode" id="qc-inbox-mode-row" style="display: none;">
-      <label class="qc-destination-label">Mode</label>
       <div class="qc-inbox-mode-options">
         <button type="button" class="qc-inbox-mode-btn active" data-inbox-mode="append">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -121,18 +140,38 @@
       </div>
     </div>
 
-    <!-- Code mode: language selector -->
-    <div class="qc-language" id="qc-language-row" style="display: none;">
-      <label class="qc-destination-label">Language</label>
-      <div class="qc-language-options" id="qc-language-options">
-        <button type="button" class="qc-lang-btn active" data-lang="kotlin">Kotlin</button>
-        <button type="button" class="qc-lang-btn" data-lang="bash">Bash</button>
-        <button type="button" class="qc-lang-btn" data-lang="sql">SQL</button>
-        <button type="button" class="qc-lang-btn" data-lang="ruby">Ruby</button>
-        <button type="button" class="qc-lang-btn" data-lang="python">Python</button>
-        <button type="button" class="qc-lang-btn" data-lang="go">Go</button>
-        <button type="button" class="qc-lang-btn" data-lang="javascript">JS</button>
-        <button type="button" class="qc-lang-btn" data-lang="yaml">YAML</button>
+    <!-- Todo mode fields (visible only when Todo mode is selected) -->
+    <div class="qc-todo-fields" id="qc-todo-fields" style="display: none;">
+      <div class="qc-todo-row-main">
+        <input type="text" id="qc-todo-title" class="qc-todo-title-input" placeholder="What needs to be done?" maxlength="200" />
+        <input type="number" id="qc-todo-estimate" class="qc-todo-estimate-input" placeholder="min" min="1" max="999" />
+      </div>
+      <div class="qc-todo-row-icons">
+        <!-- Date picker icon + chip -->
+        <button type="button" class="qc-todo-icon-btn" id="qc-todo-date-btn" title="Set date">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>
+        </button>
+        <span class="qc-todo-chip" id="qc-todo-date-chip" style="display: none;">
+          <span class="qc-todo-chip-text" id="qc-todo-date-chip-text"></span>
+          <button type="button" class="qc-todo-chip-clear" id="qc-todo-date-clear">&times;</button>
+        </span>
+
+        <!-- Reminder icon + chip -->
+        <button type="button" class="qc-todo-icon-btn" id="qc-todo-reminder-btn" title="Set reminder">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+        </button>
+        <span class="qc-todo-chip" id="qc-todo-reminder-chip" style="display: none;">
+          <span class="qc-todo-chip-text" id="qc-todo-reminder-chip-text"></span>
+          <button type="button" class="qc-todo-chip-clear" id="qc-todo-reminder-clear">&times;</button>
+        </span>
       </div>
     </div>
 
