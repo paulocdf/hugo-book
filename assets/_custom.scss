@@ -3378,7 +3378,7 @@ html.sidebar-collapsed {
 
 // Dark mode: keep white background for Kroki diagrams (they render with
 // their own colors/fills that assume a light background)
-@media (prefers-color-scheme: dark) {
+[data-theme="dark"] {
   .dm-diagram-rendered {
     background: #fafafa;
     border-color: var(--gray-300);
@@ -3394,9 +3394,9 @@ html.sidebar-collapsed {
 
 .dm-diagram-error {
   padding: 0.75rem 1rem;
-  color: #e53e3e;
+  color: var(--color-danger);
   font-size: 0.85rem;
-  background: rgba(229, 62, 62, 0.08);
+  background: var(--color-danger-bg);
   border-radius: 6px;
   margin-bottom: 0.5rem;
 }

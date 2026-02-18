@@ -51,9 +51,33 @@
 
 <!-- Markdown renderer + Syntax highlighting (client-side) -->
 <script src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js" integrity="sha384-H+hy9ULve6xfxRkWIh/YOtvDdpXgV2fmAGQkIDTxIgZwNoaoBal14Di2YTMR6MzR" crossorigin="anonymous"></script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" media="(prefers-color-scheme: dark)">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css" integrity="sha384-eFTL69TLRZTkNfYZOLM+G04821K1qZao/4QLJbet1pP4tcF+fdXq/9CdqAbWRl/L" crossorigin="anonymous" media="(prefers-color-scheme: light)">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github-dark.min.css" integrity="sha384-wH75j6z1lH97ZOpMOInqhgKzFkAInZPPSPlZpYKYTOqsaizPvhQZmAtLcPKXpLyH" crossorigin="anonymous" id="hljs-dark" disabled>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/styles/github.min.css" integrity="sha384-eFTL69TLRZTkNfYZOLM+G04821K1qZao/4QLJbet1pP4tcF+fdXq/9CdqAbWRl/L" crossorigin="anonymous" id="hljs-light" disabled>
 <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.11.1/build/highlight.min.js" integrity="sha384-RH2xi4eIQ/gjtbs9fUXM68sLSi99C7ZWBRX1vDrVv6GQXRibxXLbwO2NGZB74MbU" crossorigin="anonymous"></script>
+
+<!-- Sync highlight.js theme with data-theme attribute -->
+<script>
+(function() {
+  function syncHljsTheme() {
+    var theme = document.documentElement.getAttribute('data-theme') ||
+      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    var dark = document.getElementById('hljs-dark');
+    var light = document.getElementById('hljs-light');
+    if (dark) dark.disabled = (theme !== 'dark');
+    if (light) light.disabled = (theme !== 'light');
+  }
+  // Initial sync
+  syncHljsTheme();
+  // Watch for data-theme changes
+  new MutationObserver(function(mutations) {
+    mutations.forEach(function(m) {
+      if (m.attributeName === 'data-theme') syncHljsTheme();
+    });
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  // Fallback: OS preference change
+  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', syncHljsTheme);
+})();
+</script>
 
 <!-- Configure marked.js to match Hugo's heading rendering -->
 <script>
@@ -109,25 +133,49 @@
 
   // Mermaid lazy-loader
   var mermaidReady = null; // Promise, set once
+
+  function getMermaidConfig() {
+    var theme = document.documentElement.getAttribute('data-theme') ||
+      (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    if (theme === 'dark') {
+      return {
+        startOnLoad: false,
+        flowchart: { useMaxWidth: true },
+        theme: 'dark',
+        themeVariables: {
+          darkMode: true,
+          background: '#161921',
+          primaryColor: '#1e3a5f',
+          primaryTextColor: '#e1e4e8',
+          primaryBorderColor: '#64b5f6',
+          lineColor: '#4a5568',
+          secondaryColor: '#1a2332',
+          tertiaryColor: '#1e222d'
+        }
+      };
+    }
+    return {
+      startOnLoad: false,
+      flowchart: { useMaxWidth: true },
+      theme: 'default',
+      themeVariables: {
+        darkMode: false,
+        background: '#ffffff',
+        primaryColor: '#e3f2fd',
+        primaryTextColor: '#374151',
+        primaryBorderColor: '#1976d2',
+        lineColor: '#9e9e9e',
+        secondaryColor: '#f3e5f5',
+        tertiaryColor: '#e8f5e9'
+      }
+    };
+  }
+
   function loadMermaid() {
     if (mermaidReady) return mermaidReady;
     mermaidReady = new Promise(function(resolve, reject) {
       if (typeof mermaid !== 'undefined') {
-        mermaid.initialize({
-          startOnLoad: false,
-          flowchart: { useMaxWidth: true },
-          theme: 'dark',
-          themeVariables: {
-            darkMode: true,
-            background: '#161921',
-            primaryColor: '#1e3a5f',
-            primaryTextColor: '#e1e4e8',
-            primaryBorderColor: '#64b5f6',
-            lineColor: '#4a5568',
-            secondaryColor: '#1a2332',
-            tertiaryColor: '#1e222d'
-          }
-        });
+        mermaid.initialize(getMermaidConfig());
         resolve();
         return;
       }
@@ -137,21 +185,7 @@
         : '') + '/mermaid.min.js';
       script.onload = function() {
         if (typeof mermaid !== 'undefined') {
-          mermaid.initialize({
-            startOnLoad: false,
-            flowchart: { useMaxWidth: true },
-            theme: 'dark',
-            themeVariables: {
-              darkMode: true,
-              background: '#161921',
-              primaryColor: '#1e3a5f',
-              primaryTextColor: '#e1e4e8',
-              primaryBorderColor: '#64b5f6',
-              lineColor: '#4a5568',
-              secondaryColor: '#1a2332',
-              tertiaryColor: '#1e222d'
-            }
-          });
+          mermaid.initialize(getMermaidConfig());
         }
         resolve();
       };
