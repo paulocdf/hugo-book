@@ -135,8 +135,7 @@
   var bookTitleRow = document.getElementById('qc-book-title-row');
   var bookTitleInput = document.getElementById('qc-book-title-input');
   var bookTitleDatalist = document.getElementById('qc-book-title-list');
-  var inboxModeRow = document.getElementById('qc-inbox-mode-row');
-  var inboxModeButtons = document.querySelectorAll('.qc-inbox-mode-btn');
+  var inboxNewBtn = document.getElementById('qc-inbox-new-btn');
   var previewWrapper = document.getElementById('qc-preview-wrapper');
   var previewPanel = document.getElementById('qc-preview-panel');
   var notePreviewWrapper = document.getElementById('qc-note-preview-wrapper');
@@ -610,7 +609,6 @@
       // Hide everything first
       destRow.style.display = 'none';
       langRow.style.display = 'none';
-      if (inboxModeRow) inboxModeRow.style.display = 'none';
       if (bookTitleRow) bookTitleRow.style.display = 'none';
       previewWrapper.style.display = 'none';
       notePreviewWrapper.style.display = 'none';
@@ -639,7 +637,6 @@
         // note mode
         destRow.style.display = '';
         if (toolbar) toolbar.style.display = '';
-        if (inboxModeRow) inboxModeRow.style.display = selectedDest.tag === 'inbox' ? '' : 'none';
         if (bookTitleRow) bookTitleRow.style.display = selectedDest.tag === 'book-note' ? '' : 'none';
         input.classList.remove('code-mode');
         dialog.classList.remove('code-mode');
@@ -668,23 +665,24 @@
         bookTitleRow.style.display = 'none';
       }
 
-      // Show/hide inbox mode toggle
-      if (selectedDest.tag === 'inbox' && inboxModeRow) {
-        inboxModeRow.style.display = '';
-      } else if (inboxModeRow) {
-        inboxModeRow.style.display = 'none';
+      // Show/hide new-note toggle (only visible when Inbox is selected)
+      if (inboxNewBtn) {
+        inboxNewBtn.style.display = selectedDest.tag === 'inbox' ? '' : 'none';
+        if (selectedDest.tag !== 'inbox') {
+          inboxNewBtn.classList.remove('active');
+          inboxMode = 'append';
+        }
       }
     });
   });
 
-  // Inbox mode button click handling
-  inboxModeButtons.forEach(function(ibtn) {
-    ibtn.addEventListener('click', function() {
-      inboxModeButtons.forEach(function(b) { b.classList.remove('active'); });
-      ibtn.classList.add('active');
-      inboxMode = ibtn.getAttribute('data-inbox-mode');
+  // Inbox new-note toggle click handling
+  if (inboxNewBtn) {
+    inboxNewBtn.addEventListener('click', function() {
+      var isNew = inboxNewBtn.classList.toggle('active');
+      inboxMode = isNew ? 'new' : 'append';
     });
-  });
+  }
 
   // Language button click handling
   langButtons.forEach(function(lbtn) {
@@ -899,11 +897,9 @@
     langRow.style.display = 'none';
     if (bookTitleRow) bookTitleRow.style.display = 'none';
     if (bookTitleInput) bookTitleInput.value = '';
-    // Reset inbox mode toggle — show it since default dest is Inbox
+    // Reset inbox new-note toggle
     inboxMode = 'append';
-    if (inboxModeRow) inboxModeRow.style.display = '';
-    inboxModeButtons.forEach(function(b) { b.classList.remove('active'); });
-    if (inboxModeButtons.length) inboxModeButtons[0].classList.add('active');
+    if (inboxNewBtn) inboxNewBtn.classList.remove('active');
     previewWrapper.style.display = 'none';
     notePreviewWrapper.style.display = 'none';
     if (toolbar) toolbar.style.display = '';

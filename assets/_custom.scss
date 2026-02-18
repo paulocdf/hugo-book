@@ -1901,59 +1901,6 @@ html.sidebar-collapsed {
   }
 }
 
-// Inbox mode toggle (Append / New note)
-.qc-inbox-mode {
-  margin-bottom: 0.6rem;
-}
-
-.qc-inbox-mode-options {
-  display: flex;
-  gap: 0.4rem;
-}
-
-.qc-inbox-mode-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.8rem;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background: var(--surface-1);
-  color: var(--text-secondary);
-  font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  svg {
-    flex-shrink: 0;
-    opacity: 0.7;
-    transition: opacity 0.15s ease;
-  }
-
-  &:hover {
-    background: var(--surface-2);
-    border-color: var(--border-medium);
-    color: var(--body-font-color);
-
-    svg { opacity: 1; }
-  }
-
-  &.active {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
-    border-color: transparent;
-    color: #fff;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(25, 118, 210, 0.25);
-
-    svg {
-      opacity: 1;
-      stroke: #fff;
-    }
-  }
-}
-
 // Language selector (Code mode)
 .qc-language {
   margin-bottom: 0.6rem;
@@ -2244,6 +2191,47 @@ html.sidebar-collapsed {
     color: #fff;
     font-weight: 600;
     box-shadow: 0 2px 8px rgba(25, 118, 210, 0.25);
+
+    svg {
+      opacity: 1;
+      stroke: #fff;
+    }
+  }
+}
+
+// Small "+" toggle next to Inbox to switch between append/new note
+.qc-inbox-new-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  margin-left: -0.2rem;
+  padding: 0;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  svg {
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+  }
+
+  &:hover {
+    background: var(--surface-2);
+    border-color: var(--border-medium);
+    svg { opacity: 1; }
+  }
+
+  &.active {
+    background: var(--accent-blue);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 1px 4px rgba(25, 118, 210, 0.3);
 
     svg {
       opacity: 1;
