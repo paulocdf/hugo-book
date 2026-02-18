@@ -31,6 +31,7 @@
 
 <style>
 .todo-list {
+  position: relative;
   margin-bottom: 1.5rem;
   border: 1px solid var(--gray-200);
   border-radius: 12px;
@@ -349,6 +350,32 @@
   color: var(--body-font-color);
   font-weight: 600;
 }
+
+/* Toast notifications */
+.todo-toast {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  z-index: 10;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.todo-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.todo-toast-error {
+  background: var(--color-danger-bg, #fee);
+  color: var(--color-danger, #c53030);
+  border: 1px solid var(--color-danger, #c53030);
+}
 </style>
 
 <script>
@@ -370,6 +397,19 @@
 
   // State
   var allTodos = [];
+
+  // ─── Toast notifications ───
+  function showTodoError(msg) {
+    var toast = document.createElement('div');
+    toast.className = 'todo-toast todo-toast-error';
+    toast.textContent = msg;
+    container.appendChild(toast);
+    setTimeout(function() { toast.classList.add('show'); }, 10);
+    setTimeout(function() {
+      toast.classList.remove('show');
+      setTimeout(function() { toast.remove(); }, 300);
+    }, 4000);
+  }
 
   // ─── Toggle collapse ───
   function toggleCollapse() {
@@ -631,6 +671,7 @@
 
   function createTodo(title, estimatedMin, parentId, onDone) {
     if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
+      showTodoError('Not signed in — please sign in to add tasks');
       if (onDone) onDone();
       return;
     }
@@ -670,6 +711,7 @@
       })
       .catch(function(err) {
         console.error('Error creating todo:', err);
+        showTodoError('Failed to add task — check console');
         if (onDone) onDone();
       });
   }
@@ -703,6 +745,7 @@
       })
       .catch(function(err) {
         console.error('Error completing todo:', err);
+        showTodoError('Failed to complete task — check console');
         // Revert local state so UI reflects the failure
         todo.done = false;
         todo.actualMin = null;
@@ -758,6 +801,7 @@
       })
       .catch(function(err) {
         console.error('Error auto-completing parent:', err);
+        showTodoError('Failed to auto-complete parent task');
       });
   }
 
@@ -825,6 +869,7 @@
       render();
     }).catch(function(err) {
       console.error('Error deleting todo:', err);
+      showTodoError('Failed to delete task — check console');
     });
   }
 
