@@ -1,0 +1,830 @@
+<!-- todo-list: Time-tracked TODO list for Inbox page -->
+<!-- Renders above inbox note content. Requires dm-sync and dm-todo-complete-modal. -->
+<div class="todo-list" id="todo-list" style="display: none;">
+  <div class="todo-list-header">
+    <h3 class="todo-list-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+      Tasks
+    </h3>
+    <button type="button" class="todo-list-toggle-btn" id="todo-list-toggle" title="Toggle task list">
+      <svg class="todo-toggle-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+    </button>
+  </div>
+
+  <div class="todo-list-body" id="todo-list-body">
+    <!-- Add todo form -->
+    <div class="todo-add-form" id="todo-add-form">
+      <input type="text" id="todo-add-title" class="todo-add-title" placeholder="New task...">
+      <input type="number" id="todo-add-estimate" class="todo-add-estimate" min="1" placeholder="min">
+      <button type="button" id="todo-add-btn" class="todo-add-btn" title="Add task">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      </button>
+    </div>
+
+    <!-- Todo items rendered here -->
+    <div class="todo-items" id="todo-items"></div>
+
+    <!-- Summary -->
+    <div class="todo-summary" id="todo-summary" style="display: none;"></div>
+  </div>
+</div>
+
+<style>
+.todo-list {
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.todo-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
+  cursor: pointer;
+  user-select: none;
+}
+.todo-list-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--body-font-color);
+}
+.todo-list-title svg {
+  color: var(--color-link);
+}
+.todo-list-toggle-btn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--gray-500);
+  border-radius: 4px;
+  transition: background 0.15s;
+  line-height: 0;
+}
+.todo-list-toggle-btn:hover {
+  background: var(--gray-200);
+}
+.todo-toggle-chevron {
+  transition: transform 0.2s;
+}
+.todo-list.collapsed .todo-toggle-chevron {
+  transform: rotate(-90deg);
+}
+.todo-list.collapsed .todo-list-body {
+  display: none;
+}
+
+.todo-list-body {
+  padding: 0.75rem 1rem;
+}
+
+/* Add form */
+.todo-add-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.todo-add-title {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  transition: border-color 0.2s;
+}
+.todo-add-title:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+.todo-add-estimate {
+  width: 70px;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  text-align: center;
+  transition: border-color 0.2s;
+}
+.todo-add-estimate:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+.todo-add-estimate::placeholder {
+  color: var(--gray-400);
+  font-size: 0.8rem;
+}
+.todo-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-link);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--color-link);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+  line-height: 0;
+}
+.todo-add-btn:hover {
+  background: var(--color-link);
+  color: #fff;
+}
+
+/* Todo items */
+.todo-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.todo-item:hover {
+  background: var(--gray-100);
+}
+.todo-item.done {
+  opacity: 0.6;
+}
+.todo-item-checkbox {
+  margin-top: 3px;
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  accent-color: var(--color-link);
+  flex-shrink: 0;
+}
+.todo-item-content {
+  flex: 1;
+  min-width: 0;
+}
+.todo-item-title {
+  font-size: 0.88rem;
+  line-height: 1.4;
+  word-break: break-word;
+}
+.todo-item.done .todo-item-title {
+  text-decoration: line-through;
+  color: var(--gray-500);
+}
+.todo-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+  flex-wrap: wrap;
+}
+.todo-item-estimate,
+.todo-item-actual,
+.todo-item-category {
+  font-size: 0.72rem;
+  color: var(--gray-500);
+}
+.todo-item-estimate {
+  background: var(--gray-100);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.todo-item-actual {
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.todo-item-actual.over {
+  background: rgba(229, 62, 62, 0.1);
+  color: #e53e3e;
+}
+.todo-item-actual.under {
+  background: rgba(52, 168, 83, 0.1);
+  color: #34a853;
+}
+.todo-item-category {
+  background: rgba(0, 105, 255, 0.08);
+  color: var(--color-link);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.todo-item-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.todo-item:hover .todo-item-actions {
+  opacity: 1;
+}
+.todo-item-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  line-height: 0;
+}
+.todo-item-action-btn:hover {
+  background: var(--gray-200);
+  color: var(--body-font-color);
+}
+.todo-item-action-btn.delete:hover {
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.08);
+}
+
+/* Subtasks */
+.todo-subtasks {
+  margin-left: 25px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.todo-add-subtask-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: 25px;
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+.todo-add-subtask-input {
+  flex: 1;
+  padding: 5px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+}
+.todo-add-subtask-input:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+.todo-add-subtask-estimate {
+  width: 55px;
+  padding: 5px 8px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  text-align: center;
+}
+.todo-add-subtask-estimate:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+
+/* Summary bar */
+.todo-summary {
+  margin-top: 0.75rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--gray-100);
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.todo-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.todo-summary-item strong {
+  color: var(--body-font-color);
+  font-weight: 600;
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  var container = document.getElementById('todo-list');
+  var body = document.getElementById('todo-list-body');
+  var toggleBtn = document.getElementById('todo-list-toggle');
+  var headerEl = container ? container.querySelector('.todo-list-header') : null;
+  var itemsEl = document.getElementById('todo-items');
+  var summaryEl = document.getElementById('todo-summary');
+
+  var addTitleInput = document.getElementById('todo-add-title');
+  var addEstimateInput = document.getElementById('todo-add-estimate');
+  var addBtn = document.getElementById('todo-add-btn');
+
+  if (!container || !itemsEl) return;
+
+  // State
+  var allTodos = [];
+
+  // ─── Toggle collapse ───
+  function toggleCollapse() {
+    container.classList.toggle('collapsed');
+    try {
+      localStorage.setItem('dm-todo-collapsed', container.classList.contains('collapsed') ? '1' : '0');
+    } catch(e) {}
+  }
+
+  if (headerEl) headerEl.addEventListener('click', toggleCollapse);
+  if (toggleBtn) toggleBtn.addEventListener('click', function(e) { e.stopPropagation(); toggleCollapse(); });
+
+  // Restore collapse state
+  try {
+    if (localStorage.getItem('dm-todo-collapsed') === '1') {
+      container.classList.add('collapsed');
+    }
+  } catch(e) {}
+
+  // ─── Render ───
+  function buildTodoItemHtml(todo, isSubtask) {
+    var doneClass = todo.done ? ' done' : '';
+    var checked = todo.done ? ' checked' : '';
+    var html = '<div class="todo-item' + doneClass + '" data-todo-id="' + todo.id + '">';
+    html += '<input type="checkbox" class="todo-item-checkbox"' + checked + ' data-todo-id="' + todo.id + '">';
+    html += '<div class="todo-item-content">';
+    html += '<div class="todo-item-title">' + escapeHtml(todo.title) + '</div>';
+    html += '<div class="todo-item-meta">';
+
+    if (todo.estimatedMin) {
+      html += '<span class="todo-item-estimate">est: ' + todo.estimatedMin + 'min</span>';
+    }
+    if (todo.done && todo.actualMin != null) {
+      var actualClass = '';
+      if (todo.estimatedMin) {
+        actualClass = todo.actualMin > todo.estimatedMin ? ' over' : ' under';
+      }
+      html += '<span class="todo-item-actual' + actualClass + '">actual: ' + todo.actualMin + 'min</span>';
+    }
+    if (todo.category) {
+      html += '<span class="todo-item-category">' + escapeHtml(todo.category) + '</span>';
+    }
+
+    html += '</div></div>';
+
+    // Action buttons
+    html += '<div class="todo-item-actions">';
+    if (!isSubtask && !todo.done) {
+      html += '<button type="button" class="todo-item-action-btn add-subtask" data-parent-id="' + todo.id + '" title="Add subtask">';
+      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
+      html += '</button>';
+    }
+    if (!todo.done) {
+      html += '<button type="button" class="todo-item-action-btn delete" data-delete-id="' + todo.id + '" title="Delete task">';
+      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+      html += '</button>';
+    }
+    html += '</div>';
+    html += '</div>';
+    return html;
+  }
+
+  function render() {
+    if (!allTodos.length) {
+      container.style.display = 'none';
+      return;
+    }
+    container.style.display = '';
+
+    // Separate parents and children
+    var parents = [];
+    var childrenMap = {}; // parentId -> [children]
+    allTodos.forEach(function(t) {
+      if (t.parentId) {
+        if (!childrenMap[t.parentId]) childrenMap[t.parentId] = [];
+        childrenMap[t.parentId].push(t);
+      } else {
+        parents.push(t);
+      }
+    });
+
+    // Sort parents: incomplete first by order, then done by completedAt desc
+    parents.sort(function(a, b) {
+      if (a.done !== b.done) return a.done ? 1 : -1;
+      return (a.order || 0) - (b.order || 0);
+    });
+
+    // Sort children by order
+    Object.keys(childrenMap).forEach(function(pid) {
+      childrenMap[pid].sort(function(a, b) {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        return (a.order || 0) - (b.order || 0);
+      });
+    });
+
+    var html = '';
+    parents.forEach(function(parent) {
+      html += buildTodoItemHtml(parent, false);
+      var children = childrenMap[parent.id] || [];
+      if (children.length > 0) {
+        html += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
+        children.forEach(function(child) {
+          html += buildTodoItemHtml(child, true);
+        });
+        html += '</div>';
+      }
+    });
+
+    itemsEl.innerHTML = html;
+
+    // Summary
+    var totalEst = 0, totalActual = 0, doneCount = 0, totalCount = 0;
+    allTodos.forEach(function(t) {
+      // Only count leaf tasks (no children or subtasks themselves)
+      var hasChildren = childrenMap[t.id] && childrenMap[t.id].length > 0;
+      if (!hasChildren) {
+        totalCount++;
+        if (t.estimatedMin) totalEst += t.estimatedMin;
+        if (t.done) {
+          doneCount++;
+          if (t.actualMin != null) totalActual += t.actualMin;
+        }
+      }
+    });
+
+    if (totalCount > 0) {
+      var pomEst = (totalEst / 25).toFixed(1);
+      var pomActual = (totalActual / 25).toFixed(1);
+      summaryEl.innerHTML =
+        '<span class="todo-summary-item"><strong>' + doneCount + '/' + totalCount + '</strong> tasks done</span>' +
+        (totalEst ? '<span class="todo-summary-item">Est: <strong>' + totalEst + 'min</strong> (' + pomEst + ' pom)</span>' : '') +
+        (totalActual ? '<span class="todo-summary-item">Actual: <strong>' + totalActual + 'min</strong> (' + pomActual + ' pom)</span>' : '');
+      summaryEl.style.display = '';
+    } else {
+      summaryEl.style.display = 'none';
+    }
+
+    // Attach event listeners
+    attachEventListeners();
+  }
+
+  function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  // ─── Event listeners ───
+  function attachEventListeners() {
+    // Checkbox toggle
+    itemsEl.querySelectorAll('.todo-item-checkbox').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        var todoId = cb.getAttribute('data-todo-id');
+        var todo = allTodos.find(function(t) { return t.id === todoId; });
+        if (!todo) return;
+
+        if (cb.checked) {
+          // Opening completion modal
+          if (window.dmTodoComplete) {
+            window.dmTodoComplete.open(todo, function(result) {
+              if (!result) {
+                // Cancelled — revert checkbox
+                cb.checked = false;
+                return;
+              }
+              completeTodo(todo, result.actualMin, result.category);
+            });
+          }
+        } else {
+          // Unchecking — reopen the todo
+          reopenTodo(todo);
+        }
+      });
+    });
+
+    // Add subtask button
+    itemsEl.querySelectorAll('.add-subtask').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var parentId = btn.getAttribute('data-parent-id');
+        showSubtaskInput(parentId);
+      });
+    });
+
+    // Delete button
+    itemsEl.querySelectorAll('[data-delete-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-delete-id');
+        if (confirm('Delete this task?')) {
+          deleteTodo(todoId);
+        }
+      });
+    });
+  }
+
+  function showSubtaskInput(parentId) {
+    // Remove any existing subtask input
+    var existing = document.querySelector('.todo-add-subtask-row');
+    if (existing) existing.remove();
+
+    // Find where to insert
+    var subtasksEl = itemsEl.querySelector('.todo-subtasks[data-parent-id="' + parentId + '"]');
+    var parentItem = itemsEl.querySelector('.todo-item[data-todo-id="' + parentId + '"]');
+    if (!parentItem) return;
+
+    var row = document.createElement('div');
+    row.className = 'todo-add-subtask-row';
+    row.innerHTML =
+      '<input type="text" class="todo-add-subtask-input" placeholder="Subtask...">' +
+      '<input type="number" class="todo-add-subtask-estimate" min="1" placeholder="min">';
+
+    if (subtasksEl) {
+      subtasksEl.appendChild(row);
+    } else {
+      parentItem.insertAdjacentElement('afterend', row);
+    }
+
+    var subInput = row.querySelector('.todo-add-subtask-input');
+    var subEstInput = row.querySelector('.todo-add-subtask-estimate');
+    subInput.focus();
+
+    function addSubtask() {
+      var title = subInput.value.trim();
+      if (!title) { subInput.focus(); return; }
+      var est = parseInt(subEstInput.value, 10) || 0;
+      createTodo(title, est, parentId);
+      row.remove();
+    }
+
+    subInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); addSubtask(); }
+      if (e.key === 'Escape') { row.remove(); }
+    });
+    subEstInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); addSubtask(); }
+      if (e.key === 'Escape') { row.remove(); }
+    });
+  }
+
+  // ─── CRUD operations ───
+  function getNextOrder(parentId) {
+    var siblings = allTodos.filter(function(t) {
+      return parentId ? t.parentId === parentId : !t.parentId;
+    });
+    var maxOrder = 0;
+    siblings.forEach(function(t) {
+      if (t.order > maxOrder) maxOrder = t.order;
+    });
+    return maxOrder + 1;
+  }
+
+  function createTodo(title, estimatedMin, parentId) {
+    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) return;
+
+    var user = window.dmAuth.currentUser;
+    var order = getNextOrder(parentId || null);
+
+    var todoData = {
+      userId: user.uid,
+      title: title,
+      estimatedMin: estimatedMin || 0,
+      actualMin: null,
+      category: null,
+      done: false,
+      parentId: parentId || null,
+      order: order,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      completedAt: null
+    };
+
+    window.dmDb.collection('todos').add(todoData)
+      .then(function(docRef) {
+        var localTodo = Object.assign({}, todoData, {
+          id: docRef.id,
+          createdAt: Date.now(),
+          updatedAt: Date.now()
+        });
+        allTodos.push(localTodo);
+        if (window.dmSync) {
+          return window.dmSync.putTodo(localTodo);
+        }
+      })
+      .then(function() {
+        render();
+      })
+      .catch(function(err) {
+        console.error('Error creating todo:', err);
+      });
+  }
+
+  function completeTodo(todo, actualMin, category) {
+    if (!window.dmDb) return;
+
+    var updateData = {
+      done: true,
+      actualMin: actualMin,
+      category: category,
+      completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    window.dmDb.collection('todos').doc(todo.id).update(updateData)
+      .then(function() {
+        todo.done = true;
+        todo.actualMin = actualMin;
+        todo.category = category;
+        todo.completedAt = Date.now();
+        todo.updatedAt = Date.now();
+        if (window.dmSync) {
+          return window.dmSync.putTodo(todo);
+        }
+      })
+      .then(function() {
+        // Check if parent should auto-complete
+        checkParentAutoComplete(todo.parentId);
+        render();
+      })
+      .catch(function(err) {
+        console.error('Error completing todo:', err);
+      });
+  }
+
+  function checkParentAutoComplete(parentId) {
+    if (!parentId) return;
+
+    var parent = allTodos.find(function(t) { return t.id === parentId; });
+    if (!parent || parent.done) return;
+
+    var children = allTodos.filter(function(t) { return t.parentId === parentId; });
+    if (children.length === 0) return;
+
+    var allDone = children.every(function(t) { return t.done; });
+    if (!allDone) return;
+
+    // Calculate parent's actual time = sum of children
+    var totalActual = 0;
+    var categories = [];
+    children.forEach(function(c) {
+      if (c.actualMin != null) totalActual += c.actualMin;
+      if (c.category && categories.indexOf(c.category) === -1) {
+        categories.push(c.category);
+      }
+    });
+
+    var updateData = {
+      done: true,
+      actualMin: totalActual,
+      category: categories.join(', ') || null,
+      completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    window.dmDb.collection('todos').doc(parent.id).update(updateData)
+      .then(function() {
+        parent.done = true;
+        parent.actualMin = totalActual;
+        parent.category = categories.join(', ') || null;
+        parent.completedAt = Date.now();
+        parent.updatedAt = Date.now();
+        if (window.dmSync) {
+          return window.dmSync.putTodo(parent);
+        }
+      })
+      .then(function() {
+        render();
+      })
+      .catch(function(err) {
+        console.error('Error auto-completing parent:', err);
+      });
+  }
+
+  function reopenTodo(todo) {
+    if (!window.dmDb) return;
+
+    var updateData = {
+      done: false,
+      actualMin: null,
+      category: null,
+      completedAt: null,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    window.dmDb.collection('todos').doc(todo.id).update(updateData)
+      .then(function() {
+        todo.done = false;
+        todo.actualMin = null;
+        todo.category = null;
+        todo.completedAt = null;
+        todo.updatedAt = Date.now();
+        if (window.dmSync) {
+          return window.dmSync.putTodo(todo);
+        }
+      })
+      .then(function() {
+        // If this is a subtask, reopen parent too
+        if (todo.parentId) {
+          var parent = allTodos.find(function(t) { return t.id === todo.parentId; });
+          if (parent && parent.done) {
+            reopenTodo(parent);
+            return;
+          }
+        }
+        render();
+      })
+      .catch(function(err) {
+        console.error('Error reopening todo:', err);
+      });
+  }
+
+  function deleteTodo(todoId) {
+    if (!window.dmDb) return;
+
+    // Also delete children
+    var toDelete = [todoId];
+    allTodos.forEach(function(t) {
+      if (t.parentId === todoId) toDelete.push(t.id);
+    });
+
+    var chain = Promise.resolve();
+    toDelete.forEach(function(id) {
+      chain = chain.then(function() {
+        return window.dmDb.collection('todos').doc(id).delete()
+          .then(function() {
+            if (window.dmSync) return window.dmSync.deleteTodo(id);
+          });
+      });
+    });
+
+    chain.then(function() {
+      allTodos = allTodos.filter(function(t) {
+        return toDelete.indexOf(t.id) === -1;
+      });
+      render();
+    }).catch(function(err) {
+      console.error('Error deleting todo:', err);
+    });
+  }
+
+  // ─── Add form ───
+  function addFromForm() {
+    var title = addTitleInput.value.trim();
+    if (!title) { addTitleInput.focus(); return; }
+    var est = parseInt(addEstimateInput.value, 10) || 0;
+    createTodo(title, est, null);
+    addTitleInput.value = '';
+    addEstimateInput.value = '';
+    addTitleInput.focus();
+  }
+
+  addBtn.addEventListener('click', addFromForm);
+  addTitleInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
+  });
+  addEstimateInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
+  });
+
+  // ─── Load todos ───
+  function loadTodos() {
+    if (!window.dmSync) return;
+
+    window.dmSync.getAllTodos().then(function(todos) {
+      allTodos = todos;
+      render();
+    });
+  }
+
+  // Listen for todo updates
+  window.addEventListener('dm-todos-updated', loadTodos);
+  window.addEventListener('dm-sync-complete', loadTodos);
+
+  // Initial load when auth is ready
+  if (window.dmAuth) {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        loadTodos();
+      } else {
+        allTodos = [];
+        render();
+      }
+    });
+  }
+
+})();
+</script>

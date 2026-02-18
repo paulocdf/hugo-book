@@ -1,0 +1,368 @@
+<!-- Todo Completion Modal — shown when user checks a TODO as done -->
+<!-- Exposes: window.dmTodoComplete.open(todo, onComplete), window.dmTodoComplete.close() -->
+<div class="todo-complete-modal" id="todo-complete-modal" style="display: none;">
+  <div class="todo-complete-backdrop" id="todo-complete-backdrop"></div>
+  <div class="todo-complete-dialog">
+    <div class="todo-complete-header">
+      <h3>Complete Task</h3>
+      <button type="button" class="todo-complete-close" id="todo-complete-close">&times;</button>
+    </div>
+
+    <div class="todo-complete-task-info">
+      <span class="todo-complete-task-title" id="todo-complete-task-title"></span>
+      <span class="todo-complete-estimate" id="todo-complete-estimate"></span>
+    </div>
+
+    <div class="todo-complete-field">
+      <label for="todo-complete-actual">Actual time (minutes)</label>
+      <input type="number" id="todo-complete-actual" class="todo-complete-input" min="1" placeholder="e.g. 30">
+    </div>
+
+    <div class="todo-complete-field">
+      <label>Category</label>
+      <div class="todo-complete-category-row" id="todo-complete-category-row">
+        <div class="todo-complete-category-chips" id="todo-complete-category-chips"></div>
+        <input type="text" id="todo-complete-category-input" class="todo-complete-category-input" placeholder="Add category + Enter">
+      </div>
+    </div>
+
+    <div class="todo-complete-actions">
+      <button type="button" class="todo-complete-btn-cancel" id="todo-complete-cancel">Cancel</button>
+      <button type="button" class="todo-complete-btn-save" id="todo-complete-save">Mark Done</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.todo-complete-modal {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.todo-complete-backdrop {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.todo-complete-dialog {
+  position: relative;
+  background: var(--body-background);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 94%;
+  max-width: 420px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+  animation: todo-complete-in 0.2s ease-out;
+}
+@keyframes todo-complete-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.todo-complete-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.todo-complete-header h3 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.todo-complete-close {
+  background: none; border: none; font-size: 1.5rem;
+  cursor: pointer; color: var(--body-font-color); padding: 4px 8px;
+  border-radius: 6px; transition: background 0.15s;
+}
+.todo-complete-close:hover { background: var(--gray-100); }
+
+.todo-complete-task-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--gray-100);
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.todo-complete-task-title {
+  font-weight: 600;
+  font-size: 0.92rem;
+  flex: 1;
+  min-width: 0;
+  word-break: break-word;
+}
+.todo-complete-estimate {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+
+.todo-complete-field {
+  margin-bottom: 1rem;
+}
+.todo-complete-field label {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.4rem;
+}
+.todo-complete-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.todo-complete-input:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+
+.todo-complete-category-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  min-height: 36px;
+  background: var(--body-background);
+  transition: border-color 0.2s;
+}
+.todo-complete-category-row:focus-within {
+  border-color: var(--color-link);
+}
+.todo-complete-category-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.todo-complete-category-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.todo-complete-category-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.25);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.todo-complete-category-remove:hover {
+  background: rgba(255,255,255,0.45);
+}
+.todo-complete-category-input {
+  flex: 1;
+  min-width: 80px;
+  padding: 2px 4px;
+  border: none;
+  background: transparent;
+  color: var(--body-font-color);
+  font-size: 0.82rem;
+  outline: none;
+}
+.todo-complete-category-input::placeholder {
+  color: var(--gray-400);
+}
+
+.todo-complete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 0.5rem;
+}
+.todo-complete-btn-cancel,
+.todo-complete-btn-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.todo-complete-btn-cancel:hover { background: var(--gray-100); }
+.todo-complete-btn-save {
+  border-color: #34a853;
+  color: #34a853;
+}
+.todo-complete-btn-save:hover {
+  background: #34a853;
+  color: #fff;
+}
+.todo-complete-btn-save:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media screen and (max-width: 500px) {
+  .todo-complete-dialog {
+    width: 96%;
+    padding: 1rem;
+  }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  var modal = document.getElementById('todo-complete-modal');
+  if (!modal) return;
+
+  var backdrop = document.getElementById('todo-complete-backdrop');
+  var closeBtn = document.getElementById('todo-complete-close');
+  var cancelBtn = document.getElementById('todo-complete-cancel');
+  var saveBtn = document.getElementById('todo-complete-save');
+  var taskTitleEl = document.getElementById('todo-complete-task-title');
+  var estimateEl = document.getElementById('todo-complete-estimate');
+  var actualInput = document.getElementById('todo-complete-actual');
+  var categoryChipsEl = document.getElementById('todo-complete-category-chips');
+  var categoryInput = document.getElementById('todo-complete-category-input');
+
+  var currentTodo = null;
+  var categories = [];
+  var onCompleteCallback = null;
+
+  function renderCategories() {
+    categoryChipsEl.innerHTML = '';
+    categories.forEach(function(cat, idx) {
+      var chip = document.createElement('span');
+      chip.className = 'todo-complete-category-chip';
+      chip.textContent = cat;
+      var removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'todo-complete-category-remove';
+      removeBtn.innerHTML = '&times;';
+      removeBtn.addEventListener('click', function() {
+        categories.splice(idx, 1);
+        renderCategories();
+      });
+      chip.appendChild(removeBtn);
+      categoryChipsEl.appendChild(chip);
+    });
+  }
+
+  categoryInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var val = categoryInput.value.trim().toLowerCase();
+      if (val && categories.indexOf(val) === -1) {
+        categories.push(val);
+        renderCategories();
+      }
+      categoryInput.value = '';
+    }
+    if (e.key === 'Backspace' && !categoryInput.value && categories.length > 0) {
+      categories.pop();
+      renderCategories();
+    }
+  });
+
+  function openModal(todo, onComplete) {
+    currentTodo = todo;
+    onCompleteCallback = onComplete || null;
+    categories = [];
+
+    taskTitleEl.textContent = todo.title || 'Untitled';
+    estimateEl.textContent = todo.estimatedMin ? 'Est: ' + todo.estimatedMin + 'min' : '';
+    actualInput.value = todo.estimatedMin || '';
+    renderCategories();
+    categoryInput.value = '';
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Mark Done';
+
+    modal.style.display = '';
+    setTimeout(function() { actualInput.focus(); actualInput.select(); }, 50);
+  }
+
+  function closeModal(revertCheckbox) {
+    modal.style.display = 'none';
+    if (revertCheckbox && onCompleteCallback) {
+      onCompleteCallback(null); // signal cancellation
+    }
+    currentTodo = null;
+    onCompleteCallback = null;
+    categories = [];
+  }
+
+  saveBtn.addEventListener('click', function() {
+    if (!currentTodo) return;
+
+    var actual = parseInt(actualInput.value, 10);
+    if (!actual || actual < 0) {
+      actualInput.focus();
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    var category = categories.length > 0 ? categories.join(', ') : null;
+
+    if (onCompleteCallback) {
+      onCompleteCallback({
+        actualMin: actual,
+        category: category
+      });
+    }
+
+    modal.style.display = 'none';
+    currentTodo = null;
+    onCompleteCallback = null;
+    categories = [];
+  });
+
+  backdrop.addEventListener('click', function() { closeModal(true); });
+  closeBtn.addEventListener('click', function() { closeModal(true); });
+  cancelBtn.addEventListener('click', function() { closeModal(true); });
+
+  // Escape key
+  modal.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal(true);
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      saveBtn.click();
+    }
+  });
+
+  // Expose public API
+  window.dmTodoComplete = {
+    open: openModal,
+    close: function() { closeModal(true); }
+  };
+})();
+</script>
