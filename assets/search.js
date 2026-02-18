@@ -29,6 +29,8 @@
   let activeIndex = -1;
   let initialized = false;
   let useFirestore = false;
+  let searchDebounceTimer = null;
+  const DEBOUNCE_MS = 150;
 
   // ── Helper: get base URL ─────────────────────────────
   function getBaseUrl() {
@@ -185,8 +187,10 @@
       return;
     }
 
-    hits.forEach(function(page) {
+    hits.forEach(function(page, idx) {
       var li = document.createElement('li');
+      li.setAttribute('role', 'option');
+      li.id = 'search-result-' + idx;
       var a = document.createElement('a');
       a.href = page.href;
       a.textContent = page.title;
@@ -206,6 +210,7 @@
     while (results.firstChild) {
       results.removeChild(results.firstChild);
     }
+    input.setAttribute('aria-activedescendant', '');
   }
 
   // ── Keyboard navigation within results ────────────────
@@ -215,18 +220,24 @@
 
   function setActive(index) {
     var links = getLinks();
-    if (!links.length) return;
+    if (!links.length) {
+      input.setAttribute('aria-activedescendant', '');
+      return;
+    }
 
     // Remove previous active
-    links.forEach(function(a) { a.classList.remove('active'); });
+    links.forEach(function(a) { a.parentElement.classList.remove('active'); a.parentElement.removeAttribute('aria-selected'); });
 
     // Clamp index
     if (index < 0) index = links.length - 1;
     if (index >= links.length) index = 0;
     activeIndex = index;
 
-    links[activeIndex].classList.add('active');
+    var activeLi = links[activeIndex].parentElement;
+    activeLi.classList.add('active');
+    activeLi.setAttribute('aria-selected', 'true');
     links[activeIndex].scrollIntoView({ block: 'nearest' });
+    input.setAttribute('aria-activedescendant', activeLi.id || '');
   }
 
   // ── Event listeners ───────────────────────────────────
@@ -248,8 +259,11 @@
   // Backdrop click closes
   backdrop.addEventListener('click', closeModal);
 
-  // Type-to-search
-  input.addEventListener('input', search);
+  // Type-to-search (debounced)
+  input.addEventListener('input', function() {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(search, DEBOUNCE_MS);
+  });
 
   // Keyboard shortcuts
   document.addEventListener('keydown', function(e) {
@@ -306,6 +320,26 @@
         closeModal();
       }
       return;
+    }
+
+    // Focus trap: keep Tab cycling within the modal
+    if (e.key === 'Tab') {
+      var dialog = modal.querySelector('.search-modal-dialog');
+      var focusable = dialog.querySelectorAll('input, a, button, [tabindex]:not([tabindex="-1"])');
+      if (focusable.length === 0) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        }
+      } else {
+        if (document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     }
   });
 })();

@@ -849,7 +849,7 @@ body {
   flex: 1;
   background: transparent;
   border: none;
-  outline: none;
+  outline: none; // embedded in bordered container
   font-size: 1.05rem;
   font-family: inherit;
   color: var(--body-font-color);
@@ -919,12 +919,17 @@ body {
       transition: background 0.1s ease;
       cursor: pointer;
 
-      &:hover,
-      &.active {
+      &:hover {
         background: var(--surface-2);
         color: var(--accent-blue);
         text-decoration: none;
       }
+    }
+
+    &.active a {
+      background: var(--surface-2);
+      color: var(--accent-blue);
+      text-decoration: none;
     }
 
     small {
@@ -1889,10 +1894,11 @@ html.sidebar-collapsed {
   font-weight: 500;
   transition: border-color 0.2s ease, background 0.2s ease;
 
-  &:focus {
+  &:focus-visible {
     outline: none;
     border-color: var(--accent-blue);
     background: var(--surface-2);
+    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
 
   &::placeholder {
@@ -1965,10 +1971,11 @@ html.sidebar-collapsed {
   font-weight: 500;
   transition: border-color 0.2s ease, background 0.2s ease;
 
-  &:focus {
+  &:focus-visible {
     outline: none;
     border-color: var(--accent-blue);
     background: var(--surface-2);
+    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
 
   &::placeholder {
@@ -1997,10 +2004,11 @@ html.sidebar-collapsed {
     margin: 0;
   }
 
-  &:focus {
+  &:focus-visible {
     outline: none;
     border-color: var(--accent-blue);
     background: var(--surface-2);
+    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
 
   &::placeholder {
@@ -2114,9 +2122,10 @@ html.sidebar-collapsed {
   font-size: 0.78rem;
   cursor: pointer;
 
-  &:focus {
+  &:focus-visible {
     outline: none;
     border-color: var(--accent-blue);
+    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
 }
 
@@ -2134,10 +2143,11 @@ html.sidebar-collapsed {
   font-weight: 500;
   transition: border-color 0.2s ease, background 0.2s ease;
 
-  &:focus {
+  &:focus-visible {
     outline: none;
     border-color: var(--accent-blue);
     background: var(--surface-2);
+    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
 
   &::placeholder {
@@ -2320,7 +2330,7 @@ html.sidebar-collapsed {
   transition: min-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:focus {
-    outline: none;
+    outline: none; // embedded in bordered modal container
   }
 
   &::placeholder {
@@ -3509,5 +3519,31 @@ html.sidebar-collapsed {
     max-height: 100%;
     width: auto;
     height: auto;
+  }
+}
+
+// =============================================================================
+// Focus-visible: custom focus ring for interactive elements that don't define
+// their own :focus-visible styles (buttons, links, etc.)
+// =============================================================================
+button:focus-visible,
+a:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-blue);
+  outline-offset: 2px;
+}
+
+// =============================================================================
+// Reduced motion: respect user's motion preferences
+// =============================================================================
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -401,7 +401,7 @@
   transition: border-color 0.2s ease;
   width: 130px;
 
-  &:focus {
+  &:focus-visible {
     border-color: var(--accent-blue);
     box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.15);
   }

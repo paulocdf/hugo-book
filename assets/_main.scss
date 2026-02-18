@@ -38,7 +38,7 @@ img {
   vertical-align: baseline;
 }
 
-:focus {
+:focus-visible {
   @include outline;
 }
 

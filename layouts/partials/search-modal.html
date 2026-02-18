@@ -1,17 +1,17 @@
 <!-- Search Modal (Spotlight-style) -->
 <div class="search-modal" id="search-modal" aria-hidden="true">
   <div class="search-modal-backdrop" id="search-modal-backdrop"></div>
-  <div class="search-modal-dialog" role="dialog" aria-label="Search">
+  <div class="search-modal-dialog" role="dialog" aria-label="Search" aria-modal="true">
     <div class="search-modal-input-wrap">
       <svg class="search-modal-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="11" cy="11" r="8"></circle>
         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
       </svg>
-      <input type="text" id="search-modal-input" placeholder="Search pages..." aria-label="Search" maxlength="64" autocomplete="off" />
+      <input type="text" id="search-modal-input" placeholder="Search pages..." aria-label="Search" aria-controls="search-modal-results" aria-autocomplete="list" aria-activedescendant="" maxlength="64" autocomplete="off" />
       <div class="search-modal-spinner hidden"></div>
       <kbd class="search-modal-esc">Esc</kbd>
     </div>
-    <ul id="search-modal-results" class="search-modal-results"></ul>
+    <ul id="search-modal-results" class="search-modal-results" role="listbox" aria-live="polite" aria-label="Search results"></ul>
     <div class="search-modal-footer">
       <span class="search-modal-hint">
         <kbd>&uarr;</kbd><kbd>&darr;</kbd> navigate
