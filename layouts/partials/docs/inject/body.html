@@ -1011,7 +1011,8 @@
     topics: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>',
     inbox: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>',
     snippets: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
-    tags: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>'
+    tags: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>',
+    dashboard: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>'
   };
 
   function getBaseUrl() {
@@ -1180,6 +1181,12 @@
       '<a href="' + sectionUrl('tags') + '"' + tagsActive + '>' + ICONS.tags + 'Tags</a>' +
       '</li>';
 
+    // Add Dashboard entry (static)
+    var dashboardActive = window.location.pathname.indexOf('/docs/dashboard') !== -1 ? ' class="active"' : '';
+    html += '<li class="sidebar-item" data-section="dashboard">' +
+      '<a href="' + sectionUrl('dashboard') + '"' + dashboardActive + '>' + ICONS.dashboard + 'Dashboard</a>' +
+      '</li>';
+
     // Replace sidebar content
     existingUl.innerHTML = html;
 
@@ -1212,6 +1219,11 @@
     var tagsActive = window.location.pathname.indexOf('/docs/tags') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item" data-section="tags">' +
       '<a href="' + sectionUrl('tags') + '"' + tagsActive + '>' + ICONS.tags + 'Tags</a>' +
+      '</li>';
+
+    var dashboardActive = window.location.pathname.indexOf('/docs/dashboard') !== -1 ? ' class="active"' : '';
+    html += '<li class="sidebar-item" data-section="dashboard">' +
+      '<a href="' + sectionUrl('dashboard') + '"' + dashboardActive + '>' + ICONS.dashboard + 'Dashboard</a>' +
       '</li>';
 
     existingUl.innerHTML = html;

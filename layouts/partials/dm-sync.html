@@ -164,9 +164,7 @@
   // ─── Sync Engine ───
 
   function syncNotes(userId) {
-    if (_syncing) return Promise.resolve();
     if (!window.dmDb) return Promise.reject(new Error('Firestore not available'));
-    _syncing = true;
 
     console.log('[dm-sync] Starting sync...');
     var startTime = Date.now();
