@@ -2,10 +2,11 @@
 
 /**
   Digital Memory - Multi-View Knowledge Visualization
-  Three view modes for exploring connected notes, books, and topics:
+  Four view modes for exploring connected notes, books, and topics:
     1. Graph: D3 force-directed network
     2. Grid: Card-based browsable layout
     3. Radial: D3 sunburst hierarchy
+    4. Time: D3 time tracking analytics (from todos)
   Supports light/dark theme switching via CSS custom properties.
 */
 (function () {
@@ -69,6 +70,9 @@
   const graphWrapper = document.getElementById('graph-wrapper');
   const gridWrapper = document.getElementById('grid-wrapper');
   const radialWrapper = document.getElementById('radial-wrapper');
+  const timeWrapper = document.getElementById('time-wrapper');
+  const notesLegend = document.getElementById('notes-legend');
+  const timeLegend = document.getElementById('time-legend');
   if (!graphWrapper) return;
 
   let currentNodeId = -1;
@@ -79,6 +83,7 @@
   let graphRendered = false;
   let gridRendered = false;
   let radialRendered = false;
+  let timeRendered = false;
 
   init();
 
@@ -175,6 +180,8 @@
       graphRendered = false;
       gridRendered = false;
       radialRendered = false;
+      timeRendered = false;
+      _allTodos = null;
       currentNodeId = -1;
       nodesSize = {};
       switchView(currentView);
@@ -195,15 +202,33 @@
       loadFromIndexedDB().then(onDataReady).catch(function() {});
     });
 
+    // Re-render time view when todos change
+    window.addEventListener('dm-todos-updated', function() {
+      if (currentView === 'time') {
+        // Refresh cached todos and re-render content area
+        if (window.dmSync && window.dmSync.getAllTodos) {
+          window.dmSync.getAllTodos().then(function(todos) {
+            _allTodos = todos;
+            triggerTimeContentUpdate();
+          }).catch(function() {});
+        }
+      } else {
+        timeRendered = false; // mark stale for next switch
+        _allTodos = null;     // clear cache
+      }
+    });
+
     // Re-render active view when theme changes
     var observer = new MutationObserver(function(mutations) {
       mutations.forEach(function(m) {
-        if (m.attributeName === 'data-theme' && cachedData) {
+        if (m.attributeName === 'data-theme') {
           setTimeout(function() {
             // Force re-render of current view
             graphRendered = false;
             gridRendered = false;
             radialRendered = false;
+            timeRendered = false;
+            _allTodos = null;
             currentNodeId = -1;
             nodesSize = {};
             renderCurrentView();
@@ -245,10 +270,21 @@
       target.classList.add('active');
     }
 
+    // Toggle legends: notes legend for graph/grid/radial, time legend for time
+    if (notesLegend) notesLegend.style.display = (viewName === 'time') ? 'none' : '';
+    if (timeLegend) timeLegend.style.display = (viewName === 'time') ? '' : 'none';
+
     renderCurrentView();
   }
 
   function renderCurrentView() {
+    // Time view has its own data source (todos), so it doesn't depend on cachedData
+    if (currentView === 'time' && !timeRendered) {
+      renderTimeView();
+      timeRendered = true;
+      return;
+    }
+
     if (!cachedData) return;
 
     if (currentView === 'graph' && !graphRendered) {
@@ -815,6 +851,620 @@
       g.attr('transform', 'translate(' + (newW / 2) + ',' + (newH / 2) + ')');
     });
     resizeObserver.observe(radialWrapper);
+  }
+
+  // =========================================================================
+  // TIME VIEW — todo time tracking analytics
+  // =========================================================================
+  var _allTodos = null; // cached across filter changes
+  var _timeFilterState = {
+    mode: localStorage.getItem('dm-time-filter') || 'all',
+    customFrom: localStorage.getItem('dm-time-custom-from') || '',
+    customTo: localStorage.getItem('dm-time-custom-to') || ''
+  };
+
+  function renderTimeView() {
+    if (!timeWrapper) return;
+    timeWrapper.innerHTML = '';
+
+    var theme = getThemeColors();
+
+    // Load todos from IndexedDB
+    if (!window.dmSync || !window.dmSync.getAllTodos) {
+      showTimeEmpty(timeWrapper, 'Sync not available', 'Time tracking data requires sign-in and sync.');
+      return;
+    }
+
+    window.dmSync.getAllTodos().then(function(todos) {
+      if (!todos || !todos.length) {
+        showTimeEmpty(timeWrapper, 'No tasks yet', 'Create tasks in the Inbox to see time tracking analytics here.');
+        return;
+      }
+
+      _allTodos = todos;
+
+      // ---- Build filter bar ----
+      var filterBar = buildTimeFilterBar();
+      timeWrapper.appendChild(filterBar.bar);
+      timeWrapper.appendChild(filterBar.customRow);
+
+      // ---- Content area (swapped on filter change) ----
+      var contentArea = document.createElement('div');
+      contentArea.className = 'time-content-area';
+      timeWrapper.appendChild(contentArea);
+
+      // Initial render
+      renderTimeContent(contentArea, todos, theme, true);
+
+    }).catch(function(err) {
+      console.error('Time view: failed to load todos', err);
+      showTimeEmpty(timeWrapper, 'Error loading data', 'Could not load time tracking data.');
+    });
+  }
+
+  function buildTimeFilterBar() {
+    var presets = [
+      { key: 'week', label: 'Week' },
+      { key: 'month', label: 'Month' },
+      { key: 'year', label: 'Year' },
+      { key: 'all', label: 'All' },
+      { key: 'custom', label: 'Custom' }
+    ];
+
+    var bar = document.createElement('div');
+    bar.className = 'time-filter-bar';
+
+    var segment = document.createElement('div');
+    segment.className = 'time-filter-segment';
+
+    presets.forEach(function(preset) {
+      var btn = document.createElement('button');
+      btn.className = 'time-filter-btn' + (_timeFilterState.mode === preset.key ? ' active' : '');
+      btn.textContent = preset.label;
+      btn.dataset.filter = preset.key;
+      btn.addEventListener('click', function() {
+        onTimeFilterClick(preset.key);
+      });
+      segment.appendChild(btn);
+    });
+
+    bar.appendChild(segment);
+
+    // Custom date row
+    var customRow = document.createElement('div');
+    customRow.className = 'time-filter-custom-row' + (_timeFilterState.mode === 'custom' ? ' visible' : '');
+    customRow.id = 'time-custom-row';
+
+    var fromInput = document.createElement('input');
+    fromInput.type = 'date';
+    fromInput.className = 'time-filter-date-input';
+    fromInput.id = 'time-custom-from';
+    fromInput.value = _timeFilterState.customFrom;
+
+    var sep = document.createElement('span');
+    sep.className = 'time-filter-date-sep';
+    sep.textContent = 'to';
+
+    var toInput = document.createElement('input');
+    toInput.type = 'date';
+    toInput.className = 'time-filter-date-input';
+    toInput.id = 'time-custom-to';
+    toInput.value = _timeFilterState.customTo;
+
+    var applyBtn = document.createElement('button');
+    applyBtn.className = 'time-filter-apply-btn';
+    applyBtn.textContent = 'Apply';
+    applyBtn.addEventListener('click', function() {
+      onCustomDateApply();
+    });
+
+    customRow.appendChild(fromInput);
+    customRow.appendChild(sep);
+    customRow.appendChild(toInput);
+    customRow.appendChild(applyBtn);
+
+    // Also apply on Enter key in date inputs
+    fromInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') onCustomDateApply(); });
+    toInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') onCustomDateApply(); });
+
+    return { bar: bar, customRow: customRow };
+  }
+
+  function onTimeFilterClick(filterKey) {
+    _timeFilterState.mode = filterKey;
+    localStorage.setItem('dm-time-filter', filterKey);
+
+    // Update active state on buttons
+    document.querySelectorAll('.time-filter-btn').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.filter === filterKey);
+    });
+
+    // Toggle custom row
+    var customRow = document.getElementById('time-custom-row');
+    if (customRow) {
+      customRow.classList.toggle('visible', filterKey === 'custom');
+    }
+
+    // If custom, don't re-render yet (wait for Apply)
+    if (filterKey === 'custom') return;
+
+    triggerTimeContentUpdate();
+  }
+
+  function onCustomDateApply() {
+    var fromEl = document.getElementById('time-custom-from');
+    var toEl = document.getElementById('time-custom-to');
+    if (!fromEl || !toEl) return;
+
+    _timeFilterState.customFrom = fromEl.value;
+    _timeFilterState.customTo = toEl.value;
+    localStorage.setItem('dm-time-custom-from', fromEl.value);
+    localStorage.setItem('dm-time-custom-to', toEl.value);
+
+    triggerTimeContentUpdate();
+  }
+
+  function triggerTimeContentUpdate() {
+    var contentArea = timeWrapper ? timeWrapper.querySelector('.time-content-area') : null;
+    if (!contentArea || !_allTodos) return;
+
+    var theme = getThemeColors();
+
+    // Fade out
+    contentArea.classList.add('fading');
+    setTimeout(function() {
+      renderTimeContent(contentArea, _allTodos, theme, false);
+      contentArea.classList.remove('fading');
+    }, 250);
+  }
+
+  function getTimeFilterRange() {
+    var now = new Date();
+    var mode = _timeFilterState.mode;
+
+    if (mode === 'week') {
+      var weekAgo = new Date(now);
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return { from: weekAgo, to: now };
+    }
+    if (mode === 'month') {
+      var monthAgo = new Date(now);
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      return { from: monthAgo, to: now };
+    }
+    if (mode === 'year') {
+      var yearAgo = new Date(now);
+      yearAgo.setFullYear(yearAgo.getFullYear() - 1);
+      return { from: yearAgo, to: now };
+    }
+    if (mode === 'custom') {
+      var from = _timeFilterState.customFrom ? new Date(_timeFilterState.customFrom + 'T00:00:00') : null;
+      var to = _timeFilterState.customTo ? new Date(_timeFilterState.customTo + 'T23:59:59') : null;
+      return { from: from, to: to };
+    }
+    // 'all'
+    return { from: null, to: null };
+  }
+
+  function filterTodosByTimeRange(todos, range) {
+    if (!range.from && !range.to) return todos;
+
+    return todos.filter(function(t) {
+      // Use completedAt for completed tasks
+      var dateVal = t.completedAt || t.updatedAt || t.createdAt;
+      if (!dateVal) return true; // include if no date
+
+      // Handle Firestore timestamps and date strings
+      var d;
+      if (dateVal.toDate) {
+        d = dateVal.toDate();
+      } else if (dateVal.seconds) {
+        d = new Date(dateVal.seconds * 1000);
+      } else {
+        d = new Date(dateVal);
+      }
+
+      if (isNaN(d.getTime())) return true; // include if unparseable
+
+      if (range.from && d < range.from) return false;
+      if (range.to && d > range.to) return false;
+      return true;
+    });
+  }
+
+  function renderTimeContent(contentArea, allTodos, theme, animate) {
+    contentArea.innerHTML = '';
+
+    var range = getTimeFilterRange();
+
+    // Filter ALL todos by range first, then filter to completed parents
+    var todosInRange = filterTodosByTimeRange(allTodos, range);
+    var completedTodos = todosInRange.filter(function(t) { return t.done && t.actualMin != null && !t.parentId; });
+
+    if (!completedTodos.length) {
+      var modeLabel = _timeFilterState.mode === 'custom' ? 'this date range' :
+                      _timeFilterState.mode === 'all' ? '' :
+                      'the last ' + _timeFilterState.mode;
+      var emptyMsg = modeLabel ? 'No completed tasks in ' + modeLabel + '.' : 'No completed tasks yet.';
+      contentArea.innerHTML =
+        '<div class="time-empty-state">' +
+          '<div class="time-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+          '<div class="time-empty-title">No data</div>' +
+          '<div class="time-empty-text">' + emptyMsg + '</div>' +
+        '</div>';
+      // Clear legend
+      if (timeLegend) timeLegend.innerHTML = '';
+      return;
+    }
+
+    // ---- Compute stats ----
+    var totalEstimated = 0;
+    var totalActual = 0;
+    completedTodos.forEach(function(t) {
+      totalEstimated += (t.estimatedMin || 25);
+      totalActual += (t.actualMin || 0);
+    });
+    var totalPomodoros = Math.round((totalActual / 25) * 10) / 10;
+
+    // ---- Build category data ----
+    var categoryMap = {};
+    completedTodos.forEach(function(t) {
+      var cat = t.category || 'Uncategorized';
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = { estimated: 0, actual: 0, count: 0 };
+      }
+      categoryMap[cat].estimated += (t.estimatedMin || 25);
+      categoryMap[cat].actual += (t.actualMin || 0);
+      categoryMap[cat].count++;
+    });
+
+    var categoryData = Object.keys(categoryMap).map(function(name) {
+      return {
+        name: name,
+        estimated: categoryMap[name].estimated,
+        actual: categoryMap[name].actual,
+        count: categoryMap[name].count
+      };
+    }).sort(function(a, b) { return b.actual - a.actual; });
+
+    // ---- Color palette for categories ----
+    var palette = [
+      '#64b5f6', '#81c784', '#ffb74d', '#ef5350', '#ba68c8',
+      '#4dd0e1', '#fff176', '#a1887f', '#90a4ae', '#f06292'
+    ];
+
+    function catColor(i) { return palette[i % palette.length]; }
+
+    // ---- Summary stat cards ----
+    var statRow = document.createElement('div');
+    statRow.className = 'time-stat-row';
+    statRow.innerHTML =
+      '<div class="time-stat-card"><div class="time-stat-value">' + completedTodos.length + '</div><div class="time-stat-label">Completed</div></div>' +
+      '<div class="time-stat-card"><div class="time-stat-value">' + totalActual + '<span style="font-size:0.9rem;font-weight:400;">m</span></div><div class="time-stat-label">Actual Time</div></div>' +
+      '<div class="time-stat-card"><div class="time-stat-value">' + totalEstimated + '<span style="font-size:0.9rem;font-weight:400;">m</span></div><div class="time-stat-label">Estimated</div></div>' +
+      '<div class="time-stat-card"><div class="time-stat-value">' + totalPomodoros + '</div><div class="time-stat-label">Pomodoros</div></div>';
+    contentArea.appendChild(statRow);
+
+    // Animate stat cards
+    if (animate) {
+      statRow.querySelectorAll('.time-stat-card').forEach(function(card, i) {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(12px)';
+        setTimeout(function() {
+          card.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+          card.style.opacity = '1';
+          card.style.transform = 'translateY(0)';
+        }, i * 100);
+      });
+    }
+
+    // ---- Two-panel grid ----
+    var grid = document.createElement('div');
+    grid.className = 'time-view-grid';
+    contentArea.appendChild(grid);
+
+    // Panel 1: Category donut chart
+    var donutPanel = document.createElement('div');
+    donutPanel.className = 'time-chart-panel';
+    donutPanel.innerHTML = '<div class="time-chart-title">Time by Category</div>';
+    grid.appendChild(donutPanel);
+
+    // Panel 2: Estimated vs Actual bar chart
+    var barPanel = document.createElement('div');
+    barPanel.className = 'time-chart-panel';
+    barPanel.innerHTML = '<div class="time-chart-title">Estimated vs Actual</div>';
+    grid.appendChild(barPanel);
+
+    // ---- Donut Chart ----
+    renderDonutChart(donutPanel, categoryData, catColor, theme);
+
+    // ---- Grouped Bar Chart ----
+    renderComparisonChart(barPanel, categoryData, catColor, theme);
+
+    // ---- Update time legend ----
+    if (timeLegend) {
+      timeLegend.innerHTML = categoryData.map(function(cat, i) {
+        return '<div class="legend-item">' +
+          '<span class="legend-dot" style="background:' + catColor(i) + ';box-shadow:0 0 6px ' + catColor(i) + '40;"></span>' +
+          '<span>' + cat.name + '</span>' +
+        '</div>';
+      }).join('');
+    }
+  }
+
+  function showTimeEmpty(container, title, text) {
+    container.innerHTML =
+      '<div class="time-empty-state">' +
+        '<div class="time-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+        '<div class="time-empty-title">' + title + '</div>' +
+        '<div class="time-empty-text">' + text + '</div>' +
+      '</div>';
+  }
+
+  // ---- Donut Chart (time per category) ----
+  function renderDonutChart(container, categoryData, catColor, theme) {
+    var size = 260;
+    var outerRadius = size / 2 - 10;
+    var innerRadius = outerRadius * 0.55;
+
+    var svg = d3.select(container)
+      .append('svg')
+      .attr('width', size)
+      .attr('height', size);
+
+    var g = svg.append('g')
+      .attr('transform', 'translate(' + (size / 2) + ',' + (size / 2) + ')');
+
+    var pie = d3.pie()
+      .value(function(d) { return d.actual; })
+      .sort(null)
+      .padAngle(0.03);
+
+    var arc = d3.arc()
+      .innerRadius(innerRadius)
+      .outerRadius(outerRadius)
+      .cornerRadius(4);
+
+    var arcs = g.selectAll('path')
+      .data(pie(categoryData))
+      .enter()
+      .append('path')
+      .attr('fill', function(d, i) { return catColor(i); })
+      .attr('fill-opacity', 0.85)
+      .attr('stroke', theme.background)
+      .attr('stroke-width', 2)
+      .style('cursor', 'pointer');
+
+    // Animate from zero
+    arcs
+      .attr('d', d3.arc().innerRadius(innerRadius).outerRadius(outerRadius).cornerRadius(4)
+        .startAngle(function(d) { return d.startAngle; })
+        .endAngle(function(d) { return d.startAngle; }) // collapsed
+      )
+      .transition()
+      .delay(function(d, i) { return 200 + i * 100; })
+      .duration(600)
+      .ease(d3.easeQuadOut)
+      .attrTween('d', function(d) {
+        var interpolate = d3.interpolate(d.startAngle, d.endAngle);
+        return function(t) {
+          return d3.arc()
+            .innerRadius(innerRadius)
+            .outerRadius(outerRadius)
+            .cornerRadius(4)
+            .startAngle(d.startAngle)
+            .endAngle(interpolate(t))();
+        };
+      });
+
+    // Hover
+    arcs
+      .on('mouseover', function(event, d) {
+        d3.select(this).transition().duration(150)
+          .attr('fill-opacity', 1)
+          .attr('transform', function() {
+            var centroid = arc.centroid(d);
+            var x = centroid[0] * 0.08;
+            var y = centroid[1] * 0.08;
+            return 'translate(' + x + ',' + y + ')';
+          });
+        var pct = Math.round(d.data.actual / d3.sum(categoryData, function(c) { return c.actual; }) * 100);
+        tooltip.innerHTML =
+          '<div class="graph-tooltip-title">' + d.data.name + '</div>' +
+          '<div class="graph-tooltip-category">' + d.data.actual + ' min (' + pct + '%)</div>' +
+          '<div class="graph-tooltip-connections">' + d.data.count + ' task' + (d.data.count !== 1 ? 's' : '') + '</div>';
+        tooltip.style.opacity = '1';
+        moveTooltip(event);
+      })
+      .on('mousemove', function(event) { moveTooltip(event); })
+      .on('mouseout', function(event, d) {
+        d3.select(this).transition().duration(200)
+          .attr('fill-opacity', 0.85)
+          .attr('transform', 'translate(0,0)');
+        tooltip.style.opacity = '0';
+      });
+
+    // Center total
+    var totalMin = d3.sum(categoryData, function(c) { return c.actual; });
+    var centerG = g.append('g').style('pointer-events', 'none');
+
+    centerG.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .attr('dy', '-0.3em')
+      .text(totalMin)
+      .style('fill', theme.text)
+      .style('font-size', '1.6rem')
+      .style('font-weight', '700')
+      .style('font-family', "'Inter', sans-serif")
+      .attr('opacity', 0)
+      .transition().delay(500).duration(400)
+      .attr('opacity', 1);
+
+    centerG.append('text')
+      .attr('text-anchor', 'middle')
+      .attr('dominant-baseline', 'central')
+      .attr('dy', '1.1em')
+      .text('minutes')
+      .style('fill', theme.textMuted)
+      .style('font-size', '0.7rem')
+      .style('text-transform', 'uppercase')
+      .style('letter-spacing', '0.08em')
+      .style('font-family', "'Inter', sans-serif")
+      .attr('opacity', 0)
+      .transition().delay(500).duration(400)
+      .attr('opacity', 1);
+  }
+
+  // ---- Grouped Bar Chart (estimated vs actual per category) ----
+  function renderComparisonChart(container, categoryData, catColor, theme) {
+    var margin = { top: 10, right: 20, bottom: 50, left: 50 };
+    var containerWidth = container.clientWidth || 340;
+    var width = Math.min(containerWidth - margin.left - margin.right - 40, 360);
+    var height = 230;
+
+    var svg = d3.select(container)
+      .append('svg')
+      .attr('width', width + margin.left + margin.right)
+      .attr('height', height + margin.top + margin.bottom);
+
+    var g = svg.append('g')
+      .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
+
+    // X scale: categories
+    var x0 = d3.scaleBand()
+      .domain(categoryData.map(function(d) { return d.name; }))
+      .range([0, width])
+      .padding(0.35);
+
+    // X1 scale: estimated vs actual within each category
+    var x1 = d3.scaleBand()
+      .domain(['estimated', 'actual'])
+      .range([0, x0.bandwidth()])
+      .padding(0.08);
+
+    // Y scale
+    var maxVal = d3.max(categoryData, function(d) { return Math.max(d.estimated, d.actual); }) || 25;
+    var y = d3.scaleLinear()
+      .domain([0, maxVal * 1.15])
+      .range([height, 0]);
+
+    // X axis
+    g.append('g')
+      .attr('class', 'time-axis')
+      .attr('transform', 'translate(0,' + height + ')')
+      .call(d3.axisBottom(x0).tickSize(0))
+      .selectAll('text')
+      .style('text-anchor', 'end')
+      .attr('dx', '-0.5em')
+      .attr('dy', '0.5em')
+      .attr('transform', 'rotate(-25)')
+      .text(function(d) { return d.length > 12 ? d.substring(0, 12) + '...' : d; });
+
+    // Y axis
+    g.append('g')
+      .attr('class', 'time-axis')
+      .call(d3.axisLeft(y).ticks(5).tickFormat(function(d) { return d + 'm'; }));
+
+    // Bars
+    var groups = g.selectAll('.time-bar-group')
+      .data(categoryData)
+      .enter()
+      .append('g')
+      .attr('transform', function(d) { return 'translate(' + x0(d.name) + ',0)'; });
+
+    // Estimated bars (semi-transparent version of category color)
+    groups.append('rect')
+      .attr('class', 'time-bar')
+      .attr('x', x1('estimated'))
+      .attr('width', x1.bandwidth())
+      .attr('y', height)
+      .attr('height', 0)
+      .attr('rx', 3)
+      .attr('fill', function(d, i) { return catColor(i); })
+      .attr('fill-opacity', 0.3)
+      .attr('stroke', function(d, i) { return catColor(i); })
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '4,2')
+      .on('mouseover', function(event, d) {
+        tooltip.innerHTML =
+          '<div class="graph-tooltip-title">' + d.name + '</div>' +
+          '<div class="graph-tooltip-category">Estimated: ' + d.estimated + ' min</div>';
+        tooltip.style.opacity = '1';
+        moveTooltip(event);
+      })
+      .on('mousemove', function(event) { moveTooltip(event); })
+      .on('mouseout', function() { tooltip.style.opacity = '0'; })
+      .transition()
+      .delay(function(d, i) { return 300 + i * 80; })
+      .duration(500)
+      .ease(d3.easeBackOut.overshoot(1))
+      .attr('y', function(d) { return y(d.estimated); })
+      .attr('height', function(d) { return height - y(d.estimated); });
+
+    // Actual bars (solid category color)
+    groups.append('rect')
+      .attr('class', 'time-bar')
+      .attr('x', x1('actual'))
+      .attr('width', x1.bandwidth())
+      .attr('y', height)
+      .attr('height', 0)
+      .attr('rx', 3)
+      .attr('fill', function(d, i) { return catColor(i); })
+      .attr('fill-opacity', 0.85)
+      .on('mouseover', function(event, d) {
+        var diff = d.actual - d.estimated;
+        var sign = diff >= 0 ? '+' : '';
+        tooltip.innerHTML =
+          '<div class="graph-tooltip-title">' + d.name + '</div>' +
+          '<div class="graph-tooltip-category">Actual: ' + d.actual + ' min</div>' +
+          '<div class="graph-tooltip-connections">' + sign + diff + ' min vs estimate</div>';
+        tooltip.style.opacity = '1';
+        moveTooltip(event);
+      })
+      .on('mousemove', function(event) { moveTooltip(event); })
+      .on('mouseout', function() { tooltip.style.opacity = '0'; })
+      .transition()
+      .delay(function(d, i) { return 400 + i * 80; })
+      .duration(500)
+      .ease(d3.easeBackOut.overshoot(1))
+      .attr('y', function(d) { return y(d.actual); })
+      .attr('height', function(d) { return height - y(d.actual); });
+
+    // Bar chart legend (inline, below the chart)
+    var legendG = svg.append('g')
+      .attr('transform', 'translate(' + (margin.left + width / 2 - 80) + ',' + (height + margin.top + margin.bottom - 8) + ')');
+
+    // Estimated legend
+    legendG.append('rect')
+      .attr('x', 0).attr('y', 0)
+      .attr('width', 14).attr('height', 10)
+      .attr('rx', 2)
+      .attr('fill', theme.textMuted)
+      .attr('fill-opacity', 0.3)
+      .attr('stroke', theme.textMuted)
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '3,2');
+    legendG.append('text')
+      .attr('x', 18).attr('y', 9)
+      .text('Estimated')
+      .style('fill', theme.textMuted)
+      .style('font-size', '10px')
+      .style('font-family', "'Inter', sans-serif");
+
+    // Actual legend
+    legendG.append('rect')
+      .attr('x', 85).attr('y', 0)
+      .attr('width', 14).attr('height', 10)
+      .attr('rx', 2)
+      .attr('fill', theme.textMuted)
+      .attr('fill-opacity', 0.85);
+    legendG.append('text')
+      .attr('x', 103).attr('y', 9)
+      .text('Actual')
+      .style('fill', theme.textMuted)
+      .style('font-size', '10px')
+      .style('font-family', "'Inter', sans-serif");
   }
 
   // =========================================================================

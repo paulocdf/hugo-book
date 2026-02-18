@@ -26,14 +26,21 @@
         <circle cx="12" cy="12" r="10"/>
       </svg>
     </button>
+    <button class="view-toggle-btn" data-view="time" title="Time Tracking View">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <polyline points="12 6 12 12 16 14"/>
+      </svg>
+    </button>
   </div>
 
   <!-- View Containers -->
   <div id="graph-wrapper" class="view-container active"></div>
   <div id="grid-wrapper" class="view-container"></div>
   <div id="radial-wrapper" class="view-container"></div>
+  <div id="time-wrapper" class="view-container"></div>
 
-  <div class="graph-legend">
+  <div class="graph-legend" id="notes-legend">
     <div class="legend-item">
       <span class="legend-dot books"></span>
       <span>Books</span>
@@ -47,4 +54,5 @@
       <span>Inbox</span>
     </div>
   </div>
+  <div class="graph-legend" id="time-legend" style="display:none;"></div>
 </div>
