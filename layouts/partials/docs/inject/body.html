@@ -597,55 +597,67 @@
     if (currentMode === 'note') scheduleNotePreview();
   });
 
-  // Mode toggle
+  // Mode switching logic
+  var modes = ['note', 'code', 'todo'];
+
+  function setMode(mode) {
+    if (mode === currentMode) return;
+    currentMode = mode;
+    modeButtons.forEach(function(b) { b.classList.remove('active'); });
+    modeButtons.forEach(function(b) {
+      if (b.getAttribute('data-mode') === mode) b.classList.add('active');
+    });
+
+    // Hide everything first
+    destRow.style.display = 'none';
+    langRow.style.display = 'none';
+    if (bookTitleRow) bookTitleRow.style.display = 'none';
+    previewWrapper.style.display = 'none';
+    notePreviewWrapper.style.display = 'none';
+    if (todoFieldsEl) todoFieldsEl.style.display = 'none';
+
+    if (mode === 'code') {
+      langRow.style.display = '';
+      previewWrapper.style.display = '';
+      if (toolbar) toolbar.style.display = 'none';
+      input.classList.add('code-mode');
+      dialog.classList.add('code-mode');
+      input.placeholder = 'Paste or type your code here...';
+      titleInput.style.display = '';
+      document.getElementById('qc-editor-box').style.display = '';
+      updatePreview();
+    } else if (mode === 'todo') {
+      if (todoFieldsEl) todoFieldsEl.style.display = '';
+      if (toolbar) toolbar.style.display = 'none';
+      titleInput.style.display = 'none';
+      document.getElementById('qc-editor-box').style.display = 'none';
+      input.classList.remove('code-mode');
+      dialog.classList.remove('code-mode');
+    } else {
+      // note mode
+      destRow.style.display = '';
+      if (toolbar) toolbar.style.display = '';
+      if (bookTitleRow) bookTitleRow.style.display = selectedDest.tag === 'book-note' ? '' : 'none';
+      input.classList.remove('code-mode');
+      dialog.classList.remove('code-mode');
+      input.placeholder = "What's on your mind?";
+      titleInput.style.display = '';
+      document.getElementById('qc-editor-box').style.display = '';
+      updateNotePreview();
+    }
+
+    // Focus the primary input for the new mode
+    if (mode === 'todo') {
+      if (todoTitleInput) todoTitleInput.focus();
+    } else {
+      titleInput.focus();
+    }
+  }
+
+  // Mode toggle click handlers
   modeButtons.forEach(function(mbtn) {
     mbtn.addEventListener('click', function() {
-      var mode = mbtn.getAttribute('data-mode');
-      if (mode === currentMode) return;
-      currentMode = mode;
-      modeButtons.forEach(function(b) { b.classList.remove('active'); });
-      mbtn.classList.add('active');
-
-      // Hide everything first
-      destRow.style.display = 'none';
-      langRow.style.display = 'none';
-      if (bookTitleRow) bookTitleRow.style.display = 'none';
-      previewWrapper.style.display = 'none';
-      notePreviewWrapper.style.display = 'none';
-      if (todoFieldsEl) todoFieldsEl.style.display = 'none';
-
-      if (mode === 'code') {
-        langRow.style.display = '';
-        previewWrapper.style.display = '';
-        if (toolbar) toolbar.style.display = 'none';
-        input.classList.add('code-mode');
-        dialog.classList.add('code-mode');
-        input.placeholder = 'Paste or type your code here...';
-        // Show note fields
-        titleInput.style.display = '';
-        document.getElementById('qc-editor-box').style.display = '';
-        updatePreview();
-      } else if (mode === 'todo') {
-        if (todoFieldsEl) todoFieldsEl.style.display = '';
-        if (toolbar) toolbar.style.display = 'none';
-        // Hide note/code-specific fields
-        titleInput.style.display = 'none';
-        document.getElementById('qc-editor-box').style.display = 'none';
-        input.classList.remove('code-mode');
-        dialog.classList.remove('code-mode');
-      } else {
-        // note mode
-        destRow.style.display = '';
-        if (toolbar) toolbar.style.display = '';
-        if (bookTitleRow) bookTitleRow.style.display = selectedDest.tag === 'book-note' ? '' : 'none';
-        input.classList.remove('code-mode');
-        dialog.classList.remove('code-mode');
-        input.placeholder = "What's on your mind?";
-        // Show note fields
-        titleInput.style.display = '';
-        document.getElementById('qc-editor-box').style.display = '';
-        updateNotePreview();
-      }
+      setMode(mbtn.getAttribute('data-mode'));
     });
   });
 
@@ -1187,6 +1199,15 @@
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
       e.preventDefault();
       submit();
+    }
+    // Tab cycles modes: Note → Code → Todo → Note
+    if (e.key === 'Tab' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      var idx = modes.indexOf(currentMode);
+      var next = e.shiftKey
+        ? modes[(idx - 1 + modes.length) % modes.length]
+        : modes[(idx + 1) % modes.length];
+      setMode(next);
     }
 
     // Formatting shortcuts (Note mode only, when textarea is focused)
