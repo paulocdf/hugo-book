@@ -147,13 +147,15 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-  var DB_VERSION = 5;
+  var DB_VERSION = 6;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
   var STORE_WRITE_QUEUE = 'writeQueue';
   var STORE_VERSIONS = 'noteVersions';
+  var STORE_ATTACHMENTS = 'attachments';
   var MAX_VERSIONS_PER_NOTE = 50;
+  var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
   var SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
   var _db = null;
   var _syncTimer = null;
@@ -203,6 +205,12 @@
           var versionStore = db.createObjectStore(STORE_VERSIONS, { keyPath: 'id' });
           versionStore.createIndex('noteId', 'noteId', { unique: false });
           versionStore.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+        // Attachments store (v6)
+        if (!db.objectStoreNames.contains(STORE_ATTACHMENTS)) {
+          var attachStore = db.createObjectStore(STORE_ATTACHMENTS, { keyPath: 'id' });
+          attachStore.createIndex('noteId', 'noteId', { unique: false });
+          attachStore.createIndex('createdAt', 'createdAt', { unique: false });
         }
       };
       req.onsuccess = function(e) {
@@ -676,6 +684,7 @@
     return syncNotes(userId)
       .then(function() { return syncTodos(userId); })
       .then(function() { return syncVersions(userId); })
+      .then(function() { return syncAttachments(userId); })
       .then(function() {
         _syncing = false;
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -1034,6 +1043,219 @@
       });
   }
 
+  // ─── Attachments ───
+
+  function serializeAttachment(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      noteId: data.noteId || '',
+      fileName: data.fileName || '',
+      fileType: data.fileType || '',
+      fileSize: data.fileSize || 0,
+      storagePath: data.storagePath || '',
+      downloadUrl: data.downloadUrl || '',
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0
+    };
+  }
+
+  /**
+   * Upload a file to Firebase Storage and create attachment metadata in Firestore.
+   * @param {string} noteId — the note this attachment belongs to
+   * @param {File} file — the File object to upload
+   * @param {function} onProgress — optional callback(percent) for upload progress
+   * @returns {Promise<Object>} — the attachment metadata object
+   */
+  function uploadAttachment(noteId, file, onProgress) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+    if (!window.dmStorage) return Promise.reject(new Error('Storage not available'));
+
+    if (file.size > MAX_FILE_SIZE) {
+      return Promise.reject(new Error('File too large (max 10 MB)'));
+    }
+
+    // Generate unique filename to avoid collisions
+    var timestamp = Date.now();
+    var safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+    var storagePath = 'users/' + user.uid + '/attachments/' + noteId + '/' + timestamp + '-' + safeName;
+    var storageRef = window.dmStorage.ref(storagePath);
+
+    return new Promise(function(resolve, reject) {
+      var uploadTask = storageRef.put(file);
+
+      uploadTask.on('state_changed',
+        function(snapshot) {
+          if (onProgress) {
+            var pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+            onProgress(pct);
+          }
+        },
+        function(error) {
+          console.error('[dm-sync] Upload error:', error);
+          reject(error);
+        },
+        function() {
+          // Upload complete — get download URL
+          uploadTask.snapshot.ref.getDownloadURL().then(function(downloadUrl) {
+            // Create attachment metadata in Firestore
+            var attachId = window.dmDb
+              ? window.dmDb.collection('attachments').doc().id
+              : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+
+            var now = Date.now();
+            var attachData = {
+              userId: user.uid,
+              noteId: noteId,
+              fileName: file.name,
+              fileType: file.type || 'application/octet-stream',
+              fileSize: file.size,
+              storagePath: storagePath,
+              downloadUrl: downloadUrl,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            };
+
+            var localAttach = {
+              id: attachId,
+              userId: user.uid,
+              noteId: noteId,
+              fileName: file.name,
+              fileType: file.type || 'application/octet-stream',
+              fileSize: file.size,
+              storagePath: storagePath,
+              downloadUrl: downloadUrl,
+              createdAt: now
+            };
+
+            firestoreWrite({
+              collection: 'attachments',
+              docId: attachId,
+              op: 'set',
+              data: attachData,
+              localOp: function() { return idbPut(STORE_ATTACHMENTS, localAttach); }
+            }).then(function() {
+              window.dispatchEvent(new CustomEvent('dm-attachments-updated', { detail: { noteId: noteId } }));
+              resolve(localAttach);
+            }).catch(function(err) {
+              reject(err);
+            });
+          }).catch(function(err) {
+            reject(err);
+          });
+        }
+      );
+    });
+  }
+
+  /**
+   * Get all attachments for a note, sorted newest first.
+   */
+  function getAttachmentsForNote(noteId) {
+    return idbGetAll(STORE_ATTACHMENTS).then(function(all) {
+      return all.filter(function(a) { return a.noteId === noteId; })
+        .sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    });
+  }
+
+  /**
+   * Delete an attachment: remove from Storage, Firestore, and IDB.
+   */
+  function deleteAttachment(attachment) {
+    if (!attachment) return Promise.resolve();
+
+    // Delete from Firebase Storage
+    var storagePromise = Promise.resolve();
+    if (window.dmStorage && attachment.storagePath && _isOnline) {
+      var ref = window.dmStorage.ref(attachment.storagePath);
+      storagePromise = ref.delete().catch(function(err) {
+        // Ignore 'object-not-found' — file may already be deleted
+        if (err.code !== 'storage/object-not-found') {
+          console.warn('[dm-sync] Storage delete error:', err);
+        }
+      });
+    }
+
+    // Delete metadata from Firestore + IDB
+    return storagePromise.then(function() {
+      return firestoreWrite({
+        collection: 'attachments',
+        docId: attachment.id,
+        op: 'delete',
+        data: null,
+        localOp: function() { return idbDelete(STORE_ATTACHMENTS, attachment.id); }
+      });
+    }).then(function() {
+      window.dispatchEvent(new CustomEvent('dm-attachments-updated', { detail: { noteId: attachment.noteId } }));
+    });
+  }
+
+  /**
+   * Delete all attachments for a note.
+   */
+  function deleteAttachmentsForNote(noteId) {
+    return getAttachmentsForNote(noteId).then(function(attachments) {
+      var chain = Promise.resolve();
+      attachments.forEach(function(a) {
+        chain = chain.then(function() { return deleteAttachment(a); });
+      });
+      return chain;
+    });
+  }
+
+  /**
+   * Sync attachments from Firestore for a given user.
+   */
+  function syncAttachments(userId) {
+    if (!window.dmDb) return Promise.resolve();
+
+    console.log('[dm-sync] Syncing attachments...');
+    return window.dmDb.collection('attachments')
+      .where('userId', '==', userId)
+      .get()
+      .then(function(snapshot) {
+        var remoteAttachments = [];
+        snapshot.forEach(function(doc) {
+          remoteAttachments.push(serializeAttachment(doc));
+        });
+
+        return idbGetAll(STORE_ATTACHMENTS).then(function(localAttachments) {
+          var localMap = {};
+          localAttachments.forEach(function(a) { localMap[a.id] = a; });
+
+          var remoteMap = {};
+          remoteAttachments.forEach(function(a) { remoteMap[a.id] = a; });
+
+          var toUpsert = [];
+          remoteAttachments.forEach(function(ra) {
+            var la = localMap[ra.id];
+            if (!la || la.createdAt !== ra.createdAt) {
+              toUpsert.push(ra);
+            }
+          });
+
+          var toDelete = [];
+          localAttachments.forEach(function(la) {
+            if (!remoteMap[la.id]) {
+              toDelete.push(la.id);
+            }
+          });
+
+          var promises = [];
+          if (toUpsert.length > 0) {
+            promises.push(idbPutBatch(STORE_ATTACHMENTS, toUpsert));
+          }
+          toDelete.forEach(function(id) {
+            promises.push(idbDelete(STORE_ATTACHMENTS, id));
+          });
+
+          return Promise.all(promises).then(function() {
+            console.log('[dm-sync] Attachments sync complete. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
+          });
+        });
+      });
+  }
+
   // ─── Public API ───
 
   window.dmSync = {
@@ -1244,6 +1466,7 @@
         idbClear(STORE_TODOS),
         idbClear(STORE_META),
         idbClear(STORE_VERSIONS),
+        idbClear(STORE_ATTACHMENTS),
         clearQueue()
       ]).then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -1274,7 +1497,13 @@
         data: null,
         localOp: function() { return idbDelete(STORE_VERSIONS, versionId); }
       });
-    }
+    },
+
+    // Attachments
+    uploadAttachment: uploadAttachment,
+    getAttachmentsForNote: getAttachmentsForNote,
+    deleteAttachment: deleteAttachment,
+    deleteAttachmentsForNote: deleteAttachmentsForNote
   };
 
   // ─── Auto-sync on Auth State Change ───
@@ -1287,7 +1516,7 @@
           var cachedUserId = meta ? meta.value : null;
           var proceed = cachedUserId === user.uid
             ? Promise.resolve()
-            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), clearQueue()]);
+            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), clearQueue()]);
 
           return proceed.then(function() {
             return idbPut(STORE_META, { key: 'currentUserId', value: user.uid });
@@ -1309,7 +1538,7 @@
         stopBackgroundSync();
         clearAllReminderTimers();
         // Clear cache on sign-out so no data leaks to another user
-        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), clearQueue()])
+        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), clearQueue()])
           .then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));

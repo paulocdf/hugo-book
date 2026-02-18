@@ -74,6 +74,12 @@
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
           </svg>
         </button>
+        <button type="button" class="qc-toolbar-btn" id="note-edit-attach-btn" title="Attach file">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
+          </svg>
+        </button>
+        <input type="file" id="note-edit-file-input" multiple style="display: none;">
         <span class="qc-toolbar-sep"></span>
         <button type="button" class="qc-toolbar-btn note-edit-preview-btn" id="note-edit-preview-toggle" title="Toggle preview">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -83,6 +89,26 @@
         </button>
       </div>
       <textarea id="note-edit-content" class="note-edit-textarea" rows="20" placeholder="Write your note..."></textarea>
+      <!-- Drop zone overlay -->
+      <div class="note-edit-dropzone" id="note-edit-dropzone" style="display: none;">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+        <span>Drop files to attach</span>
+      </div>
+      <!-- Upload progress -->
+      <div class="note-edit-upload-bar" id="note-edit-upload-bar" style="display: none;">
+        <div class="note-edit-upload-progress" id="note-edit-upload-progress"></div>
+        <span class="note-edit-upload-text" id="note-edit-upload-text">Uploading...</span>
+      </div>
+    </div>
+
+    <!-- Attachment gallery -->
+    <div class="note-edit-attachments" id="note-edit-attachments" style="display: none;">
+      <span class="note-edit-attachments-label">Attachments</span>
+      <div class="note-edit-attachments-list" id="note-edit-attachments-list"></div>
     </div>
 
     <!-- Live preview panel -->
@@ -451,6 +477,146 @@
     display: none;
   }
 }
+
+/* Drop zone overlay */
+.note-edit-dropzone {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 85, 187, 0.08);
+  border: 2px dashed var(--color-link, #0055bb);
+  border-radius: 0 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: var(--color-link, #0055bb);
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 5;
+  pointer-events: none;
+}
+.note-edit-editor-box {
+  position: relative;
+}
+
+/* Upload progress bar */
+.note-edit-upload-bar {
+  position: relative;
+  height: 24px;
+  background: var(--gray-100);
+  border-top: 1px solid var(--gray-200);
+  overflow: hidden;
+}
+.note-edit-upload-progress {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 0%;
+  background: var(--color-link, #0055bb);
+  opacity: 0.2;
+  transition: width 0.2s ease;
+}
+.note-edit-upload-text {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--gray-600, #555);
+}
+
+/* Attachment gallery */
+.note-edit-attachments {
+  margin-top: 0.5rem;
+}
+.note-edit-attachments-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.35rem;
+}
+.note-edit-attachments-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.note-edit-attach-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--gray-100);
+  font-size: 0.75rem;
+  max-width: 220px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.note-edit-attach-item:hover {
+  border-color: var(--gray-400, #aaa);
+}
+.note-edit-attach-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--gray-200);
+}
+.note-edit-attach-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  color: var(--gray-400);
+}
+.note-edit-attach-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.note-edit-attach-name {
+  display: block;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--body-font-color);
+}
+.note-edit-attach-size {
+  display: block;
+  font-size: 0.65rem;
+  color: var(--gray-400);
+}
+.note-edit-attach-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.note-edit-attach-action {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  color: var(--gray-400);
+  transition: color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+}
+.note-edit-attach-action:hover {
+  color: var(--color-link, #0055bb);
+  background: var(--gray-200);
+}
+.note-edit-attach-action--delete:hover {
+  color: var(--color-danger, #ea4335);
+}
 </style>
 
 <script>
@@ -723,6 +889,8 @@
     editModal.style.display = '';
     // Render preview with current content
     updateEditPreview();
+    // Load attachment gallery
+    renderAttachmentGallery(note.id);
     // Focus title
     setTimeout(function() { editTitleInput.focus(); }, 50);
   }
@@ -733,6 +901,11 @@
     editSave.textContent = 'Save Changes';
     currentNote = null;
     onSaveCallback = null;
+    // Reset attachment UI
+    if (attachGallery) attachGallery.style.display = 'none';
+    if (attachList) attachList.innerHTML = '';
+    if (attachUploadBar) attachUploadBar.style.display = 'none';
+    dragCounter = 0;
   }
 
   editBackdrop.addEventListener('click', closeEditModal);
@@ -816,6 +989,244 @@
           if (typeof updateEditPreview === 'function') updateEditPreview();
           showEditFeedback('success', 'Version restored — click Save to apply.');
         }
+      });
+    });
+  }
+
+  // ============================
+  // Attachments — drag/drop, paste, upload, gallery
+  // ============================
+  var attachBtn = document.getElementById('note-edit-attach-btn');
+  var attachFileInput = document.getElementById('note-edit-file-input');
+  var attachDropzone = document.getElementById('note-edit-dropzone');
+  var attachUploadBar = document.getElementById('note-edit-upload-bar');
+  var attachUploadProgress = document.getElementById('note-edit-upload-progress');
+  var attachUploadText = document.getElementById('note-edit-upload-text');
+  var attachGallery = document.getElementById('note-edit-attachments');
+  var attachList = document.getElementById('note-edit-attachments-list');
+  var dragCounter = 0;
+
+  function isImageType(fileType) {
+    return fileType && fileType.startsWith('image/');
+  }
+
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function insertAtCursor(text) {
+    var start = editContentInput.selectionStart;
+    var end = editContentInput.selectionEnd;
+    var val = editContentInput.value;
+    // Add newline before if cursor is not at start of line
+    var prefix = '';
+    if (start > 0 && val[start - 1] !== '\n') prefix = '\n';
+    var suffix = '\n';
+    editContentInput.value = val.slice(0, start) + prefix + text + suffix + val.slice(end);
+    var newPos = start + prefix.length + text.length + suffix.length;
+    editContentInput.selectionStart = editContentInput.selectionEnd = newPos;
+    editContentInput.focus();
+    scheduleEditPreview();
+  }
+
+  function insertAttachmentMarkdown(attachment) {
+    if (isImageType(attachment.fileType)) {
+      insertAtCursor('![' + attachment.fileName + '](' + attachment.downloadUrl + ')');
+    } else {
+      insertAtCursor('[' + attachment.fileName + '](' + attachment.downloadUrl + ')');
+    }
+  }
+
+  function handleFiles(files, noteId) {
+    if (!files || !files.length || !noteId) return;
+    if (!window.dmSync || !window.dmSync.uploadAttachment) return;
+
+    var fileArr = Array.from(files);
+    var total = fileArr.length;
+    var completed = 0;
+
+    attachUploadBar.style.display = '';
+    attachUploadProgress.style.width = '0%';
+    attachUploadText.textContent = 'Uploading ' + total + ' file' + (total > 1 ? 's' : '') + '...';
+
+    var chain = Promise.resolve();
+    fileArr.forEach(function(file) {
+      chain = chain.then(function() {
+        return window.dmSync.uploadAttachment(noteId, file, function(pct) {
+          var overallPct = Math.round(((completed + pct / 100) / total) * 100);
+          attachUploadProgress.style.width = overallPct + '%';
+          attachUploadText.textContent = 'Uploading ' + (completed + 1) + '/' + total + ' (' + pct + '%)';
+        }).then(function(attachment) {
+          completed++;
+          insertAttachmentMarkdown(attachment);
+          return renderAttachmentGallery(noteId);
+        }).catch(function(err) {
+          completed++;
+          console.error('[attachments] Upload error:', err);
+          attachUploadText.textContent = 'Failed: ' + (err.message || 'Upload error');
+        });
+      });
+    });
+
+    chain.then(function() {
+      setTimeout(function() {
+        attachUploadBar.style.display = 'none';
+      }, 1500);
+    });
+  }
+
+  // File picker button
+  if (attachBtn && attachFileInput) {
+    attachBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (currentNote) attachFileInput.click();
+    });
+
+    attachFileInput.addEventListener('change', function() {
+      if (attachFileInput.files.length > 0 && currentNote) {
+        handleFiles(attachFileInput.files, currentNote.id);
+        attachFileInput.value = '';
+      }
+    });
+  }
+
+  // Drag and drop on editor box
+  var editorBox = document.getElementById('note-edit-editor-box');
+  if (editorBox) {
+    editorBox.addEventListener('dragenter', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter++;
+      if (currentNote) attachDropzone.style.display = '';
+    });
+
+    editorBox.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        attachDropzone.style.display = 'none';
+      }
+    });
+
+    editorBox.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    editorBox.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      dragCounter = 0;
+      attachDropzone.style.display = 'none';
+      if (e.dataTransfer && e.dataTransfer.files.length > 0 && currentNote) {
+        handleFiles(e.dataTransfer.files, currentNote.id);
+      }
+    });
+  }
+
+  // Paste handler — intercept image paste
+  editContentInput.addEventListener('paste', function(e) {
+    if (!currentNote) return;
+    var items = (e.clipboardData || e.originalEvent.clipboardData || {}).items;
+    if (!items) return;
+
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        var f = items[i].getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      handleFiles(files, currentNote.id);
+    }
+  });
+
+  // Render attachment gallery
+  function renderAttachmentGallery(noteId) {
+    if (!window.dmSync || !window.dmSync.getAttachmentsForNote) {
+      attachGallery.style.display = 'none';
+      return Promise.resolve();
+    }
+
+    return window.dmSync.getAttachmentsForNote(noteId).then(function(attachments) {
+      if (!attachments.length) {
+        attachGallery.style.display = 'none';
+        return;
+      }
+
+      attachGallery.style.display = '';
+      attachList.innerHTML = '';
+
+      attachments.forEach(function(att) {
+        var item = document.createElement('div');
+        item.className = 'note-edit-attach-item';
+
+        // Thumbnail or icon
+        if (isImageType(att.fileType)) {
+          var thumb = document.createElement('img');
+          thumb.className = 'note-edit-attach-thumb';
+          thumb.src = att.downloadUrl;
+          thumb.alt = att.fileName;
+          thumb.loading = 'lazy';
+          item.appendChild(thumb);
+        } else {
+          var icon = document.createElement('span');
+          icon.className = 'note-edit-attach-icon';
+          icon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>';
+          item.appendChild(icon);
+        }
+
+        // File info
+        var info = document.createElement('div');
+        info.className = 'note-edit-attach-info';
+        var nameEl = document.createElement('span');
+        nameEl.className = 'note-edit-attach-name';
+        nameEl.textContent = att.fileName;
+        nameEl.title = att.fileName;
+        var sizeEl = document.createElement('span');
+        sizeEl.className = 'note-edit-attach-size';
+        sizeEl.textContent = formatFileSize(att.fileSize);
+        info.appendChild(nameEl);
+        info.appendChild(sizeEl);
+        item.appendChild(info);
+
+        // Actions
+        var actions = document.createElement('div');
+        actions.className = 'note-edit-attach-actions';
+
+        // Copy markdown link
+        var copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'note-edit-attach-action';
+        copyBtn.title = 'Insert into note';
+        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"></polyline><line x1="12" y1="6" x2="12" y2="18"></line></svg>';
+        copyBtn.addEventListener('click', function() {
+          insertAttachmentMarkdown(att);
+        });
+        actions.appendChild(copyBtn);
+
+        // Delete
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'note-edit-attach-action note-edit-attach-action--delete';
+        delBtn.title = 'Delete attachment';
+        delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+        delBtn.addEventListener('click', function() {
+          if (!confirm('Delete "' + att.fileName + '"?')) return;
+          window.dmSync.deleteAttachment(att).then(function() {
+            renderAttachmentGallery(noteId);
+          });
+        });
+        actions.appendChild(delBtn);
+
+        item.appendChild(actions);
+        attachList.appendChild(item);
       });
     });
   }

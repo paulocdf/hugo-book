@@ -43,6 +43,10 @@
     {{ partial "todo-list.html" . }}
     {{ end }}
     <div class="single-note-body markdown"></div>
+    <div class="note-viewer-attachments" id="sn-attachments" style="display: none;">
+      <h3 class="note-viewer-attachments-title">Attachments</h3>
+      <div class="note-viewer-attachments-list" id="sn-attachments-list"></div>
+    </div>
   </div>
 </div>
 
@@ -194,6 +198,8 @@
     var editBtn = container.querySelector('.single-note-edit-btn');
     var historyBtn = container.querySelector('.single-note-history-btn');
     var mergeBtn = container.querySelector('.single-note-merge-btn');
+    var snAttachSection = document.getElementById('sn-attachments');
+    var snAttachList = document.getElementById('sn-attachments-list');
 
     var currentNote = null;
     var allDestNotes = [];
@@ -244,10 +250,54 @@
         window.dmRenderDiagrams(bodyEl);
       }
 
+      // Load attachments
+      loadAttachments(note.id);
+
       showState('content');
 
       // Fire event so dynamic ToC can be built
       window.dispatchEvent(new CustomEvent('dm-content-rendered'));
+      });
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      var div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+
+    function loadAttachments(noteId) {
+      if (!window.dmSync || !window.dmSync.getAttachmentsForNote || !snAttachSection) return;
+      window.dmSync.getAttachmentsForNote(noteId).then(function(attachments) {
+        if (!attachments || !attachments.length) {
+          snAttachSection.style.display = 'none';
+          return;
+        }
+        var html = '';
+        attachments.forEach(function(att) {
+          var isImage = att.fileType && att.fileType.startsWith('image/');
+          if (isImage) {
+            html += '<a class="nv-attach-item nv-attach-image" href="' + escapeHtml(att.downloadUrl) + '" target="_blank" rel="noopener">'
+              + '<img class="nv-attach-thumb" src="' + escapeHtml(att.downloadUrl) + '" alt="' + escapeHtml(att.fileName) + '" loading="lazy">'
+              + '<span class="nv-attach-name">' + escapeHtml(att.fileName) + '</span>'
+              + '</a>';
+          } else {
+            html += '<a class="nv-attach-item nv-attach-file" href="' + escapeHtml(att.downloadUrl) + '" target="_blank" rel="noopener" download>'
+              + '<svg class="nv-attach-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>'
+              + '<span class="nv-attach-info"><span class="nv-attach-name">' + escapeHtml(att.fileName) + '</span>'
+              + '<span class="nv-attach-size">' + formatFileSize(att.fileSize) + '</span></span>'
+              + '</a>';
+          }
+        });
+        snAttachList.innerHTML = html;
+        snAttachSection.style.display = '';
       });
     }
 
