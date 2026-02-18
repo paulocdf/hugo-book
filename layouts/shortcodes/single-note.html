@@ -32,6 +32,9 @@
       <button type="button" class="single-note-merge-btn note-action-btn note-action-btn-edit" style="display: none;" title="Merge notes">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v12"></path><path d="M16 6v6"></path><path d="M16 12a4 4 0 0 1-4 4H8"></path><circle cx="8" cy="6" r="2"></circle><circle cx="16" cy="6" r="2"></circle><circle cx="8" cy="18" r="2"></circle></svg>
       </button>
+      <button type="button" class="single-note-history-btn note-action-btn" title="Version History">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+      </button>
       <button type="button" class="single-note-edit-btn note-action-btn note-action-btn-edit" title="Edit">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
       </button>
@@ -189,6 +192,7 @@
     var signinBtn = container.querySelector('.single-note-signin-btn');
     var createBtn = container.querySelector('.single-note-create-btn');
     var editBtn = container.querySelector('.single-note-edit-btn');
+    var historyBtn = container.querySelector('.single-note-history-btn');
     var mergeBtn = container.querySelector('.single-note-merge-btn');
 
     var currentNote = null;
@@ -352,6 +356,31 @@
             selfTriggeredSync = true;
             renderNote(updatedNote);
             setTimeout(function() { selfTriggeredSync = false; }, 200);
+          }
+        });
+      });
+    }
+
+    // History button
+    if (historyBtn) {
+      historyBtn.addEventListener('click', function() {
+        if (!currentNote || !window.dmVersionHistory) return;
+        window.dmVersionHistory.open(currentNote, {
+          onRestore: function(version) {
+            if (window.dmEditModal) {
+              var restoredNote = Object.assign({}, currentNote, {
+                title: version.title || currentNote.title,
+                content: version.content || '',
+                tags: version.tags || currentNote.tags
+              });
+              window.dmEditModal.open(restoredNote, {
+                onSave: function(updatedNote) {
+                  selfTriggeredSync = true;
+                  renderNote(updatedNote);
+                  setTimeout(function() { selfTriggeredSync = false; }, 200);
+                }
+              });
+            }
           }
         });
       });

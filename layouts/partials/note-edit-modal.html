@@ -5,6 +5,12 @@
   <div class="note-edit-dialog">
     <div class="note-edit-header">
       <h3>Edit Note</h3>
+      <button type="button" class="note-edit-history-btn" id="note-edit-history" title="Version History">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+      </button>
       <button type="button" class="note-edit-close" id="note-edit-close">&times;</button>
     </div>
     <input type="text" id="note-edit-title" class="note-edit-title-input" placeholder="Title">
@@ -136,17 +142,34 @@
 }
 .note-edit-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 0.5rem;
   margin-bottom: 1rem;
 }
-.note-edit-header h3 { margin: 0; font-size: 1.1rem; font-weight: 700; }
+.note-edit-header h3 { margin: 0; font-size: 1.1rem; font-weight: 700; flex: 1; }
 .note-edit-close {
   background: none; border: none; font-size: 1.5rem;
   cursor: pointer; color: var(--body-font-color); padding: 4px 8px;
   border-radius: 6px; transition: background 0.15s;
 }
 .note-edit-close:hover { background: var(--gray-100); }
+.note-edit-history-btn {
+  background: none;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--gray-400, #9ca3af);
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.note-edit-history-btn:hover {
+  color: var(--color-link, #0055bb);
+  border-color: var(--color-link, #0055bb);
+  background: var(--color-link-bg, rgba(0,85,187,0.06));
+}
 .note-edit-title-input {
   width: 100%;
   padding: 10px 14px;
@@ -723,28 +746,38 @@
     var newContent = editContentInput.value.trim();
     if (!newContent) return;
 
+    // Skip version save if content hasn't actually changed
+    var contentChanged = newContent !== (currentNote.content || '') || newTitle !== (currentNote.title || '');
+
     editSave.disabled = true;
     editSave.textContent = 'Saving...';
 
-    var updateData = {
-      title: newTitle,
-      content: newContent,
-      tags: editTags,
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
+    // Save a version snapshot of the CURRENT state before applying edits
+    var versionPromise = (contentChanged && window.dmSync && window.dmSync.saveNoteVersion)
+      ? window.dmSync.saveNoteVersion(currentNote)
+      : Promise.resolve();
 
-    window.dmSync.firestoreWrite({
-      collection: 'notes',
-      docId: currentNote.id,
-      op: 'update',
-      data: updateData,
-      localOp: function() {
-        currentNote.title = newTitle;
-        currentNote.content = newContent;
-        currentNote.tags = editTags.slice();
-        currentNote.updatedAt = Date.now();
-        return window.dmSync.putNote(currentNote);
-      }
+    versionPromise.then(function() {
+      var updateData = {
+        title: newTitle,
+        content: newContent,
+        tags: editTags,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      return window.dmSync.firestoreWrite({
+        collection: 'notes',
+        docId: currentNote.id,
+        op: 'update',
+        data: updateData,
+        localOp: function() {
+          currentNote.title = newTitle;
+          currentNote.content = newContent;
+          currentNote.tags = editTags.slice();
+          currentNote.updatedAt = Date.now();
+          return window.dmSync.putNote(currentNote);
+        }
+      });
     })
       .then(function() {
         // Call the onSave callback with the updated note
@@ -765,6 +798,27 @@
         showEditFeedback('error', 'Failed to save. Please try again.');
       });
   });
+
+  // History button — opens version history modal
+  var editHistoryBtn = document.getElementById('note-edit-history');
+  if (editHistoryBtn) {
+    editHistoryBtn.addEventListener('click', function() {
+      if (!currentNote || !window.dmVersionHistory) return;
+      window.dmVersionHistory.open(currentNote, {
+        onRestore: function(version) {
+          // Populate editor with restored version content
+          editTitleInput.value = version.title || '';
+          editContentInput.value = version.content || '';
+          // Update tags
+          editTags = version.tags ? version.tags.slice() : [];
+          renderEditTags();
+          // Update preview if visible
+          if (typeof updateEditPreview === 'function') updateEditPreview();
+          showEditFeedback('success', 'Version restored — click Save to apply.');
+        }
+      });
+    });
+  }
 
   // Expose public API
   window.dmEditModal = {

@@ -147,11 +147,13 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-  var DB_VERSION = 4;
+  var DB_VERSION = 5;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
   var STORE_WRITE_QUEUE = 'writeQueue';
+  var STORE_VERSIONS = 'noteVersions';
+  var MAX_VERSIONS_PER_NOTE = 50;
   var SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
   var _db = null;
   var _syncTimer = null;
@@ -195,6 +197,12 @@
         // Offline write queue store (v4)
         if (!db.objectStoreNames.contains(STORE_WRITE_QUEUE)) {
           db.createObjectStore(STORE_WRITE_QUEUE, { keyPath: 'queueId', autoIncrement: true });
+        }
+        // Note versions store (v5)
+        if (!db.objectStoreNames.contains(STORE_VERSIONS)) {
+          var versionStore = db.createObjectStore(STORE_VERSIONS, { keyPath: 'id' });
+          versionStore.createIndex('noteId', 'noteId', { unique: false });
+          versionStore.createIndex('createdAt', 'createdAt', { unique: false });
         }
       };
       req.onsuccess = function(e) {
@@ -667,6 +675,7 @@
 
     return syncNotes(userId)
       .then(function() { return syncTodos(userId); })
+      .then(function() { return syncVersions(userId); })
       .then(function() {
         _syncing = false;
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -873,6 +882,157 @@
   window.addEventListener('dm-todos-updated', function() {
     scheduleAllReminders();
   });
+
+  // ─── Note Version History ───
+
+  /**
+   * Save a snapshot of the current note state as a version.
+   * Called BEFORE applying new edits so the "previous" state is preserved.
+   * @param {Object} note — the note object (current state before edit)
+   * @returns {Promise}
+   */
+  function saveNoteVersion(note) {
+    if (!note || !note.id) return Promise.resolve();
+
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve();
+
+    var versionId = window.dmDb
+      ? window.dmDb.collection('noteVersions').doc().id
+      : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+
+    var now = Date.now();
+    var versionData = {
+      userId: user.uid,
+      noteId: note.id,
+      title: note.title || '',
+      content: note.content || '',
+      tags: note.tags ? note.tags.slice() : [],
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    var localVersion = {
+      id: versionId,
+      userId: user.uid,
+      noteId: note.id,
+      title: note.title || '',
+      content: note.content || '',
+      tags: note.tags ? note.tags.slice() : [],
+      createdAt: now
+    };
+
+    return firestoreWrite({
+      collection: 'noteVersions',
+      docId: versionId,
+      op: 'set',
+      data: versionData,
+      localOp: function() { return idbPut(STORE_VERSIONS, localVersion); }
+    }).then(function() {
+      // Prune old versions beyond MAX_VERSIONS_PER_NOTE
+      return pruneVersions(note.id);
+    }).catch(function(err) {
+      console.warn('[dm-sync] Version save failed (non-blocking):', err);
+    });
+  }
+
+  /**
+   * Remove oldest versions beyond MAX_VERSIONS_PER_NOTE for a given note.
+   */
+  function pruneVersions(noteId) {
+    return getVersionsForNote(noteId).then(function(versions) {
+      if (versions.length <= MAX_VERSIONS_PER_NOTE) return;
+
+      // versions are sorted newest first — remove excess from the end
+      var toDelete = versions.slice(MAX_VERSIONS_PER_NOTE);
+      var chain = Promise.resolve();
+      toDelete.forEach(function(v) {
+        chain = chain.then(function() {
+          return firestoreWrite({
+            collection: 'noteVersions',
+            docId: v.id,
+            op: 'delete',
+            data: null,
+            localOp: function() { return idbDelete(STORE_VERSIONS, v.id); }
+          });
+        });
+      });
+      return chain;
+    });
+  }
+
+  /**
+   * Get all versions for a note, sorted newest first.
+   */
+  function getVersionsForNote(noteId) {
+    return idbGetAll(STORE_VERSIONS).then(function(all) {
+      return all.filter(function(v) { return v.noteId === noteId; })
+        .sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    });
+  }
+
+  /**
+   * Sync versions from Firestore for a given user (called during full sync).
+   */
+  function syncVersions(userId) {
+    if (!window.dmDb) return Promise.resolve();
+
+    console.log('[dm-sync] Syncing note versions...');
+    return window.dmDb.collection('noteVersions')
+      .where('userId', '==', userId)
+      .get()
+      .then(function(snapshot) {
+        var remoteVersions = [];
+        snapshot.forEach(function(doc) {
+          var data = doc.data();
+          remoteVersions.push({
+            id: doc.id,
+            userId: data.userId || '',
+            noteId: data.noteId || '',
+            title: data.title || '',
+            content: data.content || '',
+            tags: data.tags || [],
+            createdAt: data.createdAt ? data.createdAt.toMillis() : 0
+          });
+        });
+
+        return idbGetAll(STORE_VERSIONS).then(function(localVersions) {
+          var localMap = {};
+          localVersions.forEach(function(v) { localMap[v.id] = v; });
+
+          var remoteMap = {};
+          remoteVersions.forEach(function(v) { remoteMap[v.id] = v; });
+
+          // Upsert remote versions
+          var toUpsert = [];
+          remoteVersions.forEach(function(rv) {
+            var lv = localMap[rv.id];
+            if (!lv || lv.createdAt !== rv.createdAt) {
+              toUpsert.push(rv);
+            }
+          });
+
+          // Delete local versions that no longer exist remotely
+          var toDelete = [];
+          localVersions.forEach(function(lv) {
+            if (!remoteMap[lv.id]) {
+              toDelete.push(lv.id);
+            }
+          });
+
+          var promises = [];
+          if (toUpsert.length > 0) {
+            promises.push(idbPutBatch(STORE_VERSIONS, toUpsert));
+          }
+          toDelete.forEach(function(id) {
+            promises.push(idbDelete(STORE_VERSIONS, id));
+          });
+
+          return Promise.all(promises).then(function() {
+            console.log('[dm-sync] Versions sync complete. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
+          });
+        });
+      });
+  }
 
   // ─── Public API ───
 
@@ -1083,6 +1243,7 @@
         idbClear(STORE_NOTES),
         idbClear(STORE_TODOS),
         idbClear(STORE_META),
+        idbClear(STORE_VERSIONS),
         clearQueue()
       ]).then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -1100,7 +1261,20 @@
     },
 
     // Reminder banner (for use by other partials)
-    showReminderBanner: showReminderBanner
+    showReminderBanner: showReminderBanner,
+
+    // Note version history
+    saveNoteVersion: saveNoteVersion,
+    getVersionsForNote: getVersionsForNote,
+    deleteVersion: function(versionId) {
+      return firestoreWrite({
+        collection: 'noteVersions',
+        docId: versionId,
+        op: 'delete',
+        data: null,
+        localOp: function() { return idbDelete(STORE_VERSIONS, versionId); }
+      });
+    }
   };
 
   // ─── Auto-sync on Auth State Change ───
@@ -1113,7 +1287,7 @@
           var cachedUserId = meta ? meta.value : null;
           var proceed = cachedUserId === user.uid
             ? Promise.resolve()
-            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), clearQueue()]);
+            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), clearQueue()]);
 
           return proceed.then(function() {
             return idbPut(STORE_META, { key: 'currentUserId', value: user.uid });
@@ -1135,7 +1309,7 @@
         stopBackgroundSync();
         clearAllReminderTimers();
         // Clear cache on sign-out so no data leaks to another user
-        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), clearQueue()])
+        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), clearQueue()])
           .then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));
