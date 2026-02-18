@@ -2499,7 +2499,7 @@ html.sidebar-collapsed {
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  background: var(--surface-bg);
+  background: var(--body-background);
   border-radius: 12px;
   z-index: 10;
   animation: qc-feedback-in 0.2s ease;
@@ -2507,19 +2507,19 @@ html.sidebar-collapsed {
 
 .qc-feedback--success {
   .qc-feedback-icon {
-    color: #34a853;
+    color: var(--color-success);
   }
   .qc-feedback-text {
-    color: #34a853;
+    color: var(--color-success);
   }
 }
 
 .qc-feedback--error {
   .qc-feedback-icon {
-    color: #ea4335;
+    color: var(--color-danger);
   }
   .qc-feedback-text {
-    color: #ea4335;
+    color: var(--color-danger);
   }
 }
 
@@ -2950,7 +2950,7 @@ html.sidebar-collapsed {
   padding: 0.6rem 1.25rem;
   border: 1px solid var(--border-medium);
   border-radius: 8px;
-  background: var(--surface-bg);
+  background: var(--body-background);
   color: var(--body-font-color);
   font-family: inherit;
   font-size: 0.9rem;
@@ -3057,7 +3057,7 @@ html.sidebar-collapsed {
 }
 
 .my-notes-error {
-  color: #ea4335;
+  color: var(--color-danger);
 }
 
 .my-notes-empty {
@@ -3131,8 +3131,8 @@ html.sidebar-collapsed {
   transition: all 0.12s ease;
 
   &:hover {
-    background: rgba(234, 67, 53, 0.1);
-    color: #ea4335;
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
   }
 }
 
@@ -3223,7 +3223,7 @@ html.sidebar-collapsed {
 .section-notes-error {
   padding: 1rem;
   font-size: 0.82rem;
-  color: #ea4335;
+  color: var(--color-danger);
 }
 
 .section-notes-signin-hint {
@@ -3299,8 +3299,8 @@ html.sidebar-collapsed {
   transition: all 0.12s ease;
 
   &:hover {
-    background: rgba(234, 67, 53, 0.1);
-    color: #ea4335;
+    background: var(--color-danger-bg);
+    color: var(--color-danger);
   }
 }
 
