@@ -53,6 +53,10 @@
       </div>
     </div>
     <div class="note-viewer-body markdown" id="note-viewer-body"></div>
+    <div class="backlinks-section" id="backlinks-section" style="display: none;">
+      <h3 class="backlinks-title">Linked from</h3>
+      <div class="backlinks-list" id="backlinks-list"></div>
+    </div>
   </div>
 </div>
 
@@ -231,6 +235,45 @@
   var currentNote = null;
   var selfTriggeredSync = false;
 
+  // Backlinks elements
+  var backlinksSectionEl = document.getElementById('backlinks-section');
+  var backlinksListEl = document.getElementById('backlinks-list');
+
+  function getBaseUrl() {
+    var manifest = document.querySelector('link[rel="manifest"]');
+    return manifest ? manifest.getAttribute('href').replace('/manifest.json', '') : '';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function loadBacklinks(noteId) {
+    if (!window.dmSync || !window.dmSync.getBacklinksForNote) return;
+    window.dmSync.getBacklinksForNote(noteId).then(function(results) {
+      if (!results || !results.length) {
+        backlinksSectionEl.style.display = 'none';
+        return;
+      }
+      var base = getBaseUrl();
+      var html = '';
+      results.forEach(function(r) {
+        var badge = r.type === 'wikilink'
+          ? '<span class="backlink-badge backlink-explicit">linked</span>'
+          : '<span class="backlink-badge backlink-mention">mentioned</span>';
+        html += '<a class="backlink-card" href="' + base + '/docs/view/?id=' + encodeURIComponent(r.note.id) + '">'
+          + '<span class="backlink-card-title">' + escapeHtml(r.note.title || 'Untitled') + '</span>'
+          + badge
+          + '</a>';
+      });
+      backlinksListEl.innerHTML = html;
+      backlinksSectionEl.style.display = '';
+    });
+  }
+
   // Get note ID from URL
   var params = new URLSearchParams(window.location.search);
   var noteId = params.get('id');
@@ -275,47 +318,57 @@
       });
     }
 
-    // Render markdown content
-    var content = note.content || '';
+    // Build wikilink map if not yet populated, then render
+    var mapReady = Object.keys(window._wikilinkMap || {}).length > 0
+      ? Promise.resolve()
+      : (window.dmSync ? window.dmSync.getAllNotes().then(function(notes) { window.buildWikilinkMap(notes); }) : Promise.resolve());
 
-    // Strip leading top-level heading — the viewer header already shows the title
-    content = content.replace(/^\s*#\s+.+\n*/, '');
+    mapReady.then(function() {
+      // Render markdown content
+      var content = note.content || '';
 
-    if (note.mode === 'code' && note.language) {
-      // For code snippets, wrap in a code block if not already
-      if (!content.trim().startsWith('```')) {
-        content = '```' + note.language + '\n' + content + '\n```';
+      // Strip leading top-level heading — the viewer header already shows the title
+      content = content.replace(/^\s*#\s+.+\n*/, '');
+
+      if (note.mode === 'code' && note.language) {
+        // For code snippets, wrap in a code block if not already
+        if (!content.trim().startsWith('```')) {
+          content = '```' + note.language + '\n' + content + '\n```';
+        }
       }
-    }
 
-    bodyEl.innerHTML = marked.parse(content);
+      bodyEl.innerHTML = marked.parse(content);
 
-    // Apply syntax highlighting to code blocks
-    bodyEl.querySelectorAll('pre code').forEach(function(block) {
-      if (typeof hljs !== 'undefined') {
-        hljs.highlightElement(block);
-      }
-    });
-
-    // Enable interactive checkboxes
-    if (window.dmEnableCheckboxes) {
-      window.dmEnableCheckboxes(bodyEl, note, function(updated) {
-        // Checkbox already toggled visually; no re-render needed
+      // Apply syntax highlighting to code blocks
+      bodyEl.querySelectorAll('pre code').forEach(function(block) {
+        if (typeof hljs !== 'undefined') {
+          hljs.highlightElement(block);
+        }
       });
-    }
 
-    // Render diagrams (Mermaid, PlantUML, D2, etc.)
-    if (window.dmRenderDiagrams) {
-      window.dmRenderDiagrams(bodyEl);
-    }
+      // Enable interactive checkboxes
+      if (window.dmEnableCheckboxes) {
+        window.dmEnableCheckboxes(bodyEl, note, function(updated) {
+          // Checkbox already toggled visually; no re-render needed
+        });
+      }
 
-    // Fire event so dynamic ToC can be built
-    window.dispatchEvent(new CustomEvent('dm-content-rendered'));
+      // Render diagrams (Mermaid, PlantUML, D2, etc.)
+      if (window.dmRenderDiagrams) {
+        window.dmRenderDiagrams(bodyEl);
+      }
 
-    // Update breadcrumbs dynamically
-    updateBreadcrumbs(note);
+      // Load backlinks
+      loadBacklinks(note.id);
 
-    showState('content');
+      // Fire event so dynamic ToC can be built
+      window.dispatchEvent(new CustomEvent('dm-content-rendered'));
+
+      // Update breadcrumbs dynamically
+      updateBreadcrumbs(note);
+
+      showState('content');
+    });
   }
 
   function updateBreadcrumbs(note) {

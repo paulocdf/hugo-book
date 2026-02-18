@@ -147,6 +147,46 @@
       }
     }
 
+    // Build edges from wikilinks [[Note Title]] and title mentions
+    var titleToId = {};
+    var nodeById = {};
+    nodes.forEach(function(node) {
+      if (node.label) titleToId[node.label.toLowerCase()] = node.id;
+      nodeById[node.id] = node;
+    });
+
+    notes.forEach(function(note) {
+      if (!note.content || !note.id) return;
+
+      // Scan for [[wikilinks]]
+      var wikilinkRegex = /\[\[([^\]]+)\]\]/g;
+      var match;
+      while ((match = wikilinkRegex.exec(note.content)) !== null) {
+        var targetTitle = match[1].trim().toLowerCase();
+        var targetId = titleToId[targetTitle];
+        if (targetId && targetId !== note.id) {
+          var key = note.id < targetId ? note.id + '|' + targetId : targetId + '|' + note.id;
+          if (!edgeSet[key]) {
+            edgeSet[key] = true;
+            edges.push({ source: note.id, target: targetId, type: 'backlink' });
+          }
+        }
+      }
+
+      // Scan for title mentions (secondary)
+      Object.keys(titleToId).forEach(function(title) {
+        if (title.length <= 3) return;
+        var targetId = titleToId[title];
+        if (targetId === note.id) return;
+        var key = note.id < targetId ? note.id + '|' + targetId : targetId + '|' + note.id;
+        if (edgeSet[key]) return; // already linked via tag or wikilink
+        if (note.content.toLowerCase().indexOf(title) !== -1) {
+          edgeSet[key] = true;
+          edges.push({ source: note.id, target: targetId, type: 'backlink' });
+        }
+      });
+    });
+
     // Count neighbours
     edges.forEach(function(edge) {
       nodes.forEach(function(node) {

@@ -1,0 +1,438 @@
+<!-- Pomodoro Timer: Floating countdown widget for TODO tasks -->
+<div id="pomodoro-timer" class="pomodoro-timer" style="display: none;">
+  <div class="pomodoro-timer-header">
+    <span class="pomodoro-timer-phase" id="pomodoro-phase">Work</span>
+    <button type="button" class="pomodoro-timer-close" id="pomodoro-close" title="Cancel timer" aria-label="Close timer">&times;</button>
+  </div>
+  <div class="pomodoro-timer-title" id="pomodoro-title"></div>
+  <div class="pomodoro-timer-display" id="pomodoro-display">25:00</div>
+  <div class="pomodoro-timer-progress">
+    <div class="pomodoro-timer-progress-bar" id="pomodoro-progress"></div>
+  </div>
+  <div class="pomodoro-timer-controls">
+    <button type="button" class="pomodoro-btn pomodoro-btn-secondary" id="pomodoro-reset" title="Reset">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+    </button>
+    <button type="button" class="pomodoro-btn pomodoro-btn-primary" id="pomodoro-toggle">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="pomodoro-play-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="pomodoro-pause-icon" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+    </button>
+    <button type="button" class="pomodoro-btn pomodoro-btn-secondary" id="pomodoro-skip" title="Skip to next phase">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+    </button>
+  </div>
+  <div class="pomodoro-timer-session" id="pomodoro-session">Session 1</div>
+</div>
+
+<style>
+.pomodoro-timer {
+  position: fixed;
+  bottom: 100px;
+  right: 24px;
+  width: 220px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  z-index: 1050;
+  padding: 14px 16px;
+  user-select: none;
+  transition: box-shadow 0.3s;
+}
+.pomodoro-timer:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
+.pomodoro-timer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.pomodoro-timer-phase {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-blue);
+}
+.pomodoro-timer-phase.break {
+  color: var(--color-success, #34a853);
+}
+.pomodoro-timer-close {
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--gray-400);
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+}
+.pomodoro-timer-close:hover { color: var(--color-danger); }
+.pomodoro-timer-title {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 8px;
+}
+.pomodoro-timer-display {
+  font-size: 2.2rem;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  color: var(--body-font-color);
+  line-height: 1.2;
+}
+.pomodoro-timer-progress {
+  height: 4px;
+  background: var(--gray-200);
+  border-radius: 2px;
+  margin: 8px 0;
+  overflow: hidden;
+}
+.pomodoro-timer-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent-blue);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+.pomodoro-timer-progress-bar.break {
+  background: var(--color-success, #34a853);
+}
+.pomodoro-timer-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.pomodoro-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+.pomodoro-btn:active { transform: scale(0.92); }
+.pomodoro-btn-primary {
+  width: 40px;
+  height: 40px;
+  background: var(--accent-blue);
+  color: #fff;
+}
+.pomodoro-btn-primary:hover { opacity: 0.9; }
+.pomodoro-btn-secondary {
+  width: 30px;
+  height: 30px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+.pomodoro-btn-secondary:hover {
+  background: var(--gray-200);
+  color: var(--body-font-color);
+}
+.pomodoro-timer-session {
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  margin-top: 6px;
+}
+/* Active timer indicator on todo item */
+.todo-item-timer-active {
+  font-size: 0.7rem;
+  color: var(--accent-blue);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  animation: pomo-pulse 2s ease-in-out infinite;
+}
+@keyframes pomo-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+@media (max-width: 600px) {
+  .pomodoro-timer {
+    right: 12px;
+    bottom: 80px;
+    width: 190px;
+  }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  var WORK_SECONDS = 25 * 60;
+  var BREAK_SECONDS = 5 * 60;
+
+  var timerEl = document.getElementById('pomodoro-timer');
+  var phaseEl = document.getElementById('pomodoro-phase');
+  var titleEl = document.getElementById('pomodoro-title');
+  var displayEl = document.getElementById('pomodoro-display');
+  var progressEl = document.getElementById('pomodoro-progress');
+  var toggleBtn = document.getElementById('pomodoro-toggle');
+  var playIcon = document.getElementById('pomodoro-play-icon');
+  var pauseIcon = document.getElementById('pomodoro-pause-icon');
+  var resetBtn = document.getElementById('pomodoro-reset');
+  var skipBtn = document.getElementById('pomodoro-skip');
+  var closeBtn = document.getElementById('pomodoro-close');
+  var sessionEl = document.getElementById('pomodoro-session');
+
+  var activeTodoId = null;
+  var activeTodoTitle = '';
+  var phase = 'work'; // 'work' | 'break'
+  var secondsLeft = WORK_SECONDS;
+  var totalPhaseSeconds = WORK_SECONDS;
+  var isRunning = false;
+  var intervalId = null;
+  var sessionCount = 1;
+  var accumulatedWorkSeconds = 0; // total work seconds done for this todo
+
+  function formatTime(s) {
+    var m = Math.floor(s / 60);
+    var sec = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (sec < 10 ? '0' : '') + sec;
+  }
+
+  function updateDisplay() {
+    displayEl.textContent = formatTime(secondsLeft);
+    var pct = ((totalPhaseSeconds - secondsLeft) / totalPhaseSeconds) * 100;
+    progressEl.style.width = pct + '%';
+
+    phaseEl.textContent = phase === 'work' ? 'Work' : 'Break';
+    phaseEl.className = 'pomodoro-timer-phase' + (phase === 'break' ? ' break' : '');
+    progressEl.className = 'pomodoro-timer-progress-bar' + (phase === 'break' ? ' break' : '');
+
+    sessionEl.textContent = 'Session ' + sessionCount + ' \u00b7 ' + Math.round(accumulatedWorkSeconds / 60) + 'min tracked';
+
+    // Update document title while running
+    if (isRunning) {
+      document.title = formatTime(secondsLeft) + ' \u2014 ' + (phase === 'work' ? 'Work' : 'Break') + ' | Digital Memory';
+    }
+  }
+
+  function showPlayIcon() {
+    playIcon.style.display = '';
+    pauseIcon.style.display = 'none';
+  }
+
+  function showPauseIcon() {
+    playIcon.style.display = 'none';
+    pauseIcon.style.display = '';
+  }
+
+  function playChime() {
+    try {
+      var ctx = new (window.AudioContext || window.webkitAudioContext)();
+      var notes = [
+        { freq: 830, start: 0, dur: 0.12 },
+        { freq: 1050, start: 0.13, dur: 0.12 },
+        { freq: 1250, start: 0.26, dur: 0.18 }
+      ];
+      notes.forEach(function(n) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = n.freq;
+        gain.gain.setValueAtTime(0.15, ctx.currentTime + n.start);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + n.start + n.dur);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + n.start);
+        osc.stop(ctx.currentTime + n.start + n.dur + 0.05);
+      });
+      setTimeout(function() { ctx.close(); }, 600);
+    } catch(e) {}
+  }
+
+  function tick() {
+    if (secondsLeft <= 0) {
+      clearInterval(intervalId);
+      intervalId = null;
+      isRunning = false;
+      showPlayIcon();
+      playChime();
+
+      if (phase === 'work') {
+        accumulatedWorkSeconds += totalPhaseSeconds;
+        // Switch to break
+        phase = 'break';
+        secondsLeft = BREAK_SECONDS;
+        totalPhaseSeconds = BREAK_SECONDS;
+        updateDisplay();
+        // Auto-start break
+        startTimer();
+      } else {
+        // Break finished, start next work session
+        sessionCount++;
+        phase = 'work';
+        secondsLeft = WORK_SECONDS;
+        totalPhaseSeconds = WORK_SECONDS;
+        updateDisplay();
+        // Don't auto-start — wait for user
+      }
+      return;
+    }
+    secondsLeft--;
+    updateDisplay();
+  }
+
+  function startTimer() {
+    if (intervalId) return;
+    isRunning = true;
+    showPauseIcon();
+    intervalId = setInterval(tick, 1000);
+    updateDisplay();
+  }
+
+  function pauseTimer() {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    isRunning = false;
+    showPlayIcon();
+    // Accumulate partial work time
+    if (phase === 'work') {
+      accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
+      totalPhaseSeconds = secondsLeft; // remaining becomes new total for progress tracking
+    }
+    // Restore page title
+    document.title = document.title.replace(/^\d{2}:\d{2} \u2014 (Work|Break) \| /, '');
+    updateDisplay();
+  }
+
+  function resetTimer() {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    isRunning = false;
+    // If resetting during work, accumulate partial work time
+    if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
+      accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
+    }
+    phase = 'work';
+    secondsLeft = WORK_SECONDS;
+    totalPhaseSeconds = WORK_SECONDS;
+    showPlayIcon();
+    updateDisplay();
+  }
+
+  function skipPhase() {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    isRunning = false;
+
+    if (phase === 'work') {
+      // Accumulate partial work time
+      accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
+      // Move to break
+      phase = 'break';
+      secondsLeft = BREAK_SECONDS;
+      totalPhaseSeconds = BREAK_SECONDS;
+    } else {
+      // Move to next work session
+      sessionCount++;
+      phase = 'work';
+      secondsLeft = WORK_SECONDS;
+      totalPhaseSeconds = WORK_SECONDS;
+    }
+    showPlayIcon();
+    updateDisplay();
+  }
+
+  function closeTimer() {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    isRunning = false;
+
+    // Accumulate any remaining partial work
+    if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
+      accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
+    }
+
+    timerEl.style.display = 'none';
+    showPlayIcon();
+
+    // Restore page title
+    var cleanTitle = document.title.replace(/^\d{2}:\d{2} \u2014 (Work|Break) \| /, '');
+    document.title = cleanTitle;
+
+    var trackedMinutes = Math.round(accumulatedWorkSeconds / 60);
+    var closedTodoId = activeTodoId;
+    activeTodoId = null;
+    activeTodoTitle = '';
+
+    // Notify the todo list about tracked time
+    if (closedTodoId && trackedMinutes > 0) {
+      window.dispatchEvent(new CustomEvent('dm-pomodoro-stopped', {
+        detail: { todoId: closedTodoId, trackedMinutes: trackedMinutes }
+      }));
+    }
+  }
+
+  // ── Button handlers ──
+  toggleBtn.addEventListener('click', function() {
+    if (isRunning) {
+      pauseTimer();
+    } else {
+      startTimer();
+    }
+  });
+
+  resetBtn.addEventListener('click', resetTimer);
+  skipBtn.addEventListener('click', skipPhase);
+  closeBtn.addEventListener('click', function() {
+    if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
+      var trackedSoFar = accumulatedWorkSeconds;
+      if (phase === 'work') trackedSoFar += (totalPhaseSeconds - secondsLeft);
+      var mins = Math.round(trackedSoFar / 60);
+      if (mins > 0 && !confirm('Stop timer? ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ' of work will be recorded.')) {
+        return;
+      }
+    }
+    closeTimer();
+  });
+
+  // ── Public API ──
+  window.dmPomodoro = {
+    start: function(todoId, todoTitle) {
+      // If a different todo is already being timed, close it first
+      if (activeTodoId && activeTodoId !== todoId) {
+        closeTimer();
+      }
+      activeTodoId = todoId;
+      activeTodoTitle = todoTitle || 'Task';
+      titleEl.textContent = activeTodoTitle;
+      phase = 'work';
+      secondsLeft = WORK_SECONDS;
+      totalPhaseSeconds = WORK_SECONDS;
+      sessionCount = 1;
+      accumulatedWorkSeconds = 0;
+      isRunning = false;
+      showPlayIcon();
+      updateDisplay();
+      timerEl.style.display = '';
+      startTimer();
+    },
+    stop: closeTimer,
+    isActive: function(todoId) {
+      return activeTodoId === todoId;
+    },
+    getActiveTodoId: function() {
+      return activeTodoId;
+    }
+  };
+})();
+</script>

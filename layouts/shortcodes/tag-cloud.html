@@ -1,23 +1,322 @@
-{{- $tags := dict -}}
+{{/* Tag Cloud: dynamically renders tags from IndexedDB/Firestore notes */}}
+<div class="tag-cloud-container" id="tag-cloud-container">
+  <div class="tag-cloud-auth" style="display: none;">
+    <div class="tag-cloud-auth-card">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <h3>Sign in to view tags</h3>
+      <p>Your notes are stored securely and require authentication.</p>
+      <button type="button" class="tag-cloud-signin-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
 
-{{- range .Site.RegularPages -}}
-  {{- with .Params.tags -}}
-    {{- range . -}}
-      {{- $count := index $tags . | default 0 -}}
-      {{- $tags = merge $tags (dict . (add $count 1)) -}}
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
+  <div class="tag-cloud-loading" style="display: none;">
+    <div class="tag-cloud-spinner"></div>
+    <span>Loading tags...</span>
+  </div>
 
-{{ if $tags }}
-<div class="tag-cloud">
-  {{- range $tag, $count := $tags -}}
-    <span class="tag-pill" data-count="{{ $count }}">
-      <span class="tag-name">{{ $tag }}</span>
-      <span class="tag-count">{{ $count }}</span>
-    </span>
-  {{- end -}}
+  <div class="tag-cloud-empty" style="display: none;">
+    <p>No tags yet. Add tags to your notes to see them here.</p>
+  </div>
+
+  <div class="tag-cloud" style="display: none;"></div>
+
+  <div class="tag-cloud-filter-info" style="display: none;">
+    <span class="tag-cloud-filter-text"></span>
+    <button type="button" class="tag-cloud-filter-clear">Clear filter</button>
+  </div>
+
+  <div class="tag-cloud-notes"></div>
 </div>
-{{ else }}
-<p>No tags yet. Add tags to your notes to see them here.</p>
-{{ end }}
+
+<script>
+(function() {
+  'use strict';
+
+  var container = document.getElementById('tag-cloud-container');
+  if (!container) return;
+
+  var authEl = container.querySelector('.tag-cloud-auth');
+  var loadingEl = container.querySelector('.tag-cloud-loading');
+  var emptyEl = container.querySelector('.tag-cloud-empty');
+  var cloudEl = container.querySelector('.tag-cloud');
+  var filterInfoEl = container.querySelector('.tag-cloud-filter-info');
+  var filterTextEl = container.querySelector('.tag-cloud-filter-text');
+  var filterClearBtn = container.querySelector('.tag-cloud-filter-clear');
+  var notesEl = container.querySelector('.tag-cloud-notes');
+  var signinBtn = container.querySelector('.tag-cloud-signin-btn');
+
+  var activeTag = null;
+
+  function showState(state) {
+    authEl.style.display = state === 'auth' ? '' : 'none';
+    loadingEl.style.display = state === 'loading' ? '' : 'none';
+    emptyEl.style.display = state === 'empty' ? '' : 'none';
+    cloudEl.style.display = (state === 'content' || state === 'loading') ? '' : 'none';
+  }
+
+  function getBaseUrl() {
+    var manifest = document.querySelector('link[rel="manifest"]');
+    if (manifest) return manifest.getAttribute('href').replace('/manifest.json', '');
+    return '';
+  }
+
+  function viewUrl(noteId) {
+    return getBaseUrl() + '/docs/view/?id=' + encodeURIComponent(noteId);
+  }
+
+  function formatDate(ms) {
+    if (!ms) return '';
+    var d = new Date(ms);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  var editIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>'
+    + '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>'
+    + '</svg>';
+
+  var deleteIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<polyline points="3 6 5 6 21 6"></polyline>'
+    + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>'
+    + '</svg>';
+
+  // ── Destination labels ──
+  var destLabels = {
+    'inbox': 'Inbox',
+    'topic': 'Topics',
+    'book-note': 'Books',
+    'snippets': 'Snippets'
+  };
+
+  // ── Render tag pills ──
+  function renderTags(tags) {
+    if (!tags.length) {
+      showState('empty');
+      return;
+    }
+    showState('content');
+
+    var html = '';
+    tags.forEach(function(t) {
+      var activeClass = t.tag === activeTag ? ' tag-pill-active' : '';
+      html += '<button type="button" class="tag-pill' + activeClass + '" data-tag="' + escapeHtml(t.tag) + '">'
+        + '<span class="tag-name">' + escapeHtml(t.tag) + '</span>'
+        + '<span class="tag-count">' + t.count + '</span>'
+        + '</button>';
+    });
+    cloudEl.innerHTML = html;
+
+    // Bind click handlers
+    cloudEl.querySelectorAll('.tag-pill').forEach(function(pill) {
+      pill.addEventListener('click', function() {
+        var tag = this.getAttribute('data-tag');
+        if (activeTag === tag) {
+          clearFilter();
+        } else {
+          selectTag(tag);
+        }
+      });
+    });
+  }
+
+  // ── Select a tag and show filtered notes ──
+  function selectTag(tag) {
+    activeTag = tag;
+
+    // Update pill states
+    cloudEl.querySelectorAll('.tag-pill').forEach(function(pill) {
+      if (pill.getAttribute('data-tag') === tag) {
+        pill.classList.add('tag-pill-active');
+      } else {
+        pill.classList.remove('tag-pill-active');
+      }
+    });
+
+    // Show filter info
+    filterInfoEl.style.display = '';
+
+    // Load notes for this tag
+    if (!window.dmSync) return;
+    window.dmSync.getNotesByTag(tag).then(function(notes) {
+      notes.sort(function(a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+      filterTextEl.textContent = notes.length + ' note' + (notes.length !== 1 ? 's' : '') + ' tagged \u201c' + tag + '\u201d';
+      renderNoteCards(notes);
+    });
+  }
+
+  // ── Clear the tag filter ──
+  function clearFilter() {
+    activeTag = null;
+    cloudEl.querySelectorAll('.tag-pill').forEach(function(pill) {
+      pill.classList.remove('tag-pill-active');
+    });
+    filterInfoEl.style.display = 'none';
+    notesEl.innerHTML = '';
+  }
+
+  // ── Render note cards ──
+  function renderNoteCards(notes) {
+    if (!notes.length) {
+      notesEl.innerHTML = '<p class="tag-cloud-no-results">No notes found.</p>';
+      return;
+    }
+
+    var html = '';
+    notes.forEach(function(note) {
+      var tagsHtml = '';
+      if (note.tags && note.tags.length) {
+        note.tags.forEach(function(t) {
+          tagsHtml += '<span class="section-notes-tag">' + escapeHtml(t) + '</span>';
+        });
+      }
+
+      var destLabel = destLabels[note.destination] || note.destination || '';
+      if (destLabel) {
+        tagsHtml = '<span class="section-notes-tag tag-cloud-dest">' + escapeHtml(destLabel) + '</span>' + tagsHtml;
+      }
+
+      var preview = note.content || '';
+      if (note.mode === 'code') {
+        var codePreview = preview.length > 200 ? preview.substring(0, 200) + '...' : preview;
+        preview = '<pre><code>' + escapeHtml(codePreview) + '</code></pre>';
+      } else {
+        var textPreview = preview.length > 250 ? preview.substring(0, 250) + '...' : preview;
+        preview = escapeHtml(textPreview);
+      }
+
+      html += '<a class="section-notes-card" href="' + viewUrl(note.id) + '">'
+        + '<div class="section-notes-card-header">'
+        + '<div>'
+        + '<h4 class="section-notes-card-title">' + escapeHtml(note.title || 'Untitled') + '</h4>'
+        + '<div class="section-notes-card-meta">'
+        + '<span class="section-notes-date">' + formatDate(note.updatedAt || note.createdAt) + '</span>'
+        + tagsHtml
+        + '</div>'
+        + '</div>'
+        + '<div class="section-notes-card-actions">'
+        + '<button type="button" class="section-notes-edit" data-id="' + note.id + '" title="Edit note">' + editIcon + '</button>'
+        + '<button type="button" class="section-notes-delete" data-id="' + note.id + '" title="Delete note">' + deleteIcon + '</button>'
+        + '</div>'
+        + '</div>'
+        + '<div class="section-notes-preview">' + preview + '</div>'
+        + '</a>';
+    });
+    notesEl.innerHTML = html;
+    bindActionButtons();
+  }
+
+  // ── Action button handlers (edit/delete) ──
+  function bindActionButtons() {
+    notesEl.querySelectorAll('.section-notes-edit').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var noteId = this.getAttribute('data-id');
+        if (window.dmNoteEditModal) {
+          window.dmSync.getNote(noteId).then(function(note) {
+            if (note) window.dmNoteEditModal.open(note);
+          });
+        }
+      });
+    });
+    notesEl.querySelectorAll('.section-notes-delete').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var noteId = this.getAttribute('data-id');
+        if (confirm('Delete this note permanently?')) {
+          var user = window.dmAuth && window.dmAuth.currentUser;
+          if (window.dmDb && user) {
+            window.dmDb.collection('notes').doc(noteId).delete().catch(function(err) {
+              console.warn('[tag-cloud] Firestore delete failed:', err);
+            });
+          }
+          window.dmSync.deleteNote(noteId);
+        }
+      });
+    });
+  }
+
+  // ── Load data from cache ──
+  function loadFromCache() {
+    if (!window.dmSync) return;
+    window.dmSync.getAllTags().then(function(tags) {
+      renderTags(tags);
+      // Re-apply active filter if set
+      if (activeTag) {
+        var stillExists = tags.some(function(t) { return t.tag === activeTag; });
+        if (stillExists) {
+          selectTag(activeTag);
+        } else {
+          clearFilter();
+        }
+      }
+    });
+  }
+
+  // ── Auth gating ──
+  if (signinBtn) {
+    signinBtn.addEventListener('click', function() {
+      if (window.dmAuth) window.dmAuth.signIn();
+    });
+  }
+
+  if (window.dmAuth) {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        showState('loading');
+        // Wait for sync, then load
+        var loaded = false;
+        function onSync() {
+          if (loaded) return;
+          loaded = true;
+          loadFromCache();
+        }
+        window.addEventListener('dm-sync-complete', onSync);
+        // Also try loading from cache immediately (may already be synced)
+        setTimeout(function() {
+          if (!loaded) loadFromCache();
+        }, 500);
+      } else {
+        showState('auth');
+        cloudEl.innerHTML = '';
+        notesEl.innerHTML = '';
+        filterInfoEl.style.display = 'none';
+        activeTag = null;
+      }
+    });
+  } else {
+    showState('auth');
+  }
+
+  // ── Live updates ──
+  window.addEventListener('dm-sync-complete', function() {
+    if (window.dmAuth && window.dmAuth.currentUser) {
+      loadFromCache();
+    }
+  });
+
+  // ── Dispatch content-rendered for ToC builder ──
+  window.addEventListener('dm-sync-complete', function() {
+    window.dispatchEvent(new CustomEvent('dm-content-rendered'));
+  });
+
+  if (filterClearBtn) {
+    filterClearBtn.addEventListener('click', clearFilter);
+  }
+})();
+</script>

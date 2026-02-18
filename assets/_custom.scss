@@ -1459,6 +1459,197 @@ aside nav ul a:hover {
   }
 }
 
+.tag-pill-active,
+.tag-pill-active:visited,
+.tag-pill-active:hover {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: #fff;
+  transform: none;
+
+  .tag-count {
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+  }
+}
+
+// Tag cloud container states
+.tag-cloud-container {
+  min-height: 120px;
+}
+
+.tag-cloud-auth {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+
+.tag-cloud-auth-card {
+  text-align: center;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  max-width: 380px;
+
+  h3 { margin: 1rem 0 0.5rem; }
+  p { color: var(--gray-500); margin-bottom: 1.5rem; font-size: 0.9rem; }
+}
+
+.tag-cloud-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+
+  &:hover { background: var(--gray-100); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+}
+
+.tag-cloud-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2rem 0;
+  justify-content: center;
+  color: var(--gray-500);
+}
+
+.tag-cloud-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--color-link);
+  border-radius: 50%;
+  animation: sn-spin 0.8s linear infinite;
+}
+
+@keyframes sn-spin { to { transform: rotate(360deg); } }
+
+.tag-cloud-empty {
+  text-align: center;
+  padding: 2rem 0;
+  color: var(--gray-500);
+}
+
+.tag-cloud-filter-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  margin: 1rem 0;
+  background: var(--surface-1);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.tag-cloud-filter-clear {
+  background: none;
+  border: none;
+  color: var(--color-link);
+  cursor: pointer;
+  font-size: 0.85rem;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+
+  &:hover { background: var(--surface-2); }
+}
+
+.tag-cloud-dest {
+  font-weight: 600;
+}
+
+.tag-cloud-no-results {
+  text-align: center;
+  color: var(--gray-500);
+  padding: 1rem 0;
+}
+
+// ======================================
+// Backlinks
+// ======================================
+
+.backlinks-section {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--gray-200);
+}
+
+.backlinks-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 0.75rem;
+}
+
+.backlinks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.backlink-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--body-font-color);
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    border-color: var(--color-link);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.06);
+  }
+}
+
+.backlink-card-title {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.backlink-badge {
+  font-size: 0.7rem;
+  padding: 1px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.backlink-explicit {
+  background: rgba(0, 105, 255, 0.1);
+  color: var(--accent-blue);
+}
+
+.backlink-mention {
+  background: var(--gray-100);
+  color: var(--text-faint);
+}
+
+// Wikilink inline styling
+.wikilink {
+  color: var(--color-link);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+}
+
+.wikilink-missing {
+  color: var(--color-danger);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  cursor: help;
+}
+
 // ======================================
 // Responsive
 // ======================================

@@ -209,18 +209,24 @@
       // Strip leading top-level heading if present
       content = content.replace(/^\s*#\s+.+\n*/, '');
 
-      if (typeof marked !== 'undefined') {
-        bodyEl.innerHTML = marked.parse(content);
-      } else {
-        bodyEl.textContent = content;
-      }
+      // Build wikilink map if not yet populated
+      var mapReady = Object.keys(window._wikilinkMap || {}).length > 0
+        ? Promise.resolve()
+        : (window.dmSync ? window.dmSync.getAllNotes().then(function(notes) { window.buildWikilinkMap(notes); }) : Promise.resolve());
 
-      // Syntax highlighting
-      bodyEl.querySelectorAll('pre code').forEach(function(block) {
-        if (typeof hljs !== 'undefined') {
-          hljs.highlightElement(block);
+      mapReady.then(function() {
+        if (typeof marked !== 'undefined') {
+          bodyEl.innerHTML = marked.parse(content);
+        } else {
+          bodyEl.textContent = content;
         }
-      });
+
+        // Syntax highlighting
+        bodyEl.querySelectorAll('pre code').forEach(function(block) {
+          if (typeof hljs !== 'undefined') {
+            hljs.highlightElement(block);
+          }
+        });
 
       // Enable interactive checkboxes
       if (window.dmEnableCheckboxes) {
@@ -238,6 +244,7 @@
 
       // Fire event so dynamic ToC can be built
       window.dispatchEvent(new CustomEvent('dm-content-rendered'));
+      });
     }
 
     function loadFromCache() {

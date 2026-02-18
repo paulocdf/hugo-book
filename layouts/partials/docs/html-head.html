@@ -131,6 +131,67 @@
     breaks: false
   });
 
+  // ── Wikilink extension: [[Note Title]] → clickable links ──
+  window._wikilinkMap = {}; // title (lowercase) → { id, title }
+
+  window.buildWikilinkMap = function(notes) {
+    var map = {};
+    if (notes && notes.length) {
+      notes.forEach(function(n) {
+        if (n.title) map[n.title.toLowerCase()] = { id: n.id, title: n.title };
+      });
+    }
+    window._wikilinkMap = map;
+  };
+
+  function _getBaseUrl() {
+    var m = document.querySelector('link[rel="manifest"]');
+    return m ? m.getAttribute('href').replace('/manifest.json', '') : '';
+  }
+
+  function _escHtml(str) {
+    if (!str) return '';
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  marked.use({
+    extensions: [{
+      name: 'wikilink',
+      level: 'inline',
+      start: function(src) {
+        return src.indexOf('[[');
+      },
+      tokenizer: function(src) {
+        var match = /^\[\[([^\]]+)\]\]/.exec(src);
+        if (match) {
+          return {
+            type: 'wikilink',
+            raw: match[0],
+            title: match[1].trim()
+          };
+        }
+      },
+      renderer: function(token) {
+        var entry = window._wikilinkMap[token.title.toLowerCase()];
+        if (entry) {
+          return '<a href="' + _getBaseUrl() + '/docs/view/?id=' + encodeURIComponent(entry.id) + '" class="wikilink">' + _escHtml(token.title) + '</a>';
+        }
+        return '<span class="wikilink wikilink-missing" title="Note not found">' + _escHtml(token.title) + '</span>';
+      }
+    }]
+  });
+
+  // Build wikilink map when sync completes (and on initial load)
+  window.addEventListener('dm-sync-complete', function() {
+    if (window.dmSync) {
+      window.dmSync.getAllNotes().then(function(notes) {
+        window.buildWikilinkMap(notes);
+      });
+    }
+  });
+
   // Mermaid lazy-loader
   var mermaidReady = null; // Promise, set once
 

@@ -731,6 +731,24 @@
   color: var(--color-link);
 }
 
+/* Pomodoro start button */
+.todo-item-action-btn.pomodoro-start {
+  color: var(--gray-400);
+}
+.todo-item-action-btn.pomodoro-start:hover {
+  background: rgba(0, 105, 255, 0.08);
+  color: var(--accent-blue);
+}
+.todo-item-action-btn.pomodoro-start.active {
+  color: var(--accent-blue);
+  opacity: 1;
+  animation: pomo-btn-pulse 2s ease-in-out infinite;
+}
+@keyframes pomo-btn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
 /* Reminder info text under task title */
 .todo-item-reminder {
   font-size: 0.68rem;
@@ -876,6 +894,7 @@
 
   // State
   var allTodos = [];
+  var _pomodoroTrackedMinutes = {}; // { todoId: minutes } — stores tracked time from Pomodoro timer
 
   // ─── Date helpers ───
   function getTodayStr() {
@@ -1226,6 +1245,10 @@
       }
       html += '<span class="todo-item-actual' + actualClass + '">actual: ' + todo.actualMin + 'min</span>';
     }
+    // Active pomodoro indicator
+    if (!todo.done && window.dmPomodoro && window.dmPomodoro.isActive(todo.id)) {
+      html += '<span class="todo-item-timer-active"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> timing</span>';
+    }
     if (todo.category) {
       html += '<span class="todo-item-category">' + escapeHtml(todo.category) + '</span>';
     }
@@ -1244,6 +1267,15 @@
     // Action buttons
     html += '<div class="todo-item-actions">';
     if (!todo.done) {
+      // Pomodoro timer button
+      var isTimerActive = window.dmPomodoro && window.dmPomodoro.isActive(todo.id);
+      html += '<button type="button" class="todo-item-action-btn pomodoro-start' + (isTimerActive ? ' active' : '') + '" data-pomodoro-id="' + todo.id + '" title="' + (isTimerActive ? 'Timer running' : 'Start Pomodoro') + '" aria-label="Start Pomodoro timer">';
+      if (isTimerActive) {
+        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+      } else {
+        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
+      }
+      html += '</button>';
       var hasReminder = todo.reminderAt && !todo.reminderFired;
       html += '<button type="button" class="todo-item-action-btn reminder-bell' + (hasReminder ? ' has-reminder' : '') + '" data-reminder-id="' + todo.id + '" title="' + (hasReminder ? 'Edit reminder' : 'Set reminder') + '" aria-label="Set reminder">';
       if (hasReminder) {
@@ -1490,16 +1522,38 @@
         if (!todo) return;
 
         if (cb.checked) {
+          // If Pomodoro timer is running for this todo, stop it and capture tracked time
+          var pomodoroMinutes = 0;
+          if (window.dmPomodoro && window.dmPomodoro.isActive(todoId)) {
+            // Stop will fire dm-pomodoro-stopped event, but we capture time preemptively
+            // by reading it before stop() clears state
+            pomodoroMinutes = _pomodoroTrackedMinutes[todoId] || 0;
+            window.dmPomodoro.stop();
+            // The stop event fires synchronously and updates _pomodoroTrackedMinutes
+            if (_pomodoroTrackedMinutes[todoId]) {
+              pomodoroMinutes = _pomodoroTrackedMinutes[todoId];
+            }
+          } else if (_pomodoroTrackedMinutes[todoId]) {
+            // Timer was already stopped for this todo — use stored tracked time
+            pomodoroMinutes = _pomodoroTrackedMinutes[todoId];
+          }
+
           // Opening completion modal
           if (window.dmTodoComplete) {
+            var modalOpts = {};
+            if (pomodoroMinutes > 0) {
+              modalOpts.trackedMinutes = pomodoroMinutes;
+            }
             window.dmTodoComplete.open(todo, function(result) {
               if (!result) {
-                // Cancelled — revert checkbox
-                cb.checked = false;
+                // Cancelled — re-render to reset checkbox state
+                render();
                 return;
               }
               completeTodo(todo, result.actualMin, result.category);
-            });
+              // Clear stored pomodoro time after completion
+              delete _pomodoroTrackedMinutes[todoId];
+            }, modalOpts);
           }
         } else {
           // Unchecking — reopen the todo
@@ -1534,6 +1588,24 @@
         e.stopPropagation();
         var todoId = btn.getAttribute('data-reminder-id');
         showReminderPopover(btn, todoId);
+      });
+    });
+
+    // Pomodoro timer button
+    itemsEl.querySelectorAll('.pomodoro-start[data-pomodoro-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-pomodoro-id');
+        var todo = allTodos.find(function(t) { return t.id === todoId; });
+        if (!todo) return;
+        if (window.dmPomodoro) {
+          if (window.dmPomodoro.isActive(todoId)) {
+            // Already active — focus the timer (it's already visible)
+            return;
+          }
+          window.dmPomodoro.start(todoId, todo.title);
+          render();
+        }
       });
     });
 
@@ -2032,6 +2104,15 @@
   // Listen for todo updates
   window.addEventListener('dm-todos-updated', loadTodos);
   window.addEventListener('dm-sync-complete', loadTodos);
+
+  // Listen for Pomodoro timer stop — store tracked time and re-render
+  window.addEventListener('dm-pomodoro-stopped', function(e) {
+    var detail = e.detail || {};
+    if (detail.todoId && detail.trackedMinutes > 0) {
+      _pomodoroTrackedMinutes[detail.todoId] = detail.trackedMinutes;
+    }
+    render();
+  });
 
   // Initial load when auth is ready
   if (window.dmAuth) {

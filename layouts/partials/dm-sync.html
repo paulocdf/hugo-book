@@ -731,6 +731,66 @@
       });
     },
 
+    // Query helpers — Tags
+    getAllTags: function() {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        var tagMap = {};
+        notes.forEach(function(n) {
+          if (n.tags && n.tags.length) {
+            n.tags.forEach(function(t) {
+              if (!tagMap[t]) tagMap[t] = 0;
+              tagMap[t]++;
+            });
+          }
+        });
+        return Object.keys(tagMap).map(function(tag) {
+          return { tag: tag, count: tagMap[tag] };
+        }).sort(function(a, b) { return b.count - a.count || a.tag.localeCompare(b.tag); });
+      });
+    },
+    getNotesByTag: function(tag) {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        return notes.filter(function(n) {
+          return n.tags && n.tags.indexOf(tag) !== -1;
+        });
+      });
+    },
+
+    // Query helpers — Backlinks
+    getBacklinksForNote: function(noteId) {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        var targetNote = null;
+        notes.forEach(function(n) { if (n.id === noteId) targetNote = n; });
+        if (!targetNote || !targetNote.title) return [];
+
+        var results = [];
+        var titleLower = targetNote.title.toLowerCase();
+        var escapedTitle = targetNote.title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        var wikilinkPattern = new RegExp('\\[\\[' + escapedTitle + '\\]\\]', 'i');
+
+        notes.forEach(function(n) {
+          if (n.id === noteId) return;
+          if (!n.content) return;
+
+          var isExplicit = wikilinkPattern.test(n.content);
+          var isTitleMatch = !isExplicit && titleLower.length > 3 && n.content.toLowerCase().indexOf(titleLower) !== -1;
+
+          if (isExplicit || isTitleMatch) {
+            results.push({
+              note: n,
+              type: isExplicit ? 'wikilink' : 'mention',
+              confidence: isExplicit ? 'high' : 'medium'
+            });
+          }
+        });
+
+        return results.sort(function(a, b) {
+          if (a.type !== b.type) return a.type === 'wikilink' ? -1 : 1;
+          return (b.note.updatedAt || 0) - (a.note.updatedAt || 0);
+        });
+      });
+    },
+
     // Sync operations
     sync: function(userId) { return syncAll(userId); },
     syncNotes: function(userId) { return syncNotes(userId); },

@@ -1,5 +1,5 @@
 <!-- Todo Completion Modal — shown when user checks a TODO as done -->
-<!-- Exposes: window.dmTodoComplete.open(todo, onComplete), window.dmTodoComplete.close() -->
+<!-- Exposes: window.dmTodoComplete.open(todo, onComplete, opts), window.dmTodoComplete.close() -->
 <div class="todo-complete-modal" id="todo-complete-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="todo-complete-heading">
   <div class="todo-complete-backdrop" id="todo-complete-backdrop"></div>
   <div class="todo-complete-dialog">
@@ -501,14 +501,21 @@
     }
   });
 
-  function openModal(todo, onComplete) {
+  function openModal(todo, onComplete, opts) {
     currentTodo = todo;
     onCompleteCallback = onComplete || null;
     categories = [];
+    opts = opts || {};
 
     taskTitleEl.textContent = todo.title || 'Untitled';
     estimateEl.textContent = todo.estimatedMin ? 'Est: ' + todo.estimatedMin + 'min' : '';
-    actualInput.value = todo.estimatedMin || '';
+
+    // Pre-fill actual minutes: use tracked Pomodoro time if available, else estimate
+    if (opts.trackedMinutes && opts.trackedMinutes > 0) {
+      actualInput.value = opts.trackedMinutes;
+    } else {
+      actualInput.value = todo.estimatedMin || '';
+    }
     renderCategories();
     categoryInput.value = '';
     hideDropdown();
