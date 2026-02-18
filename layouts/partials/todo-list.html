@@ -12,13 +12,23 @@
   </div>
 
   <div class="todo-list-body" id="todo-list-body">
-    <!-- Add todo form -->
+    <!-- Add todo form — two rows -->
     <div class="todo-add-form" id="todo-add-form">
-      <input type="text" id="todo-add-title" class="todo-add-title" placeholder="New task...">
-      <input type="number" id="todo-add-estimate" class="todo-add-estimate" min="1" placeholder="25">
-      <button type="button" id="todo-add-btn" class="todo-add-btn" title="Add task">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-      </button>
+      <div class="todo-add-row-main">
+        <input type="text" id="todo-add-title" class="todo-add-title" placeholder="New task...">
+        <input type="number" id="todo-add-estimate" class="todo-add-estimate" min="1" placeholder="25">
+        <button type="button" id="todo-add-btn" class="todo-add-btn" title="Add task">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+      </div>
+      <div class="todo-add-row-date">
+        <span class="todo-add-date-label">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </span>
+        <button type="button" class="todo-date-shortcut" data-offset="0" title="Today">Today</button>
+        <button type="button" class="todo-date-shortcut" data-offset="1" title="Tomorrow">Tmrw</button>
+        <input type="date" id="todo-add-date" class="todo-add-date" title="Pick a date">
+      </div>
     </div>
 
     <!-- Todo items rendered here -->
@@ -86,12 +96,28 @@
   padding: 0.75rem 1rem;
 }
 
-/* Add form */
+/* Add form — two-row layout */
 .todo-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 0.75rem;
+}
+.todo-add-row-main {
   display: flex;
   gap: 8px;
   align-items: center;
-  margin-bottom: 0.75rem;
+}
+.todo-add-row-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2px;
+}
+.todo-add-date-label {
+  display: inline-flex;
+  align-items: center;
+  color: var(--gray-400);
 }
 .todo-add-title {
   flex: 1;
@@ -125,6 +151,111 @@
 .todo-add-estimate::placeholder {
   color: var(--gray-400);
   font-size: 0.8rem;
+}
+/* Date picker — inline in second row */
+.todo-add-date {
+  width: 120px;
+  padding: 4px 6px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 0.75rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  transition: border-color 0.2s;
+}
+.todo-add-date:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+.todo-date-shortcut {
+  padding: 2px 8px;
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  background: var(--body-background);
+  color: var(--gray-500);
+  font-size: 0.68rem;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.todo-date-shortcut:hover {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+.todo-date-shortcut.active {
+  background: var(--color-link);
+  color: #fff;
+  border-color: var(--color-link);
+}
+/* Day group headers */
+.todo-day-group {
+  margin-bottom: 4px;
+}
+.todo-day-group:not(:first-child) {
+  margin-top: 12px;
+}
+.todo-day-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  border-left: 3px solid var(--gray-300);
+  margin-bottom: 4px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+.todo-day-header:hover {
+  background: var(--gray-100);
+}
+.todo-day-header.today {
+  color: var(--color-link);
+  border-left-color: var(--color-link);
+  background: rgba(0, 105, 255, 0.04);
+}
+.todo-day-header.today:hover {
+  background: rgba(0, 105, 255, 0.08);
+}
+.todo-day-header.overdue {
+  color: var(--color-danger);
+  border-left-color: var(--color-danger);
+  background: var(--color-danger-bg);
+}
+.todo-day-header.tomorrow {
+  color: var(--color-success);
+  border-left-color: var(--color-success);
+}
+.todo-day-chevron {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.todo-day-group.collapsed .todo-day-chevron {
+  transform: rotate(-90deg);
+}
+.todo-day-group.collapsed .todo-day-group-items {
+  display: none;
+}
+.todo-day-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.todo-day-label {
+  font-weight: 500;
+  flex: 1;
+}
+.todo-day-progress {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--gray-400);
+  margin-left: auto;
 }
 .todo-add-btn {
   display: inline-flex;
@@ -265,6 +396,39 @@
 .todo-item-action-btn.delete:hover {
   color: var(--color-danger);
   background: var(--color-danger-bg);
+}
+
+/* Subtask collapse toggle */
+.todo-subtask-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, transform 0.2s;
+  flex-shrink: 0;
+  line-height: 0;
+  padding: 0;
+}
+.todo-subtask-toggle:hover {
+  background: var(--gray-200);
+  color: var(--body-font-color);
+}
+.todo-subtask-toggle svg {
+  transition: transform 0.2s;
+}
+.todo-subtask-toggle.collapsed svg {
+  transform: rotate(-90deg);
+}
+.todo-subtasks-wrapper.collapsed .todo-subtasks,
+.todo-subtasks-wrapper.collapsed .todo-add-subtask-row {
+  display: none;
 }
 
 /* Subtasks */
@@ -410,6 +574,34 @@
   color: var(--color-danger, #c53030);
   border: 1px solid var(--color-danger, #c53030);
 }
+
+/* Mobile responsiveness */
+@media screen and (max-width: 500px) {
+  .todo-add-row-main {
+    flex-wrap: wrap;
+  }
+  .todo-add-title {
+    flex: 1 1 100%;
+  }
+  .todo-add-estimate {
+    flex: 1;
+  }
+  .todo-add-row-date {
+    flex-wrap: wrap;
+  }
+  .todo-add-date {
+    width: auto;
+    flex: 1;
+  }
+  .todo-item-actions {
+    opacity: 1;
+  }
+  .todo-day-header {
+    font-size: 0.72rem;
+    padding: 5px 8px;
+    gap: 6px;
+  }
+}
 </style>
 
 <script>
@@ -425,12 +617,82 @@
 
   var addTitleInput = document.getElementById('todo-add-title');
   var addEstimateInput = document.getElementById('todo-add-estimate');
+  var addDateInput = document.getElementById('todo-add-date');
   var addBtn = document.getElementById('todo-add-btn');
 
   if (!container || !itemsEl) return;
 
   // State
   var allTodos = [];
+
+  // ─── Date helpers ───
+  function getTodayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function getDateOffset(offset) {
+    var d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function formatDayHeader(dateStr) {
+    var today = getTodayStr();
+    var tomorrow = getDateOffset(1);
+    var parts = dateStr.split('-');
+    var date = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    var dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    var dayName = dayNames[date.getDay()];
+    var monthDay = monthNames[date.getMonth()] + ' ' + date.getDate();
+
+    if (dateStr === today) {
+      return { label: 'Today — ' + dayName + ', ' + monthDay, cssClass: 'today', badge: 'Today' };
+    }
+    if (dateStr === tomorrow) {
+      return { label: 'Tomorrow — ' + dayName + ', ' + monthDay, cssClass: 'tomorrow', badge: 'Tomorrow' };
+    }
+    if (dateStr < today) {
+      return { label: dayName + ', ' + monthDay, cssClass: 'overdue', badge: 'Overdue' };
+    }
+    return { label: dayName + ', ' + monthDay, cssClass: '', badge: '' };
+  }
+
+  // ─── Date shortcut buttons ───
+  function initDateShortcuts() {
+    var shortcuts = document.querySelectorAll('.todo-date-shortcut');
+    shortcuts.forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var offset = parseInt(btn.getAttribute('data-offset'), 10);
+        var dateStr = getDateOffset(offset);
+        if (addDateInput.value === dateStr) {
+          // Toggle off
+          addDateInput.value = '';
+          btn.classList.remove('active');
+        } else {
+          addDateInput.value = dateStr;
+          // Update active states
+          shortcuts.forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+        }
+      });
+    });
+    // Sync shortcut highlight when date input changes manually
+    addDateInput.addEventListener('change', function() {
+      shortcuts.forEach(function(btn) {
+        var offset = parseInt(btn.getAttribute('data-offset'), 10);
+        btn.classList.toggle('active', addDateInput.value === getDateOffset(offset));
+      });
+    });
+    // Default to today
+    addDateInput.value = getTodayStr();
+    shortcuts.forEach(function(btn) {
+      var offset = parseInt(btn.getAttribute('data-offset'), 10);
+      if (getDateOffset(offset) === getTodayStr()) btn.classList.add('active');
+    });
+  }
+  initDateShortcuts();
 
   // ─── Toast notifications ───
   function showTodoError(msg) {
@@ -467,10 +729,20 @@
   } catch(e) {}
 
   // ─── Render ───
-  function buildTodoItemHtml(todo, isSubtask) {
+  function buildTodoItemHtml(todo, isSubtask, hasChildren) {
     var doneClass = todo.done ? ' done' : '';
     var checked = todo.done ? ' checked' : '';
     var html = '<div class="todo-item' + doneClass + '" data-todo-id="' + todo.id + '">';
+
+    // Subtask collapse toggle for parents with children
+    if (!isSubtask && hasChildren) {
+      var isCollapsed = false;
+      try { isCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + todo.id) === '1'; } catch(e) {}
+      html += '<button type="button" class="todo-subtask-toggle' + (isCollapsed ? ' collapsed' : '') + '" data-toggle-parent="' + todo.id + '" title="Toggle subtasks" aria-label="Toggle subtasks">';
+      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
+      html += '</button>';
+    }
+
     html += '<input type="checkbox" class="todo-item-checkbox"' + checked + ' data-todo-id="' + todo.id + '" aria-label="Complete: ' + escapeHtml(todo.title) + '">';
     html += '<div class="todo-item-content">';
     html += '<div class="todo-item-title">' + escapeHtml(todo.title) + '</div>';
@@ -522,11 +794,6 @@
       }
     });
 
-    // Sort parents by order (done tasks stay in place)
-    parents.sort(function(a, b) {
-      return (a.order || 0) - (b.order || 0);
-    });
-
     // Sort children by order
     Object.keys(childrenMap).forEach(function(pid) {
       childrenMap[pid].sort(function(a, b) {
@@ -534,22 +801,120 @@
       });
     });
 
-    var html = '';
-
-    if (parents.length === 0) {
-      html = '<div class="todo-empty">No tasks yet. Add one above to get started.</div>';
-    }
-    parents.forEach(function(parent) {
-      html += buildTodoItemHtml(parent, false);
-      var children = childrenMap[parent.id] || [];
-      if (children.length > 0) {
-        html += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
-        children.forEach(function(child) {
-          html += buildTodoItemHtml(child, true);
-        });
-        html += '</div>';
+    // Group parents by scheduledDate
+    var dateGroups = {}; // dateStr -> [parents]
+    var unscheduled = [];
+    parents.forEach(function(p) {
+      if (p.scheduledDate) {
+        if (!dateGroups[p.scheduledDate]) dateGroups[p.scheduledDate] = [];
+        dateGroups[p.scheduledDate].push(p);
+      } else {
+        unscheduled.push(p);
       }
     });
+
+    // Sort dates
+    var sortedDates = Object.keys(dateGroups).sort();
+
+    // Sort parents within each group by order
+    sortedDates.forEach(function(dateStr) {
+      dateGroups[dateStr].sort(function(a, b) {
+        return (a.order || 0) - (b.order || 0);
+      });
+    });
+    unscheduled.sort(function(a, b) {
+      return (a.order || 0) - (b.order || 0);
+    });
+
+    var html = '';
+    var totalParents = parents.length;
+
+    if (totalParents === 0) {
+      html = '<div class="todo-empty">No tasks yet. Add one above to get started.</div>';
+    }
+
+    var today = getTodayStr();
+    var tomorrow = getDateOffset(1);
+
+    // Helper: build a day group with header, chevron, progress, collapse
+    function buildDayGroup(groupKey, headerInfo, tasksInGroup) {
+      // Calculate progress (count leaf tasks — parent tasks with children are excluded)
+      var doneInGroup = 0;
+      var totalInGroup = 0;
+      tasksInGroup.forEach(function(p) {
+        var ch = childrenMap[p.id] || [];
+        if (ch.length > 0) {
+          ch.forEach(function(c) { totalInGroup++; if (c.done) doneInGroup++; });
+        } else {
+          totalInGroup++;
+          if (p.done) doneInGroup++;
+        }
+      });
+
+      // Fix 6: overdue styling only when group has at least one incomplete task
+      var cssClass = headerInfo.cssClass;
+      var badge = headerInfo.badge;
+      if (cssClass === 'overdue' && doneInGroup === totalInGroup) {
+        cssClass = ''; // all done, no overdue accent
+        badge = '';
+      }
+
+      // Fix 3: auto-collapse logic
+      var storageKey = 'dm-todo-daygroup-' + groupKey;
+      var stored = null;
+      try { stored = localStorage.getItem(storageKey); } catch(e) {}
+      var isCollapsed;
+      if (stored !== null) {
+        isCollapsed = stored === '1';
+      } else {
+        // Default: collapse future dates and unscheduled; expand today, tomorrow, overdue
+        if (groupKey === '_unscheduled') {
+          isCollapsed = true;
+        } else {
+          isCollapsed = groupKey > tomorrow;
+        }
+      }
+
+      var g = '<div class="todo-day-group' + (isCollapsed ? ' collapsed' : '') + '" data-day-group="' + escapeHtml(groupKey) + '">';
+      g += '<div class="todo-day-header ' + cssClass + '" data-day-toggle="' + escapeHtml(groupKey) + '">';
+      g += '<span class="todo-day-chevron"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>';
+      if (badge) {
+        g += '<span class="todo-day-badge">' + escapeHtml(badge) + '</span>';
+      }
+      g += '<span class="todo-day-label">' + escapeHtml(headerInfo.label) + '</span>';
+      g += '<span class="todo-day-progress">' + doneInGroup + '/' + totalInGroup + '</span>';
+      g += '</div>';
+      g += '<div class="todo-day-group-items">';
+      tasksInGroup.forEach(function(parent) {
+        var children = childrenMap[parent.id] || [];
+        g += buildTodoItemHtml(parent, false, children.length > 0);
+        if (children.length > 0) {
+          var subCollapsed = false;
+          try { subCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + parent.id) === '1'; } catch(e) {}
+          g += '<div class="todo-subtasks-wrapper' + (subCollapsed ? ' collapsed' : '') + '" data-subtasks-parent="' + parent.id + '">';
+          g += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
+          children.forEach(function(child) {
+            g += buildTodoItemHtml(child, true, false);
+          });
+          g += '</div>';
+          g += '</div>';
+        }
+      });
+      g += '</div>';
+      g += '</div>';
+      return g;
+    }
+
+    // Render date groups
+    sortedDates.forEach(function(dateStr) {
+      var info = formatDayHeader(dateStr);
+      html += buildDayGroup(dateStr, info, dateGroups[dateStr]);
+    });
+
+    // Render unscheduled
+    if (unscheduled.length > 0) {
+      html += buildDayGroup('_unscheduled', { label: 'Unscheduled', cssClass: '', badge: '' }, unscheduled);
+    }
 
     // Clear all completed bar (shown when there are completed tasks)
     var completedCount = 0;
@@ -605,6 +970,29 @@
 
   // ─── Event listeners ───
   function attachEventListeners() {
+    // Day group collapse toggle
+    itemsEl.querySelectorAll('.todo-day-header[data-day-toggle]').forEach(function(header) {
+      header.addEventListener('click', function() {
+        var groupKey = header.getAttribute('data-day-toggle');
+        var group = itemsEl.querySelector('.todo-day-group[data-day-group="' + groupKey + '"]');
+        if (!group) return;
+        var isCollapsed = group.classList.toggle('collapsed');
+        try { localStorage.setItem('dm-todo-daygroup-' + groupKey, isCollapsed ? '1' : '0'); } catch(e) {}
+      });
+    });
+
+    // Subtask collapse toggle
+    itemsEl.querySelectorAll('.todo-subtask-toggle').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var parentId = btn.getAttribute('data-toggle-parent');
+        var wrapper = itemsEl.querySelector('.todo-subtasks-wrapper[data-subtasks-parent="' + parentId + '"]');
+        var isCollapsed = btn.classList.toggle('collapsed');
+        if (wrapper) wrapper.classList.toggle('collapsed', isCollapsed);
+        try { localStorage.setItem('dm-todo-subtask-collapsed-' + parentId, isCollapsed ? '1' : '0'); } catch(e) {}
+      });
+    });
+
     // Checkbox toggle
     itemsEl.querySelectorAll('.todo-item-checkbox').forEach(function(cb) {
       cb.addEventListener('change', function() {
@@ -672,6 +1060,15 @@
     var existing = document.querySelector('.todo-add-subtask-row');
     if (existing) existing.remove();
 
+    // Expand subtasks if collapsed
+    var toggleBtn = itemsEl.querySelector('.todo-subtask-toggle[data-toggle-parent="' + parentId + '"]');
+    var wrapper = itemsEl.querySelector('.todo-subtasks-wrapper[data-subtasks-parent="' + parentId + '"]');
+    if (toggleBtn && toggleBtn.classList.contains('collapsed')) {
+      toggleBtn.classList.remove('collapsed');
+      if (wrapper) wrapper.classList.remove('collapsed');
+      try { localStorage.setItem('dm-todo-subtask-collapsed-' + parentId, '0'); } catch(e) {}
+    }
+
     // Find where to insert
     var subtasksEl = itemsEl.querySelector('.todo-subtasks[data-parent-id="' + parentId + '"]');
     var parentItem = itemsEl.querySelector('.todo-item[data-todo-id="' + parentId + '"]');
@@ -688,6 +1085,8 @@
 
     if (subtasksEl) {
       subtasksEl.appendChild(row);
+    } else if (wrapper) {
+      wrapper.appendChild(row);
     } else {
       parentItem.insertAdjacentElement('afterend', row);
     }
@@ -701,7 +1100,10 @@
       var title = subInput.value.trim();
       if (!title) { subInput.focus(); return; }
       var est = parseInt(subEstInput.value, 10) || 25;
-      createTodo(title, est, parentId);
+      // Subtasks inherit parent's scheduledDate
+      var parent = allTodos.find(function(t) { return t.id === parentId; });
+      var scheduledDate = parent ? parent.scheduledDate : null;
+      createTodo(title, est, parentId, scheduledDate);
       row.remove();
     }
 
@@ -728,7 +1130,7 @@
     return maxOrder + 1;
   }
 
-  function createTodo(title, estimatedMin, parentId, onDone) {
+  function createTodo(title, estimatedMin, parentId, scheduledDate, onDone) {
     if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
       showTodoError('Not signed in — please sign in to add tasks');
       if (onDone) onDone();
@@ -747,6 +1149,7 @@
       done: false,
       parentId: parentId || null,
       order: order,
+      scheduledDate: scheduledDate || null,
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       completedAt: null
@@ -961,12 +1364,14 @@
     var title = addTitleInput.value.trim();
     if (!title) { addTitleInput.focus(); return; }
     var est = parseInt(addEstimateInput.value, 10) || 25;
+    var scheduledDate = addDateInput.value || null;
     addBtn.disabled = true;
-    createTodo(title, est, null, function() {
+    createTodo(title, est, null, scheduledDate, function() {
       addBtn.disabled = false;
     });
     addTitleInput.value = '';
     addEstimateInput.value = '';
+    // Keep date input as-is so user can add multiple tasks to same day
     addTitleInput.focus();
   }
 
@@ -975,6 +1380,9 @@
     if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
   });
   addEstimateInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
+  });
+  addDateInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
   });
 

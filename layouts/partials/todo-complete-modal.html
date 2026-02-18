@@ -20,9 +20,10 @@
 
     <div class="todo-complete-field">
       <label>Category</label>
-      <div class="todo-complete-category-row" id="todo-complete-category-row">
+      <div class="todo-complete-category-row" id="todo-complete-category-row" style="position: relative;">
         <div class="todo-complete-category-chips" id="todo-complete-category-chips"></div>
-        <input type="text" id="todo-complete-category-input" class="todo-complete-category-input" placeholder="Add category + Enter">
+        <input type="text" id="todo-complete-category-input" class="todo-complete-category-input" placeholder="Add category + Enter" autocomplete="off">
+        <div class="todo-complete-category-dropdown" id="todo-complete-category-dropdown"></div>
       </div>
     </div>
 
@@ -193,6 +194,46 @@
 .todo-complete-category-input::placeholder {
   color: var(--gray-400);
 }
+/* Category autocomplete dropdown */
+.todo-complete-category-dropdown {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  max-height: 160px;
+  overflow-y: auto;
+  z-index: 10;
+  display: none;
+}
+.todo-complete-category-dropdown.show {
+  display: block;
+}
+.todo-complete-category-option {
+  padding: 7px 12px;
+  font-size: 0.82rem;
+  color: var(--body-font-color);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.todo-complete-category-option:first-child {
+  border-radius: 8px 8px 0 0;
+}
+.todo-complete-category-option:last-child {
+  border-radius: 0 0 8px 8px;
+}
+.todo-complete-category-option:hover,
+.todo-complete-category-option.active {
+  background: var(--gray-100);
+}
+.todo-complete-category-option .cat-highlight {
+  font-weight: 700;
+  color: var(--color-link);
+}
 
 .todo-complete-actions {
   display: flex;
@@ -269,10 +310,14 @@
   var actualInput = document.getElementById('todo-complete-actual');
   var categoryChipsEl = document.getElementById('todo-complete-category-chips');
   var categoryInput = document.getElementById('todo-complete-category-input');
+  var categoryDropdown = document.getElementById('todo-complete-category-dropdown');
 
   var currentTodo = null;
   var categories = [];
   var onCompleteCallback = null;
+  var existingCategories = []; // populated from all completed todos
+  var dropdownActiveIdx = -1;
+  var _dropdownJustClosed = false; // flag to prevent Escape from closing modal after dropdown dismiss
 
   function renderCategories() {
     categoryChipsEl.innerHTML = '';
@@ -295,19 +340,164 @@
     });
   }
 
+  // ─── Autocomplete dropdown ───
+  function loadExistingCategories() {
+    existingCategories = [];
+    if (!window.dmSync) return Promise.resolve();
+    return window.dmSync.getAllTodos().then(function(todos) {
+      var catSet = {};
+      todos.forEach(function(t) {
+        if (t.category) {
+          // categories can be comma-separated (from multi-chip saves)
+          t.category.split(',').forEach(function(c) {
+            var trimmed = c.trim().toLowerCase();
+            if (trimmed) catSet[trimmed] = true;
+          });
+        }
+      });
+      existingCategories = Object.keys(catSet).sort();
+    });
+  }
+
+  function getFilteredSuggestions(query) {
+    var q = query.trim().toLowerCase();
+    if (!q) return existingCategories.filter(function(c) { return categories.indexOf(c) === -1; });
+    return existingCategories.filter(function(c) {
+      return c.indexOf(q) !== -1 && categories.indexOf(c) === -1;
+    });
+  }
+
+  function highlightMatch(text, query) {
+    var q = query.trim().toLowerCase();
+    if (!q) return escapeHtmlModal(text);
+    var idx = text.toLowerCase().indexOf(q);
+    if (idx === -1) return escapeHtmlModal(text);
+    return escapeHtmlModal(text.substring(0, idx)) +
+      '<span class="cat-highlight">' + escapeHtmlModal(text.substring(idx, idx + q.length)) + '</span>' +
+      escapeHtmlModal(text.substring(idx + q.length));
+  }
+
+  function escapeHtmlModal(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function showDropdown() {
+    var query = categoryInput.value.trim().toLowerCase();
+    var suggestions = getFilteredSuggestions(query);
+    dropdownActiveIdx = -1;
+
+    if (suggestions.length === 0) {
+      categoryDropdown.classList.remove('show');
+      categoryDropdown.innerHTML = '';
+      return;
+    }
+
+    categoryDropdown.innerHTML = '';
+    suggestions.forEach(function(cat, idx) {
+      var opt = document.createElement('div');
+      opt.className = 'todo-complete-category-option';
+      opt.innerHTML = highlightMatch(cat, query);
+      opt.setAttribute('data-cat', cat);
+      opt.addEventListener('mousedown', function(e) {
+        e.preventDefault(); // prevent blur
+        selectCategory(cat);
+      });
+      categoryDropdown.appendChild(opt);
+    });
+    categoryDropdown.classList.add('show');
+  }
+
+  function hideDropdown() {
+    categoryDropdown.classList.remove('show');
+    categoryDropdown.innerHTML = '';
+    dropdownActiveIdx = -1;
+  }
+
+  function selectCategory(cat) {
+    if (categories.indexOf(cat) === -1) {
+      categories.push(cat);
+      renderCategories();
+    }
+    categoryInput.value = '';
+    hideDropdown();
+    categoryInput.focus();
+  }
+
+  function navigateDropdown(direction) {
+    var options = categoryDropdown.querySelectorAll('.todo-complete-category-option');
+    if (options.length === 0) return;
+    // Remove current active
+    if (dropdownActiveIdx >= 0 && dropdownActiveIdx < options.length) {
+      options[dropdownActiveIdx].classList.remove('active');
+    }
+    dropdownActiveIdx += direction;
+    if (dropdownActiveIdx < 0) dropdownActiveIdx = options.length - 1;
+    if (dropdownActiveIdx >= options.length) dropdownActiveIdx = 0;
+    options[dropdownActiveIdx].classList.add('active');
+    options[dropdownActiveIdx].scrollIntoView({ block: 'nearest' });
+  }
+
+  categoryInput.addEventListener('input', function() {
+    showDropdown();
+  });
+
+  categoryInput.addEventListener('focus', function() {
+    showDropdown();
+  });
+
+  categoryInput.addEventListener('blur', function() {
+    // Delay to allow mousedown on dropdown options
+    setTimeout(hideDropdown, 150);
+  });
+
   categoryInput.addEventListener('keydown', function(e) {
+    var isDropdownVisible = categoryDropdown.classList.contains('show');
+    var options = categoryDropdown.querySelectorAll('.todo-complete-category-option');
+
+    if (e.key === 'ArrowDown' && isDropdownVisible) {
+      e.preventDefault();
+      navigateDropdown(1);
+      return;
+    }
+    if (e.key === 'ArrowUp' && isDropdownVisible) {
+      e.preventDefault();
+      navigateDropdown(-1);
+      return;
+    }
+    if (e.key === 'Tab' && isDropdownVisible && dropdownActiveIdx >= 0 && dropdownActiveIdx < options.length) {
+      e.preventDefault();
+      var cat = options[dropdownActiveIdx].getAttribute('data-cat');
+      selectCategory(cat);
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
+      // If dropdown active, select that option
+      if (isDropdownVisible && dropdownActiveIdx >= 0 && dropdownActiveIdx < options.length) {
+        var cat = options[dropdownActiveIdx].getAttribute('data-cat');
+        selectCategory(cat);
+        return;
+      }
+      // Otherwise, add as new category
       var val = categoryInput.value.trim().toLowerCase();
       if (val && categories.indexOf(val) === -1) {
         categories.push(val);
         renderCategories();
       }
       categoryInput.value = '';
+      hideDropdown();
     }
     if (e.key === 'Backspace' && !categoryInput.value && categories.length > 0) {
       categories.pop();
       renderCategories();
+    }
+    if (e.key === 'Escape' && isDropdownVisible) {
+      e.stopPropagation(); // don't close the modal
+      _dropdownJustClosed = true;
+      hideDropdown();
+      return;
     }
   });
 
@@ -321,15 +511,24 @@
     actualInput.value = todo.estimatedMin || '';
     renderCategories();
     categoryInput.value = '';
+    hideDropdown();
     saveBtn.disabled = false;
     saveBtn.textContent = 'Mark Done';
 
-    modal.style.display = '';
-    setTimeout(function() { actualInput.focus(); actualInput.select(); }, 50);
+    // Load existing categories for autocomplete
+    loadExistingCategories().then(function() {
+      modal.style.display = '';
+      setTimeout(function() { actualInput.focus(); actualInput.select(); }, 50);
+    }).catch(function() {
+      // Still open even if loading categories fails
+      modal.style.display = '';
+      setTimeout(function() { actualInput.focus(); actualInput.select(); }, 50);
+    });
   }
 
   function closeModal(revertCheckbox) {
     modal.style.display = 'none';
+    hideDropdown();
     if (revertCheckbox && onCompleteCallback) {
       onCompleteCallback(null); // signal cancellation
     }
@@ -372,6 +571,12 @@
   // Escape key
   modal.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
+      // Don't close modal if dropdown was just dismissed by Escape
+      if (_dropdownJustClosed) {
+        _dropdownJustClosed = false;
+        return;
+      }
+      if (categoryDropdown.classList.contains('show')) return;
       e.preventDefault();
       closeModal(true);
     }
