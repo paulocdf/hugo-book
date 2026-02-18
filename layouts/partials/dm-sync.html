@@ -2,6 +2,12 @@
 
 <!-- Reminder banner container -->
 <div id="dm-reminder-banner-container"></div>
+
+<!-- Offline indicator -->
+<div id="dm-offline-indicator" class="dm-offline-indicator" style="display: none;">
+  <svg class="dm-offline-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.56 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+  <span class="dm-offline-text">Offline</span>
+</div>
 <style>
 #dm-reminder-banner-container {
   position: fixed;
@@ -98,6 +104,42 @@
     padding: 0.2rem 0.6rem;
   }
 }
+
+/* Offline indicator */
+.dm-offline-indicator {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  z-index: 1060;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--gray-800, #333);
+  color: #fff;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.3s, transform 0.3s;
+  pointer-events: none;
+}
+.dm-offline-indicator.dm-offline--show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.dm-offline-icon {
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .dm-offline-indicator {
+    bottom: 16px;
+    left: 16px;
+  }
+}
 </style>
 
 <script>
@@ -105,14 +147,17 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-  var DB_VERSION = 3;
+  var DB_VERSION = 4;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
+  var STORE_WRITE_QUEUE = 'writeQueue';
   var SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
   var _db = null;
   var _syncTimer = null;
   var _syncing = false;
+  var _isOnline = navigator.onLine;
+  var _draining = false;
 
   // ─── IndexedDB Wrapper ───
 
@@ -146,6 +191,10 @@
           if (!existingStore.indexNames.contains('reminderAt')) {
             existingStore.createIndex('reminderAt', 'reminderAt', { unique: false });
           }
+        }
+        // Offline write queue store (v4)
+        if (!db.objectStoreNames.contains(STORE_WRITE_QUEUE)) {
+          db.createObjectStore(STORE_WRITE_QUEUE, { keyPath: 'queueId', autoIncrement: true });
         }
       };
       req.onsuccess = function(e) {
@@ -225,6 +274,229 @@
       });
     });
   }
+
+  // ─── Offline Write Queue ───
+  // Queues Firestore operations when offline; drains on reconnect.
+  // Each queued entry: { collection, docId, op: 'set'|'update'|'delete', data, timestamp }
+
+  function queueWrite(entry) {
+    entry.timestamp = Date.now();
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_WRITE_QUEUE, 'readwrite');
+        tx.objectStore(STORE_WRITE_QUEUE).add(entry);
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function getAllQueued() {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_WRITE_QUEUE, 'readonly');
+        var req = tx.objectStore(STORE_WRITE_QUEUE).getAll();
+        req.onsuccess = function() { resolve(req.result || []); };
+        req.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function removeQueued(queueId) {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_WRITE_QUEUE, 'readwrite');
+        tx.objectStore(STORE_WRITE_QUEUE).delete(queueId);
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  function clearQueue() {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_WRITE_QUEUE, 'readwrite');
+        tx.objectStore(STORE_WRITE_QUEUE).clear();
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
+  /**
+   * Execute a Firestore write with offline queue fallback.
+   * @param {Object} opts
+   *   collection: string — 'notes' or 'todos'
+   *   docId: string — document ID
+   *   op: 'set'|'update'|'delete' — Firestore operation
+   *   data: Object|null — data for set/update (null for delete)
+   *   localOp: function|null — optional callback to apply optimistic IDB write immediately
+   * @returns {Promise}
+   */
+  function firestoreWrite(opts) {
+    // Always apply local operation first (optimistic)
+    var localPromise = opts.localOp ? opts.localOp() : Promise.resolve();
+
+    return localPromise.then(function() {
+      if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser || !_isOnline) {
+        // Offline or no Firestore — queue for later
+        console.log('[dm-sync] Queuing offline write:', opts.op, opts.collection, opts.docId);
+        return queueWrite({
+          collection: opts.collection,
+          docId: opts.docId,
+          op: opts.op,
+          data: opts.data || null
+        }).then(function() {
+          updateOfflineIndicator();
+        });
+      }
+
+      // Online — try Firestore directly
+      var ref = window.dmDb.collection(opts.collection).doc(opts.docId);
+      var fsPromise;
+      if (opts.op === 'set') {
+        fsPromise = ref.set(opts.data);
+      } else if (opts.op === 'update') {
+        fsPromise = ref.update(opts.data);
+      } else if (opts.op === 'delete') {
+        fsPromise = ref.delete();
+      } else {
+        return Promise.reject(new Error('Unknown op: ' + opts.op));
+      }
+
+      return fsPromise.catch(function(err) {
+        // Firestore write failed (maybe went offline mid-write) — queue it
+        console.warn('[dm-sync] Firestore write failed, queuing:', err.message);
+        return queueWrite({
+          collection: opts.collection,
+          docId: opts.docId,
+          op: opts.op,
+          data: opts.data || null
+        }).then(function() {
+          updateOfflineIndicator();
+        });
+      });
+    });
+  }
+
+  /**
+   * Drain the offline write queue. Called on reconnect.
+   * Processes entries in FIFO order. If an entry fails, stops and retries later.
+   */
+  function drainQueue() {
+    if (_draining) return Promise.resolve();
+    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser || !_isOnline) {
+      return Promise.resolve();
+    }
+    _draining = true;
+    console.log('[dm-sync] Draining offline write queue...');
+
+    return getAllQueued().then(function(entries) {
+      if (entries.length === 0) {
+        _draining = false;
+        updateOfflineIndicator();
+        return;
+      }
+
+      console.log('[dm-sync] Queue has ' + entries.length + ' pending write(s)');
+
+      // Process sequentially to preserve order
+      var chain = Promise.resolve();
+      var processed = 0;
+      var failed = false;
+
+      entries.forEach(function(entry) {
+        chain = chain.then(function() {
+          if (failed) return; // stop on first failure
+
+          var ref = window.dmDb.collection(entry.collection).doc(entry.docId);
+          var fsPromise;
+          if (entry.op === 'set') {
+            fsPromise = ref.set(entry.data);
+          } else if (entry.op === 'update') {
+            fsPromise = ref.update(entry.data);
+          } else if (entry.op === 'delete') {
+            fsPromise = ref.delete();
+          } else {
+            // Unknown op — remove from queue
+            return removeQueued(entry.queueId);
+          }
+
+          return fsPromise.then(function() {
+            processed++;
+            return removeQueued(entry.queueId);
+          }).catch(function(err) {
+            // Check if it's a "not found" error for update/delete — remove from queue
+            if (err.code === 'not-found') {
+              console.warn('[dm-sync] Doc not found, removing queued op:', entry.collection, entry.docId);
+              return removeQueued(entry.queueId);
+            }
+            console.warn('[dm-sync] Queue drain failed at entry, will retry:', err.message);
+            failed = true;
+          });
+        });
+      });
+
+      return chain.then(function() {
+        _draining = false;
+        console.log('[dm-sync] Queue drain complete. Processed: ' + processed + '/' + entries.length);
+        updateOfflineIndicator();
+
+        // If all succeeded, trigger a sync to reconcile
+        if (!failed && processed > 0) {
+          var user = window.dmAuth.currentUser;
+          if (user) {
+            syncAll(user.uid).catch(function() {});
+          }
+        }
+
+        // If some failed, retry after a delay
+        if (failed) {
+          setTimeout(drainQueue, 10000);
+        }
+      });
+    }).catch(function(err) {
+      console.warn('[dm-sync] Queue drain error:', err);
+      _draining = false;
+    });
+  }
+
+  // ─── Online/Offline Detection ───
+
+  function updateOfflineIndicator() {
+    getAllQueued().then(function(entries) {
+      var indicator = document.getElementById('dm-offline-indicator');
+      if (!indicator) return;
+
+      if (!_isOnline) {
+        indicator.style.display = '';
+        indicator.querySelector('.dm-offline-text').textContent = 'Offline' + (entries.length ? ' (' + entries.length + ' pending)' : '');
+        indicator.classList.add('dm-offline--show');
+      } else if (entries.length > 0) {
+        indicator.style.display = '';
+        indicator.querySelector('.dm-offline-text').textContent = 'Syncing ' + entries.length + ' change' + (entries.length > 1 ? 's' : '') + '...';
+        indicator.classList.add('dm-offline--show');
+      } else {
+        indicator.classList.remove('dm-offline--show');
+        setTimeout(function() { indicator.style.display = 'none'; }, 300);
+      }
+    }).catch(function() {});
+  }
+
+  window.addEventListener('online', function() {
+    _isOnline = true;
+    console.log('[dm-sync] Back online');
+    updateOfflineIndicator();
+    // Drain queue after a short delay to let network stabilize
+    setTimeout(drainQueue, 1500);
+  });
+
+  window.addEventListener('offline', function() {
+    _isOnline = false;
+    console.log('[dm-sync] Gone offline');
+    updateOfflineIndicator();
+  });
 
   // ─── Firestore Document Serializer ───
 
@@ -533,22 +805,21 @@
     playReminderChime();
     showReminderBanner('Reminder:', body);
 
-    // Mark as fired — dual write
+    // Mark as fired — optimistic local write + queued Firestore write
     todo.reminderFired = true;
     todo.updatedAt = Date.now();
-    var promises = [];
-    if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
-      promises.push(
-        window.dmDb.collection('todos').doc(todo.id).update({
-          reminderFired: true,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        }).catch(function(err) {
-          console.warn('[dm-sync] Failed to update reminder fired in Firestore:', err);
-        })
-      );
-    }
-    promises.push(idbPut(STORE_TODOS, todo));
-    Promise.all(promises).then(function() {
+    firestoreWrite({
+      collection: 'todos',
+      docId: todo.id,
+      op: 'update',
+      data: {
+        reminderFired: true,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      },
+      localOp: function() {
+        return idbPut(STORE_TODOS, todo);
+      }
+    }).then(function() {
       window.dispatchEvent(new CustomEvent('dm-todos-updated'));
     });
   }
@@ -649,19 +920,19 @@
         todo.reminderAt = reminderAtMs;
         todo.reminderFired = false;
         todo.updatedAt = Date.now();
-        var promises = [idbPut(STORE_TODOS, todo)];
-        if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
-          promises.push(
-            window.dmDb.collection('todos').doc(todoId).update({
-              reminderAt: firebase.firestore.Timestamp.fromMillis(reminderAtMs),
-              reminderFired: false,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).catch(function(err) {
-              console.warn('[dm-sync] Firestore setReminder failed (offline?):', err);
-            })
-          );
-        }
-        return Promise.all(promises).then(function() {
+        return firestoreWrite({
+          collection: 'todos',
+          docId: todoId,
+          op: 'update',
+          data: {
+            reminderAt: firebase.firestore.Timestamp.fromMillis(reminderAtMs),
+            reminderFired: false,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          },
+          localOp: function() {
+            return idbPut(STORE_TODOS, todo);
+          }
+        }).then(function() {
           scheduleReminder(todo);
           window.dispatchEvent(new CustomEvent('dm-todos-updated'));
         });
@@ -674,19 +945,19 @@
         todo.reminderAt = null;
         todo.reminderFired = false;
         todo.updatedAt = Date.now();
-        var promises = [idbPut(STORE_TODOS, todo)];
-        if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
-          promises.push(
-            window.dmDb.collection('todos').doc(todoId).update({
-              reminderAt: null,
-              reminderFired: false,
-              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }).catch(function(err) {
-              console.warn('[dm-sync] Firestore clearReminder failed (offline?):', err);
-            })
-          );
-        }
-        return Promise.all(promises).then(function() {
+        return firestoreWrite({
+          collection: 'todos',
+          docId: todoId,
+          op: 'update',
+          data: {
+            reminderAt: null,
+            reminderFired: false,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          },
+          localOp: function() {
+            return idbPut(STORE_TODOS, todo);
+          }
+        }).then(function() {
           window.dispatchEvent(new CustomEvent('dm-todos-updated'));
         });
       });
@@ -811,11 +1082,21 @@
       return Promise.all([
         idbClear(STORE_NOTES),
         idbClear(STORE_TODOS),
-        idbClear(STORE_META)
+        idbClear(STORE_META),
+        clearQueue()
       ]).then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
         window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+        updateOfflineIndicator();
       });
+    },
+
+    // Offline write support
+    firestoreWrite: firestoreWrite,
+    drainQueue: drainQueue,
+    isOnline: function() { return _isOnline; },
+    getQueuedCount: function() {
+      return getAllQueued().then(function(entries) { return entries.length; });
     },
 
     // Reminder banner (for use by other partials)
@@ -832,15 +1113,19 @@
           var cachedUserId = meta ? meta.value : null;
           var proceed = cachedUserId === user.uid
             ? Promise.resolve()
-            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META)]);
+            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), clearQueue()]);
 
           return proceed.then(function() {
             return idbPut(STORE_META, { key: 'currentUserId', value: user.uid });
+          }).then(function() {
+            // Drain any queued offline writes before syncing
+            return drainQueue();
           }).then(function() {
             return syncAll(user.uid);
           }).then(function() {
             startBackgroundSync(user.uid);
             scheduleAllReminders();
+            updateOfflineIndicator();
           });
         }).catch(function(err) {
           console.warn('[dm-sync] Initial sync failed, using cached data if available');
@@ -850,7 +1135,7 @@
         stopBackgroundSync();
         clearAllReminderTimers();
         // Clear cache on sign-out so no data leaks to another user
-        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META)])
+        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), clearQueue()])
           .then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));

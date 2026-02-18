@@ -733,15 +733,19 @@
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    window.dmDb.collection('notes').doc(currentNote.id).update(updateData)
-      .then(function() {
-        // Update local note object
+    window.dmSync.firestoreWrite({
+      collection: 'notes',
+      docId: currentNote.id,
+      op: 'update',
+      data: updateData,
+      localOp: function() {
         currentNote.title = newTitle;
         currentNote.content = newContent;
         currentNote.tags = editTags.slice();
         currentNote.updatedAt = Date.now();
         return window.dmSync.putNote(currentNote);
-      })
+      }
+    })
       .then(function() {
         // Call the onSave callback with the updated note
         if (onSaveCallback) {

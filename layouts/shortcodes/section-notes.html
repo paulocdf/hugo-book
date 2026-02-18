@@ -333,10 +333,13 @@
           if (!confirm('Delete this note?')) return;
 
           if (window.dmDb) {
-            window.dmDb.collection('notes').doc(noteId).delete()
-              .then(function() {
-                if (window.dmSync) return window.dmSync.deleteNote(noteId);
-              })
+            window.dmSync.firestoreWrite({
+              collection: 'notes',
+              docId: noteId,
+              op: 'delete',
+              data: null,
+              localOp: function() { return window.dmSync.deleteNote(noteId); }
+            })
               .then(function() {
                 loadFromCache();
                 window.dispatchEvent(new CustomEvent('dm-sync-complete'));

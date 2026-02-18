@@ -469,10 +469,13 @@
 
     deleteBtn.disabled = true;
 
-    window.dmDb.collection('notes').doc(currentNote.id).delete()
-      .then(function() {
-        return window.dmSync.deleteNote(currentNote.id);
-      })
+    window.dmSync.firestoreWrite({
+      collection: 'notes',
+      docId: currentNote.id,
+      op: 'delete',
+      data: null,
+      localOp: function() { return window.dmSync.deleteNote(currentNote.id); }
+    })
       .then(function() {
         // Navigate back to section
         var base = '';

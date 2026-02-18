@@ -239,13 +239,18 @@
         e.stopPropagation();
         var noteId = this.getAttribute('data-id');
         if (confirm('Delete this note permanently?')) {
-          var user = window.dmAuth && window.dmAuth.currentUser;
-          if (window.dmDb && user) {
-            window.dmDb.collection('notes').doc(noteId).delete().catch(function(err) {
-              console.warn('[tag-cloud] Firestore delete failed:', err);
-            });
-          }
-          window.dmSync.deleteNote(noteId);
+          window.dmSync.firestoreWrite({
+            collection: 'notes',
+            docId: noteId,
+            op: 'delete',
+            data: null,
+            localOp: function() { return window.dmSync.deleteNote(noteId); }
+          }).then(function() {
+            loadFromCache();
+            window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+          }).catch(function(err) {
+            console.warn('[tag-cloud] Delete failed:', err);
+          });
         }
       });
     });

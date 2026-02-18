@@ -660,11 +660,17 @@
           // Set flag so listeners know this sync was triggered by a checkbox toggle
           // and should NOT re-render (the checkbox is already toggled visually).
           window._dmCheckboxSyncing = true;
-          window.dmDb.collection('notes').doc(note.id).update({
-            content: newContent,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }).then(function() {
-            return window.dmSync.putNote(note);
+          window.dmSync.firestoreWrite({
+            collection: 'notes',
+            docId: note.id,
+            op: 'update',
+            data: {
+              content: newContent,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            localOp: function() {
+              return window.dmSync.putNote(note);
+            }
           }).then(function() {
             window._dmCheckboxSyncing = false;
             if (onUpdate) onUpdate(note);

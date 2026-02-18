@@ -1042,11 +1042,16 @@
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           };
 
-          window.dmDb.collection('notes').doc(existing.id).update(updateData)
-            .then(function() {
-              existing.content = prepended;
-              existing.updatedAt = Date.now();
-              return window.dmSync.putNote(existing);
+          window.dmSync.firestoreWrite({
+              collection: 'notes',
+              docId: existing.id,
+              op: 'update',
+              data: updateData,
+              localOp: function() {
+                existing.content = prepended;
+                existing.updatedAt = Date.now();
+                return window.dmSync.putNote(existing);
+              }
             })
             .then(function() {
               isSaving = false;
@@ -1081,19 +1086,21 @@
   }
 
   function createNewNote(noteData) {
-    window.dmDb.collection('notes').add(noteData)
-      .then(function(docRef) {
-        // Dual-write: also save to IndexedDB cache
-        if (window.dmSync) {
-          var localNote = Object.assign({}, noteData, {
-            id: docRef.id,
-            createdAt: Date.now(),
-            updatedAt: Date.now()
-          });
-          window.dmSync.putNote(localNote).catch(function(err) {
-            console.error('IndexedDB cache write error:', err);
-          });
-        }
+    var newDocId = window.dmDb ? window.dmDb.collection('notes').doc().id : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+    var localNote = Object.assign({}, noteData, {
+      id: newDocId,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+
+    window.dmSync.firestoreWrite({
+      collection: 'notes',
+      docId: newDocId,
+      op: 'set',
+      data: noteData,
+      localOp: function() { return window.dmSync.putNote(localNote); }
+    })
+      .then(function() {
         isSaving = false;
         submitBtn.disabled = false;
         showFeedback('success', 'Note saved!');
@@ -1150,19 +1157,22 @@
       completedAt: null
     };
 
-    window.dmDb.collection('todos').add(todoData)
-      .then(function(docRef) {
-        var localTodo = Object.assign({}, todoData, {
-          id: docRef.id,
-          reminderAt: reminderAtMs || null,
-          reminderFired: false,
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        });
-        if (window.dmSync) {
-          return window.dmSync.putTodo(localTodo);
-        }
-      })
+    var newTodoId = window.dmDb ? window.dmDb.collection('todos').doc().id : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+    var localTodo = Object.assign({}, todoData, {
+      id: newTodoId,
+      reminderAt: reminderAtMs || null,
+      reminderFired: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now()
+    });
+
+    window.dmSync.firestoreWrite({
+      collection: 'todos',
+      docId: newTodoId,
+      op: 'set',
+      data: todoData,
+      localOp: function() { return window.dmSync.putTodo(localTodo); }
+    })
       .then(function() {
         isSaving = false;
         submitBtn.disabled = false;

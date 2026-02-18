@@ -1857,34 +1857,48 @@
       completedAt: null
     };
 
-    window.dmDb.collection('todos').add(todoData)
-      .then(function(docRef) {
-        var localTodo = Object.assign({}, todoData, {
-          id: docRef.id,
-          reminderAt: reminderAtMs || null,
-          reminderFired: false,
-          createdAt: Date.now(),
-          updatedAt: Date.now()
-        });
-        allTodos.push(localTodo);
-        if (window.dmSync) {
+    // Generate client-side ID so we can write locally even when offline
+    var newDocId = window.dmDb ? window.dmDb.collection('todos').doc().id : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+    var localTodo = {
+      id: newDocId,
+      userId: user.uid,
+      title: title,
+      estimatedMin: estimatedMin || 25,
+      actualMin: null,
+      category: null,
+      done: false,
+      parentId: parentId || null,
+      order: order,
+      scheduledDate: scheduledDate || null,
+      reminderAt: reminderAtMs || null,
+      reminderFired: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      completedAt: null
+    };
+
+    if (window.dmSync) {
+      window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: newDocId,
+        op: 'set',
+        data: todoData,
+        localOp: function() {
+          allTodos.push(localTodo);
           return window.dmSync.putTodo(localTodo);
         }
-      })
-      .then(function() {
+      }).then(function() {
         if (onDone) onDone();
         render();
-      })
-      .catch(function(err) {
+      }).catch(function(err) {
         console.error('Error creating todo:', err);
         showTodoError('Failed to add task — check console');
         if (onDone) onDone();
       });
+    }
   }
 
   function completeTodo(todo, actualMin, category) {
-    if (!window.dmDb) return;
-
     var updateData = {
       done: true,
       actualMin: actualMin,
@@ -1893,23 +1907,27 @@
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    window.dmDb.collection('todos').doc(todo.id).update(updateData)
-      .then(function() {
-        todo.done = true;
-        todo.actualMin = actualMin;
-        todo.category = category;
-        todo.completedAt = Date.now();
-        todo.updatedAt = Date.now();
-        if (window.dmSync) {
+    // Optimistic local update
+    todo.done = true;
+    todo.actualMin = actualMin;
+    todo.category = category;
+    todo.completedAt = Date.now();
+    todo.updatedAt = Date.now();
+
+    if (window.dmSync) {
+      window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: todo.id,
+        op: 'update',
+        data: updateData,
+        localOp: function() {
           return window.dmSync.putTodo(todo);
         }
-      })
-      .then(function() {
+      }).then(function() {
         // Check if parent should auto-complete
         checkParentAutoComplete(todo.parentId);
         render();
-      })
-      .catch(function(err) {
+      }).catch(function(err) {
         console.error('Error completing todo:', err);
         showTodoError('Failed to complete task — check console');
         // Revert local state so UI reflects the failure
@@ -1919,6 +1937,7 @@
         todo.completedAt = null;
         render();
       });
+    }
   }
 
   function checkParentAutoComplete(parentId) {
@@ -1951,29 +1970,32 @@
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    window.dmDb.collection('todos').doc(parent.id).update(updateData)
-      .then(function() {
-        parent.done = true;
-        parent.actualMin = totalActual;
-        parent.category = categories.join(', ') || null;
-        parent.completedAt = Date.now();
-        parent.updatedAt = Date.now();
-        if (window.dmSync) {
+    // Optimistic local update
+    parent.done = true;
+    parent.actualMin = totalActual;
+    parent.category = categories.join(', ') || null;
+    parent.completedAt = Date.now();
+    parent.updatedAt = Date.now();
+
+    if (window.dmSync) {
+      window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: parent.id,
+        op: 'update',
+        data: updateData,
+        localOp: function() {
           return window.dmSync.putTodo(parent);
         }
-      })
-      .then(function() {
+      }).then(function() {
         render();
-      })
-      .catch(function(err) {
+      }).catch(function(err) {
         console.error('Error auto-completing parent:', err);
         showTodoError('Failed to auto-complete parent task');
       });
+    }
   }
 
   function reopenTodo(todo) {
-    if (!window.dmDb) return;
-
     var updateData = {
       done: false,
       actualMin: null,
@@ -1982,18 +2004,23 @@
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
 
-    window.dmDb.collection('todos').doc(todo.id).update(updateData)
-      .then(function() {
-        todo.done = false;
-        todo.actualMin = null;
-        todo.category = null;
-        todo.completedAt = null;
-        todo.updatedAt = Date.now();
-        if (window.dmSync) {
+    // Optimistic local update
+    todo.done = false;
+    todo.actualMin = null;
+    todo.category = null;
+    todo.completedAt = null;
+    todo.updatedAt = Date.now();
+
+    if (window.dmSync) {
+      window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: todo.id,
+        op: 'update',
+        data: updateData,
+        localOp: function() {
           return window.dmSync.putTodo(todo);
         }
-      })
-      .then(function() {
+      }).then(function() {
         // If this is a subtask, reopen parent too
         if (todo.parentId) {
           var parent = allTodos.find(function(t) { return t.id === todo.parentId; });
@@ -2003,28 +2030,33 @@
           }
         }
         render();
-      })
-      .catch(function(err) {
+      }).catch(function(err) {
         console.error('Error reopening todo:', err);
       });
+    }
   }
 
   function deleteTodo(todoId) {
-    if (!window.dmDb) return;
-
     // Also delete children
     var toDelete = [todoId];
     allTodos.forEach(function(t) {
       if (t.parentId === todoId) toDelete.push(t.id);
     });
 
+    if (!window.dmSync) return;
+
     var chain = Promise.resolve();
     toDelete.forEach(function(id) {
       chain = chain.then(function() {
-        return window.dmDb.collection('todos').doc(id).delete()
-          .then(function() {
-            if (window.dmSync) return window.dmSync.deleteTodo(id);
-          });
+        return window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: id,
+          op: 'delete',
+          data: null,
+          localOp: function() {
+            return window.dmSync.deleteTodo(id);
+          }
+        });
       });
     });
 
@@ -2040,15 +2072,20 @@
   }
 
   function clearAllCompleted(ids) {
-    if (!window.dmDb || ids.length === 0) return;
+    if (!window.dmSync || ids.length === 0) return;
 
     var chain = Promise.resolve();
     ids.forEach(function(id) {
       chain = chain.then(function() {
-        return window.dmDb.collection('todos').doc(id).delete()
-          .then(function() {
-            if (window.dmSync) return window.dmSync.deleteTodo(id);
-          });
+        return window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: id,
+          op: 'delete',
+          data: null,
+          localOp: function() {
+            return window.dmSync.deleteTodo(id);
+          }
+        });
       });
     });
 
