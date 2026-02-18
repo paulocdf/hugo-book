@@ -562,14 +562,19 @@
 
         // Persist to Firestore + IndexedDB
         if (window.dmDb && window.dmSync) {
+          // Set flag so listeners know this sync was triggered by a checkbox toggle
+          // and should NOT re-render (the checkbox is already toggled visually).
+          window._dmCheckboxSyncing = true;
           window.dmDb.collection('notes').doc(note.id).update({
             content: newContent,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           }).then(function() {
             return window.dmSync.putNote(note);
           }).then(function() {
+            window._dmCheckboxSyncing = false;
             if (onUpdate) onUpdate(note);
           }).catch(function(err) {
+            window._dmCheckboxSyncing = false;
             console.error('Checkbox save error:', err);
             // Revert the checkbox visually
             cb.checked = !cb.checked;

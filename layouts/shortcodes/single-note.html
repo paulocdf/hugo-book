@@ -432,6 +432,7 @@
     // Listen for sync completion
     window.addEventListener('dm-sync-complete', function(e) {
       if (selfTriggeredSync) return;
+      if (window._dmCheckboxSyncing) return;
       if (e.detail && e.detail.source === 'edit-modal') return;
       if (window.dmAuth && window.dmAuth.currentUser) {
         loadFromCache();

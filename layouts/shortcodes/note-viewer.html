@@ -442,6 +442,7 @@
   // Listen for sync completion to reload note (skip self-triggered events)
   window.addEventListener('dm-sync-complete', function(e) {
     if (selfTriggeredSync) return;
+    if (window._dmCheckboxSyncing) return;
     if (e.detail && e.detail.source === 'edit-modal') return;
     if (noteId && window.dmAuth && window.dmAuth.currentUser) {
       loadNote();
