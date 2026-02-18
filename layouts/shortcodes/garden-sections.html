@@ -19,6 +19,12 @@
 <ul id="garden-section-topics"><li><em>Loading...</em></li></ul>
 </div>
 
+<div class="section-card card-dashboard">
+<h3><a href="{{ "docs/dashboard/" | relURL }}">Dashboard</a></h3>
+<p>Time tracking insights: estimated vs actual, categories, and more.</p>
+<div id="garden-section-dashboard"><em>Loading...</em></div>
+</div>
+
 </div>
 
 <script>
@@ -94,6 +100,33 @@
       renderInboxPreview();
       renderList('garden-section-books', books, MAX_BOOKS, '/docs/books/', 'No book notes yet.');
       renderList('garden-section-topics', topics, MAX_TOPICS, '/docs/topics/', 'Start adding topics to grow your knowledge graph.');
+      renderDashboardPreview();
+    });
+  }
+
+  function renderDashboardPreview() {
+    var el = document.getElementById('garden-section-dashboard');
+    if (!el || !window.dmSync) return;
+
+    window.dmSync.getAllTodos().then(function(todos) {
+      if (!todos || !todos.length) {
+        el.innerHTML = '<em style="font-size: 0.85rem; color: var(--gray-500);">No tasks yet. Add tasks in your Inbox to see insights here.</em>';
+        return;
+      }
+      var done = 0, totalEst = 0, totalActual = 0;
+      todos.forEach(function(t) {
+        if (t.done) {
+          done++;
+          if (t.actualMin) totalActual += t.actualMin;
+        }
+        if (t.estimatedMin) totalEst += t.estimatedMin;
+      });
+      var pomActual = (totalActual / 25).toFixed(1);
+      var html = '<div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.85rem;">';
+      html += '<span style="color: var(--gray-500);"><strong style="color: var(--body-font-color);">' + done + '/' + todos.length + '</strong> done</span>';
+      if (totalActual) html += '<span style="color: var(--gray-500);"><strong style="color: var(--body-font-color);">' + totalActual + 'min</strong> tracked (' + pomActual + ' pom)</span>';
+      html += '</div>';
+      el.innerHTML = html;
     });
   }
 
@@ -110,6 +143,8 @@
         });
         var inboxEl = document.getElementById('garden-section-inbox');
         if (inboxEl) inboxEl.innerHTML = '<em>Sign in to see your notes.</em>';
+        var dashEl = document.getElementById('garden-section-dashboard');
+        if (dashEl) dashEl.innerHTML = '<em>Sign in to see your data.</em>';
       }
     });
   }
