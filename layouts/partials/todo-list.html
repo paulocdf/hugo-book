@@ -351,53 +351,20 @@
   font-weight: 600;
 }
 
-/* Completed section */
-.todo-completed-section {
-  margin-top: 0.5rem;
-}
-.todo-completed-divider {
+/* Clear all completed bar */
+.todo-clear-all-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 0;
+  margin-top: 0.5rem;
+  padding: 6px 4px;
   border-top: 1px solid var(--gray-200);
-  margin-top: 4px;
 }
-.todo-completed-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: none;
-  border: none;
-  padding: 4px 8px;
-  border-radius: 6px;
+.todo-clear-all-count {
   font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--gray-500);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.todo-completed-toggle:hover {
-  background: var(--gray-100);
-  color: var(--body-font-color);
-}
-.todo-completed-chevron {
-  transition: transform 0.2s;
-}
-.todo-completed-section.collapsed .todo-completed-chevron {
-  transform: rotate(-90deg);
-}
-.todo-completed-section.collapsed .todo-completed-items {
-  display: none;
-}
-.todo-completed-items {
-  padding-top: 4px;
-}
-.todo-completed-items .todo-item {
-  opacity: 0.7;
-}
-.todo-completed-items .todo-item:hover {
-  opacity: 1;
+  color: var(--gray-400);
+  font-weight: 500;
+  padding-left: 4px;
 }
 .todo-clear-all-btn {
   display: inline-flex;
@@ -416,12 +383,6 @@
   color: var(--color-danger, #e53e3e);
   background: var(--color-danger-bg, rgba(229, 62, 62, 0.06));
   border-color: var(--color-danger, #e53e3e);
-}
-.todo-empty-subtle {
-  font-size: 0.82rem;
-  color: var(--gray-400);
-  padding: 0.5rem 0;
-  text-align: center;
 }
 
 /* Toast notifications */
@@ -561,84 +522,45 @@
       }
     });
 
-    // Split into active and completed parents
-    var activeParents = [];
-    var completedParents = [];
-    parents.forEach(function(p) {
-      if (p.done) {
-        completedParents.push(p);
-      } else {
-        activeParents.push(p);
-      }
-    });
-
-    // Sort active by order
-    activeParents.sort(function(a, b) {
+    // Sort parents by order (done tasks stay in place)
+    parents.sort(function(a, b) {
       return (a.order || 0) - (b.order || 0);
-    });
-
-    // Sort completed by completedAt desc (most recent first)
-    completedParents.sort(function(a, b) {
-      return (b.completedAt || 0) - (a.completedAt || 0);
     });
 
     // Sort children by order
     Object.keys(childrenMap).forEach(function(pid) {
       childrenMap[pid].sort(function(a, b) {
-        if (a.done !== b.done) return a.done ? 1 : -1;
         return (a.order || 0) - (b.order || 0);
       });
     });
 
-    // Helper to render a parent + its children
-    function renderGroup(parent) {
-      var h = buildTodoItemHtml(parent, false);
-      var children = childrenMap[parent.id] || [];
-      if (children.length > 0) {
-        h += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
-        children.forEach(function(child) {
-          h += buildTodoItemHtml(child, true);
-        });
-        h += '</div>';
-      }
-      return h;
-    }
-
     var html = '';
 
-    // Active tasks
-    if (activeParents.length === 0 && completedParents.length === 0) {
+    if (parents.length === 0) {
       html = '<div class="todo-empty">No tasks yet. Add one above to get started.</div>';
-    } else if (activeParents.length === 0) {
-      html = '<div class="todo-empty todo-empty-subtle">No active tasks.</div>';
     }
-    activeParents.forEach(function(parent) {
-      html += renderGroup(parent);
+    parents.forEach(function(parent) {
+      html += buildTodoItemHtml(parent, false);
+      var children = childrenMap[parent.id] || [];
+      if (children.length > 0) {
+        html += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
+        children.forEach(function(child) {
+          html += buildTodoItemHtml(child, true);
+        });
+        html += '</div>';
+      }
     });
 
-    // Completed section
-    if (completedParents.length > 0) {
-      var completedCollapsed = false;
-      try { completedCollapsed = localStorage.getItem('dm-todo-completed-collapsed') !== '0'; } catch(e) {}
-      var collapsedClass = completedCollapsed ? ' collapsed' : '';
-      var ariaExpanded = completedCollapsed ? 'false' : 'true';
-
-      html += '<div class="todo-completed-section' + collapsedClass + '" id="todo-completed-section">';
-      html += '<div class="todo-completed-divider">';
-      html += '<button type="button" class="todo-completed-toggle" id="todo-completed-toggle" aria-expanded="' + ariaExpanded + '">';
-      html += '<svg class="todo-completed-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
-      html += 'Completed (' + completedParents.length + ')';
-      html += '</button>';
+    // Clear all completed bar (shown when there are completed tasks)
+    var completedCount = 0;
+    allTodos.forEach(function(t) { if (t.done) completedCount++; });
+    if (completedCount > 0) {
+      html += '<div class="todo-clear-all-bar">';
+      html += '<span class="todo-clear-all-count">' + completedCount + ' completed</span>';
       html += '<button type="button" class="todo-clear-all-btn" id="todo-clear-all" title="Permanently delete all completed tasks">';
       html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
       html += ' Clear all';
       html += '</button>';
-      html += '</div>';
-      html += '<div class="todo-completed-items">';
-      completedParents.forEach(function(parent) {
-        html += renderGroup(parent);
-      });
-      html += '</div>';
       html += '</div>';
     }
 
@@ -728,18 +650,6 @@
         }
       });
     });
-
-    // Completed section toggle
-    var completedSection = document.getElementById('todo-completed-section');
-    var completedToggle = document.getElementById('todo-completed-toggle');
-    if (completedSection && completedToggle) {
-      completedToggle.addEventListener('click', function() {
-        completedSection.classList.toggle('collapsed');
-        var isCollapsed = completedSection.classList.contains('collapsed');
-        completedToggle.setAttribute('aria-expanded', !isCollapsed);
-        try { localStorage.setItem('dm-todo-completed-collapsed', isCollapsed ? '1' : '0'); } catch(e) {}
-      });
-    }
 
     // Clear all completed button
     var clearAllBtn = document.getElementById('todo-clear-all');
