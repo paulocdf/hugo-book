@@ -836,7 +836,7 @@
 
     _nvDeleteMessage.textContent = 'Move "' + (currentNote.title || 'this note') + '" to trash?';
     _nvDeleteModal.style.display = '';
-    setTimeout(function() { _nvDeleteConfirmBtn.focus(); }, 50);
+    setTimeout(function() { _nvDeleteConfirmBtn.focus({ preventScroll: true }); }, 50);
 
     // Remove any previous handler to avoid stacking
     var newConfirmBtn = _nvDeleteConfirmBtn.cloneNode(true);

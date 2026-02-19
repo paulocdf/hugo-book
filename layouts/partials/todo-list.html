@@ -1323,7 +1323,7 @@
     _deleteModalMessage.textContent = message;
     _deleteOnConfirm = onConfirm;
     _deleteModal.style.display = '';
-    setTimeout(function() { _deleteModalConfirmBtn.focus(); }, 50);
+    setTimeout(function() { _deleteModalConfirmBtn.focus({ preventScroll: true }); }, 50);
   }
 
   function closeDeleteModal() {
