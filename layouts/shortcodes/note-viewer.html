@@ -73,6 +73,25 @@
   </div>
 </div>
 
+<!-- Delete Confirmation Modal -->
+<div class="nv-delete-modal" id="nv-delete-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="nv-delete-heading">
+  <div class="nv-delete-backdrop" id="nv-delete-backdrop"></div>
+  <div class="nv-delete-dialog">
+    <div class="nv-delete-header">
+      <h3 id="nv-delete-heading">Delete Note</h3>
+      <button type="button" class="nv-delete-close" id="nv-delete-close">&times;</button>
+    </div>
+    <p class="nv-delete-message" id="nv-delete-message"></p>
+    <div class="nv-delete-actions">
+      <button type="button" class="nv-delete-btn-cancel" id="nv-delete-cancel">Cancel</button>
+      <button type="button" class="nv-delete-btn-confirm" id="nv-delete-confirm">Delete</button>
+    </div>
+    <div class="nv-delete-hints">
+      <kbd>Esc</kbd> cancel &middot; <kbd>Enter</kbd> delete
+    </div>
+  </div>
+</div>
+
 <style>
 .note-viewer-auth, .note-viewer-loading, .note-viewer-error {
   display: flex;
@@ -226,6 +245,104 @@
   font-size: 0.9em;
 }
 .note-viewer-body img { max-width: 100%; border-radius: 8px; }
+/* ─── Delete confirmation modal ─── */
+.nv-delete-modal {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.nv-delete-backdrop {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.nv-delete-dialog {
+  position: relative;
+  background: var(--body-background);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 94%;
+  max-width: 380px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+  animation: nv-delete-in 0.2s ease-out;
+}
+@keyframes nv-delete-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.nv-delete-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.nv-delete-header h3 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.nv-delete-close {
+  background: none; border: none; font-size: 1.5rem;
+  cursor: pointer; color: var(--body-font-color); padding: 4px 8px;
+  border-radius: 6px; transition: background 0.15s;
+}
+.nv-delete-close:hover { background: var(--gray-100); }
+.nv-delete-message {
+  font-size: 0.9rem;
+  color: var(--body-font-color);
+  margin: 0 0 1.25rem 0;
+  line-height: 1.5;
+}
+.nv-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.nv-delete-btn-cancel,
+.nv-delete-btn-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.nv-delete-btn-cancel:hover { background: var(--gray-100); }
+.nv-delete-btn-confirm {
+  border-color: var(--color-danger, #e53e3e);
+  color: var(--color-danger, #e53e3e);
+}
+.nv-delete-btn-confirm:hover {
+  background: var(--color-danger, #e53e3e);
+  color: #fff;
+}
+.nv-delete-hints {
+  margin-top: 0.75rem;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--gray-400);
+}
+.nv-delete-hints kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: var(--gray-100);
+  font-size: 0.65rem;
+  font-family: inherit;
+  color: var(--gray-500);
+}
+@media screen and (max-width: 500px) {
+  .nv-delete-dialog {
+    width: 96%;
+    padding: 1rem;
+  }
+}
 </style>
 
 <script>
@@ -684,37 +801,77 @@
     });
   }
 
+  // Delete confirmation modal
+  var _nvDeleteModal = document.getElementById('nv-delete-modal');
+  var _nvDeleteMessage = document.getElementById('nv-delete-message');
+  var _nvDeleteConfirmBtn = document.getElementById('nv-delete-confirm');
+  var _nvDeleteCancelBtn = document.getElementById('nv-delete-cancel');
+  var _nvDeleteCloseBtn = document.getElementById('nv-delete-close');
+  var _nvDeleteBackdrop = document.getElementById('nv-delete-backdrop');
+
+  function closeDeleteModal() {
+    if (_nvDeleteModal) _nvDeleteModal.style.display = 'none';
+  }
+
+  if (_nvDeleteModal) {
+    _nvDeleteCancelBtn.addEventListener('click', closeDeleteModal);
+    _nvDeleteCloseBtn.addEventListener('click', closeDeleteModal);
+    _nvDeleteBackdrop.addEventListener('click', closeDeleteModal);
+    _nvDeleteModal.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeDeleteModal();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        _nvDeleteConfirmBtn.click();
+      }
+    });
+  }
+
   // Delete functionality
   deleteBtn.addEventListener('click', function() {
     if (!currentNote) return;
-    if (!confirm('Move "' + (currentNote.title || 'this note') + '" to trash?')) return;
+    if (!_nvDeleteModal) return;
 
-    deleteBtn.disabled = true;
+    _nvDeleteMessage.textContent = 'Move "' + (currentNote.title || 'this note') + '" to trash?';
+    _nvDeleteModal.style.display = '';
+    setTimeout(function() { _nvDeleteConfirmBtn.focus(); }, 50);
 
-    window.dmSync.firestoreWrite({
-      collection: 'notes',
-      docId: currentNote.id,
-      op: 'update',
-      data: { deletedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
-      localOp: function() { return window.dmSync.trashNote(currentNote.id); }
-    })
-      .then(function() {
-        // Navigate back to section
-        var base = '';
-        var baseUrl = document.querySelector('link[rel="manifest"]');
-        if (baseUrl) base = baseUrl.getAttribute('href').replace('/manifest.json', '');
+    // Remove any previous handler to avoid stacking
+    var newConfirmBtn = _nvDeleteConfirmBtn.cloneNode(true);
+    _nvDeleteConfirmBtn.parentNode.replaceChild(newConfirmBtn, _nvDeleteConfirmBtn);
+    _nvDeleteConfirmBtn = newConfirmBtn;
 
-        var dest = currentNote.destination;
-        if (dest === 'book-note') window.location.href = base + '/docs/books/';
-        else if (dest === 'snippets') window.location.href = base + '/docs/snippets/';
-        else if (dest === 'topic') window.location.href = base + '/docs/topics/';
-        else window.location.href = base + '/docs/inbox/';
+    _nvDeleteConfirmBtn.addEventListener('click', function() {
+      closeDeleteModal();
+      deleteBtn.disabled = true;
+
+      window.dmSync.firestoreWrite({
+        collection: 'notes',
+        docId: currentNote.id,
+        op: 'update',
+        data: { deletedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+        localOp: function() { return window.dmSync.trashNote(currentNote.id); }
       })
-      .catch(function(err) {
-        console.error('Error deleting note:', err);
-        deleteBtn.disabled = false;
-        alert('Failed to delete note. Please try again.');
-      });
+        .then(function() {
+          // Navigate back to section
+          var base = '';
+          var baseUrl = document.querySelector('link[rel="manifest"]');
+          if (baseUrl) base = baseUrl.getAttribute('href').replace('/manifest.json', '');
+
+          var dest = currentNote.destination;
+          if (dest === 'book-note') window.location.href = base + '/docs/books/';
+          else if (dest === 'snippets') window.location.href = base + '/docs/snippets/';
+          else if (dest === 'topic') window.location.href = base + '/docs/topics/';
+          else window.location.href = base + '/docs/inbox/';
+        })
+        .catch(function(err) {
+          console.error('Error deleting note:', err);
+          deleteBtn.disabled = false;
+          alert('Failed to delete note. Please try again.');
+        });
+    });
   });
 
   // Listen for sync completion to reload note (skip self-triggered events)
