@@ -1535,6 +1535,8 @@
   addCategoryInput.addEventListener('blur', function() {
     setTimeout(function() {
       hideCatDropdown();
+      // If a category was already selected (chip is showing), don't override
+      if (addCategorySelected.style.display !== 'none' && _addFormCategory) return;
       // Commit whatever is typed
       var val = addCategoryInput.value.trim().toLowerCase();
       _addFormCategory = val || null;
