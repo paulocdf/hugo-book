@@ -495,7 +495,6 @@
 
     if (days < 0) {
       var absDays = Math.abs(days);
-      if (absDays === 0) return 'due now';
       if (absDays === 1) return '1 day overdue';
       return absDays + ' days overdue';
     }
@@ -535,7 +534,8 @@
       allCards.forEach(function(c) { c._note = noteMap[c.noteId] || null; });
       dueCards.forEach(function(c) { c._note = noteMap[c.noteId] || null; });
 
-      // Filter out cards whose notes no longer exist
+      // Filter out cards whose notes no longer exist or are trashed
+      allCards = allCards.filter(function(c) { return c._note; });
       dueCards = dueCards.filter(function(c) { return c._note; });
 
       // Count reviewed today
@@ -833,7 +833,10 @@
   });
   window.addEventListener('dm-review-updated', function() {
     if (window.dmAuth && window.dmAuth.currentUser && document.getElementById('review-queue')) {
-      // Don't reload during active review session
+      // Only reload if not in an active review session (avoid resetting progress mid-review)
+      if (cardContainerEl.style.display === 'none') {
+        loadQueue();
+      }
     }
   });
 })();

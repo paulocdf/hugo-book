@@ -539,6 +539,8 @@
       userId: data.userId || '',
       userEmail: data.userEmail || '',
       userName: data.userName || '',
+      pinned: data.pinned || false,
+      deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
       createdAt: createdAt,
       updatedAt: updatedAt
     };
