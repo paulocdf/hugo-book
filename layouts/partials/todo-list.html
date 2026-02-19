@@ -78,24 +78,7 @@
   </div>
 </div>
 
-<!-- Delete Confirmation Modal -->
-<div class="todo-delete-modal" id="todo-delete-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="todo-delete-heading">
-  <div class="todo-delete-backdrop" id="todo-delete-backdrop"></div>
-  <div class="todo-delete-dialog">
-    <div class="todo-delete-header">
-      <h3 id="todo-delete-heading">Delete Task</h3>
-      <button type="button" class="todo-delete-close" id="todo-delete-close">&times;</button>
-    </div>
-    <p class="todo-delete-message" id="todo-delete-message"></p>
-    <div class="todo-delete-actions">
-      <button type="button" class="todo-delete-btn-cancel" id="todo-delete-cancel">Cancel</button>
-      <button type="button" class="todo-delete-btn-confirm" id="todo-delete-confirm">Delete</button>
-    </div>
-    <div class="todo-delete-hints">
-      <kbd>Esc</kbd> cancel &middot; <kbd>Enter</kbd> delete
-    </div>
-  </div>
-</div>
+<!-- Delete modal is created dynamically via JS and appended to document.body -->
 
 <style>
 .todo-list {
@@ -1307,38 +1290,52 @@
     setTimeout(function() { _justCompletedIds = {}; }, 400);
   }
 
-  // ─── Delete confirmation modal ───
-  var _deleteModal = document.getElementById('todo-delete-modal');
-  var _deleteModalHeading = document.getElementById('todo-delete-heading');
-  var _deleteModalMessage = document.getElementById('todo-delete-message');
-  var _deleteModalConfirmBtn = document.getElementById('todo-delete-confirm');
-  var _deleteModalCancelBtn = document.getElementById('todo-delete-cancel');
-  var _deleteModalCloseBtn = document.getElementById('todo-delete-close');
-  var _deleteModalBackdrop = document.getElementById('todo-delete-backdrop');
+  // ─── Delete confirmation modal (appended to document.body to avoid CSS containing-block issues) ───
+  var _deleteModal = null;
+  var _deleteModalHeading = null;
+  var _deleteModalMessage = null;
+  var _deleteModalConfirmBtn = null;
   var _deleteOnConfirm = null;
 
-  function showDeleteConfirm(message, onConfirm, title) {
-    if (!_deleteModal) return onConfirm(); // fallback
-    _deleteModalHeading.textContent = title || 'Delete Task';
-    _deleteModalMessage.textContent = message;
-    _deleteOnConfirm = onConfirm;
-    _deleteModal.style.display = '';
-    setTimeout(function() { _deleteModalConfirmBtn.focus({ preventScroll: true }); }, 50);
-  }
+  function ensureDeleteModal() {
+    if (_deleteModal) return;
+    _deleteModal = document.createElement('div');
+    _deleteModal.className = 'todo-delete-modal';
+    _deleteModal.setAttribute('role', 'dialog');
+    _deleteModal.setAttribute('aria-modal', 'true');
+    _deleteModal.style.display = 'none';
+    _deleteModal.innerHTML =
+      '<div class="todo-delete-backdrop"></div>'
+      + '<div class="todo-delete-dialog">'
+      + '<div class="todo-delete-header">'
+      + '<h3 class="todo-delete-heading">Delete Task</h3>'
+      + '<button type="button" class="todo-delete-close">&times;</button>'
+      + '</div>'
+      + '<p class="todo-delete-message"></p>'
+      + '<div class="todo-delete-actions">'
+      + '<button type="button" class="todo-delete-btn-cancel">Cancel</button>'
+      + '<button type="button" class="todo-delete-btn-confirm">Delete</button>'
+      + '</div>'
+      + '<div class="todo-delete-hints">'
+      + '<kbd>Esc</kbd> cancel &middot; <kbd>Enter</kbd> delete'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(_deleteModal);
 
-  function closeDeleteModal() {
-    if (_deleteModal) _deleteModal.style.display = 'none';
-    _deleteOnConfirm = null;
-  }
+    _deleteModalHeading = _deleteModal.querySelector('.todo-delete-heading');
+    _deleteModalMessage = _deleteModal.querySelector('.todo-delete-message');
+    _deleteModalConfirmBtn = _deleteModal.querySelector('.todo-delete-btn-confirm');
+    var cancelBtn = _deleteModal.querySelector('.todo-delete-btn-cancel');
+    var closeBtn = _deleteModal.querySelector('.todo-delete-close');
+    var backdrop = _deleteModal.querySelector('.todo-delete-backdrop');
 
-  if (_deleteModal) {
     _deleteModalConfirmBtn.addEventListener('click', function() {
       if (_deleteOnConfirm) _deleteOnConfirm();
       closeDeleteModal();
     });
-    _deleteModalCancelBtn.addEventListener('click', closeDeleteModal);
-    _deleteModalCloseBtn.addEventListener('click', closeDeleteModal);
-    _deleteModalBackdrop.addEventListener('click', closeDeleteModal);
+    cancelBtn.addEventListener('click', closeDeleteModal);
+    closeBtn.addEventListener('click', closeDeleteModal);
+    backdrop.addEventListener('click', closeDeleteModal);
     _deleteModal.addEventListener('keydown', function(e) {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -1349,6 +1346,20 @@
         _deleteModalConfirmBtn.click();
       }
     });
+  }
+
+  function showDeleteConfirm(message, onConfirm, title) {
+    ensureDeleteModal();
+    _deleteModalHeading.textContent = title || 'Delete Task';
+    _deleteModalMessage.textContent = message;
+    _deleteOnConfirm = onConfirm;
+    _deleteModal.style.display = '';
+    setTimeout(function() { _deleteModalConfirmBtn.focus({ preventScroll: true }); }, 50);
+  }
+
+  function closeDeleteModal() {
+    if (_deleteModal) _deleteModal.style.display = 'none';
+    _deleteOnConfirm = null;
   }
 
   // ─── Speech-to-text (mic dictation) ───
