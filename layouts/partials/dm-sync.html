@@ -684,6 +684,27 @@
       });
   }
 
+  // ─── Auto-purge expired trash ───
+
+  function purgeExpiredTrash() {
+    var thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+    var cutoff = Date.now() - thirtyDaysMs;
+    return idbGetAll(STORE_NOTES).then(function(notes) {
+      var expired = notes.filter(function(n) { return n.deletedAt && n.deletedAt < cutoff; });
+      if (!expired.length) return Promise.resolve();
+      console.log('[dm-sync] Purging ' + expired.length + ' expired trash items');
+      return Promise.all(expired.map(function(n) {
+        return firestoreWrite({
+          collection: 'notes',
+          docId: n.id,
+          op: 'delete',
+          data: null,
+          localOp: function() { return idbDelete(STORE_NOTES, n.id); }
+        });
+      }));
+    });
+  }
+
   function syncAll(userId) {
     if (_syncing) return Promise.resolve();
     _syncing = true;
@@ -696,6 +717,10 @@
       .then(function() {
         _syncing = false;
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+        // Auto-purge expired trash (30+ days old) after sync
+        purgeExpiredTrash().catch(function(err) {
+          console.warn('[dm-sync] Trash purge error:', err);
+        });
       })
       .catch(function(err) {
         console.error('[dm-sync] Sync error:', err);
@@ -1524,10 +1549,23 @@
 
   // ─── Public API ───
 
+  // Helper: get all non-trashed notes from IDB
+  function getActiveNotes() {
+    return idbGetAll(STORE_NOTES).then(function(notes) {
+      return notes.filter(function(n) { return !n.deletedAt; });
+    });
+  }
+
   window.dmSync = {
     // IndexedDB operations — Notes
-    getNote: function(id) { return idbGet(STORE_NOTES, id); },
-    getAllNotes: function() { return idbGetAll(STORE_NOTES); },
+    getNote: function(id) {
+      return idbGet(STORE_NOTES, id).then(function(note) {
+        if (note && note.deletedAt) return null;
+        return note;
+      });
+    },
+    getNoteIncludingTrashed: function(id) { return idbGet(STORE_NOTES, id); },
+    getAllNotes: function() { return getActiveNotes(); },
     putNote: function(note) {
       return idbPut(STORE_NOTES, note).then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -1535,6 +1573,55 @@
     },
     deleteNote: function(id) {
       return idbDelete(STORE_NOTES, id).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    },
+    // Soft-delete: move note to trash
+    trashNote: function(id) {
+      return idbGet(STORE_NOTES, id).then(function(note) {
+        if (!note) return;
+        note.deletedAt = Date.now();
+        note.updatedAt = Date.now();
+        return idbPut(STORE_NOTES, note).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+        });
+      });
+    },
+    // Restore a trashed note
+    restoreNote: function(id) {
+      return idbGet(STORE_NOTES, id).then(function(note) {
+        if (!note) return;
+        delete note.deletedAt;
+        note.updatedAt = Date.now();
+        return idbPut(STORE_NOTES, note).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+        });
+      });
+    },
+    // Get all trashed notes
+    getTrashedNotes: function() {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        return notes.filter(function(n) { return !!n.deletedAt; });
+      });
+    },
+    // Permanently delete a trashed note from IDB
+    permanentlyDeleteNote: function(id) {
+      return idbDelete(STORE_NOTES, id).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    },
+    // Empty all trashed notes permanently
+    emptyTrash: function() {
+      return idbGetAll(STORE_NOTES).then(function(notes) {
+        var trashed = notes.filter(function(n) { return !!n.deletedAt; });
+        return Promise.all(trashed.map(function(n) { return idbDelete(STORE_NOTES, n.id); }));
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    },
+    // Auto-purge notes trashed more than 30 days ago
+    purgeExpiredTrash: function() {
+      return purgeExpiredTrash().then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
       });
     },
@@ -1613,22 +1700,22 @@
 
     // Query helpers — Notes
     getNotesByDestination: function(destination) {
-      return idbGetAll(STORE_NOTES).then(function(notes) {
+      return getActiveNotes().then(function(notes) {
         return notes.filter(function(n) { return n.destination === destination; });
       });
     },
     getNotesByLanguage: function(language) {
-      return idbGetAll(STORE_NOTES).then(function(notes) {
+      return getActiveNotes().then(function(notes) {
         return notes.filter(function(n) { return n.language === language; });
       });
     },
     getNotesByBookTitle: function(bookTitle) {
-      return idbGetAll(STORE_NOTES).then(function(notes) {
+      return getActiveNotes().then(function(notes) {
         return notes.filter(function(n) { return n.bookTitle === bookTitle; });
       });
     },
     getBookTitles: function() {
-      return idbGetAll(STORE_NOTES).then(function(notes) {
+      return getActiveNotes().then(function(notes) {
         var titles = {};
         notes.forEach(function(n) {
           if (n.destination === 'book-note' && n.bookTitle) {
@@ -1639,7 +1726,7 @@
       });
     },
     getSnippetLanguages: function() {
-      return idbGetAll(STORE_NOTES).then(function(notes) {
+      return getActiveNotes().then(function(notes) {
         var langs = {};
         notes.forEach(function(n) {
           if (n.destination === 'snippets' && n.language) {
@@ -1652,7 +1739,7 @@
 
     // Query helpers — Tags
     getAllTags: function() {
-      return idbGetAll(STORE_NOTES).then(function(notes) {
+      return getActiveNotes().then(function(notes) {
         var tagMap = {};
         notes.forEach(function(n) {
           if (n.tags && n.tags.length) {
@@ -1668,7 +1755,7 @@
       });
     },
     getNotesByTag: function(tag) {
-      return idbGetAll(STORE_NOTES).then(function(notes) {
+      return getActiveNotes().then(function(notes) {
         return notes.filter(function(n) {
           return n.tags && n.tags.indexOf(tag) !== -1;
         });
@@ -1677,7 +1764,7 @@
 
     // Query helpers — Backlinks
     getBacklinksForNote: function(noteId) {
-      return idbGetAll(STORE_NOTES).then(function(notes) {
+      return getActiveNotes().then(function(notes) {
         var targetNote = null;
         notes.forEach(function(n) { if (n.id === noteId) targetNote = n; });
         if (!targetNote || !targetNote.title) return [];
@@ -1719,7 +1806,7 @@
 
     // Check if cache has data
     hasCachedData: function() {
-      return idbGetAll(STORE_NOTES).then(function(notes) {
+      return getActiveNotes().then(function(notes) {
         return notes.length > 0;
       });
     },

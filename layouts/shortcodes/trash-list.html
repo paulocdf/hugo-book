@@ -1,0 +1,428 @@
+{{/* Trash List: displays soft-deleted notes with restore and permanent delete options */}}
+
+<div class="trash-list" id="trash-list">
+  <div class="trash-list-auth" style="display: none;">
+    <div class="section-notes-auth-card">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <h3>Sign in to view trash</h3>
+      <p>Your notes are stored securely and require authentication.</p>
+      <button type="button" class="section-notes-signin-btn" id="trash-signin-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <div class="trash-list-loading" style="display: none;">
+    <div class="section-notes-spinner"></div>
+    <span>Loading trash...</span>
+  </div>
+
+  <div class="trash-list-empty" style="display: none;">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--gray-300); margin-bottom: 1rem;">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+    <p>Trash is empty</p>
+    <p style="font-size: 0.85rem; color: var(--gray-400);">Deleted notes will appear here for 30 days before being permanently removed.</p>
+  </div>
+
+  <div class="trash-list-toolbar" style="display: none;">
+    <div class="trash-list-info">
+      <span class="trash-list-count"></span>
+      <span class="trash-list-purge-info">Items are permanently deleted after 30 days</span>
+    </div>
+    <button type="button" class="trash-list-empty-btn" id="trash-empty-btn">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+      </svg>
+      Empty Trash
+    </button>
+  </div>
+
+  <div class="trash-list-items"></div>
+</div>
+
+<style>
+.trash-list {
+  max-width: 800px;
+}
+.trash-list-auth {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+.trash-list-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2rem 0;
+  justify-content: center;
+  color: var(--gray-500);
+}
+.trash-list-empty {
+  text-align: center;
+  padding: 3rem 0;
+  color: var(--gray-500);
+}
+.trash-list-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--gray-200);
+}
+.trash-list-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.trash-list-count {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+.trash-list-purge-info {
+  font-size: 0.75rem;
+  color: var(--gray-400);
+}
+.trash-list-empty-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--color-danger, #e53e3e);
+  border-radius: 6px;
+  background: none;
+  color: var(--color-danger, #e53e3e);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.trash-list-empty-btn:hover {
+  background: var(--color-danger, #e53e3e);
+  color: #fff;
+}
+
+/* Trash item card */
+.trash-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 1rem 1.25rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  transition: border-color 0.2s;
+}
+.trash-item:hover {
+  border-color: var(--gray-300);
+}
+.trash-item-content {
+  flex: 1;
+  min-width: 0;
+}
+.trash-item-title {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.trash-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  flex-wrap: wrap;
+}
+.trash-item-dest {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--gray-100);
+  font-size: 0.75rem;
+}
+.trash-item-expiry {
+  color: var(--color-danger, #e53e3e);
+  font-size: 0.75rem;
+}
+.trash-item-preview {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+  line-height: 1.5;
+  max-height: 3em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.trash-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.trash-item-restore,
+.trash-item-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+.trash-item-restore {
+  background: none;
+  border: 1px solid var(--color-link);
+  color: var(--color-link);
+}
+.trash-item-restore:hover {
+  background: var(--color-link);
+  color: #fff;
+}
+.trash-item-delete {
+  background: none;
+  border: 1px solid var(--gray-300);
+  color: var(--gray-500);
+}
+.trash-item-delete:hover {
+  border-color: var(--color-danger, #e53e3e);
+  color: var(--color-danger, #e53e3e);
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  var container = document.getElementById('trash-list');
+  if (!container) return;
+
+  var authEl = container.querySelector('.trash-list-auth');
+  var loadingEl = container.querySelector('.trash-list-loading');
+  var emptyEl = container.querySelector('.trash-list-empty');
+  var toolbarEl = container.querySelector('.trash-list-toolbar');
+  var itemsEl = container.querySelector('.trash-list-items');
+  var countEl = container.querySelector('.trash-list-count');
+  var signinBtn = document.getElementById('trash-signin-btn');
+  var emptyBtn = document.getElementById('trash-empty-btn');
+
+  var restoreIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<polyline points="1 4 1 10 7 10"></polyline>'
+    + '<path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>'
+    + '</svg>';
+
+  var deleteIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<line x1="18" y1="6" x2="6" y2="18"></line>'
+    + '<line x1="6" y1="6" x2="18" y2="18"></line>'
+    + '</svg>';
+
+  function showState(state) {
+    authEl.style.display = state === 'auth' ? '' : 'none';
+    loadingEl.style.display = state === 'loading' ? '' : 'none';
+    emptyEl.style.display = state === 'empty' ? '' : 'none';
+    toolbarEl.style.display = (state === 'content') ? '' : 'none';
+    itemsEl.style.display = (state === 'content') ? '' : 'none';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function formatDate(ms) {
+    if (!ms) return '';
+    var d = new Date(ms);
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  function daysUntilPurge(deletedAt) {
+    if (!deletedAt) return 30;
+    var thirtyDays = 30 * 24 * 60 * 60 * 1000;
+    var purgeAt = deletedAt + thirtyDays;
+    var remaining = Math.ceil((purgeAt - Date.now()) / (24 * 60 * 60 * 1000));
+    return Math.max(0, remaining);
+  }
+
+  function destLabel(dest) {
+    if (dest === 'book-note') return 'Book';
+    if (dest === 'snippets') return 'Snippet';
+    if (dest === 'topic') return 'Topic';
+    if (dest === 'inbox') return 'Inbox';
+    return dest || 'Note';
+  }
+
+  function renderTrashItem(note) {
+    var preview = note.content || '';
+    var textPreview = preview.length > 200 ? preview.substring(0, 200) + '...' : preview;
+    var days = daysUntilPurge(note.deletedAt);
+    var expiryText = days <= 0 ? 'Expiring soon' : days + ' day' + (days !== 1 ? 's' : '') + ' left';
+
+    return '<div class="trash-item" data-id="' + note.id + '">'
+      + '<div class="trash-item-content">'
+      + '<h4 class="trash-item-title">' + escapeHtml(note.title || 'Untitled') + '</h4>'
+      + '<div class="trash-item-meta">'
+      + '<span class="trash-item-dest">' + destLabel(note.destination) + '</span>'
+      + '<span>Deleted ' + formatDate(note.deletedAt) + '</span>'
+      + '<span class="trash-item-expiry">' + expiryText + '</span>'
+      + '</div>'
+      + '<div class="trash-item-preview">' + escapeHtml(textPreview) + '</div>'
+      + '</div>'
+      + '<div class="trash-item-actions">'
+      + '<button type="button" class="trash-item-restore" data-restore-id="' + note.id + '" title="Restore note">' + restoreIcon + ' Restore</button>'
+      + '<button type="button" class="trash-item-delete" data-delete-id="' + note.id + '" title="Delete permanently">' + deleteIcon + ' Delete</button>'
+      + '</div>'
+      + '</div>';
+  }
+
+  function renderTrash(notes) {
+    if (!notes.length) {
+      showState('empty');
+      return;
+    }
+
+    // Sort by most recently deleted first
+    notes.sort(function(a, b) { return (b.deletedAt || 0) - (a.deletedAt || 0); });
+
+    countEl.textContent = notes.length + ' item' + (notes.length !== 1 ? 's' : '') + ' in trash';
+
+    var html = '';
+    notes.forEach(function(n) { html += renderTrashItem(n); });
+    itemsEl.innerHTML = html;
+    showState('content');
+    bindButtons();
+  }
+
+  function bindButtons() {
+    // Restore buttons
+    itemsEl.querySelectorAll('.trash-item-restore[data-restore-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var noteId = btn.getAttribute('data-restore-id');
+        if (!noteId || !window.dmSync) return;
+        btn.disabled = true;
+
+        window.dmSync.firestoreWrite({
+          collection: 'notes',
+          docId: noteId,
+          op: 'update',
+          data: { deletedAt: firebase.firestore.FieldValue.delete(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+          localOp: function() { return window.dmSync.restoreNote(noteId); }
+        }).then(function() {
+          loadFromCache();
+          window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+        }).catch(function(err) {
+          console.error('Restore error:', err);
+          btn.disabled = false;
+        });
+      });
+    });
+
+    // Permanent delete buttons
+    itemsEl.querySelectorAll('.trash-item-delete[data-delete-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var noteId = btn.getAttribute('data-delete-id');
+        if (!noteId || !window.dmSync) return;
+        if (!confirm('Permanently delete this note? This cannot be undone.')) return;
+        btn.disabled = true;
+
+        window.dmSync.firestoreWrite({
+          collection: 'notes',
+          docId: noteId,
+          op: 'delete',
+          data: null,
+          localOp: function() { return window.dmSync.permanentlyDeleteNote(noteId); }
+        }).then(function() {
+          loadFromCache();
+          window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+        }).catch(function(err) {
+          console.error('Permanent delete error:', err);
+          btn.disabled = false;
+        });
+      });
+    });
+  }
+
+  // Empty Trash button
+  if (emptyBtn) {
+    emptyBtn.addEventListener('click', function() {
+      if (!confirm('Permanently delete all items in trash? This cannot be undone.')) return;
+      emptyBtn.disabled = true;
+
+      window.dmSync.getTrashedNotes().then(function(trashed) {
+        var chain = Promise.resolve();
+        trashed.forEach(function(note) {
+          chain = chain.then(function() {
+            return window.dmSync.firestoreWrite({
+              collection: 'notes',
+              docId: note.id,
+              op: 'delete',
+              data: null,
+              localOp: function() { return window.dmSync.permanentlyDeleteNote(note.id); }
+            });
+          });
+        });
+        return chain;
+      }).then(function() {
+        loadFromCache();
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+        emptyBtn.disabled = false;
+      }).catch(function(err) {
+        console.error('Empty trash error:', err);
+        emptyBtn.disabled = false;
+      });
+    });
+  }
+
+  function loadFromCache() {
+    if (!window.dmSync) return;
+    showState('loading');
+    window.dmSync.getTrashedNotes().then(function(notes) {
+      renderTrash(notes);
+    }).catch(function(err) {
+      console.error('Error loading trash:', err);
+      showState('empty');
+    });
+  }
+
+  // Auth handling
+  if (signinBtn) {
+    signinBtn.addEventListener('click', function() {
+      if (window.dmAuth && window.dmGoogleProvider) {
+        window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+          console.error('Sign-in error:', err);
+        });
+      }
+    });
+  }
+
+  // Listen for sync events
+  window.addEventListener('dm-sync-complete', function() {
+    if (window.dmAuth && window.dmAuth.currentUser) {
+      loadFromCache();
+    }
+  });
+
+  // Auth state
+  if (window.dmAuth) {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        loadFromCache();
+      } else {
+        showState('auth');
+      }
+    });
+  } else {
+    showState('auth');
+  }
+})();
+</script>

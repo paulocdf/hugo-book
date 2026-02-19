@@ -238,13 +238,13 @@
         e.preventDefault();
         e.stopPropagation();
         var noteId = this.getAttribute('data-id');
-        if (confirm('Delete this note permanently?')) {
+        if (confirm('Move this note to trash?')) {
           window.dmSync.firestoreWrite({
             collection: 'notes',
             docId: noteId,
-            op: 'delete',
-            data: null,
-            localOp: function() { return window.dmSync.deleteNote(noteId); }
+            op: 'update',
+            data: { deletedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+            localOp: function() { return window.dmSync.trashNote(noteId); }
           }).then(function() {
             loadFromCache();
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
