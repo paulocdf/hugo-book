@@ -15,18 +15,14 @@
     <!-- Add todo form — two rows: inputs + icon bar with chips -->
     <div class="todo-add-form" id="todo-add-form">
       <div class="todo-add-row-main">
-        <input type="text" id="todo-add-title" class="todo-add-title" placeholder="New task...">
-        <div class="todo-add-category-inline" id="todo-add-category-inline">
-          <input type="text" id="todo-add-category-input" class="todo-add-category-inline-input" placeholder="category" autocomplete="off">
-          <span class="todo-add-category-selected" id="todo-add-category-selected" style="display:none;">
-            <span class="todo-add-category-selected-text" id="todo-add-category-selected-text"></span>
-            <button type="button" class="todo-add-category-selected-clear" id="todo-add-category-selected-clear" aria-label="Clear category">&times;</button>
-          </span>
-          <div class="todo-add-category-dropdown" id="todo-add-category-dropdown"></div>
-        </div>
+        <input type="text" id="todo-add-title" class="todo-add-title" placeholder="What needs to be done?">
         <button type="button" class="todo-add-pomodoro-btn" id="todo-add-pomodoro-btn" title="Pomodoros: left-click to add, right-click to remove" aria-label="Set pomodoro count">
           <svg class="todo-add-pomodoro-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
           <span class="todo-add-pomodoro-count" id="todo-add-pomodoro-count">1</span>
+        </button>
+        <button type="button" class="todo-add-mic-btn" id="todo-add-mic-btn" title="Dictate task (speech-to-text)" aria-label="Dictate task" style="display:none;">
+          <svg class="todo-mic-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="1" width="6" height="11" rx="3"></rect><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+          <span class="todo-mic-pulse" id="todo-mic-pulse"></span>
         </button>
         <button type="button" id="todo-add-btn" class="todo-add-btn" title="Add task">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
@@ -47,6 +43,19 @@
           <span class="todo-add-chip-text" id="todo-add-reminder-chip-text"></span>
           <button type="button" class="todo-add-chip-clear" id="todo-add-reminder-chip-clear" aria-label="Clear reminder">&times;</button>
         </span>
+        <div class="todo-add-category-icon-wrap" id="todo-add-category-icon-wrap">
+          <button type="button" class="todo-add-icon-btn" id="todo-add-category-icon" title="Set category" aria-label="Set category">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+          </button>
+          <div class="todo-add-category-popover" id="todo-add-category-popover" style="display:none;">
+            <input type="text" id="todo-add-category-input" class="todo-add-category-search" placeholder="Search or add category..." autocomplete="off">
+            <div class="todo-add-category-dropdown" id="todo-add-category-dropdown"></div>
+          </div>
+        </div>
+        <span class="todo-add-chip" id="todo-add-category-chip" style="display:none;">
+          <span class="todo-add-chip-text" id="todo-add-category-chip-text"></span>
+          <button type="button" class="todo-add-chip-clear" id="todo-add-category-chip-clear" aria-label="Clear category">&times;</button>
+        </span>
       </div>
     </div>
 
@@ -55,6 +64,25 @@
 
     <!-- Summary -->
     <div class="todo-summary" id="todo-summary" style="display: none;"></div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="todo-delete-modal" id="todo-delete-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="todo-delete-heading">
+  <div class="todo-delete-backdrop" id="todo-delete-backdrop"></div>
+  <div class="todo-delete-dialog">
+    <div class="todo-delete-header">
+      <h3 id="todo-delete-heading">Delete Task</h3>
+      <button type="button" class="todo-delete-close" id="todo-delete-close">&times;</button>
+    </div>
+    <p class="todo-delete-message" id="todo-delete-message"></p>
+    <div class="todo-delete-actions">
+      <button type="button" class="todo-delete-btn-cancel" id="todo-delete-cancel">Cancel</button>
+      <button type="button" class="todo-delete-btn-confirm" id="todo-delete-confirm">Delete</button>
+    </div>
+    <div class="todo-delete-hints">
+      <kbd>Esc</kbd> cancel &middot; <kbd>Enter</kbd> delete
+    </div>
   </div>
 </div>
 
@@ -124,9 +152,22 @@
 }
 .todo-add-row-main {
   display: flex;
-  gap: 8px;
+  gap: 0;
   align-items: center;
   position: relative;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.todo-add-row-main:focus-within {
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 2px rgba(0, 105, 255, 0.08);
+}
+.todo-add-row-main > :first-child {
+  border-radius: 9px 0 0 9px;
+}
+.todo-add-row-main > :last-child {
+  border-radius: 0 9px 9px 0;
 }
 /* Icon bar row with chips */
 .todo-add-row-icons {
@@ -197,104 +238,48 @@
 .todo-add-chip-clear:hover {
   background: rgba(0, 105, 255, 0.15);
 }
-/* Category popover for add-form */
-/* Inline category input in main row */
-.todo-add-category-inline {
+/* ─── Category icon + popover ─── */
+.todo-add-category-icon-wrap {
   position: relative;
-  flex-shrink: 1;
-  min-width: 70px;
-  max-width: 130px;
 }
-.todo-add-category-inline-input {
-  width: 100%;
-  padding: 6px 24px 6px 8px;
-  border: 1px solid var(--gray-200);
-  border-radius: 8px;
-  font-size: 0.8rem;
-  background: var(--body-background);
-  color: var(--body-font-color);
-  box-sizing: border-box;
-  outline: none;
-  transition: border-color 0.15s;
-  height: 34px;
-}
-.todo-add-category-inline-input:focus {
-  border-color: var(--color-link);
-}
-.todo-add-category-inline-input::placeholder {
-  color: var(--gray-400);
-  font-style: italic;
-}
-.todo-add-category-selected {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 8px 3px 10px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: var(--color-link);
-  background: rgba(0, 105, 255, 0.08);
-  border: 1px solid rgba(0, 105, 255, 0.12);
-  border-radius: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-  line-height: 1.5;
-  height: 26px;
-  box-sizing: border-box;
-  transition: background 0.15s, border-color 0.15s;
-  max-width: 130px;
-  overflow: hidden;
-}
-.todo-add-category-selected:hover {
-  background: rgba(0, 105, 255, 0.13);
-  border-color: rgba(0, 105, 255, 0.25);
-}
-.todo-add-category-selected-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.todo-add-category-selected-clear {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 14px;
-  border: none;
-  border-radius: 50%;
-  background: none;
-  color: var(--color-link);
-  font-size: 0.8rem;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0;
-  opacity: 0.6;
-  flex-shrink: 0;
-}
-.todo-add-category-selected-clear:hover {
-  opacity: 1;
-  background: rgba(0, 105, 255, 0.15);
-}
-.todo-add-category-dropdown {
+.todo-add-category-popover {
   position: absolute;
-  left: 0;
-  min-width: 200px;
-  max-width: 320px;
   top: 100%;
+  left: 0;
+  z-index: 30;
+  width: 240px;
   margin-top: 4px;
   background: var(--body-background);
   border: 1px solid var(--gray-200);
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-  max-height: 160px;
-  overflow-y: auto;
-  z-index: 30;
+  animation: todo-popover-in 0.15s ease-out;
+  overflow: hidden;
+}
+.todo-add-category-search {
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-bottom: 1px solid var(--gray-200);
+  font-size: 0.8rem;
+  background: transparent;
+  color: var(--body-font-color);
+  box-sizing: border-box;
+  outline: none;
+}
+.todo-add-category-search::placeholder {
+  color: var(--gray-400);
+}
+.todo-add-category-dropdown {
   display: none;
+  flex-wrap: wrap;
+  gap: 5px;
   padding: 6px;
+  max-height: 150px;
+  overflow-y: auto;
 }
 .todo-add-category-dropdown.show {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
 }
 .todo-add-category-chip {
   display: inline-flex;
@@ -408,42 +393,47 @@
 }
 .todo-add-title {
   flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--gray-300);
-  border-radius: 8px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 0;
   font-size: 0.88rem;
-  background: var(--body-background);
+  background: transparent;
   color: var(--body-font-color);
-  transition: border-color 0.2s;
+  outline: none;
+  min-width: 0;
 }
 .todo-add-title:focus {
   outline: none;
-  border-color: var(--color-link);
+}
+.todo-add-title::placeholder {
+  color: var(--gray-400);
 }
 /* Pomodoro counter button in add-form main row */
 .todo-add-pomodoro-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 8px;
-  border: 1px solid var(--gray-200);
-  border-radius: 8px;
-  background: var(--body-background);
+  padding: 4px 10px;
+  border: none;
+  border-left: 1px solid var(--gray-200);
+  border-radius: 0;
+  background: transparent;
   color: var(--gray-500);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s;
   flex-shrink: 0;
   user-select: none;
   -webkit-user-select: none;
   line-height: 1;
-  height: 34px;
+  height: 36px;
   box-sizing: border-box;
 }
 .todo-add-pomodoro-btn:hover {
-  border-color: var(--color-link);
+  background: var(--gray-100);
+  color: var(--color-link);
 }
 .todo-add-pomodoro-btn.has-count {
-  border-color: var(--color-link);
+  color: var(--color-link);
   background: rgba(0, 105, 255, 0.06);
 }
 .todo-add-pomodoro-icon {
@@ -497,6 +487,51 @@
 .todo-add-pomo-config-unit {
   font-size: 0.72rem;
   color: var(--gray-400);
+}
+/* ─── Mic (speech-to-text) button ─── */
+.todo-add-mic-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-left: 1px solid var(--gray-200);
+  border-radius: 0;
+  background: transparent;
+  color: var(--gray-500);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  line-height: 0;
+  box-sizing: border-box;
+}
+.todo-add-mic-btn:hover {
+  background: var(--gray-100);
+  color: var(--color-link);
+}
+.todo-add-mic-btn.recording {
+  color: var(--color-danger, #e53e3e);
+  background: var(--color-danger-bg, rgba(229, 62, 62, 0.06));
+}
+.todo-mic-pulse {
+  display: none;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-danger, #e53e3e);
+  animation: todo-mic-pulse-anim 1s ease-in-out infinite;
+}
+.todo-add-mic-btn.recording .todo-mic-pulse {
+  display: block;
+}
+@keyframes todo-mic-pulse-anim {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.3); }
 }
 /* Day group headers */
 .todo-day-group {
@@ -572,11 +607,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
+  width: 38px;
   height: 36px;
-  border: 1px solid var(--color-link);
-  border-radius: 8px;
-  background: var(--body-background);
+  border: none;
+  border-left: 1px solid var(--gray-200);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-link);
   cursor: pointer;
   transition: background 0.2s, color 0.2s;
@@ -617,6 +653,13 @@
 }
 .todo-item.done {
   opacity: 0.6;
+}
+.todo-item.done.just-completed {
+  animation: todo-slide-down 0.35s ease-out;
+}
+@keyframes todo-slide-down {
+  from { opacity: 0.3; transform: translateY(-8px); }
+  to { opacity: 0.6; transform: translateY(0); }
 }
 .todo-item-checkbox {
   margin-top: 3px;
@@ -897,6 +940,15 @@
   }
   .todo-add-title {
     flex: 1 1 100%;
+    border-bottom: 1px solid var(--gray-300);
+    border-radius: 9px 9px 0 0 !important;
+  }
+  .todo-add-row-main > :nth-child(2) {
+    border-left: none !important;
+    border-radius: 0 0 0 9px !important;
+  }
+  .todo-add-row-main > :last-child {
+    border-radius: 0 0 9px 0 !important;
   }
 
   .todo-add-row-icons {
@@ -1076,6 +1128,104 @@
   background: var(--color-danger-bg, rgba(229, 62, 62, 0.06));
 }
 
+/* ─── Delete confirmation modal ─── */
+.todo-delete-modal {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.todo-delete-backdrop {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.todo-delete-dialog {
+  position: relative;
+  background: var(--body-background);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 94%;
+  max-width: 380px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+  animation: todo-delete-in 0.2s ease-out;
+}
+@keyframes todo-delete-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.todo-delete-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+.todo-delete-header h3 { margin: 0; font-size: 1.05rem; font-weight: 700; }
+.todo-delete-close {
+  background: none; border: none; font-size: 1.5rem;
+  cursor: pointer; color: var(--body-font-color); padding: 4px 8px;
+  border-radius: 6px; transition: background 0.15s;
+}
+.todo-delete-close:hover { background: var(--gray-100); }
+.todo-delete-message {
+  font-size: 0.9rem;
+  color: var(--body-font-color);
+  margin: 0 0 1.25rem 0;
+  line-height: 1.5;
+}
+.todo-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.todo-delete-btn-cancel,
+.todo-delete-btn-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.todo-delete-btn-cancel:hover { background: var(--gray-100); }
+.todo-delete-btn-confirm {
+  border-color: var(--color-danger, #e53e3e);
+  color: var(--color-danger, #e53e3e);
+}
+.todo-delete-btn-confirm:hover {
+  background: var(--color-danger, #e53e3e);
+  color: #fff;
+}
+.todo-delete-hints {
+  margin-top: 0.75rem;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--gray-400);
+}
+.todo-delete-hints kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: var(--gray-100);
+  font-size: 0.65rem;
+  font-family: inherit;
+  color: var(--gray-500);
+}
+@media screen and (max-width: 500px) {
+  .todo-delete-dialog {
+    width: 96%;
+    padding: 1rem;
+  }
+}
+
 
 </style>
 
@@ -1104,18 +1254,22 @@
   var addReminderChip = document.getElementById('todo-add-reminder-chip');
   var addReminderChipText = document.getElementById('todo-add-reminder-chip-text');
   var addReminderChipClear = document.getElementById('todo-add-reminder-chip-clear');
-  var addCategoryInline = document.getElementById('todo-add-category-inline');
+  var addCategoryIconWrap = document.getElementById('todo-add-category-icon-wrap');
+  var addCategoryIcon = document.getElementById('todo-add-category-icon');
+  var addCategoryPopover = document.getElementById('todo-add-category-popover');
   var addCategoryInput = document.getElementById('todo-add-category-input');
-  var addCategorySelected = document.getElementById('todo-add-category-selected');
-  var addCategorySelectedText = document.getElementById('todo-add-category-selected-text');
-  var addCategorySelectedClear = document.getElementById('todo-add-category-selected-clear');
+  var addCategoryChip = document.getElementById('todo-add-category-chip');
+  var addCategoryChipText = document.getElementById('todo-add-category-chip-text');
+  var addCategoryChipClear = document.getElementById('todo-add-category-chip-clear');
   var addCategoryDropdown = document.getElementById('todo-add-category-dropdown');
+  var addMicBtn = document.getElementById('todo-add-mic-btn');
 
   if (!container || !itemsEl) return;
 
   // State
   var allTodos = [];
   var _pomodoroTrackedMinutes = {}; // { todoId: minutes } — stores tracked time from Pomodoro timer
+  var _justCompletedIds = {}; // { todoId: true } — for slide-down animation on just-completed tasks
   var _addFormCategory = null; // Selected category string for new task
   var _existingCategories = []; // Cached list of existing categories for autocomplete
   var _catDropdownActiveIdx = -1; // Active index in category dropdown
@@ -1128,6 +1282,121 @@
     var stored = parseInt(localStorage.getItem('dm-pomodoro-length'), 10);
     if (stored > 0) _globalPomodoroLength = stored;
   } catch(e) {}
+
+  // Clear just-completed animation flags after animation duration
+  function clearJustCompletedIds() {
+    setTimeout(function() { _justCompletedIds = {}; }, 400);
+  }
+
+  // ─── Delete confirmation modal ───
+  var _deleteModal = document.getElementById('todo-delete-modal');
+  var _deleteModalHeading = document.getElementById('todo-delete-heading');
+  var _deleteModalMessage = document.getElementById('todo-delete-message');
+  var _deleteModalConfirmBtn = document.getElementById('todo-delete-confirm');
+  var _deleteModalCancelBtn = document.getElementById('todo-delete-cancel');
+  var _deleteModalCloseBtn = document.getElementById('todo-delete-close');
+  var _deleteModalBackdrop = document.getElementById('todo-delete-backdrop');
+  var _deleteOnConfirm = null;
+
+  function showDeleteConfirm(message, onConfirm, title) {
+    if (!_deleteModal) return onConfirm(); // fallback
+    _deleteModalHeading.textContent = title || 'Delete Task';
+    _deleteModalMessage.textContent = message;
+    _deleteOnConfirm = onConfirm;
+    _deleteModal.style.display = '';
+    setTimeout(function() { _deleteModalConfirmBtn.focus(); }, 50);
+  }
+
+  function closeDeleteModal() {
+    if (_deleteModal) _deleteModal.style.display = 'none';
+    _deleteOnConfirm = null;
+  }
+
+  if (_deleteModal) {
+    _deleteModalConfirmBtn.addEventListener('click', function() {
+      if (_deleteOnConfirm) _deleteOnConfirm();
+      closeDeleteModal();
+    });
+    _deleteModalCancelBtn.addEventListener('click', closeDeleteModal);
+    _deleteModalCloseBtn.addEventListener('click', closeDeleteModal);
+    _deleteModalBackdrop.addEventListener('click', closeDeleteModal);
+    _deleteModal.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeDeleteModal();
+      }
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        _deleteModalConfirmBtn.click();
+      }
+    });
+  }
+
+  // ─── Speech-to-text (mic dictation) ───
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var _speechRecognition = null;
+  var _speechIsRecording = false;
+
+  function initSpeech() {
+    if (!SpeechRecognition || !addMicBtn) return;
+    // Show the mic button only when browser supports speech
+    addMicBtn.style.display = '';
+
+    _speechRecognition = new SpeechRecognition();
+    _speechRecognition.continuous = false;
+    _speechRecognition.interimResults = true;
+    _speechRecognition.lang = navigator.language || 'en-US';
+    _speechRecognition.maxAlternatives = 1;
+
+    _speechRecognition.onresult = function(event) {
+      var transcript = '';
+      for (var i = 0; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      if (addTitleInput) {
+        addTitleInput.value = transcript;
+      }
+    };
+
+    _speechRecognition.onend = function() {
+      _speechIsRecording = false;
+      addMicBtn.classList.remove('recording');
+      // Focus the title input so user can review/edit before pressing Add
+      if (addTitleInput && addTitleInput.value.trim()) {
+        addTitleInput.focus();
+      }
+    };
+
+    _speechRecognition.onerror = function(event) {
+      _speechIsRecording = false;
+      addMicBtn.classList.remove('recording');
+      if (event.error === 'not-allowed') {
+        showTodoError('Microphone access denied');
+      } else if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        showTodoError('Speech error: ' + event.error);
+      }
+    };
+
+    addMicBtn.addEventListener('click', function() {
+      if (_speechIsRecording) {
+        _speechRecognition.stop();
+        return;
+      }
+      // Clear input before starting
+      if (addTitleInput) addTitleInput.value = '';
+      _speechIsRecording = true;
+      addMicBtn.classList.add('recording');
+      try {
+        _speechRecognition.start();
+      } catch(e) {
+        // Already started — ignore
+        _speechIsRecording = false;
+        addMicBtn.classList.remove('recording');
+      }
+    });
+  }
+
+  initSpeech();
 
   // ─── Date helpers ───
   function getTodayStr() {
@@ -1410,13 +1679,12 @@
     updateReminderChip();
   });
 
-  // ─── Category popover for add-form ───
+  // ─── Category icon + popover for add-form ───
   function loadAddFormCategories() {
     _existingCategories = [];
     if (!window.dmSync) return Promise.resolve();
     return window.dmSync.getAllTodos().then(function(todos) {
-      // Track each category's most recent updatedAt and usage count
-      var catMap = {}; // { name: { lastUsed: timestamp, count: number } }
+      var catMap = {};
       todos.forEach(function(t) {
         if (t.category) {
           var ts = t.updatedAt || t.createdAt || 0;
@@ -1433,7 +1701,6 @@
           });
         }
       });
-      // Sort by most recently used first
       _existingCategories = Object.keys(catMap).sort(function(a, b) {
         return catMap[b].lastUsed - catMap[a].lastUsed;
       });
@@ -1458,18 +1725,14 @@
       escapeHtml(text.substring(idx + q.length));
   }
 
-  function updateCategoryInput() {
+  function updateCategoryChip() {
     if (_addFormCategory) {
-      // Show chip, hide input
-      addCategoryInput.style.display = 'none';
-      addCategoryInput.value = '';
-      addCategorySelectedText.textContent = _addFormCategory;
-      addCategorySelected.style.display = '';
+      addCategoryChipText.textContent = _addFormCategory;
+      addCategoryChip.style.display = '';
+      addCategoryIcon.classList.add('active');
     } else {
-      // Show input, hide chip
-      addCategorySelected.style.display = 'none';
-      addCategoryInput.style.display = '';
-      addCategoryInput.value = '';
+      addCategoryChip.style.display = 'none';
+      addCategoryIcon.classList.remove('active');
     }
   }
 
@@ -1506,8 +1769,8 @@
 
   function selectCat(cat) {
     _addFormCategory = cat;
-    updateCategoryInput();
-    hideCatDropdown();
+    updateCategoryChip();
+    hideCatPopover();
   }
 
   function navigateCatDropdown(direction) {
@@ -1523,24 +1786,41 @@
     chips[_catDropdownActiveIdx].scrollIntoView({ block: 'nearest' });
   }
 
-  addCategoryInput.addEventListener('input', function() {
-    // While typing, don't commit yet — just filter the dropdown
+  function showCatPopover() {
+    addCategoryPopover.style.display = '';
+    addCategoryInput.value = '';
     showCatDropdown();
+    setTimeout(function() { addCategoryInput.focus(); }, 30);
+  }
+
+  function hideCatPopover() {
+    addCategoryPopover.style.display = 'none';
+    hideCatDropdown();
+    addCategoryInput.value = '';
+  }
+
+  addCategoryIcon.addEventListener('click', function(e) {
+    e.stopPropagation();
+    if (addCategoryPopover.style.display !== 'none') {
+      hideCatPopover();
+    } else {
+      showCatPopover();
+    }
   });
 
-  addCategoryInput.addEventListener('focus', function() {
+  addCategoryInput.addEventListener('input', function() {
     showCatDropdown();
   });
 
   addCategoryInput.addEventListener('blur', function() {
     setTimeout(function() {
-      hideCatDropdown();
-      // If a category was already selected (chip is showing), don't override
-      if (addCategorySelected.style.display !== 'none' && _addFormCategory) return;
-      // Commit whatever is typed
+      // Commit whatever is typed on blur
       var val = addCategoryInput.value.trim().toLowerCase();
-      _addFormCategory = val || null;
-      updateCategoryInput();
+      if (val) {
+        _addFormCategory = val;
+        updateCategoryChip();
+      }
+      hideCatPopover();
     }, 150);
   });
 
@@ -1560,32 +1840,36 @@
       } else if (addCategoryInput.value.trim()) {
         selectCat(addCategoryInput.value.trim().toLowerCase());
       } else {
-        // No category typed — submit the task
-        addFromForm();
+        hideCatPopover();
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
-      hideCatDropdown();
-      addCategoryInput.blur();
+      hideCatPopover();
     }
   });
 
-  // Click the × on the selected chip to clear category
-  addCategorySelectedClear.addEventListener('click', function(e) {
+  // Click the × on the category chip to clear
+  addCategoryChipClear.addEventListener('click', function(e) {
     e.stopPropagation();
     _addFormCategory = null;
-    updateCategoryInput();
-    addCategoryInput.focus();
+    updateCategoryChip();
   });
 
-  // Click the chip itself to edit — show the input with current value
-  addCategorySelected.addEventListener('click', function(e) {
-    if (e.target === addCategorySelectedClear) return; // let clear handle it
-    addCategorySelected.style.display = 'none';
-    addCategoryInput.style.display = '';
+  // Click the chip text to re-open popover for editing
+  addCategoryChip.addEventListener('click', function(e) {
+    if (e.target === addCategoryChipClear || e.target.closest('.todo-add-chip-clear')) return;
+    showCatPopover();
     addCategoryInput.value = _addFormCategory || '';
-    addCategoryInput.focus();
-    addCategoryInput.select();
+    setTimeout(function() { addCategoryInput.select(); }, 50);
+  });
+
+  // Close popover on outside click
+  document.addEventListener('click', function(e) {
+    if (addCategoryPopover.style.display !== 'none' &&
+        !addCategoryIconWrap.contains(e.target) &&
+        !addCategoryChip.contains(e.target)) {
+      hideCatPopover();
+    }
   });
 
   // ─── Pomodoro count button handlers ───
@@ -1656,7 +1940,7 @@
   function showPomodoroConfigPopover() {
     closePomodoroConfigPopover();
     closeAddFormPopover();
-    hideCatDropdown();
+    hideCatPopover();
 
     var pop = document.createElement('div');
     pop.className = 'todo-add-pomo-config';
@@ -1718,7 +2002,7 @@
   // Initialize chips — default to Today
   updateDateChip();
   updateReminderChip();
-  updateCategoryInput();
+  updateCategoryChip();
 
   // ─── Toast notifications ───
   function showTodoError(msg) {
@@ -1757,8 +2041,9 @@
   // ─── Render ───
   function buildTodoItemHtml(todo, isSubtask, hasChildren) {
     var doneClass = todo.done ? ' done' : '';
+    var justCompletedClass = _justCompletedIds[todo.id] ? ' just-completed' : '';
     var checked = todo.done ? ' checked' : '';
-    var html = '<div class="todo-item' + doneClass + '" data-todo-id="' + todo.id + '">';
+    var html = '<div class="todo-item' + doneClass + justCompletedClass + '" data-todo-id="' + todo.id + '">';
 
     // Subtask collapse toggle for parents with children
     if (!isSubtask && hasChildren) {
@@ -1882,9 +2167,10 @@
       }
     });
 
-    // Sort children by order
+    // Sort children by order, done tasks at bottom
     Object.keys(childrenMap).forEach(function(pid) {
       childrenMap[pid].sort(function(a, b) {
+        if (a.done !== b.done) return a.done ? 1 : -1;
         return (a.order || 0) - (b.order || 0);
       });
     });
@@ -1904,13 +2190,15 @@
     // Sort dates
     var sortedDates = Object.keys(dateGroups).sort();
 
-    // Sort parents within each group by order
+    // Sort parents within each group by order, done tasks at bottom
     sortedDates.forEach(function(dateStr) {
       dateGroups[dateStr].sort(function(a, b) {
+        if (a.done !== b.done) return a.done ? 1 : -1;
         return (a.order || 0) - (b.order || 0);
       });
     });
     unscheduled.sort(function(a, b) {
+      if (a.done !== b.done) return a.done ? 1 : -1;
       return (a.order || 0) - (b.order || 0);
     });
 
@@ -2143,9 +2431,9 @@
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         var todoId = btn.getAttribute('data-delete-id');
-        if (confirm('Permanently delete this task?')) {
+        showDeleteConfirm('Permanently delete this task?', function() {
           deleteTodo(todoId);
-        }
+        });
       });
     });
 
@@ -2199,8 +2487,10 @@
           if (t.done) completedIds.push(t.id);
         });
         if (completedIds.length === 0) return;
-        if (!confirm('Permanently delete ' + completedIds.length + ' completed task' + (completedIds.length > 1 ? 's' : '') + '?')) return;
-        clearAllCompleted(completedIds);
+        var msg = 'Permanently delete ' + completedIds.length + ' completed task' + (completedIds.length > 1 ? 's' : '') + '?';
+        showDeleteConfirm(msg, function() {
+          clearAllCompleted(completedIds);
+        }, 'Clear Completed');
       });
     }
   }
@@ -2513,6 +2803,7 @@
     todo.updatedAt = Date.now();
 
     if (window.dmSync) {
+      _justCompletedIds[todo.id] = true;
       window.dmSync.firestoreWrite({
         collection: 'todos',
         docId: todo.id,
@@ -2525,6 +2816,7 @@
         // Check if parent should auto-complete
         checkParentAutoComplete(todo.parentId);
         render();
+        clearJustCompletedIds();
       }).catch(function(err) {
         console.error('Error completing todo:', err);
         showTodoError('Failed to complete task — check console');
@@ -2533,6 +2825,7 @@
         todo.actualMin = null;
         todo.category = null;
         todo.completedAt = null;
+        delete _justCompletedIds[todo.id];
         render();
       });
     }
@@ -2576,6 +2869,7 @@
     parent.updatedAt = Date.now();
 
     if (window.dmSync) {
+      _justCompletedIds[parent.id] = true;
       window.dmSync.firestoreWrite({
         collection: 'todos',
         docId: parent.id,
@@ -2586,9 +2880,11 @@
         }
       }).then(function() {
         render();
+        clearJustCompletedIds();
       }).catch(function(err) {
         console.error('Error auto-completing parent:', err);
         showTodoError('Failed to auto-complete parent task');
+        delete _justCompletedIds[parent.id];
       });
     }
   }
@@ -2720,7 +3016,7 @@
     _addFormReminderMs = null;
     updateReminderChip();
     closeAddFormPopover();
-    hideCatDropdown();
+    hideCatPopover();
     closePomodoroConfigPopover();
     addTitleInput.focus();
   }
