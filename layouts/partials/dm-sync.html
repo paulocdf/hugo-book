@@ -7,6 +7,7 @@
 <div id="dm-offline-indicator" class="dm-offline-indicator" style="display: none;">
   <svg class="dm-offline-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.56 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
   <span class="dm-offline-text">Offline</span>
+  <button id="dm-offline-dismiss" class="dm-offline-dismiss" style="display: none;" title="Clear stuck sync queue">&times;</button>
 </div>
 <style>
 #dm-reminder-banner-container {
@@ -134,6 +135,19 @@
 .dm-offline-icon {
   flex-shrink: 0;
 }
+.dm-offline-dismiss {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0 0 4px;
+  margin: 0;
+}
+.dm-offline-dismiss:hover {
+  color: #fff;
+}
 @media (max-width: 600px) {
   .dm-offline-indicator {
     bottom: 16px;
@@ -163,6 +177,8 @@
   var _syncing = false;
   var _isOnline = navigator.onLine;
   var _draining = false;
+  var _drainAttempts = 0;
+  var MAX_DRAIN_ATTEMPTS = 3; // Give up after 3 failed drain cycles
 
   // ─── IndexedDB Wrapper ───
 
@@ -327,8 +343,11 @@
   }
 
   // Reconstruct Firestore-specific objects from serialized queue data.
+  // Also handles legacy entries where serverTimestamp/Timestamp objects
+  // were stored without __type markers (pre-fix corrupt data).
   function deserializeQueueData(data) {
     if (!data || typeof data !== 'object') return data;
+    var TIMESTAMP_FIELDS = ['createdAt', 'updatedAt', 'completedAt', 'reminderAt', 'nextReviewAt', 'lastReviewedAt', 'deletedAt'];
     var out = {};
     Object.keys(data).forEach(function(key) {
       var val = data[key];
@@ -339,6 +358,20 @@
         }
         if (val.__type === 'timestamp' && typeof val.__ms === 'number') {
           out[key] = firebase.firestore.Timestamp.fromMillis(val.__ms);
+          return;
+        }
+      }
+      // Legacy fix: detect mangled timestamp fields (plain objects that lost
+      // their class identity after IDB structured clone round-trip).
+      if (val && typeof val === 'object' && TIMESTAMP_FIELDS.indexOf(key) !== -1) {
+        // If it has seconds/nanoseconds, it was a Firestore Timestamp
+        if (typeof val.seconds === 'number' && typeof val.nanoseconds === 'number') {
+          out[key] = new firebase.firestore.Timestamp(val.seconds, val.nanoseconds);
+          return;
+        }
+        // Otherwise it was likely a serverTimestamp() sentinel — replace with fresh one
+        if (!Array.isArray(val) && Object.keys(val).length <= 2) {
+          out[key] = firebase.firestore.FieldValue.serverTimestamp();
           return;
         }
       }
@@ -525,9 +558,20 @@
           }
         }
 
-        // If some failed, retry after a delay
+        // If some failed, retry after a delay (up to MAX_DRAIN_ATTEMPTS)
         if (failed) {
-          setTimeout(drainQueue, 10000);
+          _drainAttempts++;
+          if (_drainAttempts >= MAX_DRAIN_ATTEMPTS) {
+            console.warn('[dm-sync] Queue drain failed ' + _drainAttempts + ' times, clearing stuck entries');
+            clearQueue().then(function() {
+              _drainAttempts = 0;
+              updateOfflineIndicator();
+            });
+          } else {
+            setTimeout(drainQueue, 10000);
+          }
+        } else {
+          _drainAttempts = 0;
         }
       });
     }).catch(function(err) {
@@ -542,17 +586,21 @@
     getAllQueued().then(function(entries) {
       var indicator = document.getElementById('dm-offline-indicator');
       if (!indicator) return;
+      var dismissBtn = document.getElementById('dm-offline-dismiss');
 
       if (!_isOnline) {
         indicator.style.display = '';
         indicator.querySelector('.dm-offline-text').textContent = 'Offline' + (entries.length ? ' (' + entries.length + ' pending)' : '');
         indicator.classList.add('dm-offline--show');
+        if (dismissBtn) dismissBtn.style.display = 'none';
       } else if (entries.length > 0) {
         indicator.style.display = '';
         indicator.querySelector('.dm-offline-text').textContent = 'Syncing ' + entries.length + ' change' + (entries.length > 1 ? 's' : '') + '...';
         indicator.classList.add('dm-offline--show');
+        if (dismissBtn) dismissBtn.style.display = '';
       } else {
         indicator.classList.remove('dm-offline--show');
+        if (dismissBtn) dismissBtn.style.display = 'none';
         setTimeout(function() { indicator.style.display = 'none'; }, 300);
       }
     }).catch(function() {});
@@ -571,6 +619,19 @@
     console.log('[dm-sync] Gone offline');
     updateOfflineIndicator();
   });
+
+  // Dismiss button: clear stuck queue entries
+  var _dismissBtn = document.getElementById('dm-offline-dismiss');
+  if (_dismissBtn) {
+    _dismissBtn.addEventListener('click', function() {
+      clearQueue().then(function() {
+        _drainAttempts = 0;
+        _draining = false;
+        console.log('[dm-sync] Queue manually cleared by user');
+        updateOfflineIndicator();
+      });
+    });
+  }
 
   // ─── Firestore Document Serializer ───
 
