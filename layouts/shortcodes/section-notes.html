@@ -175,6 +175,36 @@
   background: rgba(229, 62, 62, 0.06);
   border-color: rgba(229, 62, 62, 0.2);
 }
+.section-notes-pin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+  color: var(--gray-400);
+}
+.section-notes-pin:hover {
+  color: var(--color-link);
+  background: rgba(0, 105, 255, 0.06);
+  border-color: rgba(0, 105, 255, 0.2);
+}
+.section-notes-pin-active {
+  color: var(--color-link);
+}
+.section-notes-card-pinned {
+  border-left: 3px solid var(--color-link);
+}
+.section-notes-pin-indicator {
+  vertical-align: -1px;
+  margin-right: 2px;
+  color: var(--color-link);
+}
 </style>
 
 <script>
@@ -236,6 +266,11 @@
       + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>'
       + '</svg>';
 
+    var pinIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<line x1="12" y1="17" x2="12" y2="22"></line>'
+      + '<path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>'
+      + '</svg>';
+
     // ---------------------------------------------------------------
     // Render a clickable card (for Topics, Books, Snippets)
     // ---------------------------------------------------------------
@@ -256,16 +291,21 @@
         preview = escapeHtml(textPreview);
       }
 
-      return '<a class="section-notes-card" href="' + viewUrl(note.id) + '">'
+      var pinnedClass = note.pinned ? ' section-notes-card-pinned' : '';
+      var pinBtnClass = 'section-notes-pin' + (note.pinned ? ' section-notes-pin-active' : '');
+      var pinTitle = note.pinned ? 'Unpin note' : 'Pin note';
+
+      return '<a class="section-notes-card' + pinnedClass + '" href="' + viewUrl(note.id) + '">'
         + '<div class="section-notes-card-header">'
         + '<div>'
-        + '<h4 class="section-notes-card-title">' + escapeHtml(note.title || 'Untitled') + '</h4>'
+        + '<h4 class="section-notes-card-title">' + (note.pinned ? '<svg class="section-notes-pin-indicator" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg> ' : '') + escapeHtml(note.title || 'Untitled') + '</h4>'
         + '<div class="section-notes-card-meta">'
         + '<span class="section-notes-date">' + formatDate(note.createdAt) + '</span>'
         + tagsHtml
         + '</div>'
         + '</div>'
         + '<div class="section-notes-card-actions">'
+        + '<button type="button" class="' + pinBtnClass + '" data-pin-id="' + note.id + '" title="' + pinTitle + '">' + pinIcon + '</button>'
         + '<button type="button" class="section-notes-edit" data-id="' + note.id + '" title="Edit note">' + editIcon + '</button>'
         + '<button type="button" class="section-notes-delete" data-id="' + note.id + '" title="Delete note">' + deleteIcon + '</button>'
         + '</div>'
@@ -280,14 +320,20 @@
         return;
       }
 
-      // Sort by createdAt descending (newest first)
-      notes.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+      // Sort: pinned first, then by createdAt descending (newest first)
+      notes.sort(function(a, b) {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      });
 
       var html = '';
 
       if (destination === 'book-note') {
-        // Flat list of book cards, sorted by bookTitle then createdAt
+        // Flat list of book cards, sorted by pinned first, then bookTitle, then createdAt
         notes.sort(function(a, b) {
+          if (a.pinned && !b.pinned) return -1;
+          if (!a.pinned && b.pinned) return 1;
           var at = (a.bookTitle || '').toLowerCase();
           var bt = (b.bookTitle || '').toLowerCase();
           if (at < bt) return -1;
@@ -349,6 +395,33 @@
                 alert('Failed to delete note.');
               });
           }
+        });
+      });
+
+      // Pin buttons
+      listEl.querySelectorAll('.section-notes-pin[data-pin-id]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var noteId = btn.getAttribute('data-pin-id');
+          if (!noteId || !window.dmSync) return;
+
+          window.dmSync.getNote(noteId).then(function(note) {
+            if (!note) return;
+            var newPinned = !note.pinned;
+            window.dmSync.firestoreWrite({
+              collection: 'notes',
+              docId: noteId,
+              op: 'update',
+              data: { pinned: newPinned, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+              localOp: function() { note.pinned = newPinned; note.updatedAt = Date.now(); return window.dmSync.putNote(note); }
+            }).then(function() {
+              loadFromCache();
+              window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+            }).catch(function(err) {
+              console.error('Pin toggle error:', err);
+            });
+          });
         });
       });
 

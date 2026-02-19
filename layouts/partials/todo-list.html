@@ -1247,7 +1247,8 @@
     }
     // Active pomodoro indicator
     if (!todo.done && window.dmPomodoro && window.dmPomodoro.isActive(todo.id)) {
-      html += '<span class="todo-item-timer-active"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> timing</span>';
+      var timerRunning = window.dmPomodoro.isTimerRunning();
+      html += '<span class="todo-item-timer-active' + (timerRunning ? '' : ' paused') + '"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ' + (timerRunning ? 'timing' : 'paused') + '</span>';
     }
     if (todo.category) {
       html += '<span class="todo-item-category">' + escapeHtml(todo.category) + '</span>';
@@ -1269,10 +1270,17 @@
     if (!todo.done) {
       // Pomodoro timer button
       var isTimerActive = window.dmPomodoro && window.dmPomodoro.isActive(todo.id);
-      html += '<button type="button" class="todo-item-action-btn pomodoro-start' + (isTimerActive ? ' active' : '') + '" data-pomodoro-id="' + todo.id + '" title="' + (isTimerActive ? 'Timer running' : 'Start Pomodoro') + '" aria-label="Start Pomodoro timer">';
-      if (isTimerActive) {
+      var isTimerRunning = isTimerActive && window.dmPomodoro.isTimerRunning();
+      var pomoBtnTitle = isTimerRunning ? 'Pause timer' : (isTimerActive ? 'Resume timer' : 'Start Pomodoro');
+      html += '<button type="button" class="todo-item-action-btn pomodoro-start' + (isTimerActive ? ' active' : '') + '" data-pomodoro-id="' + todo.id + '" title="' + pomoBtnTitle + '" aria-label="' + pomoBtnTitle + '">';
+      if (isTimerRunning) {
+        // Pause icon
         html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
+      } else if (isTimerActive) {
+        // Play/resume icon (timer paused)
+        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
       } else {
+        // Clock icon (no timer)
         html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
       }
       html += '</button>';
@@ -1600,7 +1608,9 @@
         if (!todo) return;
         if (window.dmPomodoro) {
           if (window.dmPomodoro.isActive(todoId)) {
-            // Already active — focus the timer (it's already visible)
+            // Toggle pause/resume
+            window.dmPomodoro.togglePause();
+            render();
             return;
           }
           window.dmPomodoro.start(todoId, todo.title);

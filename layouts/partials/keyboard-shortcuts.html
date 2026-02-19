@@ -1,0 +1,250 @@
+<!-- Keyboard Shortcuts Overlay: press ? to toggle -->
+<div id="keyboard-shortcuts-overlay" class="kbd-overlay" style="display: none;" role="dialog" aria-label="Keyboard shortcuts">
+  <div class="kbd-backdrop" id="kbd-backdrop"></div>
+  <div class="kbd-dialog">
+    <div class="kbd-header">
+      <h2 class="kbd-title">Keyboard Shortcuts</h2>
+      <button type="button" class="kbd-close" id="kbd-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="kbd-body">
+      <div class="kbd-section">
+        <h3 class="kbd-section-title">Global</h3>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>?</kbd></span><span class="kbd-desc">Show this help</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>E</kbd></span><span class="kbd-desc">Open Quick Capture</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>[</kbd></span><span class="kbd-desc">Toggle sidebar</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>S</kbd> or <kbd>/</kbd></span><span class="kbd-desc">Open search</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>K</kbd></span><span class="kbd-desc">Open search</span></div>
+      </div>
+
+      <div class="kbd-section">
+        <h3 class="kbd-section-title">Search</h3>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Esc</kbd></span><span class="kbd-desc">Close search</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>&darr;</kbd> / <kbd>&uarr;</kbd></span><span class="kbd-desc">Navigate results</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Enter</kbd></span><span class="kbd-desc">Open selected result</span></div>
+      </div>
+
+      <div class="kbd-section">
+        <h3 class="kbd-section-title">Quick Capture</h3>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Esc</kbd></span><span class="kbd-desc">Close modal</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span><span class="kbd-desc">Save</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Tab</kbd></span><span class="kbd-desc">Cycle mode (Note / Code / Todo)</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>B</kbd></span><span class="kbd-desc">Bold</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>I</kbd></span><span class="kbd-desc">Italic</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>E</kbd></span><span class="kbd-desc">Inline code</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd></span><span class="kbd-desc">Heading</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></span><span class="kbd-desc">Todo checkbox</span></div>
+      </div>
+
+      <div class="kbd-section">
+        <h3 class="kbd-section-title">Edit Modal</h3>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Esc</kbd></span><span class="kbd-desc">Close modal</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span><span class="kbd-desc">Save</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>B</kbd> / <kbd>I</kbd> / <kbd>E</kbd></span><span class="kbd-desc">Bold / Italic / Code</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>H</kbd> / <kbd>T</kbd></span><span class="kbd-desc">Heading / Todo</span></div>
+      </div>
+
+      <div class="kbd-section">
+        <h3 class="kbd-section-title">Review</h3>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Space</kbd></span><span class="kbd-desc">Reveal content</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>0</kbd>&ndash;<kbd>5</kbd></span><span class="kbd-desc">Rate recall quality</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Enter</kbd></span><span class="kbd-desc">Next card</span></div>
+      </div>
+
+      <div class="kbd-section">
+        <h3 class="kbd-section-title">Image Lightbox</h3>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>Esc</kbd></span><span class="kbd-desc">Close lightbox</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>+</kbd></span><span class="kbd-desc">Zoom in</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>-</kbd></span><span class="kbd-desc">Zoom out</span></div>
+        <div class="kbd-row"><span class="kbd-keys"><kbd>0</kbd></span><span class="kbd-desc">Fit to view</span></div>
+      </div>
+    </div>
+    <div class="kbd-footer">
+      Press <kbd>?</kbd> or <kbd>Esc</kbd> to close
+    </div>
+  </div>
+</div>
+
+<style>
+.kbd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kbd-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+}
+.kbd-dialog {
+  position: relative;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.2);
+  width: 600px;
+  max-width: 92vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.kbd-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+}
+.kbd-title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--body-font-color);
+}
+.kbd-close {
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  color: var(--gray-400);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.kbd-close:hover { color: var(--color-danger); }
+.kbd-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 28px;
+}
+.kbd-section {
+  min-width: 0;
+}
+.kbd-section-title {
+  margin: 0 0 8px 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary, var(--gray-500));
+}
+.kbd-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-size: 0.82rem;
+  gap: 8px;
+}
+.kbd-keys {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.kbd-desc {
+  color: var(--text-secondary, var(--gray-500));
+  text-align: right;
+  flex: 1;
+  min-width: 0;
+}
+.kbd-overlay kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 0.72rem;
+  font-family: inherit;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--body-font-color);
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  box-shadow: 0 1px 0 var(--gray-200);
+  min-width: 20px;
+  text-align: center;
+}
+.kbd-footer {
+  padding: 10px 20px;
+  border-top: 1px solid var(--gray-200);
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary, var(--gray-500));
+  flex-shrink: 0;
+}
+@media (max-width: 600px) {
+  .kbd-body {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+  .kbd-dialog {
+    max-height: 90vh;
+  }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  var overlay = document.getElementById('keyboard-shortcuts-overlay');
+  var backdrop = document.getElementById('kbd-backdrop');
+  var closeBtn = document.getElementById('kbd-close');
+  if (!overlay) return;
+
+  function isOpen() {
+    return overlay.style.display !== 'none';
+  }
+
+  function open() {
+    overlay.style.display = '';
+  }
+
+  function close() {
+    overlay.style.display = 'none';
+  }
+
+  function toggle() {
+    if (isOpen()) {
+      close();
+    } else {
+      open();
+    }
+  }
+
+  // Close on backdrop click or close button
+  backdrop.addEventListener('click', close);
+  closeBtn.addEventListener('click', close);
+
+  // Global keyboard listener
+  document.addEventListener('keydown', function(e) {
+    // Close on Escape when open
+    if (isOpen() && e.key === 'Escape') {
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+      return;
+    }
+
+    // Open on ? (Shift+/) — only when not in an input field and no modals are open
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+      // Don't open if another modal is visible
+      var qcModal = document.getElementById('quick-capture-modal');
+      var editModal = document.querySelector('.note-edit-dialog');
+      var searchModal = document.querySelector('.search-modal');
+      if (qcModal && qcModal.classList.contains('active')) return;
+      if (editModal && editModal.open) return;
+      if (searchModal && searchModal.style.display !== 'none') return;
+      e.preventDefault();
+      toggle();
+    }
+  });
+
+  // Expose API
+  window.dmKeyboardShortcuts = { open: open, close: close, toggle: toggle };
+})();
+</script>

@@ -119,6 +119,8 @@
 
 {{ partial "pomodoro-timer.html" . }}
 
+{{ partial "keyboard-shortcuts.html" . }}
+
 <!-- Quick Capture modal logic -->
 <script>
 (function() {
@@ -1417,7 +1419,11 @@
     var checkId = randomId();
     var checked = isOpen ? ' checked' : '';
     var children = '';
-    notes.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    notes.sort(function(a, b) {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
     notes.forEach(function(n) { children += buildNoteItem(n); });
 
     var html = '<li class="sidebar-section" data-section="' + escapeHtml(title.toLowerCase()) + '">';
@@ -1431,7 +1437,11 @@
   }
 
   function sortByCreatedAt(notes) {
-    return notes.sort(function(a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+    return notes.sort(function(a, b) {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return (b.createdAt || 0) - (a.createdAt || 0);
+    });
   }
 
   var SIDEBAR_MAX = 10;
@@ -1475,7 +1485,11 @@
       sortByCreatedAt(bookNotes[bt]);
       bookNotes[bt].forEach(function(n) { allBookNotes.push(n); });
     });
-    allBookNotes.sort(function(a, b) { return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); });
+    allBookNotes.sort(function(a, b) {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+    });
     var shownBooks = allBookNotes.slice(0, SIDEBAR_MAX);
     shownBooks.forEach(function(n) { booksChildren += buildNoteItem(n); });
     if (allBookNotes.length > SIDEBAR_MAX) {
@@ -1500,7 +1514,11 @@
       var langTitle = lang.charAt(0).toUpperCase() + lang.slice(1);
       var subOpen = currentNote && currentNote.language === lang;
       var langNotes = snippetNotes[lang];
-      langNotes.sort(function(a, b) { return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0); });
+      langNotes.sort(function(a, b) {
+        if (a.pinned && !b.pinned) return -1;
+        if (!a.pinned && b.pinned) return 1;
+        return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+      });
       snippetsChildren += buildSubSection(langTitle, langNotes.slice(0, SIDEBAR_MAX), subOpen);
     });
 

@@ -47,6 +47,10 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
+  cursor: grab;
+}
+.pomodoro-timer-header:active {
+  cursor: grabbing;
 }
 .pomodoro-timer-phase {
   font-size: 0.7rem;
@@ -150,6 +154,10 @@
   align-items: center;
   gap: 3px;
   animation: pomo-pulse 2s ease-in-out infinite;
+}
+.todo-item-timer-active.paused {
+  animation: none;
+  opacity: 0.65;
 }
 @keyframes pomo-pulse {
   0%, 100% { opacity: 1; }
@@ -405,6 +413,74 @@
     closeTimer();
   });
 
+  // ── Drag / move support ──
+  var isDragging = false;
+  var dragOffsetX = 0;
+  var dragOffsetY = 0;
+  var posRight = 24;  // initial CSS right
+  var posBottom = 100; // initial CSS bottom
+  var hasCustomPos = false;
+
+  function onDragStart(e) {
+    // Only drag from header area (not buttons)
+    if (e.target.closest('button')) return;
+    isDragging = true;
+    var rect = timerEl.getBoundingClientRect();
+    var clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+    var clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+    dragOffsetX = clientX - rect.left;
+    dragOffsetY = clientY - rect.top;
+    timerEl.style.transition = 'none';
+    timerEl.style.cursor = 'grabbing';
+    e.preventDefault();
+  }
+
+  function onDragMove(e) {
+    if (!isDragging) return;
+    var clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+    var clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
+    var newLeft = clientX - dragOffsetX;
+    var newTop = clientY - dragOffsetY;
+    // Clamp within viewport
+    var rect = timerEl.getBoundingClientRect();
+    var maxLeft = window.innerWidth - rect.width;
+    var maxTop = window.innerHeight - rect.height;
+    newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+    newTop = Math.max(0, Math.min(newTop, maxTop));
+    // Switch from right/bottom to left/top positioning
+    timerEl.style.right = 'auto';
+    timerEl.style.bottom = 'auto';
+    timerEl.style.left = newLeft + 'px';
+    timerEl.style.top = newTop + 'px';
+    hasCustomPos = true;
+    e.preventDefault();
+  }
+
+  function onDragEnd() {
+    if (!isDragging) return;
+    isDragging = false;
+    timerEl.style.transition = '';
+    timerEl.style.cursor = '';
+  }
+
+  // Attach drag listeners to the header
+  var headerEl = timerEl.querySelector('.pomodoro-timer-header');
+  headerEl.style.cursor = 'grab';
+  headerEl.addEventListener('mousedown', onDragStart);
+  document.addEventListener('mousemove', onDragMove);
+  document.addEventListener('mouseup', onDragEnd);
+  headerEl.addEventListener('touchstart', onDragStart, { passive: false });
+  document.addEventListener('touchmove', onDragMove, { passive: false });
+  document.addEventListener('touchend', onDragEnd);
+
+  function resetPosition() {
+    timerEl.style.left = '';
+    timerEl.style.top = '';
+    timerEl.style.right = '';
+    timerEl.style.bottom = '';
+    hasCustomPos = false;
+  }
+
   // ── Public API ──
   window.dmPomodoro = {
     start: function(todoId, todoTitle) {
@@ -423,12 +499,25 @@
       isRunning = false;
       showPlayIcon();
       updateDisplay();
+      resetPosition();
       timerEl.style.display = '';
       startTimer();
     },
     stop: closeTimer,
+    pause: pauseTimer,
+    resume: startTimer,
+    togglePause: function() {
+      if (isRunning) {
+        pauseTimer();
+      } else if (activeTodoId) {
+        startTimer();
+      }
+    },
     isActive: function(todoId) {
       return activeTodoId === todoId;
+    },
+    isTimerRunning: function() {
+      return isRunning;
     },
     getActiveTodoId: function() {
       return activeTodoId;
