@@ -101,9 +101,8 @@ body {
   }
 }
 
-// Main content: capped width for readability, generous padding
+// Main content: fills available space between sidebars, generous padding
 .book-page {
-  max-width: 56rem;
   padding: 1.5rem 2.5rem;
 }
 
@@ -111,8 +110,6 @@ body {
 // Landing page: centered layout, full-width graph
 // ======================================
 .book-page:has(.garden-hero) {
-  max-width: 100%;
-
   .markdown {
     width: 100%;
     display: flex;

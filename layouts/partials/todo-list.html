@@ -16,7 +16,18 @@
     <div class="todo-add-form" id="todo-add-form">
       <div class="todo-add-row-main">
         <input type="text" id="todo-add-title" class="todo-add-title" placeholder="New task...">
-        <input type="number" id="todo-add-estimate" class="todo-add-estimate" min="1" placeholder="25">
+        <div class="todo-add-category-inline" id="todo-add-category-inline">
+          <input type="text" id="todo-add-category-input" class="todo-add-category-inline-input" placeholder="category" autocomplete="off">
+          <span class="todo-add-category-selected" id="todo-add-category-selected" style="display:none;">
+            <span class="todo-add-category-selected-text" id="todo-add-category-selected-text"></span>
+            <button type="button" class="todo-add-category-selected-clear" id="todo-add-category-selected-clear" aria-label="Clear category">&times;</button>
+          </span>
+          <div class="todo-add-category-dropdown" id="todo-add-category-dropdown"></div>
+        </div>
+        <button type="button" class="todo-add-pomodoro-btn" id="todo-add-pomodoro-btn" title="Pomodoros: left-click to add, right-click to remove" aria-label="Set pomodoro count">
+          <svg class="todo-add-pomodoro-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
+          <span class="todo-add-pomodoro-count" id="todo-add-pomodoro-count">1</span>
+        </button>
         <button type="button" id="todo-add-btn" class="todo-add-btn" title="Add task">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
         </button>
@@ -115,6 +126,7 @@
   display: flex;
   gap: 8px;
   align-items: center;
+  position: relative;
 }
 /* Icon bar row with chips */
 .todo-add-row-icons {
@@ -184,6 +196,136 @@
 }
 .todo-add-chip-clear:hover {
   background: rgba(0, 105, 255, 0.15);
+}
+/* Category popover for add-form */
+/* Inline category input in main row */
+.todo-add-category-inline {
+  position: relative;
+  flex-shrink: 1;
+  min-width: 70px;
+  max-width: 130px;
+}
+.todo-add-category-inline-input {
+  width: 100%;
+  padding: 6px 24px 6px 8px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  font-size: 0.8rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s;
+  height: 34px;
+}
+.todo-add-category-inline-input:focus {
+  border-color: var(--color-link);
+}
+.todo-add-category-inline-input::placeholder {
+  color: var(--gray-400);
+  font-style: italic;
+}
+.todo-add-category-selected {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-link);
+  background: rgba(0, 105, 255, 0.08);
+  border: 1px solid rgba(0, 105, 255, 0.12);
+  border-radius: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  line-height: 1.5;
+  height: 26px;
+  box-sizing: border-box;
+  transition: background 0.15s, border-color 0.15s;
+  max-width: 130px;
+  overflow: hidden;
+}
+.todo-add-category-selected:hover {
+  background: rgba(0, 105, 255, 0.13);
+  border-color: rgba(0, 105, 255, 0.25);
+}
+.todo-add-category-selected-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.todo-add-category-selected-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-link);
+  font-size: 0.8rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+.todo-add-category-selected-clear:hover {
+  opacity: 1;
+  background: rgba(0, 105, 255, 0.15);
+}
+.todo-add-category-dropdown {
+  position: absolute;
+  left: 0;
+  min-width: 200px;
+  max-width: 320px;
+  top: 100%;
+  margin-top: 4px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  max-height: 160px;
+  overflow-y: auto;
+  z-index: 30;
+  display: none;
+  padding: 6px;
+}
+.todo-add-category-dropdown.show {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.todo-add-category-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-link);
+  background: rgba(0, 105, 255, 0.08);
+  border: 1px solid rgba(0, 105, 255, 0.12);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
+  line-height: 1.5;
+  user-select: none;
+}
+.todo-add-category-chip:hover {
+  background: rgba(0, 105, 255, 0.15);
+  border-color: rgba(0, 105, 255, 0.25);
+}
+.todo-add-category-chip.active {
+  background: rgba(0, 105, 255, 0.18);
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 1px var(--color-link);
+}
+.todo-add-category-chip .cat-highlight {
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--color-link);
+  text-underline-offset: 2px;
 }
 /* Add-form popover (reuses reminder popover styles but positioned for the icon bar) */
 .todo-add-popover {
@@ -278,24 +420,83 @@
   outline: none;
   border-color: var(--color-link);
 }
-.todo-add-estimate {
-  width: 70px;
-  padding: 8px 10px;
-  border: 1px solid var(--gray-300);
+/* Pomodoro counter button in add-form main row */
+.todo-add-pomodoro-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
-  font-size: 0.88rem;
   background: var(--body-background);
-  color: var(--body-font-color);
-  text-align: center;
-  transition: border-color 0.2s;
+  color: var(--gray-500);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  line-height: 1;
+  height: 34px;
+  box-sizing: border-box;
 }
-.todo-add-estimate:focus {
-  outline: none;
+.todo-add-pomodoro-btn:hover {
   border-color: var(--color-link);
 }
-.todo-add-estimate::placeholder {
-  color: var(--gray-400);
+.todo-add-pomodoro-btn.has-count {
+  border-color: var(--color-link);
+  background: rgba(0, 105, 255, 0.06);
+}
+.todo-add-pomodoro-icon {
+  flex-shrink: 0;
+}
+.todo-add-pomodoro-count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-width: 14px;
+  text-align: center;
+}
+/* Pomodoro length config popover */
+.todo-add-pomo-config {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 25;
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px var(--shadow-color, rgba(0,0,0,0.1));
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  animation: todo-popover-in 0.15s ease-out;
+  white-space: nowrap;
+}
+.todo-add-pomo-config-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.todo-add-pomo-config-input {
+  width: 50px;
+  padding: 4px 6px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
   font-size: 0.8rem;
+  text-align: center;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  outline: none;
+}
+.todo-add-pomo-config-input:focus {
+  border-color: var(--color-link);
+}
+.todo-add-pomo-config-unit {
+  font-size: 0.72rem;
+  color: var(--gray-400);
 }
 /* Day group headers */
 .todo-day-group {
@@ -536,6 +737,10 @@
 .todo-subtask-toggle.collapsed svg {
   transform: rotate(-90deg);
 }
+.todo-subtask-spacer {
+  width: 22px;
+  flex-shrink: 0;
+}
 .todo-subtasks-wrapper.collapsed .todo-subtasks,
 .todo-subtasks-wrapper.collapsed .todo-add-subtask-row {
   display: none;
@@ -693,9 +898,7 @@
   .todo-add-title {
     flex: 1 1 100%;
   }
-  .todo-add-estimate {
-    flex: 1;
-  }
+
   .todo-add-row-icons {
     flex-wrap: wrap;
   }
@@ -747,6 +950,16 @@
 @keyframes pomo-btn-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* Pomodoro stop button on todo item */
+.todo-item-action-btn.pomodoro-stop {
+  color: var(--color-danger, #ea4335);
+  opacity: 1;
+}
+.todo-item-action-btn.pomodoro-stop:hover {
+  background: rgba(234, 67, 53, 0.1);
+  color: var(--color-danger, #ea4335);
 }
 
 /* Reminder info text under task title */
@@ -878,9 +1091,11 @@
   var summaryEl = document.getElementById('todo-summary');
 
   var addTitleInput = document.getElementById('todo-add-title');
-  var addEstimateInput = document.getElementById('todo-add-estimate');
   var addBtn = document.getElementById('todo-add-btn');
+  var addMainRow = document.querySelector('.todo-add-row-main');
   var addIconRow = document.getElementById('todo-add-row-icons');
+  var addPomodoroBtn = document.getElementById('todo-add-pomodoro-btn');
+  var addPomodoroCountEl = document.getElementById('todo-add-pomodoro-count');
   var addDateIcon = document.getElementById('todo-add-date-icon');
   var addDateChip = document.getElementById('todo-add-date-chip');
   var addDateChipText = document.getElementById('todo-add-date-chip-text');
@@ -889,12 +1104,30 @@
   var addReminderChip = document.getElementById('todo-add-reminder-chip');
   var addReminderChipText = document.getElementById('todo-add-reminder-chip-text');
   var addReminderChipClear = document.getElementById('todo-add-reminder-chip-clear');
+  var addCategoryInline = document.getElementById('todo-add-category-inline');
+  var addCategoryInput = document.getElementById('todo-add-category-input');
+  var addCategorySelected = document.getElementById('todo-add-category-selected');
+  var addCategorySelectedText = document.getElementById('todo-add-category-selected-text');
+  var addCategorySelectedClear = document.getElementById('todo-add-category-selected-clear');
+  var addCategoryDropdown = document.getElementById('todo-add-category-dropdown');
 
   if (!container || !itemsEl) return;
 
   // State
   var allTodos = [];
   var _pomodoroTrackedMinutes = {}; // { todoId: minutes } — stores tracked time from Pomodoro timer
+  var _addFormCategory = null; // Selected category string for new task
+  var _existingCategories = []; // Cached list of existing categories for autocomplete
+  var _catDropdownActiveIdx = -1; // Active index in category dropdown
+  var _addFormPomodoroCount = 1; // Number of pomodoro sessions for new task (default 1)
+  var _pomodoroConfigPopover = null; // Currently open pomodoro config popover
+
+  // Global pomodoro length (minutes per session) — stored in localStorage
+  var _globalPomodoroLength = 25;
+  try {
+    var stored = parseInt(localStorage.getItem('dm-pomodoro-length'), 10);
+    if (stored > 0) _globalPomodoroLength = stored;
+  } catch(e) {}
 
   // ─── Date helpers ───
   function getTodayStr() {
@@ -1177,9 +1410,313 @@
     updateReminderChip();
   });
 
+  // ─── Category popover for add-form ───
+  function loadAddFormCategories() {
+    _existingCategories = [];
+    if (!window.dmSync) return Promise.resolve();
+    return window.dmSync.getAllTodos().then(function(todos) {
+      // Track each category's most recent updatedAt and usage count
+      var catMap = {}; // { name: { lastUsed: timestamp, count: number } }
+      todos.forEach(function(t) {
+        if (t.category) {
+          var ts = t.updatedAt || t.createdAt || 0;
+          t.category.split(',').forEach(function(c) {
+            var trimmed = c.trim().toLowerCase();
+            if (trimmed) {
+              if (!catMap[trimmed]) {
+                catMap[trimmed] = { lastUsed: ts, count: 1 };
+              } else {
+                catMap[trimmed].count++;
+                if (ts > catMap[trimmed].lastUsed) catMap[trimmed].lastUsed = ts;
+              }
+            }
+          });
+        }
+      });
+      // Sort by most recently used first
+      _existingCategories = Object.keys(catMap).sort(function(a, b) {
+        return catMap[b].lastUsed - catMap[a].lastUsed;
+      });
+    });
+  }
+
+  function getCatFilteredSuggestions(query) {
+    var q = query.trim().toLowerCase();
+    if (!q) return _existingCategories.slice();
+    return _existingCategories.filter(function(c) {
+      return c.indexOf(q) !== -1;
+    });
+  }
+
+  function catHighlightMatch(text, query) {
+    var q = query.trim().toLowerCase();
+    if (!q) return escapeHtml(text);
+    var idx = text.toLowerCase().indexOf(q);
+    if (idx === -1) return escapeHtml(text);
+    return escapeHtml(text.substring(0, idx)) +
+      '<span class="cat-highlight">' + escapeHtml(text.substring(idx, idx + q.length)) + '</span>' +
+      escapeHtml(text.substring(idx + q.length));
+  }
+
+  function updateCategoryInput() {
+    if (_addFormCategory) {
+      // Show chip, hide input
+      addCategoryInput.style.display = 'none';
+      addCategoryInput.value = '';
+      addCategorySelectedText.textContent = _addFormCategory;
+      addCategorySelected.style.display = '';
+    } else {
+      // Show input, hide chip
+      addCategorySelected.style.display = 'none';
+      addCategoryInput.style.display = '';
+      addCategoryInput.value = '';
+    }
+  }
+
+  function hideCatDropdown() {
+    addCategoryDropdown.classList.remove('show');
+    addCategoryDropdown.innerHTML = '';
+    _catDropdownActiveIdx = -1;
+  }
+
+  function showCatDropdown() {
+    loadAddFormCategories().then(function() {
+      var query = addCategoryInput.value.trim().toLowerCase();
+      var suggestions = getCatFilteredSuggestions(query);
+      _catDropdownActiveIdx = -1;
+      if (suggestions.length === 0) {
+        hideCatDropdown();
+        return;
+      }
+      addCategoryDropdown.innerHTML = '';
+      suggestions.forEach(function(cat) {
+        var chip = document.createElement('span');
+        chip.className = 'todo-add-category-chip';
+        chip.innerHTML = catHighlightMatch(cat, query);
+        chip.setAttribute('data-cat', cat);
+        chip.addEventListener('mousedown', function(e) {
+          e.preventDefault();
+          selectCat(cat);
+        });
+        addCategoryDropdown.appendChild(chip);
+      });
+      addCategoryDropdown.classList.add('show');
+    });
+  }
+
+  function selectCat(cat) {
+    _addFormCategory = cat;
+    updateCategoryInput();
+    hideCatDropdown();
+  }
+
+  function navigateCatDropdown(direction) {
+    var chips = addCategoryDropdown.querySelectorAll('.todo-add-category-chip');
+    if (chips.length === 0) return;
+    if (_catDropdownActiveIdx >= 0 && _catDropdownActiveIdx < chips.length) {
+      chips[_catDropdownActiveIdx].classList.remove('active');
+    }
+    _catDropdownActiveIdx += direction;
+    if (_catDropdownActiveIdx < 0) _catDropdownActiveIdx = chips.length - 1;
+    if (_catDropdownActiveIdx >= chips.length) _catDropdownActiveIdx = 0;
+    chips[_catDropdownActiveIdx].classList.add('active');
+    chips[_catDropdownActiveIdx].scrollIntoView({ block: 'nearest' });
+  }
+
+  addCategoryInput.addEventListener('input', function() {
+    // While typing, don't commit yet — just filter the dropdown
+    showCatDropdown();
+  });
+
+  addCategoryInput.addEventListener('focus', function() {
+    showCatDropdown();
+  });
+
+  addCategoryInput.addEventListener('blur', function() {
+    setTimeout(function() {
+      hideCatDropdown();
+      // Commit whatever is typed
+      var val = addCategoryInput.value.trim().toLowerCase();
+      _addFormCategory = val || null;
+      updateCategoryInput();
+    }, 150);
+  });
+
+  addCategoryInput.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (!addCategoryDropdown.classList.contains('show')) showCatDropdown();
+      else navigateCatDropdown(1);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      navigateCatDropdown(-1);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      var chips = addCategoryDropdown.querySelectorAll('.todo-add-category-chip');
+      if (_catDropdownActiveIdx >= 0 && _catDropdownActiveIdx < chips.length) {
+        selectCat(chips[_catDropdownActiveIdx].getAttribute('data-cat'));
+      } else if (addCategoryInput.value.trim()) {
+        selectCat(addCategoryInput.value.trim().toLowerCase());
+      } else {
+        // No category typed — submit the task
+        addFromForm();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      hideCatDropdown();
+      addCategoryInput.blur();
+    }
+  });
+
+  // Click the × on the selected chip to clear category
+  addCategorySelectedClear.addEventListener('click', function(e) {
+    e.stopPropagation();
+    _addFormCategory = null;
+    updateCategoryInput();
+    addCategoryInput.focus();
+  });
+
+  // Click the chip itself to edit — show the input with current value
+  addCategorySelected.addEventListener('click', function(e) {
+    if (e.target === addCategorySelectedClear) return; // let clear handle it
+    addCategorySelected.style.display = 'none';
+    addCategoryInput.style.display = '';
+    addCategoryInput.value = _addFormCategory || '';
+    addCategoryInput.focus();
+    addCategoryInput.select();
+  });
+
+  // ─── Pomodoro count button handlers ───
+  function updatePomodoroCountDisplay() {
+    addPomodoroCountEl.textContent = _addFormPomodoroCount;
+    if (_addFormPomodoroCount > 0) {
+      addPomodoroBtn.classList.add('has-count');
+    } else {
+      addPomodoroBtn.classList.remove('has-count');
+    }
+  }
+
+  // Left-click: increment pomodoro count
+  addPomodoroBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    _addFormPomodoroCount++;
+    updatePomodoroCountDisplay();
+  });
+
+  // Right-click: decrement pomodoro count (min 1)
+  addPomodoroBtn.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (_addFormPomodoroCount > 1) {
+      _addFormPomodoroCount--;
+      updatePomodoroCountDisplay();
+    }
+  });
+
+  // Long-press: open pomodoro config popover (change session length)
+  var _pomodoroLongPressTimer = null;
+  addPomodoroBtn.addEventListener('mousedown', function(e) {
+    if (e.button !== 0) return; // only left button
+    _pomodoroLongPressTimer = setTimeout(function() {
+      _pomodoroLongPressTimer = null;
+      showPomodoroConfigPopover();
+    }, 600);
+  });
+  addPomodoroBtn.addEventListener('mouseup', function() {
+    if (_pomodoroLongPressTimer) { clearTimeout(_pomodoroLongPressTimer); _pomodoroLongPressTimer = null; }
+  });
+  addPomodoroBtn.addEventListener('mouseleave', function() {
+    if (_pomodoroLongPressTimer) { clearTimeout(_pomodoroLongPressTimer); _pomodoroLongPressTimer = null; }
+  });
+
+  // Touch long-press support
+  addPomodoroBtn.addEventListener('touchstart', function(e) {
+    _pomodoroLongPressTimer = setTimeout(function() {
+      _pomodoroLongPressTimer = null;
+      showPomodoroConfigPopover();
+    }, 600);
+  }, { passive: true });
+  addPomodoroBtn.addEventListener('touchend', function() {
+    if (_pomodoroLongPressTimer) { clearTimeout(_pomodoroLongPressTimer); _pomodoroLongPressTimer = null; }
+  });
+  addPomodoroBtn.addEventListener('touchcancel', function() {
+    if (_pomodoroLongPressTimer) { clearTimeout(_pomodoroLongPressTimer); _pomodoroLongPressTimer = null; }
+  });
+
+  function closePomodoroConfigPopover() {
+    if (_pomodoroConfigPopover && _pomodoroConfigPopover.parentNode) {
+      _pomodoroConfigPopover.remove();
+    }
+    _pomodoroConfigPopover = null;
+  }
+
+  function showPomodoroConfigPopover() {
+    closePomodoroConfigPopover();
+    closeAddFormPopover();
+    hideCatDropdown();
+
+    var pop = document.createElement('div');
+    pop.className = 'todo-add-pomo-config';
+
+    var label = document.createElement('div');
+    label.style.cssText = 'font-size: 11px; color: var(--color-hint); margin-bottom: 6px;';
+    label.textContent = 'Session length (minutes)';
+    pop.appendChild(label);
+
+    var input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.max = '120';
+    input.value = _globalPomodoroLength;
+    input.style.cssText = 'width: 60px; padding: 4px 6px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 13px; background: var(--color-bg); color: var(--color-text);';
+    pop.appendChild(input);
+
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.textContent = 'Save';
+    saveBtn.style.cssText = 'margin-left: 6px; padding: 4px 10px; border: none; border-radius: 4px; background: var(--color-link); color: #fff; font-size: 12px; cursor: pointer;';
+    pop.appendChild(saveBtn);
+
+    function saveLength() {
+      var val = parseInt(input.value, 10);
+      if (val > 0 && val <= 120) {
+        _globalPomodoroLength = val;
+        try { localStorage.setItem('dm-pomodoro-length', val); } catch(e) {}
+        closePomodoroConfigPopover();
+      }
+    }
+
+    saveBtn.addEventListener('click', function(e) { e.stopPropagation(); saveLength(); });
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); saveLength(); }
+      if (e.key === 'Escape') { e.preventDefault(); closePomodoroConfigPopover(); }
+    });
+
+    addMainRow.appendChild(pop);
+    _pomodoroConfigPopover = pop;
+    input.focus();
+    input.select();
+
+    // Dismiss on outside click
+    function onDocClick(e) {
+      if (pop && !pop.contains(e.target) && e.target !== addPomodoroBtn) {
+        closePomodoroConfigPopover();
+        document.removeEventListener('click', onDocClick, true);
+      }
+    }
+    setTimeout(function() {
+      document.addEventListener('click', onDocClick, true);
+    }, 0);
+  }
+
+  // Initialize pomodoro count display
+  updatePomodoroCountDisplay();
+
   // Initialize chips — default to Today
   updateDateChip();
   updateReminderChip();
+  updateCategoryInput();
 
   // ─── Toast notifications ───
   function showTodoError(msg) {
@@ -1228,6 +1765,9 @@
       html += '<button type="button" class="todo-subtask-toggle' + (isCollapsed ? ' collapsed' : '') + '" data-toggle-parent="' + todo.id + '" title="Toggle subtasks" aria-label="Toggle subtasks">';
       html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>';
       html += '</button>';
+    } else if (!isSubtask) {
+      // Spacer to align with items that have a collapse toggle
+      html += '<div class="todo-subtask-spacer"></div>';
     }
 
     html += '<input type="checkbox" class="todo-item-checkbox"' + checked + ' data-todo-id="' + todo.id + '" aria-label="Complete: ' + escapeHtml(todo.title) + '">';
@@ -1236,7 +1776,13 @@
     html += '<div class="todo-item-meta">';
 
     if (todo.estimatedMin) {
-      html += '<span class="todo-item-estimate">est: ' + todo.estimatedMin + 'min</span>';
+      var pCount = todo.pomodoroCount || 1;
+      var pLen = todo.pomodoroLength || _globalPomodoroLength;
+      if (pCount > 1) {
+        html += '<span class="todo-item-estimate">' + pCount + '× ' + pLen + 'min</span>';
+      } else {
+        html += '<span class="todo-item-estimate">est: ' + todo.estimatedMin + 'min</span>';
+      }
     }
     if (todo.done && todo.actualMin != null) {
       var actualClass = '';
@@ -1248,7 +1794,12 @@
     // Active pomodoro indicator
     if (!todo.done && window.dmPomodoro && window.dmPomodoro.isActive(todo.id)) {
       var timerRunning = window.dmPomodoro.isTimerRunning();
-      html += '<span class="todo-item-timer-active' + (timerRunning ? '' : ' paused') + '"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ' + (timerRunning ? 'timing' : 'paused') + '</span>';
+      var sessionInfo = window.dmPomodoro.getSessionInfo ? window.dmPomodoro.getSessionInfo() : null;
+      var timerLabel = timerRunning ? 'timing' : 'paused';
+      if (sessionInfo && sessionInfo.total > 1) {
+        timerLabel = (timerRunning ? '' : 'paused ') + sessionInfo.current + '/' + sessionInfo.total;
+      }
+      html += '<span class="todo-item-timer-active' + (timerRunning ? '' : ' paused') + '"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ' + timerLabel + '</span>';
     }
     if (todo.category) {
       html += '<span class="todo-item-category">' + escapeHtml(todo.category) + '</span>';
@@ -1284,6 +1835,12 @@
         html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
       }
       html += '</button>';
+      // Stop timer button (only visible when timer is active for this task)
+      if (isTimerActive) {
+        html += '<button type="button" class="todo-item-action-btn pomodoro-stop" data-pomodoro-stop-id="' + todo.id + '" title="Stop &amp; record time" aria-label="Stop timer">';
+        html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>';
+        html += '</button>';
+      }
       var hasReminder = todo.reminderAt && !todo.reminderFired;
       html += '<button type="button" class="todo-item-action-btn reminder-bell' + (hasReminder ? ' has-reminder' : '') + '" data-reminder-id="' + todo.id + '" title="' + (hasReminder ? 'Edit reminder' : 'Set reminder') + '" aria-label="Set reminder">';
       if (hasReminder) {
@@ -1476,8 +2033,8 @@
     });
 
     if (totalCount > 0) {
-      var pomEst = (totalEst / 25).toFixed(1);
-      var pomActual = (totalActual / 25).toFixed(1);
+      var pomEst = (totalEst / _globalPomodoroLength).toFixed(1);
+      var pomActual = (totalActual / _globalPomodoroLength).toFixed(1);
       summaryEl.innerHTML =
         '<span class="todo-summary-item"><strong>' + doneCount + '/' + totalCount + '</strong> tasks done</span>' +
         (totalEst ? '<span class="todo-summary-item">Est: <strong>' + totalEst + 'min</strong> (' + pomEst + ' pom)</span>' : '') +
@@ -1614,6 +2171,17 @@
             return;
           }
           window.dmPomodoro.start(todoId, todo.title);
+          render();
+        }
+      });
+    });
+
+    // Pomodoro stop button on todo item
+    itemsEl.querySelectorAll('.pomodoro-stop[data-pomodoro-stop-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (window.dmPomodoro) {
+          window.dmPomodoro.stop();
           render();
         }
       });
@@ -1835,7 +2403,18 @@
     return maxOrder + 1;
   }
 
-  function createTodo(title, estimatedMin, parentId, scheduledDate, reminderAtMs, onDone) {
+  function getMinOrder(parentId) {
+    var siblings = allTodos.filter(function(t) {
+      return parentId ? t.parentId === parentId : !t.parentId;
+    });
+    var minOrder = 1;
+    siblings.forEach(function(t) {
+      if (t.order < minOrder) minOrder = t.order;
+    });
+    return minOrder - 1;
+  }
+
+  function createTodo(title, estimatedMin, parentId, scheduledDate, reminderAtMs, category, atTop, pomodoroCount, pomodoroLength, onDone) {
     if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
       showTodoError('Not signed in — please sign in to add tasks');
       if (onDone) onDone();
@@ -1843,19 +2422,24 @@
     }
 
     var user = window.dmAuth.currentUser;
-    var order = getNextOrder(parentId || null);
+    var order = atTop ? getMinOrder(parentId || null) : getNextOrder(parentId || null);
 
     // Request notification permission early if setting a reminder
     if (reminderAtMs && typeof Notification !== 'undefined' && Notification.permission === 'default') {
       try { Notification.requestPermission(); } catch(e) {}
     }
 
+    var pCount = pomodoroCount || 1;
+    var pLength = pomodoroLength || _globalPomodoroLength;
+
     var todoData = {
       userId: user.uid,
       title: title,
-      estimatedMin: estimatedMin || 25,
+      estimatedMin: estimatedMin || (pCount * pLength),
       actualMin: null,
-      category: null,
+      category: category || null,
+      pomodoroCount: pCount,
+      pomodoroLength: pLength,
       done: false,
       parentId: parentId || null,
       order: order,
@@ -1873,9 +2457,11 @@
       id: newDocId,
       userId: user.uid,
       title: title,
-      estimatedMin: estimatedMin || 25,
+      estimatedMin: estimatedMin || (pCount * pLength),
       actualMin: null,
-      category: null,
+      category: category || null,
+      pomodoroCount: pCount,
+      pomodoroLength: pLength,
       done: false,
       parentId: parentId || null,
       order: order,
@@ -2114,27 +2700,31 @@
   function addFromForm() {
     var title = addTitleInput.value.trim();
     if (!title) { addTitleInput.focus(); return; }
-    var est = parseInt(addEstimateInput.value, 10) || 25;
+    var pomCount = _addFormPomodoroCount || 1;
+    var pomLen = _globalPomodoroLength;
+    var est = pomCount * pomLen;
     var scheduledDate = _addFormDate || null;
     var reminderAtMs = _addFormReminderMs && _addFormReminderMs > Date.now() ? _addFormReminderMs : null;
+    var category = _addFormCategory || null;
     addBtn.disabled = true;
-    createTodo(title, est, null, scheduledDate, reminderAtMs, function() {
+    createTodo(title, est, null, scheduledDate, reminderAtMs, category, true, pomCount, pomLen, function() {
       addBtn.disabled = false;
     });
     addTitleInput.value = '';
-    addEstimateInput.value = '';
-    // Clear reminder but keep date so user can add multiple tasks to same day
+    // Reset pomodoro count but keep date and category sticky for rapid task creation
+    _addFormPomodoroCount = 1;
+    updatePomodoroCountDisplay();
+    // Clear reminder but keep date and category so user can rapidly add tasks
     _addFormReminderMs = null;
     updateReminderChip();
     closeAddFormPopover();
+    hideCatDropdown();
+    closePomodoroConfigPopover();
     addTitleInput.focus();
   }
 
   addBtn.addEventListener('click', addFromForm);
   addTitleInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
-  });
-  addEstimateInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); addFromForm(); }
   });
 

@@ -2,8 +2,9 @@
 <div id="pomodoro-timer" class="pomodoro-timer" style="display: none;">
   <div class="pomodoro-timer-header">
     <span class="pomodoro-timer-phase" id="pomodoro-phase">Work</span>
-    <button type="button" class="pomodoro-timer-close" id="pomodoro-close" title="Cancel timer" aria-label="Close timer">&times;</button>
+    <button type="button" class="pomodoro-timer-close" id="pomodoro-close" title="Cancel &amp; discard time" aria-label="Cancel timer">&times;</button>
   </div>
+  <div class="pomodoro-timer-category" id="pomodoro-category" style="display:none;"></div>
   <div class="pomodoro-timer-title" id="pomodoro-title"></div>
   <div class="pomodoro-timer-display" id="pomodoro-display">25:00</div>
   <div class="pomodoro-timer-progress">
@@ -19,6 +20,9 @@
     </button>
     <button type="button" class="pomodoro-btn pomodoro-btn-secondary" id="pomodoro-skip" title="Skip to next phase">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+    </button>
+    <button type="button" class="pomodoro-btn pomodoro-btn-stop" id="pomodoro-stop" title="Stop &amp; record time">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
     </button>
   </div>
   <div class="pomodoro-timer-session" id="pomodoro-session">Session 1</div>
@@ -72,6 +76,20 @@
   line-height: 1;
 }
 .pomodoro-timer-close:hover { color: var(--color-danger); }
+.pomodoro-timer-category {
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--color-link);
+  background: rgba(0, 105, 255, 0.08);
+  padding: 1px 7px;
+  border-radius: 4px;
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
 .pomodoro-timer-title {
   font-size: 0.8rem;
   color: var(--text-secondary);
@@ -139,6 +157,16 @@
   background: var(--gray-200);
   color: var(--body-font-color);
 }
+.pomodoro-btn-stop {
+  width: 30px;
+  height: 30px;
+  background: var(--gray-100);
+  color: var(--color-danger, #ea4335);
+}
+.pomodoro-btn-stop:hover {
+  background: rgba(234, 67, 53, 0.12);
+  color: var(--color-danger, #ea4335);
+}
 .pomodoro-timer-session {
   text-align: center;
   font-size: 0.7rem;
@@ -181,6 +209,7 @@
 
   var timerEl = document.getElementById('pomodoro-timer');
   var phaseEl = document.getElementById('pomodoro-phase');
+  var categoryEl = document.getElementById('pomodoro-category');
   var titleEl = document.getElementById('pomodoro-title');
   var displayEl = document.getElementById('pomodoro-display');
   var progressEl = document.getElementById('pomodoro-progress');
@@ -189,6 +218,7 @@
   var pauseIcon = document.getElementById('pomodoro-pause-icon');
   var resetBtn = document.getElementById('pomodoro-reset');
   var skipBtn = document.getElementById('pomodoro-skip');
+  var stopBtn = document.getElementById('pomodoro-stop');
   var closeBtn = document.getElementById('pomodoro-close');
   var sessionEl = document.getElementById('pomodoro-session');
 
@@ -200,6 +230,7 @@
   var isRunning = false;
   var intervalId = null;
   var sessionCount = 1;
+  var totalSessions = 1; // total pomodoro sessions for this task
   var accumulatedWorkSeconds = 0; // total work seconds done for this todo
 
   function formatTime(s) {
@@ -217,7 +248,12 @@
     phaseEl.className = 'pomodoro-timer-phase' + (phase === 'break' ? ' break' : '');
     progressEl.className = 'pomodoro-timer-progress-bar' + (phase === 'break' ? ' break' : '');
 
-    sessionEl.textContent = 'Session ' + sessionCount + ' \u00b7 ' + Math.round(accumulatedWorkSeconds / 60) + 'min tracked';
+    var sessionText = 'Session ' + sessionCount;
+    if (totalSessions > 1) {
+      sessionText += '/' + totalSessions;
+    }
+    sessionText += ' \u00b7 ' + Math.round(accumulatedWorkSeconds / 60) + 'min tracked';
+    sessionEl.textContent = sessionText;
 
     // Update document title while running
     if (isRunning) {
@@ -269,6 +305,14 @@
 
       if (phase === 'work') {
         accumulatedWorkSeconds += totalPhaseSeconds;
+
+        // If all sessions are complete, auto-stop
+        if (totalSessions > 1 && sessionCount >= totalSessions) {
+          updateDisplay();
+          closeTimer();
+          return;
+        }
+
         // Switch to break
         phase = 'break';
         secondsLeft = BREAK_SECONDS;
@@ -343,6 +387,14 @@
     if (phase === 'work') {
       // Accumulate partial work time
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
+
+      // If this was the last session, auto-stop
+      if (totalSessions > 1 && sessionCount >= totalSessions) {
+        updateDisplay();
+        closeTimer();
+        return;
+      }
+
       // Move to break
       phase = 'break';
       secondsLeft = BREAK_SECONDS;
@@ -371,6 +423,8 @@
     }
 
     timerEl.style.display = 'none';
+    categoryEl.style.display = 'none';
+    categoryEl.textContent = '';
     showPlayIcon();
 
     // Restore page title
@@ -390,6 +444,26 @@
     }
   }
 
+  function cancelTimer() {
+    if (intervalId) {
+      clearInterval(intervalId);
+      intervalId = null;
+    }
+    isRunning = false;
+    timerEl.style.display = 'none';
+    categoryEl.style.display = 'none';
+    categoryEl.textContent = '';
+    showPlayIcon();
+
+    // Restore page title
+    var cleanTitle = document.title.replace(/^\d{2}:\d{2} \u2014 (Work|Break) \| /, '');
+    document.title = cleanTitle;
+
+    activeTodoId = null;
+    activeTodoTitle = '';
+    // No event fired — time is discarded
+  }
+
   // ── Button handlers ──
   toggleBtn.addEventListener('click', function() {
     if (isRunning) {
@@ -401,7 +475,9 @@
 
   resetBtn.addEventListener('click', resetTimer);
   skipBtn.addEventListener('click', skipPhase);
-  closeBtn.addEventListener('click', function() {
+
+  // Stop button: confirm and record tracked time
+  stopBtn.addEventListener('click', function() {
     if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
       var trackedSoFar = accumulatedWorkSeconds;
       if (phase === 'work') trackedSoFar += (totalPhaseSeconds - secondsLeft);
@@ -411,6 +487,16 @@
       }
     }
     closeTimer();
+  });
+
+  // Close (x) button: cancel without recording time
+  closeBtn.addEventListener('click', function() {
+    if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
+      if (!confirm('Cancel timer? Tracked time will be discarded.')) {
+        return;
+      }
+    }
+    cancelTimer();
   });
 
   // ── Drag / move support ──
@@ -491,17 +577,50 @@
       activeTodoId = todoId;
       activeTodoTitle = todoTitle || 'Task';
       titleEl.textContent = activeTodoTitle;
-      phase = 'work';
-      secondsLeft = WORK_SECONDS;
-      totalPhaseSeconds = WORK_SECONDS;
-      sessionCount = 1;
-      accumulatedWorkSeconds = 0;
-      isRunning = false;
-      showPlayIcon();
-      updateDisplay();
-      resetPosition();
-      timerEl.style.display = '';
-      startTimer();
+
+      // Look up category and pomodoro config from IndexedDB
+      categoryEl.style.display = 'none';
+      categoryEl.textContent = '';
+
+      // Set defaults
+      WORK_SECONDS = 25 * 60;
+      totalSessions = 1;
+
+      function initAndStart() {
+        phase = 'work';
+        secondsLeft = WORK_SECONDS;
+        totalPhaseSeconds = WORK_SECONDS;
+        sessionCount = 1;
+        accumulatedWorkSeconds = 0;
+        isRunning = false;
+        showPlayIcon();
+        updateDisplay();
+        resetPosition();
+        timerEl.style.display = '';
+        startTimer();
+      }
+
+      if (window.dmSync && window.dmSync.getTodo) {
+        window.dmSync.getTodo(todoId).then(function(todo) {
+          if (todo && activeTodoId === todoId) {
+            if (todo.category) {
+              categoryEl.textContent = todo.category;
+              categoryEl.style.display = '';
+            }
+            if (todo.pomodoroLength && todo.pomodoroLength > 0) {
+              WORK_SECONDS = todo.pomodoroLength * 60;
+            }
+            if (todo.pomodoroCount && todo.pomodoroCount > 0) {
+              totalSessions = todo.pomodoroCount;
+            }
+          }
+          initAndStart();
+        }).catch(function() {
+          initAndStart();
+        });
+      } else {
+        initAndStart();
+      }
     },
     stop: closeTimer,
     pause: pauseTimer,
@@ -521,6 +640,9 @@
     },
     getActiveTodoId: function() {
       return activeTodoId;
+    },
+    getSessionInfo: function() {
+      return { current: sessionCount, total: totalSessions };
     }
   };
 })();
