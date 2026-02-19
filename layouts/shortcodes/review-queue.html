@@ -1,0 +1,840 @@
+<!-- review-queue: Spaced repetition review UI with SM-2 algorithm -->
+<div id="review-queue" class="review-queue">
+  <div class="review-auth" id="review-auth" style="display: none;">
+    <div class="review-auth-card">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <h3>Sign in to review notes</h3>
+      <p>Your review progress is stored securely and requires authentication.</p>
+      <button type="button" class="review-signin-btn" id="review-signin">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <div class="review-loading" id="review-loading" style="display: none;">
+    <div class="review-spinner"></div>
+    <p>Loading review queue...</p>
+  </div>
+
+  <div class="review-empty" id="review-empty" style="display: none;">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
+      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+    </svg>
+    <h3 id="review-empty-title">No notes to review</h3>
+    <p id="review-empty-msg">Add notes to the review queue using the book icon on any note, or check back later when reviews are due.</p>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="review-stats" id="review-stats" style="display: none;">
+    <div class="review-stats-inner">
+      <span class="review-stat">
+        <span class="review-stat-value" id="review-due-count">0</span>
+        <span class="review-stat-label">due now</span>
+      </span>
+      <span class="review-stat">
+        <span class="review-stat-value" id="review-total-count">0</span>
+        <span class="review-stat-label">total cards</span>
+      </span>
+      <span class="review-stat">
+        <span class="review-stat-value" id="review-reviewed-count">0</span>
+        <span class="review-stat-label">reviewed today</span>
+      </span>
+    </div>
+  </div>
+
+  <!-- Flashcard -->
+  <div class="review-card-container" id="review-card-container" style="display: none;">
+    <div class="review-progress">
+      <div class="review-progress-bar" id="review-progress-bar"></div>
+    </div>
+    <div class="review-card" id="review-card">
+      <div class="review-card-front" id="review-card-front">
+        <div class="review-card-meta" id="review-card-meta"></div>
+        <h2 class="review-card-title" id="review-card-title"></h2>
+        <div class="review-card-tags" id="review-card-tags"></div>
+        <button type="button" class="review-reveal-btn" id="review-reveal-btn">
+          Show Content
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+      </div>
+      <div class="review-card-back" id="review-card-back" style="display: none;">
+        <div class="review-card-content markdown" id="review-card-content"></div>
+      </div>
+    </div>
+
+    <!-- Rating buttons -->
+    <div class="review-rating" id="review-rating" style="display: none;">
+      <p class="review-rating-prompt">How well did you recall this?</p>
+      <div class="review-rating-buttons">
+        <button type="button" class="review-rate-btn review-rate-0" data-quality="0" title="Complete blackout">
+          <span class="review-rate-num">0</span>
+          <span class="review-rate-label">Blackout</span>
+        </button>
+        <button type="button" class="review-rate-btn review-rate-1" data-quality="1" title="Incorrect, but recognized on reveal">
+          <span class="review-rate-num">1</span>
+          <span class="review-rate-label">Wrong</span>
+        </button>
+        <button type="button" class="review-rate-btn review-rate-2" data-quality="2" title="Incorrect, but easy to recall on reveal">
+          <span class="review-rate-num">2</span>
+          <span class="review-rate-label">Hard</span>
+        </button>
+        <button type="button" class="review-rate-btn review-rate-3" data-quality="3" title="Correct with serious difficulty">
+          <span class="review-rate-num">3</span>
+          <span class="review-rate-label">Difficult</span>
+        </button>
+        <button type="button" class="review-rate-btn review-rate-4" data-quality="4" title="Correct with some hesitation">
+          <span class="review-rate-num">4</span>
+          <span class="review-rate-label">Good</span>
+        </button>
+        <button type="button" class="review-rate-btn review-rate-5" data-quality="5" title="Perfect recall">
+          <span class="review-rate-num">5</span>
+          <span class="review-rate-label">Perfect</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Next review info (shown after rating) -->
+    <div class="review-result" id="review-result" style="display: none;">
+      <p class="review-result-text" id="review-result-text"></p>
+      <button type="button" class="review-next-btn" id="review-next-btn">Next Card</button>
+    </div>
+  </div>
+
+  <!-- All cards list (upcoming schedule) -->
+  <div class="review-schedule" id="review-schedule" style="display: none;">
+    <h3 class="review-schedule-title">Review Schedule</h3>
+    <div class="review-schedule-list" id="review-schedule-list"></div>
+  </div>
+</div>
+
+<style>
+.review-queue { max-width: 700px; margin: 0 auto; }
+
+.review-auth, .review-loading, .review-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  text-align: center;
+  color: var(--body-font-color);
+}
+.review-auth-card {
+  padding: 2rem;
+  border-radius: 12px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  max-width: 400px;
+}
+.review-auth-card h3 { margin: 1rem 0 0.5rem; }
+.review-auth-card p { color: var(--gray-500); margin-bottom: 1.5rem; }
+.review-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s, box-shadow 0.2s;
+}
+.review-signin-btn:hover { background: var(--gray-100); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+
+.review-loading { gap: 12px; color: var(--gray-500); }
+.review-spinner {
+  width: 24px; height: 24px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--color-link);
+  border-radius: 50%;
+  animation: review-spin 0.8s linear infinite;
+}
+@keyframes review-spin { to { transform: rotate(360deg); } }
+
+.review-empty svg { color: var(--gray-400); margin-bottom: 0.5rem; }
+.review-empty h3 { margin: 0.5rem 0; }
+.review-empty p { color: var(--gray-500); font-size: 0.9rem; max-width: 400px; }
+
+/* Stats bar */
+.review-stats {
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--gray-100);
+  border-radius: 8px;
+}
+.review-stats-inner {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+}
+.review-stat {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+.review-stat-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-link);
+}
+.review-stat-label {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+
+/* Progress bar */
+.review-progress {
+  height: 4px;
+  background: var(--gray-200);
+  border-radius: 2px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.review-progress-bar {
+  height: 100%;
+  background: var(--color-link);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* Flashcard */
+.review-card {
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  background: var(--body-background);
+  overflow: hidden;
+}
+.review-card-front {
+  padding: 2rem;
+  text-align: center;
+}
+.review-card-meta {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  margin-bottom: 0.5rem;
+}
+.review-card-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0.5rem 0 1rem;
+  color: var(--body-font-color);
+}
+.review-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+.review-card-tag {
+  background: var(--gray-100);
+  color: var(--gray-600);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+.review-reveal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border: 1px solid var(--color-link);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-link);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.review-reveal-btn:hover {
+  background: var(--color-link);
+  color: #fff;
+}
+
+.review-card-back {
+  border-top: 1px solid var(--gray-200);
+  padding: 1.5rem 2rem;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+/* Rating buttons */
+.review-rating {
+  margin-top: 1.25rem;
+  text-align: center;
+}
+.review-rating-prompt {
+  font-size: 0.875rem;
+  color: var(--gray-500);
+  margin-bottom: 0.75rem;
+}
+.review-rating-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.review-rate-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: var(--body-background);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  min-width: 62px;
+}
+.review-rate-btn:hover {
+  transform: translateY(-2px);
+}
+.review-rate-btn:active {
+  transform: translateY(0);
+}
+.review-rate-num {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+.review-rate-label {
+  font-size: 0.65rem;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Rating button colors */
+.review-rate-0 { border-color: #dc2626; }
+.review-rate-0:hover { background: rgba(220,38,38,0.08); }
+.review-rate-0 .review-rate-num { color: #dc2626; }
+.review-rate-1 { border-color: #ea580c; }
+.review-rate-1:hover { background: rgba(234,88,12,0.08); }
+.review-rate-1 .review-rate-num { color: #ea580c; }
+.review-rate-2 { border-color: #d97706; }
+.review-rate-2:hover { background: rgba(217,119,6,0.08); }
+.review-rate-2 .review-rate-num { color: #d97706; }
+.review-rate-3 { border-color: #ca8a04; }
+.review-rate-3:hover { background: rgba(202,138,4,0.08); }
+.review-rate-3 .review-rate-num { color: #ca8a04; }
+.review-rate-4 { border-color: #16a34a; }
+.review-rate-4:hover { background: rgba(22,163,74,0.08); }
+.review-rate-4 .review-rate-num { color: #16a34a; }
+.review-rate-5 { border-color: #2563eb; }
+.review-rate-5:hover { background: rgba(37,99,235,0.08); }
+.review-rate-5 .review-rate-num { color: #2563eb; }
+
+/* Result after rating */
+.review-result {
+  margin-top: 1rem;
+  text-align: center;
+}
+.review-result-text {
+  font-size: 0.875rem;
+  color: var(--gray-600);
+  margin-bottom: 0.75rem;
+}
+.review-next-btn {
+  padding: 8px 24px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.review-next-btn:hover { opacity: 0.85; }
+
+/* Schedule list */
+.review-schedule {
+  margin-top: 2rem;
+  border-top: 1px solid var(--gray-200);
+  padding-top: 1.5rem;
+}
+.review-schedule-title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.review-schedule-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.review-schedule-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  text-decoration: none;
+  color: var(--body-font-color);
+  transition: background 0.15s;
+}
+.review-schedule-item:hover { background: var(--gray-100); }
+.review-schedule-item-title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.review-schedule-item-due {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+.review-schedule-item-due.review-due-now {
+  color: var(--color-link);
+  font-weight: 600;
+}
+.review-schedule-item-ef {
+  font-size: 0.7rem;
+  color: var(--gray-400);
+  white-space: nowrap;
+}
+.review-schedule-item-remove {
+  background: none;
+  border: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.review-schedule-item:hover .review-schedule-item-remove { opacity: 1; }
+.review-schedule-item-remove:hover { color: var(--color-danger, #ea4335); }
+
+@media (max-width: 600px) {
+  .review-card-front { padding: 1.5rem 1rem; }
+  .review-card-back { padding: 1rem; }
+  .review-card-title { font-size: 1.25rem; }
+  .review-rate-btn { min-width: 48px; padding: 0.4rem 0.5rem; }
+  .review-stats-inner { gap: 1rem; }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  var authEl = document.getElementById('review-auth');
+  var loadingEl = document.getElementById('review-loading');
+  var emptyEl = document.getElementById('review-empty');
+  var emptyTitleEl = document.getElementById('review-empty-title');
+  var emptyMsgEl = document.getElementById('review-empty-msg');
+  var statsEl = document.getElementById('review-stats');
+  var dueCountEl = document.getElementById('review-due-count');
+  var totalCountEl = document.getElementById('review-total-count');
+  var reviewedCountEl = document.getElementById('review-reviewed-count');
+  var cardContainerEl = document.getElementById('review-card-container');
+  var cardFrontEl = document.getElementById('review-card-front');
+  var cardBackEl = document.getElementById('review-card-back');
+  var cardTitleEl = document.getElementById('review-card-title');
+  var cardMetaEl = document.getElementById('review-card-meta');
+  var cardTagsEl = document.getElementById('review-card-tags');
+  var cardContentEl = document.getElementById('review-card-content');
+  var revealBtn = document.getElementById('review-reveal-btn');
+  var ratingEl = document.getElementById('review-rating');
+  var resultEl = document.getElementById('review-result');
+  var resultTextEl = document.getElementById('review-result-text');
+  var nextBtn = document.getElementById('review-next-btn');
+  var progressBar = document.getElementById('review-progress-bar');
+  var scheduleEl = document.getElementById('review-schedule');
+  var scheduleListEl = document.getElementById('review-schedule-list');
+  var signinBtn = document.getElementById('review-signin');
+
+  if (!document.getElementById('review-queue')) return;
+
+  var dueCards = [];
+  var currentIndex = 0;
+  var reviewedToday = 0;
+  var allCards = [];
+
+  function showState(state) {
+    authEl.style.display = state === 'auth' ? '' : 'none';
+    loadingEl.style.display = state === 'loading' ? '' : 'none';
+    emptyEl.style.display = state === 'empty' ? '' : 'none';
+    statsEl.style.display = (state === 'review' || state === 'done') ? '' : 'none';
+    cardContainerEl.style.display = state === 'review' ? '' : 'none';
+    scheduleEl.style.display = (state === 'review' || state === 'done' || state === 'empty') ? '' : 'none';
+  }
+
+  function getBaseUrl() {
+    var manifest = document.querySelector('link[rel="manifest"]');
+    return manifest ? manifest.getAttribute('href').replace('/manifest.json', '') : '';
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function formatRelativeDate(ms) {
+    if (!ms) return 'never';
+    var now = Date.now();
+    var diff = ms - now;
+    var days = Math.round(diff / 86400000);
+
+    if (days < 0) {
+      var absDays = Math.abs(days);
+      if (absDays === 0) return 'due now';
+      if (absDays === 1) return '1 day overdue';
+      return absDays + ' days overdue';
+    }
+    if (days === 0) return 'due now';
+    if (days === 1) return 'tomorrow';
+    if (days < 7) return 'in ' + days + ' days';
+    if (days < 30) {
+      var weeks = Math.round(days / 7);
+      return 'in ' + weeks + ' week' + (weeks > 1 ? 's' : '');
+    }
+    var months = Math.round(days / 30);
+    return 'in ' + months + ' month' + (months > 1 ? 's' : '');
+  }
+
+  function loadQueue() {
+    if (!window.dmSync) {
+      setTimeout(loadQueue, 100);
+      return;
+    }
+
+    showState('loading');
+
+    Promise.all([
+      window.dmSync.getReviewCards(false), // all cards
+      window.dmSync.getReviewCards(true),  // due cards only
+      window.dmSync.getAllNotes()
+    ]).then(function(results) {
+      allCards = results[0];
+      dueCards = results[1];
+      var notes = results[2];
+
+      // Build note lookup
+      var noteMap = {};
+      notes.forEach(function(n) { noteMap[n.id] = n; });
+
+      // Attach note data to cards
+      allCards.forEach(function(c) { c._note = noteMap[c.noteId] || null; });
+      dueCards.forEach(function(c) { c._note = noteMap[c.noteId] || null; });
+
+      // Filter out cards whose notes no longer exist
+      dueCards = dueCards.filter(function(c) { return c._note; });
+
+      // Count reviewed today
+      var todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      reviewedToday = 0;
+      allCards.forEach(function(c) {
+        if (c.lastReviewedAt && c.lastReviewedAt >= todayStart.getTime()) {
+          reviewedToday++;
+        }
+      });
+
+      // Update stats
+      dueCountEl.textContent = dueCards.length;
+      totalCountEl.textContent = allCards.length;
+      reviewedCountEl.textContent = reviewedToday;
+
+      if (allCards.length === 0) {
+        emptyTitleEl.textContent = 'No notes to review';
+        emptyMsgEl.textContent = 'Add notes to the review queue using the book icon on any note.';
+        showState('empty');
+        renderSchedule(noteMap);
+        return;
+      }
+
+      if (dueCards.length === 0) {
+        emptyTitleEl.textContent = 'All caught up!';
+        emptyMsgEl.textContent = 'No reviews due right now. Check back later.';
+        showState('empty');
+        renderSchedule(noteMap);
+        return;
+      }
+
+      currentIndex = 0;
+      showState('review');
+      showCard(dueCards[currentIndex]);
+      renderSchedule(noteMap);
+    }).catch(function(err) {
+      console.error('Error loading review queue:', err);
+      showState('empty');
+    });
+  }
+
+  function showCard(card) {
+    if (!card || !card._note) return;
+    var note = card._note;
+
+    // Update progress
+    var total = dueCards.length;
+    var pct = total > 0 ? Math.round((currentIndex / total) * 100) : 0;
+    progressBar.style.width = pct + '%';
+
+    // Front
+    var dest = note.destination || '';
+    if (dest === 'book-note' && note.bookTitle) dest = note.bookTitle;
+    else if (dest === 'snippets' && note.language) dest = note.language + ' snippet';
+    else if (dest === 'inbox') dest = 'Inbox';
+    else if (dest === 'topic') dest = 'Topics';
+
+    var metaParts = [dest];
+    if (card.repetitions > 0) metaParts.push('Review #' + (card.repetitions + 1));
+    metaParts.push('EF: ' + card.easeFactor.toFixed(2));
+    cardMetaEl.textContent = metaParts.join(' \u00B7 ');
+
+    cardTitleEl.textContent = note.title || 'Untitled';
+
+    // Tags
+    cardTagsEl.innerHTML = '';
+    if (note.tags && note.tags.length) {
+      note.tags.forEach(function(tag) {
+        var span = document.createElement('span');
+        span.className = 'review-card-tag';
+        span.textContent = tag;
+        cardTagsEl.appendChild(span);
+      });
+    }
+
+    // Reset state
+    cardBackEl.style.display = 'none';
+    ratingEl.style.display = 'none';
+    resultEl.style.display = 'none';
+    revealBtn.style.display = '';
+    cardContentEl.innerHTML = '';
+  }
+
+  // Reveal content
+  revealBtn.addEventListener('click', function() {
+    var card = dueCards[currentIndex];
+    if (!card || !card._note) return;
+    var note = card._note;
+
+    var content = note.content || '';
+    content = content.replace(/^\s*#\s+.+\n*/, ''); // strip leading heading
+
+    if (note.mode === 'code' && note.language && !content.trim().startsWith('```')) {
+      content = '```' + note.language + '\n' + content + '\n```';
+    }
+
+    // Build wikilink map if needed
+    var mapReady = Object.keys(window._wikilinkMap || {}).length > 0
+      ? Promise.resolve()
+      : (window.dmSync ? window.dmSync.getAllNotes().then(function(notes) { if (window.buildWikilinkMap) window.buildWikilinkMap(notes); }) : Promise.resolve());
+
+    mapReady.then(function() {
+      if (typeof marked !== 'undefined') {
+        cardContentEl.innerHTML = marked.parse(content);
+      } else {
+        cardContentEl.textContent = content;
+      }
+
+      // Syntax highlighting
+      cardContentEl.querySelectorAll('pre code').forEach(function(block) {
+        if (typeof hljs !== 'undefined') hljs.highlightElement(block);
+      });
+
+      // Diagrams
+      if (window.dmRenderDiagrams) window.dmRenderDiagrams(cardContentEl);
+
+      cardBackEl.style.display = '';
+      revealBtn.style.display = 'none';
+      ratingEl.style.display = '';
+    });
+  });
+
+  // Rating buttons
+  var rateButtons = document.querySelectorAll('.review-rate-btn');
+  rateButtons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var quality = parseInt(btn.getAttribute('data-quality'), 10);
+      var card = dueCards[currentIndex];
+      if (!card) return;
+
+      // Disable all buttons while processing
+      rateButtons.forEach(function(b) { b.disabled = true; });
+
+      window.dmSync.reviewCard(card.id, quality).then(function(updatedCard) {
+        // Show result
+        ratingEl.style.display = 'none';
+
+        var nextLabel = formatRelativeDate(updatedCard.nextReviewAt);
+        resultTextEl.textContent = 'Next review: ' + nextLabel + ' (interval: ' + updatedCard.interval + ' day' + (updatedCard.interval !== 1 ? 's' : '') + ')';
+        resultEl.style.display = '';
+
+        reviewedToday++;
+        reviewedCountEl.textContent = reviewedToday;
+        dueCountEl.textContent = Math.max(0, dueCards.length - currentIndex - 1);
+
+        // Re-enable buttons
+        rateButtons.forEach(function(b) { b.disabled = false; });
+
+        // If last card, change button text
+        if (currentIndex >= dueCards.length - 1) {
+          nextBtn.textContent = 'Done';
+        }
+      }).catch(function(err) {
+        console.error('Error submitting review:', err);
+        rateButtons.forEach(function(b) { b.disabled = false; });
+      });
+    });
+  });
+
+  // Next card button
+  nextBtn.addEventListener('click', function() {
+    currentIndex++;
+    if (currentIndex >= dueCards.length) {
+      // All done — reload to show updated schedule
+      loadQueue();
+    } else {
+      showCard(dueCards[currentIndex]);
+      var pct = Math.round((currentIndex / dueCards.length) * 100);
+      progressBar.style.width = pct + '%';
+    }
+  });
+
+  // Keyboard shortcuts for review
+  document.addEventListener('keydown', function(e) {
+    // Only handle if review card is visible
+    if (cardContainerEl.style.display === 'none') return;
+    // Don't trigger if user is typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+
+    // Space to reveal
+    if (e.key === ' ' && revealBtn.style.display !== 'none') {
+      e.preventDefault();
+      revealBtn.click();
+      return;
+    }
+
+    // Number keys 0-5 to rate
+    if (ratingEl.style.display !== 'none' && e.key >= '0' && e.key <= '5') {
+      var q = parseInt(e.key, 10);
+      var matchBtn = document.querySelector('.review-rate-btn[data-quality="' + q + '"]');
+      if (matchBtn && !matchBtn.disabled) matchBtn.click();
+      return;
+    }
+
+    // Enter to go next
+    if (resultEl.style.display !== 'none' && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      nextBtn.click();
+    }
+  });
+
+  function renderSchedule(noteMap) {
+    if (!allCards.length) {
+      scheduleEl.style.display = 'none';
+      return;
+    }
+
+    var base = getBaseUrl();
+    var now = Date.now();
+    var html = '';
+
+    // Sort: due first, then by nextReviewAt
+    var sorted = allCards.slice().sort(function(a, b) {
+      var aDue = a.nextReviewAt <= now ? 0 : 1;
+      var bDue = b.nextReviewAt <= now ? 0 : 1;
+      if (aDue !== bDue) return aDue - bDue;
+      return (a.nextReviewAt || 0) - (b.nextReviewAt || 0);
+    });
+
+    sorted.forEach(function(card) {
+      var note = noteMap[card.noteId] || card._note;
+      if (!note) return;
+
+      var isDue = card.nextReviewAt <= now;
+      var dueText = isDue ? 'Due now' : formatRelativeDate(card.nextReviewAt);
+
+      html += '<div class="review-schedule-item" data-card-id="' + card.id + '">'
+        + '<a class="review-schedule-item-title" href="' + base + '/docs/view/?id=' + encodeURIComponent(card.noteId) + '">' + escapeHtml(note.title || 'Untitled') + '</a>'
+        + '<span class="review-schedule-item-ef">EF ' + card.easeFactor.toFixed(1) + '</span>'
+        + '<span class="review-schedule-item-due' + (isDue ? ' review-due-now' : '') + '">' + escapeHtml(dueText) + '</span>'
+        + '<button type="button" class="review-schedule-item-remove" title="Remove from review">'
+        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
+        + '</button>'
+        + '</div>';
+    });
+
+    scheduleListEl.innerHTML = html;
+    scheduleEl.style.display = '';
+
+    // Attach remove handlers
+    scheduleListEl.querySelectorAll('.review-schedule-item-remove').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var item = btn.closest('.review-schedule-item');
+        var cardId = item.getAttribute('data-card-id');
+        if (!confirm('Remove this note from the review queue?')) return;
+
+        btn.disabled = true;
+        window.dmSync.deleteReviewCard(cardId).then(function() {
+          item.style.opacity = '0';
+          item.style.transform = 'translateX(20px)';
+          item.style.transition = 'opacity 0.2s, transform 0.2s';
+          setTimeout(function() {
+            if (item.parentNode) item.parentNode.removeChild(item);
+          }, 200);
+          // Reload to update counts
+          loadQueue();
+        }).catch(function(err) {
+          console.error('Error removing card:', err);
+          btn.disabled = false;
+        });
+      });
+    });
+  }
+
+  // Auth
+  signinBtn.addEventListener('click', function() {
+    if (window.dmAuth && window.dmGoogleProvider) {
+      window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+        console.error('Sign-in error:', err);
+      });
+    }
+  });
+
+  // Auth state
+  if (window.dmAuth) {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        loadQueue();
+      } else {
+        showState('auth');
+      }
+    });
+  } else {
+    showState('auth');
+  }
+
+  // Listen for sync/review updates
+  window.addEventListener('dm-sync-complete', function() {
+    if (window.dmAuth && window.dmAuth.currentUser && document.getElementById('review-queue')) {
+      loadQueue();
+    }
+  });
+  window.addEventListener('dm-review-updated', function() {
+    if (window.dmAuth && window.dmAuth.currentUser && document.getElementById('review-queue')) {
+      // Don't reload during active review session
+    }
+  });
+})();
+</script>

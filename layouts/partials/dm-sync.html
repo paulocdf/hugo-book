@@ -147,13 +147,14 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-  var DB_VERSION = 6;
+  var DB_VERSION = 7;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
   var STORE_WRITE_QUEUE = 'writeQueue';
   var STORE_VERSIONS = 'noteVersions';
   var STORE_ATTACHMENTS = 'attachments';
+  var STORE_REVIEW_CARDS = 'reviewCards';
   var MAX_VERSIONS_PER_NOTE = 50;
   var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
   var SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -211,6 +212,12 @@
           var attachStore = db.createObjectStore(STORE_ATTACHMENTS, { keyPath: 'id' });
           attachStore.createIndex('noteId', 'noteId', { unique: false });
           attachStore.createIndex('createdAt', 'createdAt', { unique: false });
+        }
+        // Review cards store (v7)
+        if (!db.objectStoreNames.contains(STORE_REVIEW_CARDS)) {
+          var reviewStore = db.createObjectStore(STORE_REVIEW_CARDS, { keyPath: 'id' });
+          reviewStore.createIndex('noteId', 'noteId', { unique: false });
+          reviewStore.createIndex('nextReviewAt', 'nextReviewAt', { unique: false });
         }
       };
       req.onsuccess = function(e) {
@@ -685,6 +692,7 @@
       .then(function() { return syncTodos(userId); })
       .then(function() { return syncVersions(userId); })
       .then(function() { return syncAttachments(userId); })
+      .then(function() { return syncReviewCards(userId); })
       .then(function() {
         _syncing = false;
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -1256,6 +1264,264 @@
       });
   }
 
+  // ─── Spaced Repetition (SM-2 Algorithm) ───
+
+  /**
+   * SM-2 algorithm implementation.
+   * @param {number} quality — 0-5 rating (0=blackout, 5=perfect)
+   * @param {number} repetitions — current successful-review count
+   * @param {number} easeFactor — current ease factor (min 1.3)
+   * @param {number} interval — current interval in days
+   * @returns {Object} - { repetitions, easeFactor, interval, nextReviewAt }
+   */
+  function sm2(quality, repetitions, easeFactor, interval) {
+    var newEF = easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+    if (newEF < 1.3) newEF = 1.3;
+
+    var newReps, newInterval;
+    if (quality >= 3) {
+      // Correct response
+      newReps = repetitions + 1;
+      if (newReps === 1) {
+        newInterval = 1;
+      } else if (newReps === 2) {
+        newInterval = 6;
+      } else {
+        newInterval = Math.round(interval * newEF);
+      }
+    } else {
+      // Incorrect — reset
+      newReps = 0;
+      newInterval = 1;
+    }
+
+    var now = new Date();
+    var nextDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + newInterval);
+    nextDate.setHours(0, 0, 0, 0);
+
+    return {
+      repetitions: newReps,
+      easeFactor: Math.round(newEF * 100) / 100,
+      interval: newInterval,
+      nextReviewAt: nextDate.getTime()
+    };
+  }
+
+  function serializeReviewCard(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      noteId: data.noteId || '',
+      userId: data.userId || '',
+      easeFactor: data.easeFactor != null ? data.easeFactor : 2.5,
+      interval: data.interval || 0,
+      repetitions: data.repetitions || 0,
+      nextReviewAt: data.nextReviewAt ? data.nextReviewAt.toMillis() : 0,
+      lastReviewedAt: data.lastReviewedAt ? data.lastReviewedAt.toMillis() : null,
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  /**
+   * Create a review card for a note (opt-in).
+   * First review is immediately due (nextReviewAt = now).
+   */
+  function createReviewCard(noteId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+
+    // Check if card already exists for this note
+    return getReviewCardForNote(noteId).then(function(existing) {
+      if (existing) return existing; // already enrolled
+
+      var cardId = window.dmDb
+        ? window.dmDb.collection('reviewCards').doc().id
+        : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+
+      var now = Date.now();
+      var localCard = {
+        id: cardId,
+        noteId: noteId,
+        userId: user.uid,
+        easeFactor: 2.5,
+        interval: 0,
+        repetitions: 0,
+        nextReviewAt: now, // due immediately
+        lastReviewedAt: null,
+        createdAt: now,
+        updatedAt: now
+      };
+
+      var fsData = {
+        noteId: noteId,
+        userId: user.uid,
+        easeFactor: 2.5,
+        interval: 0,
+        repetitions: 0,
+        nextReviewAt: firebase.firestore.Timestamp.fromMillis(now),
+        lastReviewedAt: null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      return firestoreWrite({
+        collection: 'reviewCards',
+        docId: cardId,
+        op: 'set',
+        data: fsData,
+        localOp: function() { return idbPut(STORE_REVIEW_CARDS, localCard); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-review-updated'));
+        return localCard;
+      });
+    });
+  }
+
+  /**
+   * Submit a review rating for a card. Applies SM-2 to compute next interval.
+   * @param {string} cardId
+   * @param {number} quality — 0-5
+   */
+  function reviewCard(cardId, quality) {
+    return idbGet(STORE_REVIEW_CARDS, cardId).then(function(card) {
+      if (!card) return Promise.reject(new Error('Card not found'));
+
+      var result = sm2(quality, card.repetitions, card.easeFactor, card.interval);
+      var now = Date.now();
+
+      card.easeFactor = result.easeFactor;
+      card.interval = result.interval;
+      card.repetitions = result.repetitions;
+      card.nextReviewAt = result.nextReviewAt;
+      card.lastReviewedAt = now;
+      card.updatedAt = now;
+
+      return firestoreWrite({
+        collection: 'reviewCards',
+        docId: card.id,
+        op: 'update',
+        data: {
+          easeFactor: card.easeFactor,
+          interval: card.interval,
+          repetitions: card.repetitions,
+          nextReviewAt: firebase.firestore.Timestamp.fromMillis(card.nextReviewAt),
+          lastReviewedAt: firebase.firestore.Timestamp.fromMillis(now),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        },
+        localOp: function() { return idbPut(STORE_REVIEW_CARDS, card); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-review-updated'));
+        return card;
+      });
+    });
+  }
+
+  /**
+   * Remove a note from the review system.
+   */
+  function deleteReviewCard(cardId) {
+    return firestoreWrite({
+      collection: 'reviewCards',
+      docId: cardId,
+      op: 'delete',
+      data: null,
+      localOp: function() { return idbDelete(STORE_REVIEW_CARDS, cardId); }
+    }).then(function() {
+      window.dispatchEvent(new CustomEvent('dm-review-updated'));
+    });
+  }
+
+  /**
+   * Get the review card for a specific note (if enrolled).
+   */
+  function getReviewCardForNote(noteId) {
+    return idbGetAll(STORE_REVIEW_CARDS).then(function(cards) {
+      for (var i = 0; i < cards.length; i++) {
+        if (cards[i].noteId === noteId) return cards[i];
+      }
+      return null;
+    });
+  }
+
+  /**
+   * Get all review cards, optionally only those due for review.
+   * @param {boolean} dueOnly — if true, only return cards where nextReviewAt <= now
+   */
+  function getReviewCards(dueOnly) {
+    var now = Date.now();
+    return idbGetAll(STORE_REVIEW_CARDS).then(function(cards) {
+      if (dueOnly) {
+        cards = cards.filter(function(c) { return c.nextReviewAt <= now; });
+      }
+      // Sort: due soonest first
+      return cards.sort(function(a, b) { return (a.nextReviewAt || 0) - (b.nextReviewAt || 0); });
+    });
+  }
+
+  /**
+   * Get count of cards due for review right now.
+   */
+  function getDueCount() {
+    var now = Date.now();
+    return idbGetAll(STORE_REVIEW_CARDS).then(function(cards) {
+      return cards.filter(function(c) { return c.nextReviewAt <= now; }).length;
+    });
+  }
+
+  /**
+   * Sync review cards from Firestore.
+   */
+  function syncReviewCards(userId) {
+    if (!window.dmDb) return Promise.resolve();
+
+    console.log('[dm-sync] Syncing review cards...');
+    return window.dmDb.collection('reviewCards')
+      .where('userId', '==', userId)
+      .get()
+      .then(function(snapshot) {
+        var remoteCards = [];
+        snapshot.forEach(function(doc) {
+          remoteCards.push(serializeReviewCard(doc));
+        });
+
+        return idbGetAll(STORE_REVIEW_CARDS).then(function(localCards) {
+          var localMap = {};
+          localCards.forEach(function(c) { localMap[c.id] = c; });
+
+          var remoteMap = {};
+          remoteCards.forEach(function(c) { remoteMap[c.id] = c; });
+
+          var toUpsert = [];
+          remoteCards.forEach(function(rc) {
+            var lc = localMap[rc.id];
+            if (!lc || lc.updatedAt !== rc.updatedAt) {
+              toUpsert.push(rc);
+            }
+          });
+
+          var toDelete = [];
+          localCards.forEach(function(lc) {
+            if (!remoteMap[lc.id]) {
+              toDelete.push(lc.id);
+            }
+          });
+
+          var promises = [];
+          if (toUpsert.length > 0) {
+            promises.push(idbPutBatch(STORE_REVIEW_CARDS, toUpsert));
+          }
+          toDelete.forEach(function(id) {
+            promises.push(idbDelete(STORE_REVIEW_CARDS, id));
+          });
+
+          return Promise.all(promises).then(function() {
+            console.log('[dm-sync] Review cards sync complete. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
+          });
+        });
+      });
+  }
+
   // ─── Public API ───
 
   window.dmSync = {
@@ -1467,6 +1733,7 @@
         idbClear(STORE_META),
         idbClear(STORE_VERSIONS),
         idbClear(STORE_ATTACHMENTS),
+        idbClear(STORE_REVIEW_CARDS),
         clearQueue()
       ]).then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -1503,7 +1770,15 @@
     uploadAttachment: uploadAttachment,
     getAttachmentsForNote: getAttachmentsForNote,
     deleteAttachment: deleteAttachment,
-    deleteAttachmentsForNote: deleteAttachmentsForNote
+    deleteAttachmentsForNote: deleteAttachmentsForNote,
+
+    // Spaced repetition / review
+    createReviewCard: createReviewCard,
+    reviewCard: reviewCard,
+    deleteReviewCard: deleteReviewCard,
+    getReviewCardForNote: getReviewCardForNote,
+    getReviewCards: getReviewCards,
+    getDueCount: getDueCount
   };
 
   // ─── Auto-sync on Auth State Change ───
@@ -1516,7 +1791,7 @@
           var cachedUserId = meta ? meta.value : null;
           var proceed = cachedUserId === user.uid
             ? Promise.resolve()
-            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), clearQueue()]);
+            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), clearQueue()]);
 
           return proceed.then(function() {
             return idbPut(STORE_META, { key: 'currentUserId', value: user.uid });
@@ -1538,7 +1813,7 @@
         stopBackgroundSync();
         clearAllReminderTimers();
         // Clear cache on sign-out so no data leaks to another user
-        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), clearQueue()])
+        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), clearQueue()])
           .then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));
