@@ -1170,11 +1170,48 @@ aside nav ul a:hover {
     border-radius: 9px;
     font-size: 0.68rem;
     font-weight: 600;
-    background: var(--accent-blue);
+    background: var(--accent-purple);
     color: #fff;
     margin-left: auto;
     line-height: 1;
     flex-shrink: 0;
+  }
+
+  // ---- Review: visually distinct with separator + purple accent ----
+  .sidebar-review {
+    margin-top: 0.75rem !important;
+    padding-top: 0.75rem !important;
+    border-top: 1px solid var(--border-subtle);
+
+    a {
+      font-weight: 500;
+
+      .sidebar-icon {
+        opacity: 0.75;
+      }
+
+      &:hover {
+        color: var(--accent-purple);
+
+        .sidebar-icon {
+          opacity: 1;
+          stroke: var(--accent-purple);
+        }
+      }
+
+      &.active {
+        color: var(--accent-purple);
+        font-weight: 600;
+
+        .sidebar-icon {
+          stroke: var(--accent-purple);
+        }
+
+        &::before {
+          background: linear-gradient(180deg, var(--accent-purple) 0%, var(--accent-blue) 100%);
+        }
+      }
+    }
   }
 
   // ---- Inbox: accented only when active ----
