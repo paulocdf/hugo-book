@@ -2755,14 +2755,23 @@
 
   // Initial load when auth is ready
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
-      if (user) {
-        loadTodos();
-      } else {
-        allTodos = [];
-        render();
-      }
-    });
+    function subscribeAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          loadTodos();
+        } else {
+          allTodos = [];
+          render();
+        }
+      });
+    }
+    // On localhost, wait for redirect result to settle before subscribing
+    // to avoid the null→user double-fire flash
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeAuth);
+    } else {
+      subscribeAuth();
+    }
   }
 
 })();

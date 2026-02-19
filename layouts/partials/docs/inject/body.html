@@ -209,9 +209,16 @@
 
   // Listen for auth state changes
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
-      updateAuthUI(user);
-    });
+    function subscribeSidebarAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        updateAuthUI(user);
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeSidebarAuth);
+    } else {
+      subscribeSidebarAuth();
+    }
   }
 
   if (signinBtn) {
@@ -1267,18 +1274,25 @@
   // Only run on pages that have the landing page auth elements
   if (!gardenSignin) return;
 
-  window.dmAuth.onAuthStateChanged(function(user) {
-    if (user) {
-      gardenSignin.style.display = 'none';
-      gardenAuthUser.style.display = '';
-      gardenAvatar.src = user.photoURL || '';
-      gardenAvatar.alt = user.displayName || '';
-      gardenName.textContent = user.displayName || user.email || '';
-    } else {
-      gardenSignin.style.display = '';
-      gardenAuthUser.style.display = 'none';
-    }
-  });
+  function subscribeGardenAuth() {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        gardenSignin.style.display = 'none';
+        gardenAuthUser.style.display = '';
+        gardenAvatar.src = user.photoURL || '';
+        gardenAvatar.alt = user.displayName || '';
+        gardenName.textContent = user.displayName || user.email || '';
+      } else {
+        gardenSignin.style.display = '';
+        gardenAuthUser.style.display = 'none';
+      }
+    });
+  }
+  if (window.dmAuthReady) {
+    window.dmAuthReady.then(subscribeGardenAuth);
+  } else {
+    subscribeGardenAuth();
+  }
 
   gardenSignin.addEventListener('click', function() {
     if (!window.dmGoogleProvider) return;
@@ -1618,21 +1632,28 @@
 
   // Auth state change
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
-      if (user) {
-        // Try to render from cache immediately
-        if (window.dmSync) {
-          window.dmSync.getAllNotes().then(function(notes) {
-            if (notes.length > 0) {
-              renderDynamicSidebar(notes);
-            }
-            // Sync will fire dm-sync-complete which will re-render
-          });
+    function subscribeDynSidebarAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          // Try to render from cache immediately
+          if (window.dmSync) {
+            window.dmSync.getAllNotes().then(function(notes) {
+              if (notes.length > 0) {
+                renderDynamicSidebar(notes);
+              }
+              // Sync will fire dm-sync-complete which will re-render
+            });
+          }
+        } else {
+          renderAuthPrompt();
         }
-      } else {
-        renderAuthPrompt();
-      }
-    });
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeDynSidebarAuth);
+    } else {
+      subscribeDynSidebarAuth();
+    }
   }
 })();
 </script>

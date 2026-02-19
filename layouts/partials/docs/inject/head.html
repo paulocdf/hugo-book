@@ -33,10 +33,28 @@
     window.dmGoogleProvider = new firebase.auth.GoogleAuthProvider();
     window.dmIsLocalhost = isLocalhost;
 
-    // On localhost, check for redirect result on page load
+    // dmAuthReady: resolves once Firebase auth state has settled.
+    // Prevents the null→user flash on page load (Firebase loads persisted
+    // session from IndexedDB asynchronously, causing a brief signed-out state).
     if (isLocalhost) {
-      window.dmAuth.getRedirectResult().catch(function(err) {
+      // On localhost, wait for redirect result first
+      window.dmAuthReady = window.dmAuth.getRedirectResult().catch(function(err) {
         console.error('Redirect sign-in error:', err);
+      }).then(function() {
+        return new Promise(function(resolve) {
+          var unsub = window.dmAuth.onAuthStateChanged(function(user) {
+            unsub();
+            resolve(user);
+          });
+        });
+      });
+    } else {
+      // On production, just wait for the first auth state callback
+      window.dmAuthReady = new Promise(function(resolve) {
+        var unsub = window.dmAuth.onAuthStateChanged(function(user) {
+          unsub();
+          resolve(user);
+        });
       });
     }
   })();

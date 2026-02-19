@@ -1994,7 +1994,7 @@
   // ─── Auto-sync on Auth State Change ───
 
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
+    function handleSyncAuth(user) {
       if (user) {
         // Check if this is a different user than last cached session
         idbGet(STORE_META, 'currentUserId').then(function(meta) {
@@ -2032,7 +2032,15 @@
             console.warn('[dm-sync] Error clearing cache on sign-out:', err);
           });
       }
-    });
+    }
+    // Wait for auth to settle to avoid null→user flash, then subscribe
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(function() {
+        window.dmAuth.onAuthStateChanged(handleSyncAuth);
+      });
+    } else {
+      window.dmAuth.onAuthStateChanged(handleSyncAuth);
+    }
   }
 
 })();

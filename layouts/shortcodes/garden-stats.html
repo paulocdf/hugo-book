@@ -48,9 +48,16 @@
   window.addEventListener('dm-sync-complete', updateStats);
 
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
-      if (user) updateStats();
-    });
+    function subscribeGardenStatsAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) updateStats();
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeGardenStatsAuth);
+    } else {
+      subscribeGardenStatsAuth();
+    }
   }
 })();
 </script>

@@ -133,20 +133,27 @@
   window.addEventListener('dm-sync-complete', updateSections);
 
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
-      if (user) {
-        updateSections();
-      } else {
-        ['garden-section-books', 'garden-section-topics'].forEach(function(id) {
-          var el = document.getElementById(id);
-          if (el) el.innerHTML = '<li><em>Sign in to see your notes.</em></li>';
-        });
-        var inboxEl = document.getElementById('garden-section-inbox');
-        if (inboxEl) inboxEl.innerHTML = '<em>Sign in to see your notes.</em>';
-        var dashEl = document.getElementById('garden-section-dashboard');
-        if (dashEl) dashEl.innerHTML = '<em>Sign in to see your data.</em>';
-      }
-    });
+    function subscribeGardenSectionsAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          updateSections();
+        } else {
+          ['garden-section-books', 'garden-section-topics'].forEach(function(id) {
+            var el = document.getElementById(id);
+            if (el) el.innerHTML = '<li><em>Sign in to see your notes.</em></li>';
+          });
+          var inboxEl = document.getElementById('garden-section-inbox');
+          if (inboxEl) inboxEl.innerHTML = '<em>Sign in to see your notes.</em>';
+          var dashEl = document.getElementById('garden-section-dashboard');
+          if (dashEl) dashEl.innerHTML = '<em>Sign in to see your data.</em>';
+        }
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeGardenSectionsAuth);
+    } else {
+      subscribeGardenSectionsAuth();
+    }
   }
 })();
 </script>
