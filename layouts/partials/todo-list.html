@@ -1391,8 +1391,20 @@
     _speechRecognition.onend = function() {
       _speechIsRecording = false;
       addMicBtn.classList.remove('recording');
-      // Focus the title input so user can review/edit before pressing Add
+      // Parse natural language date/time from the transcript
       if (addTitleInput && addTitleInput.value.trim()) {
+        var parsed = parseSpeechDateTime(addTitleInput.value.trim());
+        if (parsed.date || parsed.reminderMs) {
+          addTitleInput.value = parsed.cleanTitle;
+          if (parsed.date) {
+            _addFormDate = parsed.date;
+            updateDateChip();
+          }
+          if (parsed.reminderMs) {
+            _addFormReminderMs = parsed.reminderMs;
+            updateReminderChip();
+          }
+        }
         addTitleInput.focus();
       }
     };
@@ -1499,6 +1511,177 @@
       return { label: dayName + ', ' + monthDay, cssClass: 'overdue', badge: 'Overdue' };
     }
     return { label: dayName + ', ' + monthDay, cssClass: '', badge: '' };
+  }
+
+  // ─── Natural language date/time parsing for speech input ───
+  function parseSpeechDateTime(text) {
+    // Returns { cleanTitle: string, date: 'YYYY-MM-DD'|null, reminderMs: number|null }
+    // Strips temporal phrases and "remind me (to)" prefix from the title.
+    var now = new Date();
+    var date = null;   // YYYY-MM-DD string
+    var time = null;   // { hours: N, minutes: N } in 24h format
+    var cleaned = text;
+
+    // Helper: format Date as YYYY-MM-DD
+    function fmtDate(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+
+    // Helper: get next occurrence of a weekday (0=Sun..6=Sat), always in the future
+    function nextWeekday(target) {
+      var d = new Date(now);
+      var diff = target - d.getDay();
+      if (diff <= 0) diff += 7;
+      d.setDate(d.getDate() + diff);
+      return d;
+    }
+
+    // Normalize: lowercase, collapse whitespace
+    var lower = cleaned.toLowerCase().replace(/\s+/g, ' ').trim();
+
+    // ── 1. Strip "remind me (to|for|about)" prefix ──
+    lower = lower.replace(/^remind me\s+/, '');
+    cleaned = cleaned.replace(/^remind me\s+/i, '');
+
+    // ── 2. Relative durations: "in X minutes/hours" ──
+    var relMatch = lower.match(/\bin\s+(\d+)\s+(minute|minutes|min|hour|hours|hr|hrs)\b/);
+    if (relMatch) {
+      var amount = parseInt(relMatch[1], 10);
+      var unit = relMatch[2];
+      var ms = amount * (/^(hour|hours|hr|hrs)$/.test(unit) ? 3600000 : 60000);
+      var target = new Date(now.getTime() + ms);
+      date = fmtDate(target);
+      time = { hours: target.getHours(), minutes: target.getMinutes() };
+      var relRe = new RegExp('\\bin\\s+' + relMatch[1] + '\\s+' + relMatch[2] + '\\b', 'i');
+      cleaned = cleaned.replace(relRe, '');
+    }
+
+    // ── 3. "at X o'clock" / "at X:XX" / "at X AM/PM" ──
+    if (!time) {
+      // "at 3 o'clock", "at 3", "at 3 PM", "at 15:30", "at 3:30 PM"
+      var timeMatch = lower.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(?:o['']?clock)?\s*(am|pm|a\.m\.|p\.m\.)?\b/);
+      if (timeMatch) {
+        var h = parseInt(timeMatch[1], 10);
+        var m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
+        var ampm = timeMatch[3] ? timeMatch[3].replace(/\./g, '') : null;
+        if (ampm === 'pm' && h < 12) h += 12;
+        if (ampm === 'am' && h === 12) h = 0;
+        // If no AM/PM and hour <= 12, use context: if hour already passed today, it's PM
+        if (!ampm && h <= 12 && h > 0) {
+          var testDate = new Date(now);
+          testDate.setHours(h, m, 0, 0);
+          if (testDate <= now && h < 12) h += 12; // assume PM if morning already passed
+        }
+        time = { hours: h, minutes: m };
+        var timeRe = new RegExp('\\bat\\s+' + timeMatch[1] + '(?::' + (timeMatch[2] || '') + ')?\\s*(?:o[\'\\u2019]?clock)?\\s*(?:' + (timeMatch[3] || '') + ')?', 'i');
+        cleaned = cleaned.replace(timeRe, '');
+      }
+    }
+
+    // ── 4. Named days / relative dates ──
+    if (!date) {
+      // "today"
+      if (/\btoday\b/.test(lower)) {
+        date = fmtDate(now);
+        cleaned = cleaned.replace(/\btoday\b/i, '');
+      }
+      // "tonight"
+      else if (/\btonight\b/.test(lower)) {
+        date = fmtDate(now);
+        if (!time) time = { hours: 21, minutes: 0 };
+        cleaned = cleaned.replace(/\btonight\b/i, '');
+      }
+      // "tomorrow"
+      else if (/\btomorrow\b/.test(lower)) {
+        var tmrw = new Date(now); tmrw.setDate(tmrw.getDate() + 1);
+        date = fmtDate(tmrw);
+        cleaned = cleaned.replace(/\btomorrow\b/i, '');
+      }
+      // "this weekend" / "on the weekend" / "the weekend" / "on weekend"
+      else if (/\b(?:this|the|on(?:\s+the)?)\s+weekend\b/.test(lower) || /\bweekend\b/.test(lower)) {
+        date = fmtDate(nextWeekday(6)); // Saturday
+        cleaned = cleaned.replace(/\b(?:(?:this|the|on(?:\s+the)?)\s+)?weekend\b/i, '');
+      }
+      // "next week"
+      else if (/\bnext\s+week\b/.test(lower)) {
+        date = fmtDate(nextWeekday(1)); // Monday
+        cleaned = cleaned.replace(/\bnext\s+week\b/i, '');
+      }
+      // "on Monday", "on Tuesday", ... (with optional "next")
+      else {
+        var dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+        var dayMatch = lower.match(/\b(?:on\s+)?(?:next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/);
+        if (dayMatch) {
+          var dayIdx = dayNames.indexOf(dayMatch[1]);
+          if (dayIdx !== -1) {
+            date = fmtDate(nextWeekday(dayIdx));
+            var dayRe = new RegExp('\\b(?:on\\s+)?(?:next\\s+)?' + dayMatch[1] + '\\b', 'i');
+            cleaned = cleaned.replace(dayRe, '');
+          }
+        }
+      }
+    }
+
+    // ── 5. Time-of-day phrases: "in the morning/afternoon/evening" ──
+    if (!time) {
+      if (/\bin\s+the\s+morning\b/.test(lower)) {
+        time = { hours: 9, minutes: 0 };
+        cleaned = cleaned.replace(/\bin\s+the\s+morning\b/i, '');
+      } else if (/\bin\s+the\s+afternoon\b/.test(lower)) {
+        time = { hours: 14, minutes: 0 };
+        cleaned = cleaned.replace(/\bin\s+the\s+afternoon\b/i, '');
+      } else if (/\bin\s+the\s+evening\b/.test(lower)) {
+        time = { hours: 19, minutes: 0 };
+        cleaned = cleaned.replace(/\bin\s+the\s+evening\b/i, '');
+      }
+    }
+
+    // ── 6. Strip connectors: leading "to", "for", "about", "that" ──
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+    cleaned = cleaned.replace(/^(to|for|about|that)\s+/i, '');
+    // Also strip trailing connectors
+    cleaned = cleaned.replace(/\s+(to|for|about|that)$/i, '');
+    cleaned = cleaned.replace(/\s+/g, ' ').trim();
+
+    // If nothing was parsed, return unchanged
+    if (!date && !time) {
+      return { cleanTitle: text, date: null, reminderMs: null };
+    }
+
+    // ── 7. Build the reminder timestamp ──
+    var reminderDate;
+    if (date) {
+      var parts = date.split('-');
+      reminderDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+    } else {
+      reminderDate = new Date(now);
+    }
+
+    if (time) {
+      reminderDate.setHours(time.hours, time.minutes, 0, 0);
+    } else {
+      // Date-only: default reminder to 9 AM
+      reminderDate.setHours(9, 0, 0, 0);
+    }
+
+    // If the computed time is in the past (e.g. "today" with 9 AM already passed), bump to tomorrow
+    if (reminderDate.getTime() <= now.getTime() && !time) {
+      reminderDate.setDate(reminderDate.getDate() + 1);
+    }
+
+    // Final date string (may have been adjusted)
+    var finalDate = fmtDate(reminderDate);
+
+    // Capitalize first letter of cleaned title
+    if (cleaned.length > 0) {
+      cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    }
+
+    return {
+      cleanTitle: cleaned,
+      date: finalDate,
+      reminderMs: reminderDate.getTime()
+    };
   }
 
   // ─── Add-form state (internal, not DOM inputs) ───
