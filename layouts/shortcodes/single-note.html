@@ -36,7 +36,7 @@
       <button type="button" class="single-note-history-btn note-action-btn" title="Version History">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
       </button>
-      <button type="button" class="single-note-review-btn note-action-btn" title="Spaced repetition review">
+      <button type="button" class="single-note-review-btn note-action-btn" title="Create Flashcard">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.58.67 3 1.74 4.01A5.5 5.5 0 0 0 4 15.5 5.5 5.5 0 0 0 9.5 21h.5"></path><path d="M14.5 2A5.5 5.5 0 0 1 20 7.5c0 1.58-.67 3-1.74 4.01A5.5 5.5 0 0 1 20 15.5a5.5 5.5 0 0 1-5.5 5.5H14"></path><path d="M12 2v20"></path></svg>
       </button>
       <button type="button" class="single-note-pin-btn note-action-btn" title="Pin note">
@@ -270,9 +270,6 @@
 
       showState('content');
 
-      // Update review button state
-      updateReviewBtn();
-
       // Update pin button state
       updatePinBtn();
 
@@ -457,42 +454,87 @@
       });
     }
 
-    // Review button — toggle spaced repetition enrollment
-    function updateReviewBtn() {
-      if (!reviewBtn || !currentNote || !window.dmSync || !window.dmSync.getReviewCardForNote) return;
-      window.dmSync.getReviewCardForNote(currentNote.id).then(function(card) {
-        if (card) {
-          reviewBtn.classList.add('note-action-btn-active');
-          reviewBtn.title = 'Remove from review queue (spaced repetition)';
-        } else {
-          reviewBtn.classList.remove('note-action-btn-active');
-          reviewBtn.title = 'Add to review queue (spaced repetition)';
-        }
-      });
-    }
-
+    // Review button — create standalone flashcard from note content
     if (reviewBtn) {
       reviewBtn.addEventListener('click', function() {
         if (!currentNote || !window.dmSync) return;
-        reviewBtn.disabled = true;
 
-        window.dmSync.getReviewCardForNote(currentNote.id).then(function(card) {
-          if (card) {
-            return window.dmSync.deleteReviewCard(card.id).then(function() {
-              reviewBtn.classList.remove('note-action-btn-active');
-              reviewBtn.title = 'Add to review queue (spaced repetition)';
-            });
-          } else {
-            return window.dmSync.createReviewCard(currentNote.id).then(function() {
-              reviewBtn.classList.add('note-action-btn-active');
-              reviewBtn.title = 'Remove from review queue (spaced repetition)';
-            });
-          }
-        }).catch(function(err) {
-          console.error('Review toggle error:', err);
-        }).then(function() {
-          reviewBtn.disabled = false;
+        // Create and show a flashcard creation dialog
+        var overlay = document.createElement('div');
+        overlay.className = 'flashcard-modal-overlay';
+        var modal = document.createElement('div');
+        modal.className = 'flashcard-modal';
+        modal.innerHTML = '<h3 class="flashcard-modal-title">Create Flashcard</h3>'
+          + '<div class="flashcard-modal-field"><label>Front (question/prompt)</label>'
+          + '<textarea class="flashcard-modal-front" rows="3" placeholder="What is the question or prompt?"></textarea></div>'
+          + '<div class="flashcard-modal-field"><label>Back (answer)</label>'
+          + '<textarea class="flashcard-modal-back" rows="5" placeholder="What is the answer?"></textarea></div>'
+          + '<div class="flashcard-modal-field"><label>Tags (comma-separated, optional)</label>'
+          + '<input type="text" class="flashcard-modal-tags" placeholder="e.g. javascript, algorithms"></div>'
+          + '<div class="flashcard-modal-actions">'
+          + '<button type="button" class="flashcard-modal-save">Save Card</button>'
+          + '<button type="button" class="flashcard-modal-cancel">Cancel</button>'
+          + '</div>';
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        var frontTA = modal.querySelector('.flashcard-modal-front');
+        var backTA = modal.querySelector('.flashcard-modal-back');
+        var tagsInput = modal.querySelector('.flashcard-modal-tags');
+        var saveBtn = modal.querySelector('.flashcard-modal-save');
+        var cancelBtn = modal.querySelector('.flashcard-modal-cancel');
+
+        // Pre-populate with note content
+        frontTA.value = currentNote.title || '';
+        backTA.value = (currentNote.content || '').replace(/^\s*#\s+.+\n*/, ''); // strip leading heading
+        if (currentNote.tags && currentNote.tags.length) {
+          tagsInput.value = currentNote.tags.join(', ');
+        }
+
+        frontTA.focus();
+        frontTA.select();
+
+        function closeModal() {
+          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        }
+
+        cancelBtn.addEventListener('click', closeModal);
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) closeModal();
         });
+
+        saveBtn.addEventListener('click', function() {
+          var front = frontTA.value.trim();
+          var back = backTA.value.trim();
+          if (!front || !back) return;
+
+          var tags = tagsInput.value.split(',').map(function(t) { return t.trim(); }).filter(function(t) { return t; });
+          saveBtn.disabled = true;
+          saveBtn.textContent = 'Saving...';
+
+          window.dmSync.createReviewCard(front, back, tags).then(function() {
+            closeModal();
+          }).catch(function(err) {
+            console.error('Error creating flashcard:', err);
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Card';
+          });
+        });
+
+        // Keyboard shortcuts
+        function handleModalKey(e) {
+          if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+            e.preventDefault();
+            saveBtn.click();
+          }
+          if (e.key === 'Escape') {
+            closeModal();
+          }
+        }
+        frontTA.addEventListener('keydown', handleModalKey);
+        backTA.addEventListener('keydown', handleModalKey);
+        tagsInput.addEventListener('keydown', handleModalKey);
       });
     }
 

@@ -1,4 +1,4 @@
-<!-- review-queue: Spaced repetition review UI with SM-2 algorithm -->
+<!-- review-queue: Standalone flashcard review UI with SM-2 algorithm -->
 <div id="review-queue" class="review-queue">
   <div class="review-auth" id="review-auth" style="display: none;">
     <div class="review-auth-card">
@@ -6,8 +6,8 @@
         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
       </svg>
-      <h3>Sign in to review notes</h3>
-      <p>Your review progress is stored securely and requires authentication.</p>
+      <h3>Sign in to review flashcards</h3>
+      <p>Your flashcards and review progress are stored securely and require authentication.</p>
       <button type="button" class="review-signin-btn" id="review-signin">
         <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
         Sign in with Google
@@ -17,16 +17,17 @@
 
   <div class="review-loading" id="review-loading" style="display: none;">
     <div class="review-spinner"></div>
-    <p>Loading review queue...</p>
+    <p>Loading flashcards...</p>
   </div>
 
   <div class="review-empty" id="review-empty" style="display: none;">
     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path>
-      <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path>
+      <path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.58.67 3 1.74 4.01A5.5 5.5 0 0 0 4 15.5 5.5 5.5 0 0 0 9.5 21h.5"></path>
+      <path d="M14.5 2A5.5 5.5 0 0 1 20 7.5c0 1.58-.67 3-1.74 4.01A5.5 5.5 0 0 1 20 15.5a5.5 5.5 0 0 1-5.5 5.5H14"></path>
+      <path d="M12 2v20"></path>
     </svg>
-    <h3 id="review-empty-title">No notes to review</h3>
-    <p id="review-empty-msg">Add notes to the review queue using the book icon on any note, or check back later when reviews are due.</p>
+    <h3 id="review-empty-title">No flashcards yet</h3>
+    <p id="review-empty-msg">Create your first flashcard using the button below.</p>
   </div>
 
   <!-- Stats bar -->
@@ -55,21 +56,21 @@
     <div class="review-card" id="review-card">
       <div class="review-card-front" id="review-card-front">
         <div class="review-card-meta" id="review-card-meta"></div>
-        <h2 class="review-card-title" id="review-card-title"></h2>
+        <div class="review-card-front-content markdown" id="review-card-front-content"></div>
         <div class="review-card-tags" id="review-card-tags"></div>
         <button type="button" class="review-reveal-btn" id="review-reveal-btn">
-          Show Content
+          Show Answer
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </button>
       </div>
       <div class="review-card-back" id="review-card-back" style="display: none;">
-        <div class="review-card-content markdown" id="review-card-content"></div>
+        <div class="review-card-back-content markdown" id="review-card-back-content"></div>
       </div>
     </div>
 
     <!-- Rating buttons -->
     <div class="review-rating" id="review-rating" style="display: none;">
-      <p class="review-rating-prompt">How well did you recall this?</p>
+      <p class="review-rating-prompt">How well did you know this?</p>
       <div class="review-rating-buttons">
         <button type="button" class="review-rate-btn review-rate-0" data-quality="0" title="Complete blackout">
           <span class="review-rate-num">0</span>
@@ -105,9 +106,41 @@
     </div>
   </div>
 
-  <!-- All cards list (upcoming schedule) -->
+  <!-- New card form -->
+  <div class="review-form-section" id="review-form-section">
+    <button type="button" class="review-new-btn" id="review-new-btn" style="display: none;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      New Flashcard
+    </button>
+    <div class="review-form" id="review-form" style="display: none;">
+      <div class="review-form-field">
+        <label for="review-form-front">Front (question/prompt)</label>
+        <textarea id="review-form-front" rows="3" placeholder="What is the question or prompt?"></textarea>
+      </div>
+      <div class="review-form-field">
+        <label for="review-form-back">Back (answer)</label>
+        <textarea id="review-form-back" rows="4" placeholder="What is the answer?"></textarea>
+      </div>
+      <div class="review-form-field">
+        <label for="review-form-tags">Tags (comma-separated, optional)</label>
+        <input type="text" id="review-form-tags" placeholder="e.g. javascript, algorithms">
+      </div>
+      <div class="review-form-actions">
+        <button type="button" class="review-form-save" id="review-form-save">Save Card</button>
+        <button type="button" class="review-form-cancel" id="review-form-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tag filter -->
+  <div class="review-tag-filter" id="review-tag-filter" style="display: none;">
+    <span class="review-tag-filter-label">Filter:</span>
+    <div class="review-tag-filter-chips" id="review-tag-filter-chips"></div>
+  </div>
+
+  <!-- All cards list (schedule) -->
   <div class="review-schedule" id="review-schedule" style="display: none;">
-    <h3 class="review-schedule-title">Review Schedule</h3>
+    <h3 class="review-schedule-title">All Flashcards</h3>
     <div class="review-schedule-list" id="review-schedule-list"></div>
   </div>
 </div>
@@ -221,12 +254,15 @@
   color: var(--gray-500);
   margin-bottom: 0.5rem;
 }
-.review-card-title {
-  font-size: 1.5rem;
-  font-weight: 600;
+.review-card-front-content {
+  font-size: 1.15rem;
+  line-height: 1.6;
   margin: 0.5rem 0 1rem;
   color: var(--body-font-color);
 }
+.review-card-front-content p { margin: 0.5em 0; }
+.review-card-front-content p:first-child { margin-top: 0; }
+.review-card-front-content p:last-child { margin-bottom: 0; }
 .review-card-tags {
   display: flex;
   flex-wrap: wrap;
@@ -266,6 +302,10 @@
   max-height: 500px;
   overflow-y: auto;
 }
+.review-card-back-content {
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
 
 /* Rating buttons */
 .review-rating {
@@ -296,12 +336,8 @@
   transition: border-color 0.15s, background 0.15s, transform 0.1s;
   min-width: 62px;
 }
-.review-rate-btn:hover {
-  transform: translateY(-2px);
-}
-.review-rate-btn:active {
-  transform: translateY(0);
-}
+.review-rate-btn:hover { transform: translateY(-2px); }
+.review-rate-btn:active { transform: translateY(0); }
 .review-rate-num {
   font-size: 1.1rem;
   font-weight: 700;
@@ -356,9 +392,128 @@
 }
 .review-next-btn:hover { opacity: 0.85; }
 
+/* New card form */
+.review-form-section {
+  margin-top: 1.5rem;
+}
+.review-new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px dashed var(--gray-300);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-link);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  width: 100%;
+  justify-content: center;
+}
+.review-new-btn:hover {
+  background: var(--gray-100);
+  border-color: var(--color-link);
+}
+.review-form {
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 1.25rem;
+  background: var(--body-background);
+}
+.review-form-field {
+  margin-bottom: 1rem;
+}
+.review-form-field label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gray-600);
+  margin-bottom: 0.35rem;
+}
+.review-form-field textarea,
+.review-form-field input {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.875rem;
+  font-family: inherit;
+  resize: vertical;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.review-form-field textarea:focus,
+.review-form-field input:focus {
+  border-color: var(--color-link);
+  outline: none;
+}
+.review-form-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+.review-form-save {
+  padding: 6px 18px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.review-form-save:hover { opacity: 0.85; }
+.review-form-save:disabled { opacity: 0.5; cursor: not-allowed; }
+.review-form-cancel {
+  padding: 6px 18px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--body-font-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.review-form-cancel:hover { background: var(--gray-100); }
+
+/* Tag filter */
+.review-tag-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.review-tag-filter-label {
+  font-size: 0.8rem;
+  color: var(--gray-500);
+  font-weight: 500;
+}
+.review-tag-filter-chip {
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  border: 1px solid var(--gray-300);
+  background: transparent;
+  color: var(--body-font-color);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.review-tag-filter-chip:hover { background: var(--gray-100); }
+.review-tag-filter-chip.active {
+  background: var(--color-link);
+  border-color: var(--color-link);
+  color: #fff;
+}
+
 /* Schedule list */
 .review-schedule {
-  margin-top: 2rem;
+  margin-top: 1.5rem;
   border-top: 1px solid var(--gray-200);
   padding-top: 1.5rem;
 }
@@ -380,12 +535,11 @@
   border: 1px solid var(--gray-200);
   border-radius: 8px;
   font-size: 0.85rem;
-  text-decoration: none;
   color: var(--body-font-color);
   transition: background 0.15s;
 }
 .review-schedule-item:hover { background: var(--gray-100); }
-.review-schedule-item-title {
+.review-schedule-item-front {
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -407,23 +561,76 @@
   color: var(--gray-400);
   white-space: nowrap;
 }
-.review-schedule-item-remove {
+.review-schedule-item-actions {
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.review-schedule-item:hover .review-schedule-item-actions { opacity: 1; }
+.review-schedule-item-btn {
   background: none;
   border: none;
   color: var(--gray-400);
   cursor: pointer;
   padding: 2px;
   display: flex;
-  opacity: 0;
-  transition: opacity 0.15s, color 0.15s;
+  transition: color 0.15s;
 }
-.review-schedule-item:hover .review-schedule-item-remove { opacity: 1; }
-.review-schedule-item-remove:hover { color: var(--color-danger, #ea4335); }
+.review-schedule-item-btn:hover { color: var(--body-font-color); }
+.review-schedule-item-btn.review-item-delete:hover { color: var(--color-danger, #ea4335); }
+
+/* Inline edit form in schedule item */
+.review-edit-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.review-edit-form textarea {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.82rem;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.review-edit-form textarea:focus {
+  border-color: var(--color-link);
+  outline: none;
+}
+.review-edit-form-actions {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+.review-edit-form-actions button {
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.review-edit-save {
+  border: none;
+  background: var(--color-link);
+  color: #fff;
+}
+.review-edit-cancel {
+  border: 1px solid var(--gray-300);
+  background: transparent;
+  color: var(--body-font-color);
+}
 
 @media (max-width: 600px) {
   .review-card-front { padding: 1.5rem 1rem; }
   .review-card-back { padding: 1rem; }
-  .review-card-title { font-size: 1.25rem; }
+  .review-card-front-content { font-size: 1rem; }
   .review-rate-btn { min-width: 48px; padding: 0.4rem 0.5rem; }
   .review-stats-inner { gap: 1rem; }
 }
@@ -445,10 +652,10 @@
   var cardContainerEl = document.getElementById('review-card-container');
   var cardFrontEl = document.getElementById('review-card-front');
   var cardBackEl = document.getElementById('review-card-back');
-  var cardTitleEl = document.getElementById('review-card-title');
+  var cardFrontContentEl = document.getElementById('review-card-front-content');
+  var cardBackContentEl = document.getElementById('review-card-back-content');
   var cardMetaEl = document.getElementById('review-card-meta');
   var cardTagsEl = document.getElementById('review-card-tags');
-  var cardContentEl = document.getElementById('review-card-content');
   var revealBtn = document.getElementById('review-reveal-btn');
   var ratingEl = document.getElementById('review-rating');
   var resultEl = document.getElementById('review-result');
@@ -458,6 +665,15 @@
   var scheduleEl = document.getElementById('review-schedule');
   var scheduleListEl = document.getElementById('review-schedule-list');
   var signinBtn = document.getElementById('review-signin');
+  var newBtn = document.getElementById('review-new-btn');
+  var formEl = document.getElementById('review-form');
+  var formFrontEl = document.getElementById('review-form-front');
+  var formBackEl = document.getElementById('review-form-back');
+  var formTagsEl = document.getElementById('review-form-tags');
+  var formSaveBtn = document.getElementById('review-form-save');
+  var formCancelBtn = document.getElementById('review-form-cancel');
+  var tagFilterEl = document.getElementById('review-tag-filter');
+  var tagFilterChipsEl = document.getElementById('review-tag-filter-chips');
 
   if (!document.getElementById('review-queue')) return;
 
@@ -465,6 +681,7 @@
   var currentIndex = 0;
   var reviewedToday = 0;
   var allCards = [];
+  var activeTagFilter = null;
 
   function showState(state) {
     authEl.style.display = state === 'auth' ? '' : 'none';
@@ -472,12 +689,7 @@
     emptyEl.style.display = state === 'empty' ? '' : 'none';
     statsEl.style.display = (state === 'review' || state === 'done') ? '' : 'none';
     cardContainerEl.style.display = state === 'review' ? '' : 'none';
-    scheduleEl.style.display = (state === 'review' || state === 'done' || state === 'empty') ? '' : 'none';
-  }
-
-  function getBaseUrl() {
-    var manifest = document.querySelector('link[rel="manifest"]');
-    return manifest ? manifest.getAttribute('href').replace('/manifest.json', '') : '';
+    newBtn.style.display = (state !== 'auth' && state !== 'loading') ? '' : 'none';
   }
 
   function escapeHtml(str) {
@@ -485,6 +697,13 @@
     var div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function renderMarkdown(text) {
+    if (typeof marked !== 'undefined') {
+      return marked.parse(text || '');
+    }
+    return escapeHtml(text || '').replace(/\n/g, '<br>');
   }
 
   function formatRelativeDate(ms) {
@@ -509,6 +728,19 @@
     return 'in ' + months + ' month' + (months > 1 ? 's' : '');
   }
 
+  function parseTags(str) {
+    if (!str) return [];
+    return str.split(',').map(function(t) { return t.trim(); }).filter(function(t) { return t.length > 0; });
+  }
+
+  function getFirstLine(text) {
+    if (!text) return '';
+    var line = text.split('\n')[0];
+    // Strip markdown heading prefix
+    line = line.replace(/^#+\s+/, '');
+    return line.length > 80 ? line.substring(0, 80) + '...' : line;
+  }
+
   function loadQueue() {
     if (!window.dmSync) {
       setTimeout(loadQueue, 100);
@@ -519,24 +751,10 @@
 
     Promise.all([
       window.dmSync.getReviewCards(false), // all cards
-      window.dmSync.getReviewCards(true),  // due cards only
-      window.dmSync.getAllNotes()
+      window.dmSync.getReviewCards(true)   // due cards only
     ]).then(function(results) {
       allCards = results[0];
       dueCards = results[1];
-      var notes = results[2];
-
-      // Build note lookup
-      var noteMap = {};
-      notes.forEach(function(n) { noteMap[n.id] = n; });
-
-      // Attach note data to cards
-      allCards.forEach(function(c) { c._note = noteMap[c.noteId] || null; });
-      dueCards.forEach(function(c) { c._note = noteMap[c.noteId] || null; });
-
-      // Filter out cards whose notes no longer exist or are trashed
-      allCards = allCards.filter(function(c) { return c._note; });
-      dueCards = dueCards.filter(function(c) { return c._note; });
 
       // Count reviewed today
       var todayStart = new Date();
@@ -554,10 +772,11 @@
       reviewedCountEl.textContent = reviewedToday;
 
       if (allCards.length === 0) {
-        emptyTitleEl.textContent = 'No notes to review';
-        emptyMsgEl.textContent = 'Add notes to the review queue using the book icon on any note.';
+        emptyTitleEl.textContent = 'No flashcards yet';
+        emptyMsgEl.textContent = 'Create your first flashcard using the button below.';
         showState('empty');
-        renderSchedule(noteMap);
+        renderSchedule();
+        renderTagFilter();
         return;
       }
 
@@ -565,14 +784,16 @@
         emptyTitleEl.textContent = 'All caught up!';
         emptyMsgEl.textContent = 'No reviews due right now. Check back later.';
         showState('empty');
-        renderSchedule(noteMap);
+        renderSchedule();
+        renderTagFilter();
         return;
       }
 
       currentIndex = 0;
       showState('review');
       showCard(dueCards[currentIndex]);
-      renderSchedule(noteMap);
+      renderSchedule();
+      renderTagFilter();
     }).catch(function(err) {
       console.error('Error loading review queue:', err);
       showState('empty');
@@ -580,32 +801,31 @@
   }
 
   function showCard(card) {
-    if (!card || !card._note) return;
-    var note = card._note;
+    if (!card) return;
 
     // Update progress
     var total = dueCards.length;
     var pct = total > 0 ? Math.round((currentIndex / total) * 100) : 0;
     progressBar.style.width = pct + '%';
 
-    // Front
-    var dest = note.destination || '';
-    if (dest === 'book-note' && note.bookTitle) dest = note.bookTitle;
-    else if (dest === 'snippets' && note.language) dest = note.language + ' snippet';
-    else if (dest === 'inbox') dest = 'Inbox';
-    else if (dest === 'topic') dest = 'Topics';
-
-    var metaParts = [dest];
+    // Meta
+    var metaParts = [];
     if (card.repetitions > 0) metaParts.push('Review #' + (card.repetitions + 1));
     metaParts.push('EF: ' + card.easeFactor.toFixed(2));
     cardMetaEl.textContent = metaParts.join(' \u00B7 ');
 
-    cardTitleEl.textContent = note.title || 'Untitled';
+    // Front content (rendered as markdown)
+    cardFrontContentEl.innerHTML = renderMarkdown(card.front);
+
+    // Syntax highlighting on front
+    cardFrontContentEl.querySelectorAll('pre code').forEach(function(block) {
+      if (typeof hljs !== 'undefined') hljs.highlightElement(block);
+    });
 
     // Tags
     cardTagsEl.innerHTML = '';
-    if (note.tags && note.tags.length) {
-      note.tags.forEach(function(tag) {
+    if (card.tags && card.tags.length) {
+      card.tags.forEach(function(tag) {
         var span = document.createElement('span');
         span.className = 'review-card-tag';
         span.textContent = tag;
@@ -618,46 +838,27 @@
     ratingEl.style.display = 'none';
     resultEl.style.display = 'none';
     revealBtn.style.display = '';
-    cardContentEl.innerHTML = '';
+    cardBackContentEl.innerHTML = '';
   }
 
-  // Reveal content
+  // Reveal answer
   revealBtn.addEventListener('click', function() {
     var card = dueCards[currentIndex];
-    if (!card || !card._note) return;
-    var note = card._note;
+    if (!card) return;
 
-    var content = note.content || '';
-    content = content.replace(/^\s*#\s+.+\n*/, ''); // strip leading heading
+    cardBackContentEl.innerHTML = renderMarkdown(card.back);
 
-    if (note.mode === 'code' && note.language && !content.trim().startsWith('```')) {
-      content = '```' + note.language + '\n' + content + '\n```';
-    }
-
-    // Build wikilink map if needed
-    var mapReady = Object.keys(window._wikilinkMap || {}).length > 0
-      ? Promise.resolve()
-      : (window.dmSync ? window.dmSync.getAllNotes().then(function(notes) { if (window.buildWikilinkMap) window.buildWikilinkMap(notes); }) : Promise.resolve());
-
-    mapReady.then(function() {
-      if (typeof marked !== 'undefined') {
-        cardContentEl.innerHTML = marked.parse(content);
-      } else {
-        cardContentEl.textContent = content;
-      }
-
-      // Syntax highlighting
-      cardContentEl.querySelectorAll('pre code').forEach(function(block) {
-        if (typeof hljs !== 'undefined') hljs.highlightElement(block);
-      });
-
-      // Diagrams
-      if (window.dmRenderDiagrams) window.dmRenderDiagrams(cardContentEl);
-
-      cardBackEl.style.display = '';
-      revealBtn.style.display = 'none';
-      ratingEl.style.display = '';
+    // Syntax highlighting
+    cardBackContentEl.querySelectorAll('pre code').forEach(function(block) {
+      if (typeof hljs !== 'undefined') hljs.highlightElement(block);
     });
+
+    // Diagrams
+    if (window.dmRenderDiagrams) window.dmRenderDiagrams(cardBackContentEl);
+
+    cardBackEl.style.display = '';
+    revealBtn.style.display = 'none';
+    ratingEl.style.display = '';
   });
 
   // Rating buttons
@@ -668,11 +869,9 @@
       var card = dueCards[currentIndex];
       if (!card) return;
 
-      // Disable all buttons while processing
       rateButtons.forEach(function(b) { b.disabled = true; });
 
       window.dmSync.reviewCard(card.id, quality).then(function(updatedCard) {
-        // Show result
         ratingEl.style.display = 'none';
 
         var nextLabel = formatRelativeDate(updatedCard.nextReviewAt);
@@ -683,10 +882,8 @@
         reviewedCountEl.textContent = reviewedToday;
         dueCountEl.textContent = Math.max(0, dueCards.length - currentIndex - 1);
 
-        // Re-enable buttons
         rateButtons.forEach(function(b) { b.disabled = false; });
 
-        // If last card, change button text
         if (currentIndex >= dueCards.length - 1) {
           nextBtn.textContent = 'Done';
         }
@@ -701,7 +898,6 @@
   nextBtn.addEventListener('click', function() {
     currentIndex++;
     if (currentIndex >= dueCards.length) {
-      // All done — reload to show updated schedule
       loadQueue();
     } else {
       showCard(dueCards[currentIndex]);
@@ -710,21 +906,17 @@
     }
   });
 
-  // Keyboard shortcuts for review
+  // Keyboard shortcuts
   document.addEventListener('keydown', function(e) {
-    // Only handle if review card is visible
     if (cardContainerEl.style.display === 'none') return;
-    // Don't trigger if user is typing in an input
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
 
-    // Space to reveal
     if (e.key === ' ' && revealBtn.style.display !== 'none') {
       e.preventDefault();
       revealBtn.click();
       return;
     }
 
-    // Number keys 0-5 to rate
     if (ratingEl.style.display !== 'none' && e.key >= '0' && e.key <= '5') {
       var q = parseInt(e.key, 10);
       var matchBtn = document.querySelector('.review-rate-btn[data-quality="' + q + '"]');
@@ -732,58 +924,145 @@
       return;
     }
 
-    // Enter to go next
     if (resultEl.style.display !== 'none' && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault();
       nextBtn.click();
     }
   });
 
-  function renderSchedule(noteMap) {
+  // ---- New Card Form ----
+
+  newBtn.addEventListener('click', function() {
+    formEl.style.display = '';
+    newBtn.style.display = 'none';
+    formFrontEl.value = '';
+    formBackEl.value = '';
+    formTagsEl.value = '';
+    formFrontEl.focus();
+  });
+
+  formCancelBtn.addEventListener('click', function() {
+    formEl.style.display = 'none';
+    newBtn.style.display = '';
+  });
+
+  formSaveBtn.addEventListener('click', function() {
+    var front = formFrontEl.value.trim();
+    var back = formBackEl.value.trim();
+    if (!front || !back) return;
+
+    var tags = parseTags(formTagsEl.value);
+    formSaveBtn.disabled = true;
+
+    window.dmSync.createReviewCard(front, back, tags).then(function() {
+      formEl.style.display = 'none';
+      newBtn.style.display = '';
+      formSaveBtn.disabled = false;
+      loadQueue();
+    }).catch(function(err) {
+      console.error('Error creating card:', err);
+      formSaveBtn.disabled = false;
+    });
+  });
+
+  // Ctrl+Enter to save from either textarea
+  formFrontEl.addEventListener('keydown', handleFormKeydown);
+  formBackEl.addEventListener('keydown', handleFormKeydown);
+  function handleFormKeydown(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      formSaveBtn.click();
+    }
+    if (e.key === 'Escape') {
+      formCancelBtn.click();
+    }
+  }
+
+  // ---- Tag Filter ----
+
+  function renderTagFilter() {
+    var tagSet = {};
+    allCards.forEach(function(c) {
+      (c.tags || []).forEach(function(t) { tagSet[t] = true; });
+    });
+    var tags = Object.keys(tagSet).sort();
+
+    if (tags.length === 0) {
+      tagFilterEl.style.display = 'none';
+      return;
+    }
+
+    tagFilterEl.style.display = '';
+    var html = '<button type="button" class="review-tag-filter-chip' + (!activeTagFilter ? ' active' : '') + '" data-tag="">All</button>';
+    tags.forEach(function(tag) {
+      html += '<button type="button" class="review-tag-filter-chip' + (activeTagFilter === tag ? ' active' : '') + '" data-tag="' + escapeHtml(tag) + '">' + escapeHtml(tag) + '</button>';
+    });
+    tagFilterChipsEl.innerHTML = html;
+
+    tagFilterChipsEl.querySelectorAll('.review-tag-filter-chip').forEach(function(chip) {
+      chip.addEventListener('click', function() {
+        var tag = chip.getAttribute('data-tag');
+        activeTagFilter = tag || null;
+        renderTagFilter();
+        renderSchedule();
+      });
+    });
+  }
+
+  // ---- Schedule / Card List ----
+
+  function renderSchedule() {
     if (!allCards.length) {
       scheduleEl.style.display = 'none';
       return;
     }
 
-    var base = getBaseUrl();
     var now = Date.now();
-    var html = '';
+    var filtered = allCards;
+    if (activeTagFilter) {
+      filtered = allCards.filter(function(c) {
+        return (c.tags || []).indexOf(activeTagFilter) !== -1;
+      });
+    }
 
-    // Sort: due first, then by nextReviewAt
-    var sorted = allCards.slice().sort(function(a, b) {
+    var sorted = filtered.slice().sort(function(a, b) {
       var aDue = a.nextReviewAt <= now ? 0 : 1;
       var bDue = b.nextReviewAt <= now ? 0 : 1;
       if (aDue !== bDue) return aDue - bDue;
       return (a.nextReviewAt || 0) - (b.nextReviewAt || 0);
     });
 
+    var html = '';
     sorted.forEach(function(card) {
-      var note = noteMap[card.noteId] || card._note;
-      if (!note) return;
-
       var isDue = card.nextReviewAt <= now;
       var dueText = isDue ? 'Due now' : formatRelativeDate(card.nextReviewAt);
+      var frontPreview = getFirstLine(card.front);
 
       html += '<div class="review-schedule-item" data-card-id="' + card.id + '">'
-        + '<a class="review-schedule-item-title" href="' + base + '/docs/view/?id=' + encodeURIComponent(card.noteId) + '">' + escapeHtml(note.title || 'Untitled') + '</a>'
+        + '<span class="review-schedule-item-front">' + escapeHtml(frontPreview) + '</span>'
         + '<span class="review-schedule-item-ef">EF ' + card.easeFactor.toFixed(1) + '</span>'
         + '<span class="review-schedule-item-due' + (isDue ? ' review-due-now' : '') + '">' + escapeHtml(dueText) + '</span>'
-        + '<button type="button" class="review-schedule-item-remove" title="Remove from review">'
+        + '<span class="review-schedule-item-actions">'
+        + '<button type="button" class="review-schedule-item-btn review-item-edit" title="Edit card">'
+        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'
+        + '</button>'
+        + '<button type="button" class="review-schedule-item-btn review-item-delete" title="Delete card">'
         + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
         + '</button>'
+        + '</span>'
         + '</div>';
     });
 
     scheduleListEl.innerHTML = html;
     scheduleEl.style.display = '';
 
-    // Attach remove handlers
-    scheduleListEl.querySelectorAll('.review-schedule-item-remove').forEach(function(btn) {
+    // Attach handlers
+    scheduleListEl.querySelectorAll('.review-item-delete').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         var item = btn.closest('.review-schedule-item');
         var cardId = item.getAttribute('data-card-id');
-        if (!confirm('Remove this note from the review queue?')) return;
+        if (!confirm('Delete this flashcard?')) return;
 
         btn.disabled = true;
         window.dmSync.deleteReviewCard(cardId).then(function() {
@@ -793,11 +1072,64 @@
           setTimeout(function() {
             if (item.parentNode) item.parentNode.removeChild(item);
           }, 200);
-          // Reload to update counts
           loadQueue();
         }).catch(function(err) {
-          console.error('Error removing card:', err);
+          console.error('Error deleting card:', err);
           btn.disabled = false;
+        });
+      });
+    });
+
+    scheduleListEl.querySelectorAll('.review-item-edit').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var item = btn.closest('.review-schedule-item');
+        var cardId = item.getAttribute('data-card-id');
+        var card = allCards.find(function(c) { return c.id === cardId; });
+        if (!card) return;
+
+        // Replace item content with inline edit form
+        var originalHTML = item.innerHTML;
+        item.innerHTML = '<div class="review-edit-form">'
+          + '<textarea class="review-edit-front" rows="2" placeholder="Front">' + escapeHtml(card.front) + '</textarea>'
+          + '<textarea class="review-edit-back" rows="3" placeholder="Back">' + escapeHtml(card.back) + '</textarea>'
+          + '<div class="review-edit-form-actions">'
+          + '<button type="button" class="review-edit-save">Save</button>'
+          + '<button type="button" class="review-edit-cancel">Cancel</button>'
+          + '</div>'
+          + '</div>';
+
+        item.querySelector('.review-edit-front').focus();
+
+        item.querySelector('.review-edit-cancel').addEventListener('click', function() {
+          item.innerHTML = originalHTML;
+          // Re-attach handlers by re-rendering
+          renderSchedule();
+        });
+
+        item.querySelector('.review-edit-save').addEventListener('click', function() {
+          var newFront = item.querySelector('.review-edit-front').value.trim();
+          var newBack = item.querySelector('.review-edit-back').value.trim();
+          if (!newFront || !newBack) return;
+
+          window.dmSync.updateReviewCardContent(cardId, { front: newFront, back: newBack }).then(function() {
+            loadQueue();
+          }).catch(function(err) {
+            console.error('Error updating card:', err);
+          });
+        });
+
+        // Ctrl+Enter to save from edit form
+        item.querySelectorAll('.review-edit-front, .review-edit-back').forEach(function(ta) {
+          ta.addEventListener('keydown', function(ev) {
+            if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
+              ev.preventDefault();
+              item.querySelector('.review-edit-save').click();
+            }
+            if (ev.key === 'Escape') {
+              item.querySelector('.review-edit-cancel').click();
+            }
+          });
         });
       });
     });
@@ -837,11 +1169,16 @@
   });
   window.addEventListener('dm-review-updated', function() {
     if (window.dmAuth && window.dmAuth.currentUser && document.getElementById('review-queue')) {
-      // Only reload if not in an active review session (avoid resetting progress mid-review)
       if (cardContainerEl.style.display === 'none') {
         loadQueue();
       }
     }
   });
+
+  // Expose createCard for external callers (e.g., note views)
+  window.dmCreateFlashcard = function(front, back, tags) {
+    if (!window.dmSync) return Promise.reject(new Error('Sync not ready'));
+    return window.dmSync.createReviewCard(front, back, tags);
+  };
 })();
 </script>
