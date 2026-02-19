@@ -622,9 +622,13 @@
     if (signinBtn) {
       signinBtn.addEventListener('click', function() {
         if (window.dmAuth && window.dmGoogleProvider) {
-          window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
-            console.error('Sign-in error:', err);
-          });
+          if (window.dmIsLocalhost) {
+            window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
+          } else {
+            window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+              console.error('Sign-in error:', err);
+            });
+          }
         }
       });
     }

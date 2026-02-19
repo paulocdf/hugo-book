@@ -16,6 +16,9 @@
 <script>
   (function() {
     if (typeof firebase === 'undefined') return;
+    // Use signInWithRedirect on localhost to avoid third-party cookie issues
+    // with signInWithPopup (Chrome blocks cross-origin cookies from firebaseapp.com popup)
+    var isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     firebase.initializeApp({
       apiKey: "AIzaSyC_wfs6Ev6vMEr4imhEJ22H0MxSn8AOr_k",
       authDomain: "digital-memory-0.firebaseapp.com",
@@ -28,5 +31,13 @@
     window.dmDb = firebase.firestore();
     window.dmStorage = firebase.storage();
     window.dmGoogleProvider = new firebase.auth.GoogleAuthProvider();
+    window.dmIsLocalhost = isLocalhost;
+
+    // On localhost, check for redirect result on page load
+    if (isLocalhost) {
+      window.dmAuth.getRedirectResult().catch(function(err) {
+        console.error('Redirect sign-in error:', err);
+      });
+    }
   })();
 </script>

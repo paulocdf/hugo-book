@@ -75,9 +75,13 @@
   });
 
   signinBtn.addEventListener('click', function() {
-    window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
-      console.error('Sign-in error:', err);
-    });
+    if (window.dmIsLocalhost) {
+      window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
+    } else {
+      window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+        console.error('Sign-in error:', err);
+      });
+    }
   });
 
   function showStats(user) {

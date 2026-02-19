@@ -747,9 +747,13 @@
     signinBtn.addEventListener('click', function() {
       if (window.dmAuth && window.firebase) {
         var provider = new firebase.auth.GoogleAuthProvider();
-        window.dmAuth.signInWithPopup(provider).catch(function(err) {
-          console.error('[dashboard] Sign-in error:', err);
-        });
+        if (window.dmIsLocalhost) {
+          window.dmAuth.signInWithRedirect(provider);
+        } else {
+          window.dmAuth.signInWithPopup(provider).catch(function(err) {
+            console.error('[dashboard] Sign-in error:', err);
+          });
+        }
       }
     });
   }
