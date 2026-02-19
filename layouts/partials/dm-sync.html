@@ -1865,7 +1865,14 @@
     deleteReviewCard: deleteReviewCard,
     getReviewCardForNote: getReviewCardForNote,
     getReviewCards: getReviewCards,
-    getDueCount: getDueCount
+    getDueCount: getDueCount,
+
+    // Search index cache
+    getSearchIndexCache: function() { return idbGet(STORE_META, 'searchIndex'); },
+    putSearchIndexCache: function(data, noteCount) {
+      return idbPut(STORE_META, { key: 'searchIndex', data: data, noteCount: noteCount, updatedAt: Date.now() });
+    },
+    clearSearchIndexCache: function() { return idbDelete(STORE_META, 'searchIndex'); }
   };
 
   // ─── Auto-sync on Auth State Change ───

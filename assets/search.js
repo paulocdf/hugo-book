@@ -52,6 +52,34 @@
     return '';
   }
 
+  // ── Helper: build index from notes and cache to IDB ──
+  function buildIndexFromNotes(notes) {
+    var pages = notes.map(function(note, idx) {
+      return {
+        id: idx,
+        href: viewUrl(note.id),
+        title: note.title || 'Untitled',
+        section: noteSection(note),
+        content: note.content || ''
+      };
+    });
+    window.bookSearchIndex = FlexSearch.create('balance', indexConfig);
+    window.bookSearchIndex.add(pages);
+    return notes.length;
+  }
+
+  function cacheIndexToIDB(noteCount) {
+    if (!window.dmSync || !window.bookSearchIndex) return;
+    try {
+      var serialized = window.bookSearchIndex.export();
+      window.dmSync.putSearchIndexCache(serialized, noteCount).catch(function(err) {
+        console.warn('[search] Failed to cache index:', err);
+      });
+    } catch (e) {
+      console.warn('[search] Index export failed:', e);
+    }
+  }
+
   // ── Index initialization ──────────────────────────────
   function initIndex() {
     if (initialized) return Promise.resolve();
@@ -61,24 +89,42 @@
 
     // Try IndexedDB (dynamic notes) first
     if (window.dmSync) {
-      return window.dmSync.getAllNotes().then(function(notes) {
-        if (notes && notes.length > 0) {
-          useFirestore = true;
-          var pages = notes.map(function(note, idx) {
-            return {
-              id: idx,
-              href: viewUrl(note.id),
-              title: note.title || 'Untitled',
-              section: noteSection(note),
-              content: note.content || ''
-            };
+      // Attempt to load cached search index from IDB
+      return window.dmSync.getSearchIndexCache().then(function(cached) {
+        if (cached && cached.data) {
+          // Validate cache: check note count matches current IDB state
+          return window.dmSync.getAllNotes().then(function(notes) {
+            if (notes && notes.length > 0 && notes.length === cached.noteCount) {
+              // Cache is valid — import instead of rebuilding
+              try {
+                window.bookSearchIndex = FlexSearch.create('balance', indexConfig);
+                window.bookSearchIndex.import(cached.data);
+                useFirestore = true;
+                return;
+              } catch (e) {
+                console.warn('[search] Cache import failed, rebuilding:', e);
+              }
+            }
+            // Cache miss or stale — rebuild from notes
+            if (notes && notes.length > 0) {
+              useFirestore = true;
+              var count = buildIndexFromNotes(notes);
+              cacheIndexToIDB(count);
+            } else {
+              useFirestore = false;
+            }
           });
-          window.bookSearchIndex = FlexSearch.create('balance', indexConfig);
-          window.bookSearchIndex.add(pages);
-        } else {
-          // No cached notes — user may not be signed in
-          useFirestore = false;
         }
+        // No cache — build from scratch
+        return window.dmSync.getAllNotes().then(function(notes) {
+          if (notes && notes.length > 0) {
+            useFirestore = true;
+            var count = buildIndexFromNotes(notes);
+            cacheIndexToIDB(count);
+          } else {
+            useFirestore = false;
+          }
+        });
       }).catch(function() {
         useFirestore = false;
       }).finally(function() {
@@ -104,17 +150,8 @@
     window.dmSync.getAllNotes().then(function(notes) {
       if (notes && notes.length > 0) {
         useFirestore = true;
-        var pages = notes.map(function(note, idx) {
-          return {
-            id: idx,
-            href: viewUrl(note.id),
-            title: note.title || 'Untitled',
-            section: noteSection(note),
-            content: note.content || ''
-          };
-        });
-        window.bookSearchIndex = FlexSearch.create('balance', indexConfig);
-        window.bookSearchIndex.add(pages);
+        var count = buildIndexFromNotes(notes);
+        cacheIndexToIDB(count);
         initialized = true;
       }
     });
