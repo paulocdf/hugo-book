@@ -412,6 +412,7 @@ body {
       &.icon-books { background: rgba(100, 181, 246, 0.12); color: var(--accent-blue); }
       &.icon-notes { background: rgba(255, 183, 77, 0.12); color: var(--accent-orange); }
       &.icon-tags  { background: rgba(129, 199, 132, 0.12); color: var(--accent-green); }
+      &.icon-review { background: rgba(186, 104, 200, 0.12); color: var(--accent-purple); }
     }
 
     .stat-content {
@@ -1156,6 +1157,24 @@ aside nav ul a:hover {
   // ---- Standalone items (non-section, like Tags) ----
   .sidebar-item {
     margin: 1px 0;
+  }
+
+  // ---- Review due-count badge ----
+  .review-due-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 9px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    background: var(--accent-blue);
+    color: #fff;
+    margin-left: auto;
+    line-height: 1;
+    flex-shrink: 0;
   }
 
   // ---- Inbox: accented only when active ----

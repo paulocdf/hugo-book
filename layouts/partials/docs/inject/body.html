@@ -1381,6 +1381,7 @@
     snippets: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
     tags: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>',
     dashboard: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>',
+    review: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2A5.5 5.5 0 0 0 4 7.5c0 1.58.67 3 1.74 4.01A5.5 5.5 0 0 0 4 15.5 5.5 5.5 0 0 0 9.5 21h.5"></path><path d="M14.5 2A5.5 5.5 0 0 1 20 7.5c0 1.58-.67 3-1.74 4.01A5.5 5.5 0 0 1 20 15.5a5.5 5.5 0 0 1-5.5 5.5H14"></path><path d="M12 2v20"></path></svg>',
     trash: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>'
   };
 
@@ -1566,6 +1567,12 @@
       '<a href="' + sectionUrl('tags') + '"' + tagsActive + '>' + ICONS.tags + 'Tags</a>' +
       '</li>';
 
+    // Add Review entry (static)
+    var reviewActive = window.location.pathname.indexOf('/docs/review') !== -1 ? ' class="active"' : '';
+    html += '<li class="sidebar-item" data-section="review">' +
+      '<a href="' + sectionUrl('review') + '"' + reviewActive + '>' + ICONS.review + 'Review</a>' +
+      '</li>';
+
     // Add Dashboard entry (static)
     var dashboardActive = window.location.pathname.indexOf('/docs/dashboard') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item" data-section="dashboard">' +
@@ -1612,6 +1619,11 @@
       '<a href="' + sectionUrl('tags') + '"' + tagsActive + '>' + ICONS.tags + 'Tags</a>' +
       '</li>';
 
+    var reviewActive = window.location.pathname.indexOf('/docs/review') !== -1 ? ' class="active"' : '';
+    html += '<li class="sidebar-item" data-section="review">' +
+      '<a href="' + sectionUrl('review') + '"' + reviewActive + '>' + ICONS.review + 'Review</a>' +
+      '</li>';
+
     var dashboardActive = window.location.pathname.indexOf('/docs/dashboard') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item" data-section="dashboard">' +
       '<a href="' + sectionUrl('dashboard') + '"' + dashboardActive + '>' + ICONS.dashboard + 'Dashboard</a>' +
@@ -1653,6 +1665,54 @@
       window.dmAuthReady.then(subscribeDynSidebarAuth);
     } else {
       subscribeDynSidebarAuth();
+    }
+  }
+})();
+</script>
+
+<!-- Sidebar review due-count badge -->
+<script>
+(function() {
+  'use strict';
+
+  function updateReviewBadge() {
+    if (!window.dmSync || !window.dmSync.getDueCount) return;
+    window.dmSync.getDueCount().then(function(count) {
+      var link = document.querySelector('[data-section="review"] a');
+      if (!link) return;
+
+      var badge = link.querySelector('.review-due-badge');
+      if (count > 0) {
+        if (!badge) {
+          badge = document.createElement('span');
+          badge.className = 'review-due-badge';
+          link.appendChild(badge);
+        }
+        badge.textContent = count > 99 ? '99+' : count;
+      } else if (badge) {
+        badge.remove();
+      }
+    });
+  }
+
+  // Update on sync complete and review changes
+  window.addEventListener('dm-sync-complete', updateReviewBadge);
+  window.addEventListener('dm-review-updated', updateReviewBadge);
+
+  // Initial update after auth settles
+  if (window.dmAuth) {
+    function subscribeBadgeAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          // Small delay to ensure sidebar has rendered
+          setTimeout(updateReviewBadge, 500);
+        }
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeBadgeAuth);
+    } else {
+      subscribeBadgeAuth();
     }
   }
 })();

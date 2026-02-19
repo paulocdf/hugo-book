@@ -21,6 +21,13 @@
       <span class="stat-value" id="stat-tags">--</span>
     </div>
   </div>
+  <div class="stat-card">
+    <span class="stat-icon icon-review">R</span>
+    <div class="stat-content">
+      <span class="stat-label">Due</span>
+      <span class="stat-value" id="stat-review-due">--</span>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -42,10 +49,18 @@
       if (notesEl) notesEl.textContent = otherNotes;
       if (tagsEl) tagsEl.textContent = Object.keys(tagSet).length;
     });
+    // Review due count
+    if (window.dmSync.getDueCount) {
+      window.dmSync.getDueCount().then(function(count) {
+        var dueEl = document.getElementById('stat-review-due');
+        if (dueEl) dueEl.textContent = count;
+      });
+    }
   }
 
   // Update on sync and on load
   window.addEventListener('dm-sync-complete', updateStats);
+  window.addEventListener('dm-review-updated', updateStats);
 
   if (window.dmAuth) {
     function subscribeGardenStatsAuth() {
