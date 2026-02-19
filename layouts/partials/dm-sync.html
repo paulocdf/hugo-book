@@ -302,8 +302,57 @@
   // Queues Firestore operations when offline; drains on reconnect.
   // Each queued entry: { collection, docId, op: 'set'|'update'|'delete', data, timestamp }
 
+  // Serialize Firestore-specific objects (serverTimestamp sentinels, Timestamp instances)
+  // into plain objects that survive IndexedDB structured clone.
+  function serializeQueueData(data) {
+    if (!data || typeof data !== 'object') return data;
+    var out = {};
+    Object.keys(data).forEach(function(key) {
+      var val = data[key];
+      if (val && typeof val === 'object') {
+        // Detect serverTimestamp() sentinel — has _methodName or isEqual but no toMillis
+        if (val.isEqual && typeof val.isEqual === 'function' && !val.toMillis) {
+          out[key] = { __type: 'serverTimestamp' };
+          return;
+        }
+        // Detect Firestore Timestamp — has toMillis method
+        if (val.toMillis && typeof val.toMillis === 'function') {
+          out[key] = { __type: 'timestamp', __ms: val.toMillis() };
+          return;
+        }
+      }
+      out[key] = val;
+    });
+    return out;
+  }
+
+  // Reconstruct Firestore-specific objects from serialized queue data.
+  function deserializeQueueData(data) {
+    if (!data || typeof data !== 'object') return data;
+    var out = {};
+    Object.keys(data).forEach(function(key) {
+      var val = data[key];
+      if (val && typeof val === 'object' && val.__type) {
+        if (val.__type === 'serverTimestamp') {
+          out[key] = firebase.firestore.FieldValue.serverTimestamp();
+          return;
+        }
+        if (val.__type === 'timestamp' && typeof val.__ms === 'number') {
+          out[key] = firebase.firestore.Timestamp.fromMillis(val.__ms);
+          return;
+        }
+      }
+      out[key] = val;
+    });
+    return out;
+  }
+
   function queueWrite(entry) {
     entry.timestamp = Date.now();
+    // Serialize Firebase objects so they survive IDB structured clone
+    if (entry.data) {
+      entry.data = serializeQueueData(entry.data);
+    }
     return openDB().then(function(db) {
       return new Promise(function(resolve, reject) {
         var tx = db.transaction(STORE_WRITE_QUEUE, 'readwrite');
@@ -434,11 +483,13 @@
           if (failed) return; // stop on first failure
 
           var ref = window.dmDb.collection(entry.collection).doc(entry.docId);
+          // Reconstruct Firebase objects from serialized queue data
+          var fsData = entry.data ? deserializeQueueData(entry.data) : null;
           var fsPromise;
           if (entry.op === 'set') {
-            fsPromise = ref.set(entry.data);
+            fsPromise = ref.set(fsData);
           } else if (entry.op === 'update') {
-            fsPromise = ref.update(entry.data);
+            fsPromise = ref.update(fsData);
           } else if (entry.op === 'delete') {
             fsPromise = ref.delete();
           } else {
@@ -450,9 +501,9 @@
             processed++;
             return removeQueued(entry.queueId);
           }).catch(function(err) {
-            // Check if it's a "not found" error for update/delete — remove from queue
-            if (err.code === 'not-found') {
-              console.warn('[dm-sync] Doc not found, removing queued op:', entry.collection, entry.docId);
+            // Remove permanently broken entries instead of retrying forever
+            if (err.code === 'not-found' || err.code === 'invalid-argument' || err.code === 'permission-denied') {
+              console.warn('[dm-sync] Removing unrecoverable queued op (' + err.code + '):', entry.collection, entry.docId);
               return removeQueued(entry.queueId);
             }
             console.warn('[dm-sync] Queue drain failed at entry, will retry:', err.message);
