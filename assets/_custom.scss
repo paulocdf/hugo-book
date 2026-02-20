@@ -123,6 +123,16 @@ body {
   }
 }
 
+// ======================================
+// AI page: full-width layout
+// ======================================
+.book-page:has(.ai-page) {
+  .markdown {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 // TOC sidebar — padding handled in main ToC section below
 
 // ======================================
