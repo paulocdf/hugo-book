@@ -98,6 +98,18 @@ body {
     background: var(--sidebar-bg);
     border-right: 1px solid var(--border-subtle);
     padding: 1rem 0.75rem;
+
+    // Flex column layout: nav scrolls, settings footer pins to bottom
+    display: flex;
+    flex-direction: column;
+    overflow-y: hidden; // override @include fixed; nav handles its own scroll
+
+    > nav {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
   }
 }
 
@@ -1276,24 +1288,61 @@ aside nav ul a:hover {
     }
   }
 
-  // ---- Settings: inline expandable panel ----
-  .sidebar-settings {
-    a {
-      font-weight: 500;
-      cursor: pointer;
+  // ---- Settings: bottom-pinned footer panel ----
+  .sidebar-settings-footer {
+    padding: 0.5rem 0.75rem;
+    border-top: 1px solid var(--gray-200);
+    flex-shrink: 0;
+  }
 
-      .sidebar-icon {
-        opacity: 0.6;
-      }
+  .sidebar-settings-trigger {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: background 0.15s;
 
-      &:hover {
-        color: var(--gray-500);
-
-        .sidebar-icon {
-          opacity: 0.85;
-        }
-      }
+    &:hover {
+      background: var(--gray-100);
     }
+
+    .sidebar-icon {
+      opacity: 0.4;
+      margin-left: auto;
+      flex-shrink: 0;
+      transition: opacity 0.15s;
+    }
+
+    &:hover .sidebar-icon {
+      opacity: 0.7;
+    }
+  }
+
+  .sidebar-settings-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    object-fit: cover;
+  }
+
+  .sidebar-settings-avatar-fallback {
+    width: 28px;
+    height: 28px;
+    flex-shrink: 0;
+    color: var(--gray-400);
+  }
+
+  .sidebar-settings-name {
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--body-font-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   .sidebar-settings-panel {

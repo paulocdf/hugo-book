@@ -27,10 +27,18 @@
     <div class="todo-add-form" id="todo-add-form">
       <div class="todo-add-row-main">
         <input type="text" id="todo-add-title" class="todo-add-title" placeholder="What needs to be done?">
-        <button type="button" class="todo-add-pomodoro-btn" id="todo-add-pomodoro-btn" title="Pomodoros: left-click to add, right-click to remove, long-press for settings" aria-label="Set pomodoro count">
-          <svg class="todo-add-pomodoro-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
-          <span class="todo-add-pomodoro-count" id="todo-add-pomodoro-count">1</span>
-        </button>
+        <div class="todo-add-pomodoro-group" id="todo-add-pomodoro-group">
+          <button type="button" class="todo-add-pomo-minus" id="todo-add-pomo-minus" title="Remove pomodoro" aria-label="Decrease pomodoro count">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+          </button>
+          <button type="button" class="todo-add-pomodoro-btn" id="todo-add-pomodoro-btn" title="Pomodoros (long-press for settings)" aria-label="Pomodoro count">
+            <svg class="todo-add-pomodoro-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
+            <span class="todo-add-pomodoro-count" id="todo-add-pomodoro-count">1</span>
+          </button>
+          <button type="button" class="todo-add-pomo-plus" id="todo-add-pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"></line><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+          </button>
+        </div>
         <input type="number" id="todo-add-custom-min" class="todo-add-custom-min" placeholder="min" min="0" max="999" title="Custom time override (minutes)" aria-label="Custom time in minutes">
         <button type="button" class="todo-add-mic-btn" id="todo-add-mic-btn" title="Dictate task (speech-to-text)" aria-label="Dictate task" style="display:none;">
           <svg class="todo-mic-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="1" width="6" height="11" rx="3"></rect><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
@@ -413,14 +421,48 @@
 .todo-add-title::placeholder {
   color: var(--gray-400);
 }
-/* Pomodoro counter button in add-form main row */
+/* Pomodoro button group in add-form main row */
+.todo-add-pomodoro-group {
+  display: inline-flex;
+  align-items: center;
+  border-left: 1px solid var(--gray-200);
+  flex-shrink: 0;
+  height: 36px;
+  box-sizing: border-box;
+}
+.todo-add-pomo-minus,
+.todo-add-pomo-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.todo-add-pomo-minus:hover,
+.todo-add-pomo-plus:hover {
+  background: var(--gray-100);
+  color: var(--color-link);
+}
+.todo-add-pomo-minus:disabled {
+  opacity: 0.25;
+  cursor: default;
+  pointer-events: none;
+}
 .todo-add-pomodoro-btn {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  padding: 4px 6px;
   border: none;
   border-left: 1px solid var(--gray-200);
+  border-right: 1px solid var(--gray-200);
   border-radius: 0;
   background: transparent;
   color: var(--gray-500);
@@ -1356,6 +1398,8 @@
   var addIconRow = document.getElementById('todo-add-row-icons');
   var addPomodoroBtn = document.getElementById('todo-add-pomodoro-btn');
   var addPomodoroCountEl = document.getElementById('todo-add-pomodoro-count');
+  var addPomoMinusBtn = document.getElementById('todo-add-pomo-minus');
+  var addPomoPlusBtn = document.getElementById('todo-add-pomo-plus');
   var addCustomMinInput = document.getElementById('todo-add-custom-min');
   var addDateIcon = document.getElementById('todo-add-date-icon');
   var addDateChip = document.getElementById('todo-add-date-chip');
@@ -2235,23 +2279,25 @@
     addPomodoroCountEl.textContent = _addFormPomodoroCount;
     if (_addFormPomodoroCount > 0) {
       addPomodoroBtn.classList.add('has-count');
+      addPomoMinusBtn.disabled = false;
     } else {
       addPomodoroBtn.classList.remove('has-count');
+      addPomoMinusBtn.disabled = true;
     }
   }
 
-  // Left-click: increment pomodoro count
-  addPomodoroBtn.addEventListener('click', function(e) {
+  // Plus button: increment pomodoro count
+  addPomoPlusBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     e.preventDefault();
     _addFormPomodoroCount++;
     updatePomodoroCountDisplay();
   });
 
-  // Right-click: decrement pomodoro count (min 0)
-  addPomodoroBtn.addEventListener('contextmenu', function(e) {
-    e.preventDefault();
+  // Minus button: decrement pomodoro count (min 0)
+  addPomoMinusBtn.addEventListener('click', function(e) {
     e.stopPropagation();
+    e.preventDefault();
     if (_addFormPomodoroCount > 0) {
       _addFormPomodoroCount--;
       updatePomodoroCountDisplay();

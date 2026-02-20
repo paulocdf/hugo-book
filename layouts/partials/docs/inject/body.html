@@ -2075,7 +2075,7 @@
 
   var SIDEBAR_MAX = 10;
 
-  function renderDynamicSidebar(allNotes) {
+  function renderDynamicSidebar(allNotes, user) {
     var menuNav = document.querySelector('.book-menu-content nav');
     if (!menuNav) return;
 
@@ -2190,35 +2190,6 @@
       '<a href="' + sectionUrl('ai') + '"' + aiActive + '>' + ICONS.ai + 'AI</a>' +
       '</li>';
 
-    // Add Settings entry (expandable inline panel)
-    html += '<li class="sidebar-item sidebar-settings" data-section="settings">' +
-      '<a href="#" id="sidebar-settings-toggle">' + ICONS.settings + 'Settings</a>' +
-      '<div class="sidebar-settings-panel" id="sidebar-settings-panel" style="display:none;">' +
-        '<div class="sidebar-settings-row">' +
-          '<label class="sidebar-settings-label" for="setting-pomo-duration">Pomodoro duration</label>' +
-          '<div class="sidebar-settings-control">' +
-            '<input type="number" id="setting-pomo-duration" class="sidebar-settings-input" min="1" max="120" value="25">' +
-            '<span class="sidebar-settings-unit">min</span>' +
-          '</div>' +
-        '</div>' +
-        '<div class="sidebar-settings-row">' +
-          '<label class="sidebar-settings-label" for="setting-pomo-count">Default pomodoros</label>' +
-          '<div class="sidebar-settings-control">' +
-            '<input type="number" id="setting-pomo-count" class="sidebar-settings-input" min="0" max="20" value="1">' +
-          '</div>' +
-        '</div>' +
-        '<div class="sidebar-settings-row">' +
-          '<label class="sidebar-settings-label" for="setting-auto-schedule">Auto-schedule today</label>' +
-          '<div class="sidebar-settings-control">' +
-            '<label class="sidebar-settings-toggle-switch">' +
-              '<input type="checkbox" id="setting-auto-schedule" checked>' +
-              '<span class="sidebar-settings-toggle-slider"></span>' +
-            '</label>' +
-          '</div>' +
-        '</div>' +
-      '</div>' +
-      '</li>';
-
     // Add Trash entry (static)
     var trashActive = window.location.pathname.indexOf('/docs/trash') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item sidebar-trash" data-section="trash">' +
@@ -2227,6 +2198,54 @@
 
     // Replace sidebar content
     existingUl.innerHTML = html;
+
+    // Build settings footer at bottom of sidebar (outside nav, inside .book-menu-content)
+    var menuContent = document.querySelector('.book-menu-content');
+    if (menuContent) {
+      // Remove existing settings footer if present (re-render safe)
+      var existingFooter = menuContent.querySelector('.sidebar-settings-footer');
+      if (existingFooter) existingFooter.remove();
+
+      var avatarSrc = (user && user.photoURL) ? user.photoURL : '';
+      var userName = (user && (user.displayName || user.email)) || '';
+      var avatarHtml = avatarSrc
+        ? '<img class="sidebar-settings-avatar" src="' + avatarSrc + '" alt="' + escapeHtml(userName) + '" referrerpolicy="no-referrer">'
+        : '<svg class="sidebar-settings-avatar-fallback" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+
+      var footer = document.createElement('div');
+      footer.className = 'sidebar-settings-footer';
+      footer.innerHTML =
+        '<div class="sidebar-settings-panel" id="sidebar-settings-panel" style="display:none;">' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-pomo-duration">Pomodoro duration</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<input type="number" id="setting-pomo-duration" class="sidebar-settings-input" min="1" max="120" value="25">' +
+              '<span class="sidebar-settings-unit">min</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-pomo-count">Default pomodoros</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<input type="number" id="setting-pomo-count" class="sidebar-settings-input" min="0" max="20" value="1">' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-auto-schedule">Auto-schedule today</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<label class="sidebar-settings-toggle-switch">' +
+                '<input type="checkbox" id="setting-auto-schedule" checked>' +
+                '<span class="sidebar-settings-toggle-slider"></span>' +
+              '</label>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="sidebar-settings-trigger" id="sidebar-settings-toggle">' +
+          avatarHtml +
+          '<span class="sidebar-settings-name">' + escapeHtml(userName) + '</span>' +
+          ICONS.settings +
+        '</div>';
+      menuContent.appendChild(footer);
+    }
 
     // Initialize settings panel interactions
     initSettingsPanel();
@@ -2309,6 +2328,13 @@
     var existingUl = menuNav.querySelector('ul');
     if (!existingUl) return;
 
+    // Remove settings footer on sign-out
+    var menuContent = document.querySelector('.book-menu-content');
+    if (menuContent) {
+      var existingFooter = menuContent.querySelector('.sidebar-settings-footer');
+      if (existingFooter) existingFooter.remove();
+    }
+
     // Clear cached sidebar since user signed out
     try { sessionStorage.removeItem(SIDEBAR_CACHE_KEY); } catch (e) {}
 
@@ -2348,11 +2374,12 @@
   }
 
   // Listen for sync completion
+  var _sidebarUser = null; // cached user for re-renders
   window.addEventListener('dm-sync-complete', function() {
     if (!window.dmSync) return;
     window.dmSync.getAllNotes().then(function(notes) {
       if (notes.length > 0) {
-        renderDynamicSidebar(notes);
+        renderDynamicSidebar(notes, _sidebarUser);
       }
     });
   });
@@ -2362,16 +2389,18 @@
     function subscribeDynSidebarAuth() {
       window.dmAuth.onAuthStateChanged(function(user) {
         if (user) {
+          _sidebarUser = user;
           // Try to render from cache immediately
           if (window.dmSync) {
             window.dmSync.getAllNotes().then(function(notes) {
               if (notes.length > 0) {
-                renderDynamicSidebar(notes);
+                renderDynamicSidebar(notes, user);
               }
               // Sync will fire dm-sync-complete which will re-render
             });
           }
         } else {
+          _sidebarUser = null;
           renderAuthPrompt();
         }
       });
