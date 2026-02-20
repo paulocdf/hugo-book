@@ -304,6 +304,46 @@
   var totalSessions = 1; // total pomodoro sessions for this task
   var accumulatedWorkSeconds = 0; // total work seconds done for this todo
   var startedAt = null; // Date.now() when timer started
+  var activeTodoCategory = ''; // category for restored timer display
+
+  // ── State persistence (survives page navigation) ──
+  var STATE_KEY = 'dm-pomodoro-state';
+  var TRACKED_KEY = 'dm-pomodoro-tracked';
+
+  function saveState() {
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify({
+        activeTodoId: activeTodoId,
+        activeTodoTitle: activeTodoTitle,
+        activeTodoCategory: activeTodoCategory,
+        phase: phase,
+        secondsLeft: secondsLeft,
+        totalPhaseSeconds: totalPhaseSeconds,
+        sessionCount: sessionCount,
+        totalSessions: totalSessions,
+        accumulatedWorkSeconds: accumulatedWorkSeconds,
+        startedAt: startedAt,
+        WORK_SECONDS: WORK_SECONDS,
+        BREAK_SECONDS: BREAK_SECONDS,
+        isRunning: isRunning,
+        savedAt: Date.now()
+      }));
+    } catch(e) {}
+  }
+
+  function clearState() {
+    try { localStorage.removeItem(STATE_KEY); } catch(e) {}
+  }
+
+  function saveTrackedMinutes(todoId, minutes) {
+    try {
+      var tracked = {};
+      var raw = localStorage.getItem(TRACKED_KEY);
+      if (raw) tracked = JSON.parse(raw);
+      tracked[todoId] = minutes;
+      localStorage.setItem(TRACKED_KEY, JSON.stringify(tracked));
+    } catch(e) {}
+  }
 
   function formatTime(s) {
     var m = Math.floor(s / 60);
@@ -422,6 +462,7 @@
         secondsLeft = BREAK_SECONDS;
         totalPhaseSeconds = BREAK_SECONDS;
         updateDisplay();
+        saveState();
         // Auto-start break
         startTimer();
       } else {
@@ -431,12 +472,15 @@
         secondsLeft = WORK_SECONDS;
         totalPhaseSeconds = WORK_SECONDS;
         updateDisplay();
+        saveState();
         // Don't auto-start — wait for user
       }
       return;
     }
     secondsLeft--;
     updateDisplay();
+    // Persist every 5 seconds to avoid excessive writes
+    if (secondsLeft % 5 === 0) saveState();
   }
 
   function startTimer() {
@@ -445,6 +489,7 @@
     showPauseIcon();
     intervalId = setInterval(tick, 1000);
     updateDisplay();
+    saveState();
   }
 
   function pauseTimer() {
@@ -462,6 +507,7 @@
     // Restore page title
     document.title = document.title.replace(/^\d{2}:\d{2} \u2014 (Work|Break) \| /, '');
     updateDisplay();
+    saveState();
   }
 
   function resetTimer() {
@@ -479,6 +525,7 @@
     totalPhaseSeconds = WORK_SECONDS;
     showPlayIcon();
     updateDisplay();
+    saveState();
   }
 
   function skipPhase() {
@@ -512,6 +559,7 @@
     }
     showPlayIcon();
     updateDisplay();
+    saveState();
   }
 
   function closeTimer() {
@@ -540,9 +588,15 @@
     var closedTodoId = activeTodoId;
     activeTodoId = null;
     activeTodoTitle = '';
+    activeTodoCategory = '';
+
+    // Clear persisted timer state
+    clearState();
 
     // Notify the todo list about tracked time
     if (closedTodoId && trackedMinutes > 0) {
+      // Persist tracked minutes to localStorage so they survive navigation
+      saveTrackedMinutes(closedTodoId, trackedMinutes);
       window.dispatchEvent(new CustomEvent('dm-pomodoro-stopped', {
         detail: { todoId: closedTodoId, trackedMinutes: trackedMinutes }
       }));
@@ -567,6 +621,9 @@
 
     activeTodoId = null;
     activeTodoTitle = '';
+    activeTodoCategory = '';
+    // Clear persisted timer state
+    clearState();
     // No event fired — time is discarded
   }
 
@@ -740,6 +797,150 @@
     subtasksEl.style.display = 'none';
   }
 
+  // ── Restore persisted timer state on page load ──
+  function restoreState() {
+    var raw;
+    try { raw = localStorage.getItem(STATE_KEY); } catch(e) { return; }
+    if (!raw) return;
+    var s;
+    try { s = JSON.parse(raw); } catch(e) { clearState(); return; }
+    if (!s || !s.activeTodoId || !s.savedAt) { clearState(); return; }
+
+    // Calculate elapsed time since state was saved
+    var elapsedMs = Date.now() - s.savedAt;
+    if (elapsedMs < 0) { clearState(); return; } // clock skew, discard
+    var elapsedSec = Math.floor(elapsedMs / 1000);
+
+    // Restore config
+    WORK_SECONDS = s.WORK_SECONDS || 25 * 60;
+    BREAK_SECONDS = s.BREAK_SECONDS || 5 * 60;
+    activeTodoId = s.activeTodoId;
+    activeTodoTitle = s.activeTodoTitle || 'Task';
+    activeTodoCategory = s.activeTodoCategory || '';
+    totalSessions = s.totalSessions || 1;
+    startedAt = s.startedAt;
+
+    // Restore mutable state
+    var rPhase = s.phase || 'work';
+    var rSecondsLeft = s.secondsLeft || 0;
+    var rTotalPhase = s.totalPhaseSeconds || WORK_SECONDS;
+    var rSessionCount = s.sessionCount || 1;
+    var rAccWork = s.accumulatedWorkSeconds || 0;
+    var wasRunning = s.isRunning;
+
+    // If timer was running, simulate elapsed time
+    if (wasRunning && elapsedSec > 0) {
+      var result = simulateElapsed(rPhase, rSecondsLeft, rTotalPhase, rSessionCount, rAccWork, elapsedSec);
+      if (result.finished) {
+        // Timer completed entirely during navigation — auto-close
+        var trackedMinutes = Math.round(result.accWork / 60);
+        clearState();
+        if (trackedMinutes > 0) {
+          saveTrackedMinutes(activeTodoId, trackedMinutes);
+          window.dispatchEvent(new CustomEvent('dm-pomodoro-stopped', {
+            detail: { todoId: activeTodoId, trackedMinutes: trackedMinutes }
+          }));
+        }
+        activeTodoId = null;
+        activeTodoTitle = '';
+        activeTodoCategory = '';
+        return;
+      }
+      rPhase = result.phase;
+      rSecondsLeft = result.secondsLeft;
+      rTotalPhase = result.totalPhase;
+      rSessionCount = result.sessionCount;
+      rAccWork = result.accWork;
+    }
+
+    // Apply restored state
+    phase = rPhase;
+    secondsLeft = rSecondsLeft;
+    totalPhaseSeconds = rTotalPhase;
+    sessionCount = rSessionCount;
+    accumulatedWorkSeconds = rAccWork;
+
+    // Update UI
+    titleEl.textContent = activeTodoTitle;
+    if (activeTodoCategory) {
+      categoryEl.textContent = activeTodoCategory;
+      categoryEl.style.display = '';
+    }
+    updateDisplay();
+    resetPosition();
+    timerEl.style.display = '';
+
+    // Load subtasks
+    loadSubtasks(activeTodoId);
+
+    // Resume or show paused state
+    if (wasRunning) {
+      startTimer();
+    } else {
+      showPlayIcon();
+      saveState();
+    }
+  }
+
+  /**
+   * Simulate elapsed seconds across phase transitions.
+   * Returns { phase, secondsLeft, totalPhase, sessionCount, accWork, finished }
+   */
+  function simulateElapsed(curPhase, curSecondsLeft, curTotalPhase, curSession, curAccWork, elapsed) {
+    var remaining = elapsed;
+
+    while (remaining > 0) {
+      if (remaining >= curSecondsLeft) {
+        // Phase completed during navigation
+        remaining -= curSecondsLeft;
+
+        if (curPhase === 'work') {
+          curAccWork += curSecondsLeft; // work seconds remaining = work done to finish phase
+
+          // Check if all sessions are done
+          if (totalSessions > 1 && curSession >= totalSessions) {
+            return { finished: true, accWork: curAccWork };
+          }
+
+          // Switch to break (auto-started)
+          curPhase = 'break';
+          curSecondsLeft = BREAK_SECONDS;
+          curTotalPhase = BREAK_SECONDS;
+        } else {
+          // Break finished — next work session does NOT auto-start
+          curSession++;
+          curPhase = 'work';
+          curSecondsLeft = WORK_SECONDS;
+          curTotalPhase = WORK_SECONDS;
+          // Break → work transition doesn't auto-start, so stop consuming time
+          break;
+        }
+      } else {
+        // Elapsed time consumed within current phase
+        if (curPhase === 'work') {
+          // Track partial work done during elapsed time
+          curAccWork += remaining;
+          // Adjust totalPhase so progress bar is accurate
+          curTotalPhase = curSecondsLeft; // total = what was left before elapsed
+        }
+        curSecondsLeft -= remaining;
+        remaining = 0;
+      }
+    }
+
+    return {
+      finished: false,
+      phase: curPhase,
+      secondsLeft: curSecondsLeft,
+      totalPhase: curTotalPhase,
+      sessionCount: curSession,
+      accWork: curAccWork
+    };
+  }
+
+  // Restore on page load
+  restoreState();
+
   // ── Public API ──
   window.dmPomodoro = {
     start: function(todoId, todoTitle) {
@@ -749,6 +950,7 @@
       }
       activeTodoId = todoId;
       activeTodoTitle = todoTitle || 'Task';
+      activeTodoCategory = '';
       titleEl.textContent = activeTodoTitle;
 
       // Look up category and pomodoro config from IndexedDB
@@ -785,6 +987,7 @@
             if (todo.category) {
               categoryEl.textContent = todo.category;
               categoryEl.style.display = '';
+              activeTodoCategory = todo.category;
             }
             if (todo.pomodoroLength && todo.pomodoroLength > 0) {
               WORK_SECONDS = todo.pomodoroLength * 60;

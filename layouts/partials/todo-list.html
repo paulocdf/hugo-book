@@ -1398,6 +1398,11 @@
   // State
   var allTodos = [];
   var _pomodoroTrackedMinutes = {}; // { todoId: minutes } — stores tracked time from Pomodoro timer
+  // Restore tracked minutes from localStorage (persisted across page navigations)
+  try {
+    var _savedTracked = localStorage.getItem('dm-pomodoro-tracked');
+    if (_savedTracked) _pomodoroTrackedMinutes = JSON.parse(_savedTracked);
+  } catch(e) {}
   var _justCompletedIds = {}; // { todoId: true } — for slide-down animation on just-completed tasks
   var _addFormCategory = null; // Selected category string for new task
   var _addFormCategoryPrompted = false; // True when Enter opened category popover (submit on select/skip)
@@ -2856,6 +2861,16 @@
               completeTodo(todo, result.actualMin, result.category);
               // Clear stored pomodoro time after completion
               delete _pomodoroTrackedMinutes[todoId];
+              // Clean up localStorage entry
+              try {
+                var _tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
+                delete _tracked[todoId];
+                if (Object.keys(_tracked).length === 0) {
+                  localStorage.removeItem('dm-pomodoro-tracked');
+                } else {
+                  localStorage.setItem('dm-pomodoro-tracked', JSON.stringify(_tracked));
+                }
+              } catch(e) {}
             }, modalOpts);
           }
         } else {
@@ -3716,6 +3731,7 @@
     var detail = e.detail || {};
     if (detail.todoId && detail.trackedMinutes > 0) {
       _pomodoroTrackedMinutes[detail.todoId] = detail.trackedMinutes;
+      // Also saved to localStorage by pomodoro-timer.html, but sync in-memory copy
     }
     render();
   });
