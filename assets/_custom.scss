@@ -1214,6 +1214,39 @@ aside nav ul a:hover {
     }
   }
 
+  // ---- AI Companion: teal accent ----
+  .sidebar-ai {
+    a {
+      font-weight: 500;
+
+      .sidebar-icon {
+        opacity: 0.75;
+      }
+
+      &:hover {
+        color: var(--accent-ai);
+
+        .sidebar-icon {
+          opacity: 1;
+          stroke: var(--accent-ai);
+        }
+      }
+
+      &.active {
+        color: var(--accent-ai);
+        font-weight: 600;
+
+        .sidebar-icon {
+          stroke: var(--accent-ai);
+        }
+
+        &::before {
+          background: linear-gradient(180deg, var(--accent-ai) 0%, var(--accent-blue) 100%);
+        }
+      }
+    }
+  }
+
   // ---- Inbox: accented only when active ----
   .sidebar-inbox {
     margin-bottom: 0.5rem !important;

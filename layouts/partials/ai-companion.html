@@ -1,0 +1,1553 @@
+<!-- AI Companion: In-browser LLM via WebLLM (Qwen2.5-0.5B) -->
+<!-- Floating side panel + engine management. Requires dm-sync for task context. -->
+
+<!-- FAB trigger button (hidden by default until AI is enabled) -->
+<button class="ai-fab" id="ai-fab" aria-label="AI Companion (A)" title="AI Companion" style="display:none;">
+  <svg class="ai-fab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
+  </svg>
+  <span class="ai-fab-tooltip">AI Companion <kbd>A</kbd></span>
+</button>
+
+<!-- Floating side panel (appended positioning — lives outside .book-page to avoid will-change issues) -->
+<div class="ai-panel" id="ai-panel" style="display:none;" role="dialog" aria-label="AI Companion">
+  <div class="ai-panel-header">
+    <div class="ai-panel-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
+      </svg>
+      <span>AI Companion</span>
+      <span class="ai-panel-status" id="ai-panel-status"></span>
+    </div>
+    <div class="ai-panel-header-actions">
+      <button type="button" class="ai-panel-btn" id="ai-settings-btn" title="Settings" aria-label="Settings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+      </button>
+      <button type="button" class="ai-panel-btn" id="ai-clear-btn" title="Clear chat" aria-label="Clear chat">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </button>
+      <button type="button" class="ai-panel-btn ai-panel-close" id="ai-panel-close" title="Close (Esc)" aria-label="Close">&times;</button>
+    </div>
+  </div>
+
+  <!-- Settings panel (hidden by default) -->
+  <div class="ai-settings" id="ai-settings" style="display:none;">
+    <div class="ai-settings-row">
+      <span class="ai-settings-label">AI Companion</span>
+      <label class="ai-toggle-switch">
+        <input type="checkbox" id="ai-enabled-toggle">
+        <span class="ai-toggle-slider"></span>
+      </label>
+    </div>
+    <div class="ai-settings-info">
+      <p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU.</p>
+      <p>First use downloads ~350 MB (cached for future visits). Requires ~1 GB GPU memory.</p>
+    </div>
+    <div class="ai-settings-row" id="ai-webgpu-status-row">
+      <span class="ai-settings-label">WebGPU</span>
+      <span class="ai-settings-value" id="ai-webgpu-status">Checking...</span>
+    </div>
+    <div class="ai-settings-row" id="ai-model-status-row" style="display:none;">
+      <span class="ai-settings-label">Model</span>
+      <span class="ai-settings-value" id="ai-model-status">Not loaded</span>
+    </div>
+    <button type="button" class="ai-settings-unload" id="ai-unload-btn" style="display:none;">Unload model (free GPU memory)</button>
+  </div>
+
+  <!-- Download progress (shown during first model load) -->
+  <div class="ai-download" id="ai-download" style="display:none;">
+    <div class="ai-download-text" id="ai-download-text">Preparing AI model...</div>
+    <div class="ai-download-bar">
+      <div class="ai-download-fill" id="ai-download-fill" style="width:0%"></div>
+    </div>
+    <div class="ai-download-detail" id="ai-download-detail"></div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="ai-quick-actions" id="ai-quick-actions">
+    <button type="button" class="ai-quick-btn" data-action="plan">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+      Plan my day
+    </button>
+    <button type="button" class="ai-quick-btn" data-action="suggest">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+      Suggest tasks
+    </button>
+    <button type="button" class="ai-quick-btn" data-action="improve">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      Improve text
+    </button>
+    <button type="button" class="ai-quick-btn" data-action="summarize">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="17" y1="18" x2="3" y2="18"></line></svg>
+      Summarize
+    </button>
+  </div>
+
+  <!-- Chat messages -->
+  <div class="ai-messages" id="ai-messages">
+    <div class="ai-welcome" id="ai-welcome">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ai)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
+      </svg>
+      <p>I can help you plan your day, suggest tasks, improve text, or answer questions about your tasks.</p>
+      <p class="ai-welcome-hint">Use the quick actions above or type a message below.</p>
+    </div>
+  </div>
+
+  <!-- Input area -->
+  <div class="ai-input-area" id="ai-input-area">
+    <div class="ai-input-wrap">
+      <textarea class="ai-input" id="ai-input" placeholder="Ask me anything..." rows="1"></textarea>
+      <button type="button" class="ai-send-btn" id="ai-send-btn" title="Send" aria-label="Send" disabled>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+      </button>
+    </div>
+    <div class="ai-input-hint">
+      <span><kbd>Enter</kbd> send &middot; <kbd>Shift+Enter</kbd> newline</span>
+      <button type="button" class="ai-stop-btn" id="ai-stop-btn" style="display:none;">Stop</button>
+    </div>
+  </div>
+
+  <!-- Not supported message -->
+  <div class="ai-not-supported" id="ai-not-supported" style="display:none;">
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"></line>
+    </svg>
+    <p>WebGPU is not supported in your browser.</p>
+    <p class="ai-not-supported-hint">AI Companion requires Chrome 113+ or Edge 113+ with WebGPU enabled.</p>
+  </div>
+</div>
+
+<style>
+/* ─── AI FAB Button ─── */
+.ai-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 80px; /* offset from Quick Capture FAB */
+  z-index: 1100;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent-ai);
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+}
+.ai-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0,0,0,0.24);
+  background: var(--accent-ai-hover);
+}
+.ai-fab:active {
+  transform: translateY(0);
+}
+.ai-fab-tooltip {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--body-font-color);
+  color: var(--body-background);
+  font-size: 0.72rem;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.ai-fab:hover .ai-fab-tooltip {
+  opacity: 1;
+  transform: translateY(0);
+}
+.ai-fab-tooltip kbd {
+  display: inline-block;
+  padding: 1px 4px;
+  font-size: 0.65rem;
+  border-radius: 3px;
+  background: rgba(255,255,255,0.15);
+  margin-left: 4px;
+}
+
+/* ─── AI Side Panel ─── */
+.ai-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 400px;
+  max-width: 100vw;
+  z-index: 1200;
+  background: var(--body-background);
+  border-left: 1px solid var(--gray-200);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  animation: ai-panel-in 0.25s ease-out;
+}
+@keyframes ai-panel-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.ai-panel.closing {
+  animation: ai-panel-out 0.2s ease-in forwards;
+}
+@keyframes ai-panel-out {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+/* Header */
+.ai-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+}
+.ai-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--body-font-color);
+}
+.ai-panel-title svg {
+  color: var(--accent-ai);
+}
+.ai-panel-status {
+  font-size: 0.68rem;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 10px;
+  display: none;
+}
+.ai-panel-status.ready {
+  display: inline-block;
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.ai-panel-status.loading {
+  display: inline-block;
+  background: rgba(0, 105, 255, 0.08);
+  color: var(--color-link);
+}
+.ai-panel-status.error {
+  display: inline-block;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.ai-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ai-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.2s, background 0.2s, border-color 0.2s;
+  line-height: 0;
+}
+.ai-panel-btn:hover {
+  color: var(--body-font-color);
+  background: var(--gray-200);
+  border-color: var(--gray-300);
+}
+.ai-panel-close {
+  font-size: 1.4rem;
+  font-weight: 300;
+}
+
+/* ─── Settings panel ─── */
+.ai-settings {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+  animation: ai-settings-in 0.15s ease-out;
+}
+@keyframes ai-settings-in {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 300px; }
+}
+.ai-settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+}
+.ai-settings-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+}
+.ai-settings-value {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+}
+.ai-settings-info {
+  padding: 8px 0;
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  line-height: 1.5;
+}
+.ai-settings-info p {
+  margin: 0 0 4px;
+}
+.ai-settings-unload {
+  width: 100%;
+  padding: 8px;
+  margin-top: 8px;
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ai-settings-unload:hover {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+/* Toggle switch */
+.ai-toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 22px;
+}
+.ai-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.ai-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--gray-300);
+  border-radius: 22px;
+  transition: background 0.2s;
+}
+.ai-toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 3px;
+  bottom: 3px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.ai-toggle-switch input:checked + .ai-toggle-slider {
+  background: var(--accent-ai);
+}
+.ai-toggle-switch input:checked + .ai-toggle-slider::before {
+  transform: translateX(18px);
+}
+
+/* ─── Download progress ─── */
+.ai-download {
+  padding: 16px;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+}
+.ai-download-text {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+  margin-bottom: 8px;
+}
+.ai-download-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--gray-200);
+  overflow: hidden;
+}
+.ai-download-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent-ai);
+  transition: width 0.3s ease;
+}
+.ai-download-detail {
+  font-size: 0.7rem;
+  color: var(--gray-500);
+  margin-top: 6px;
+}
+
+/* ─── Quick Actions ─── */
+.ai-quick-actions {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+.ai-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 16px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.73rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.ai-quick-btn:hover {
+  background: var(--ai-accent-bg, rgba(0, 150, 136, 0.08));
+  border-color: var(--accent-ai);
+  color: var(--accent-ai);
+}
+.ai-quick-btn svg {
+  flex-shrink: 0;
+}
+
+/* ─── Chat Messages ─── */
+.ai-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ai-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--gray-500);
+  flex: 1;
+}
+.ai-welcome p {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  max-width: 280px;
+}
+.ai-welcome-hint {
+  font-size: 0.72rem !important;
+  color: var(--gray-400) !important;
+}
+
+/* Message bubbles */
+.ai-msg {
+  display: flex;
+  gap: 10px;
+  animation: ai-msg-in 0.2s ease-out;
+}
+@keyframes ai-msg-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.ai-msg-user {
+  flex-direction: row-reverse;
+}
+.ai-msg-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.ai-msg-user .ai-msg-avatar {
+  background: var(--color-link);
+  color: #fff;
+}
+.ai-msg-assistant .ai-msg-avatar {
+  background: var(--accent-ai);
+  color: #fff;
+}
+.ai-msg-bubble {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  word-break: break-word;
+}
+.ai-msg-user .ai-msg-bubble {
+  background: var(--color-link);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+.ai-msg-assistant .ai-msg-bubble {
+  background: var(--gray-100);
+  color: var(--body-font-color);
+  border-bottom-left-radius: 4px;
+}
+.ai-msg-bubble p {
+  margin: 0 0 6px;
+}
+.ai-msg-bubble p:last-child {
+  margin-bottom: 0;
+}
+.ai-msg-bubble ul, .ai-msg-bubble ol {
+  margin: 4px 0;
+  padding-left: 1.2em;
+}
+.ai-msg-bubble li {
+  margin: 2px 0;
+}
+.ai-msg-bubble code {
+  background: var(--code-bg);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.78rem;
+}
+.ai-msg-bubble strong {
+  font-weight: 600;
+}
+
+/* Typing indicator */
+.ai-typing {
+  display: flex;
+  gap: 4px;
+  padding: 4px 0;
+}
+.ai-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gray-400);
+  animation: ai-typing-bounce 1.2s ease-in-out infinite;
+}
+.ai-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.ai-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ai-typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-6px); opacity: 1; }
+}
+
+/* Task suggestion cards */
+.ai-task-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin: 4px 0;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  transition: background 0.15s;
+}
+.ai-task-card:hover {
+  background: var(--gray-100);
+}
+.ai-task-card-title {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.ai-task-card-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--accent-ai);
+  border-radius: 6px;
+  background: none;
+  color: var(--accent-ai);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 0;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.ai-task-card-add:hover {
+  background: var(--accent-ai);
+  color: #fff;
+}
+.ai-task-card-added {
+  font-size: 0.72rem;
+  color: var(--color-success);
+  font-weight: 500;
+}
+
+/* Copy button in messages */
+.ai-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  margin-top: 6px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--gray-500);
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ai-copy-btn:hover {
+  color: var(--body-font-color);
+  border-color: var(--gray-300);
+}
+.ai-copy-btn.copied {
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+/* ─── Input Area ─── */
+.ai-input-area {
+  padding: 12px 16px;
+  border-top: 1px solid var(--gray-200);
+  flex-shrink: 0;
+}
+.ai-input-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 0;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.ai-input-wrap:focus-within {
+  border-color: var(--accent-ai);
+  box-shadow: 0 0 0 2px var(--ai-accent-bg, rgba(0, 150, 136, 0.1));
+}
+.ai-input {
+  flex: 1;
+  border: none;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  background: transparent;
+  color: var(--body-font-color);
+  resize: none;
+  outline: none;
+  min-height: 36px;
+  max-height: 120px;
+  font-family: inherit;
+  border-radius: 10px 0 0 10px;
+}
+.ai-input::placeholder {
+  color: var(--gray-400);
+}
+.ai-send-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 36px;
+  border: none;
+  border-left: 1px solid var(--gray-200);
+  border-radius: 0 9px 9px 0;
+  background: transparent;
+  color: var(--accent-ai);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+  line-height: 0;
+}
+.ai-send-btn:hover:not(:disabled) {
+  background: var(--accent-ai);
+  color: #fff;
+}
+.ai-send-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.ai-input-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.65rem;
+  color: var(--gray-400);
+}
+.ai-input-hint kbd {
+  display: inline-block;
+  padding: 0 3px;
+  font-size: 0.6rem;
+  border-radius: 2px;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+}
+.ai-stop-btn {
+  padding: 2px 10px;
+  border: 1px solid var(--color-danger);
+  border-radius: 6px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 0.7rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ai-stop-btn:hover {
+  background: var(--color-danger);
+  color: #fff;
+}
+
+/* ─── Not supported ─── */
+.ai-not-supported {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--gray-500);
+  flex: 1;
+}
+.ai-not-supported p {
+  margin: 8px 0 0;
+  font-size: 0.82rem;
+}
+.ai-not-supported-hint {
+  font-size: 0.72rem !important;
+  color: var(--gray-400) !important;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 500px) {
+  .ai-panel {
+    width: 100vw;
+  }
+  .ai-fab {
+    right: 72px;
+    bottom: 20px;
+    width: 44px;
+    height: 44px;
+  }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  // ─── DOM refs ───
+  var fab = document.getElementById('ai-fab');
+  var panel = document.getElementById('ai-panel');
+  var panelClose = document.getElementById('ai-panel-close');
+  var settingsBtn = document.getElementById('ai-settings-btn');
+  var settingsPanel = document.getElementById('ai-settings');
+  var enabledToggle = document.getElementById('ai-enabled-toggle');
+  var clearBtn = document.getElementById('ai-clear-btn');
+  var messagesEl = document.getElementById('ai-messages');
+  var welcomeEl = document.getElementById('ai-welcome');
+  var quickActions = document.getElementById('ai-quick-actions');
+  var inputArea = document.getElementById('ai-input-area');
+  var inputEl = document.getElementById('ai-input');
+  var sendBtn = document.getElementById('ai-send-btn');
+  var stopBtn = document.getElementById('ai-stop-btn');
+  var statusEl = document.getElementById('ai-panel-status');
+  var downloadEl = document.getElementById('ai-download');
+  var downloadText = document.getElementById('ai-download-text');
+  var downloadFill = document.getElementById('ai-download-fill');
+  var downloadDetail = document.getElementById('ai-download-detail');
+  var webgpuStatusEl = document.getElementById('ai-webgpu-status');
+  var modelStatusEl = document.getElementById('ai-model-status');
+  var modelStatusRow = document.getElementById('ai-model-status-row');
+  var unloadBtn = document.getElementById('ai-unload-btn');
+  var notSupportedEl = document.getElementById('ai-not-supported');
+
+  if (!fab || !panel) return;
+
+  // ─── Constants ───
+  var MODEL_ID = 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC';
+  var CDN_URL = 'https://esm.run/@mlc-ai/web-llm';
+  var LS_KEY_ENABLED = 'dm-ai-enabled';
+  var SS_KEY_MESSAGES = 'dm-ai-messages';
+  var SS_KEY_PANEL = 'dm-ai-panel-open';
+
+  // ─── State ───
+  var engine = null;
+  var webllm = null;
+  var loadingPromise = null;
+  var aiStatus = 'idle'; // 'idle' | 'loading' | 'ready' | 'error' | 'disabled' | 'unsupported'
+  var chatHistory = []; // array of {role, content}
+  var isGenerating = false;
+  var abortController = null;
+  var hasWebGPU = typeof navigator !== 'undefined' && !!navigator.gpu;
+
+  // ─── System prompt builder ───
+  function buildSystemPrompt(tasks) {
+    var now = new Date();
+    var todayStr = now.toISOString().split('T')[0];
+    var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
+
+    var prompt = 'You are a helpful AI companion for a personal productivity app called Digital Memory. ';
+    prompt += 'Today is ' + dayName + ', ' + todayStr + '. ';
+    prompt += 'You help the user plan their day, suggest tasks, improve text, and summarize content. ';
+    prompt += 'Keep responses concise and actionable. Use markdown formatting when helpful.\n\n';
+
+    if (!tasks || tasks.length === 0) {
+      prompt += 'The user has no tasks right now.\n';
+      return prompt;
+    }
+
+    // Categorize tasks
+    var pending = [];
+    var overdue = [];
+    var completedRecent = [];
+    var sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+    tasks.forEach(function(t) {
+      if (t.done) {
+        if (t.completedAt && t.completedAt > sevenDaysAgo) {
+          completedRecent.push(t);
+        }
+      } else {
+        pending.push(t);
+        if (t.scheduledDate && t.scheduledDate < todayStr) {
+          overdue.push(t);
+        }
+      }
+    });
+
+    prompt += 'USER\'S TASKS:\n';
+
+    if (overdue.length > 0) {
+      prompt += '\nOverdue (' + overdue.length + '):\n';
+      overdue.forEach(function(t) {
+        prompt += '- ' + t.title;
+        if (t.category) prompt += ' [' + t.category + ']';
+        if (t.scheduledDate) prompt += ' (scheduled: ' + t.scheduledDate + ')';
+        if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
+        prompt += '\n';
+      });
+    }
+
+    if (pending.length > 0) {
+      // Show pending tasks scheduled for today
+      var todayTasks = pending.filter(function(t) { return t.scheduledDate === todayStr; });
+      var futureTasks = pending.filter(function(t) { return t.scheduledDate && t.scheduledDate > todayStr; });
+      var unscheduled = pending.filter(function(t) { return !t.scheduledDate; });
+
+      if (todayTasks.length > 0) {
+        prompt += '\nToday (' + todayTasks.length + '):\n';
+        todayTasks.forEach(function(t) {
+          prompt += '- ' + t.title;
+          if (t.category) prompt += ' [' + t.category + ']';
+          if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
+          prompt += '\n';
+        });
+      }
+
+      if (futureTasks.length > 0) {
+        prompt += '\nUpcoming (' + futureTasks.length + '):\n';
+        futureTasks.slice(0, 10).forEach(function(t) {
+          prompt += '- ' + t.title;
+          if (t.category) prompt += ' [' + t.category + ']';
+          if (t.scheduledDate) prompt += ' (scheduled: ' + t.scheduledDate + ')';
+          prompt += '\n';
+        });
+        if (futureTasks.length > 10) {
+          prompt += '- ...and ' + (futureTasks.length - 10) + ' more\n';
+        }
+      }
+
+      if (unscheduled.length > 0) {
+        prompt += '\nUnscheduled (' + unscheduled.length + '):\n';
+        unscheduled.slice(0, 15).forEach(function(t) {
+          prompt += '- ' + t.title;
+          if (t.category) prompt += ' [' + t.category + ']';
+          if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
+          prompt += '\n';
+        });
+        if (unscheduled.length > 15) {
+          prompt += '- ...and ' + (unscheduled.length - 15) + ' more\n';
+        }
+      }
+    }
+
+    if (completedRecent.length > 0) {
+      prompt += '\nRecently completed (last 7 days, ' + completedRecent.length + '):\n';
+      completedRecent.slice(0, 10).forEach(function(t) {
+        prompt += '- ' + t.title;
+        if (t.category) prompt += ' [' + t.category + ']';
+        prompt += '\n';
+      });
+      if (completedRecent.length > 10) {
+        prompt += '- ...and ' + (completedRecent.length - 10) + ' more\n';
+      }
+    }
+
+    // Category summary
+    var catCounts = {};
+    pending.forEach(function(t) {
+      var c = t.category || 'uncategorized';
+      catCounts[c] = (catCounts[c] || 0) + 1;
+    });
+    var cats = Object.keys(catCounts);
+    if (cats.length > 0) {
+      prompt += '\nCategories in use: ' + cats.map(function(c) { return c + ' (' + catCounts[c] + ')'; }).join(', ') + '\n';
+    }
+
+    return prompt;
+  }
+
+  // ─── Task context loader ───
+  function getTaskContext() {
+    return new Promise(function(resolve) {
+      if (!window.dmSync || !window.dmSync.getAllTodos) {
+        resolve([]);
+        return;
+      }
+      window.dmSync.getAllTodos().then(function(todos) {
+        resolve(todos || []);
+      }).catch(function() {
+        resolve([]);
+      });
+    });
+  }
+
+  // ─── WebGPU check ───
+  function checkWebGPU() {
+    if (!hasWebGPU) {
+      webgpuStatusEl.textContent = 'Not supported';
+      webgpuStatusEl.style.color = 'var(--color-danger)';
+      return false;
+    }
+    webgpuStatusEl.textContent = 'Supported';
+    webgpuStatusEl.style.color = 'var(--color-success)';
+    return true;
+  }
+
+  // ─── Status management ───
+  function setStatus(status, text) {
+    aiStatus = status;
+    statusEl.className = 'ai-panel-status';
+    statusEl.style.display = 'none';
+    if (status === 'ready') {
+      statusEl.textContent = text || 'Ready';
+      statusEl.className = 'ai-panel-status ready';
+      statusEl.style.display = '';
+      modelStatusEl.textContent = 'Loaded';
+      modelStatusEl.style.color = 'var(--color-success)';
+      modelStatusRow.style.display = '';
+      unloadBtn.style.display = '';
+    } else if (status === 'loading') {
+      statusEl.textContent = text || 'Loading...';
+      statusEl.className = 'ai-panel-status loading';
+      statusEl.style.display = '';
+      modelStatusEl.textContent = 'Loading...';
+      modelStatusEl.style.color = 'var(--color-link)';
+      modelStatusRow.style.display = '';
+    } else if (status === 'error') {
+      statusEl.textContent = text || 'Error';
+      statusEl.className = 'ai-panel-status error';
+      statusEl.style.display = '';
+      modelStatusEl.textContent = 'Error';
+      modelStatusEl.style.color = 'var(--color-danger)';
+      modelStatusRow.style.display = '';
+    } else {
+      modelStatusEl.textContent = 'Not loaded';
+      modelStatusEl.style.color = 'var(--gray-500)';
+      unloadBtn.style.display = 'none';
+    }
+  }
+
+  // ─── Engine management ───
+  function loadEngine() {
+    if (engine) return Promise.resolve(engine);
+    if (loadingPromise) return loadingPromise;
+    if (!hasWebGPU) {
+      setStatus('error', 'No WebGPU');
+      return Promise.reject(new Error('WebGPU not supported'));
+    }
+
+    setStatus('loading', 'Loading...');
+    downloadEl.style.display = '';
+    downloadText.textContent = 'Loading AI model...';
+    downloadFill.style.width = '0%';
+    downloadDetail.textContent = 'This may take a moment on first use (~350 MB download)';
+
+    loadingPromise = import(CDN_URL).then(function(mod) {
+      webllm = mod;
+      return mod.CreateMLCEngine(MODEL_ID, {
+        initProgressCallback: function(progress) {
+          var pct = Math.round((progress.progress || 0) * 100);
+          downloadFill.style.width = pct + '%';
+          downloadText.textContent = progress.text || 'Loading...';
+          if (pct > 0 && pct < 100) {
+            downloadDetail.textContent = pct + '% complete';
+          }
+          // Broadcast progress so the dedicated page can update its own UI
+          window.dispatchEvent(new CustomEvent('dm-ai-load-progress', { detail: { pct: pct, text: progress.text || 'Loading...' } }));
+        }
+      });
+    }).then(function(eng) {
+      engine = eng;
+      loadingPromise = null;
+      downloadEl.style.display = 'none';
+      setStatus('ready');
+      return engine;
+    }).catch(function(err) {
+      console.error('[AI Companion] Failed to load engine:', err);
+      loadingPromise = null;
+      downloadEl.style.display = 'none';
+      setStatus('error', 'Load failed');
+      addMessage('assistant', 'Failed to load AI model: ' + (err.message || err) + '. Make sure WebGPU is enabled and try again.');
+      throw err;
+    });
+    return loadingPromise;
+  }
+
+  function unloadEngine() {
+    if (engine) {
+      engine.unload().catch(function() {});
+      engine = null;
+    }
+    setStatus('idle');
+  }
+
+  // ─── Chat completion ───
+  function runChat(userMessage, systemOverride) {
+    if (isGenerating) return;
+    isGenerating = true;
+    sendBtn.disabled = true;
+    stopBtn.style.display = '';
+
+    // Add user message
+    addMessage('user', userMessage);
+    chatHistory.push({ role: 'user', content: userMessage });
+
+    // Show typing indicator
+    var typingEl = addTypingIndicator();
+
+    // Ensure engine is loaded
+    var enginePromise = engine ? Promise.resolve(engine) : loadEngine();
+
+    enginePromise.then(function(eng) {
+      engine = eng || engine;
+      return getTaskContext();
+    }).then(function(tasks) {
+      var systemPrompt = systemOverride || buildSystemPrompt(tasks);
+      var messages = [{ role: 'system', content: systemPrompt }];
+
+      // Include recent chat history (last 10 messages for context window)
+      var recentHistory = chatHistory.slice(-10);
+      messages = messages.concat(recentHistory);
+
+      // Create abort mechanism
+      var stopped = false;
+      abortController = { stop: function() { stopped = true; } };
+
+      return engine.chat.completions.create({
+        messages: messages,
+        stream: true,
+        temperature: 0.7,
+        max_tokens: 1024
+      }).then(function(chunks) {
+        // Remove typing indicator
+        if (typingEl && typingEl.parentNode) {
+          typingEl.parentNode.removeChild(typingEl);
+        }
+
+        // Create assistant message element
+        var msgEl = addMessage('assistant', '');
+        var bubbleEl = msgEl.querySelector('.ai-msg-bubble');
+        var fullText = '';
+
+        function finalizeStream() {
+          chatHistory.push({ role: 'assistant', content: fullText });
+          saveMessages();
+          bubbleEl.innerHTML = renderMarkdown(fullText);
+          addCopyButton(bubbleEl, fullText);
+          detectAndRenderTaskCards(bubbleEl, fullText);
+          isGenerating = false;
+          sendBtn.disabled = !inputEl.value.trim();
+          stopBtn.style.display = 'none';
+          abortController = null;
+        }
+
+        // Handle async iterator (WebLLM standard response format)
+        if (chunks[Symbol.asyncIterator]) {
+          var iterator = chunks[Symbol.asyncIterator]();
+          function processIterator() {
+            return iterator.next().then(function(result) {
+              if (result.done || stopped) {
+                finalizeStream();
+                return;
+              }
+              var chunk = result.value;
+              var delta = '';
+              if (chunk.choices && chunk.choices[0] && chunk.choices[0].delta) {
+                delta = chunk.choices[0].delta.content || '';
+              }
+              if (delta) {
+                fullText += delta;
+                bubbleEl.innerHTML = renderMarkdown(fullText);
+                scrollToBottom();
+              }
+              return processIterator();
+            });
+          }
+          return processIterator();
+        } else {
+          throw new Error('Unexpected streaming response format from WebLLM');
+        }
+      });
+    }).catch(function(err) {
+      if (typingEl && typingEl.parentNode) {
+        typingEl.parentNode.removeChild(typingEl);
+      }
+      if (!err.message || err.message.indexOf('not supported') === -1) {
+        addMessage('assistant', 'Something went wrong: ' + (err.message || err));
+      }
+      isGenerating = false;
+      sendBtn.disabled = !inputEl.value.trim();
+      stopBtn.style.display = 'none';
+      abortController = null;
+    });
+  }
+
+  // ─── Quick action prompts ───
+  var quickPrompts = {
+    plan: 'Look at my tasks for today and any overdue tasks. Create a prioritized plan for my day. Include estimated time for each task and suggest an order to tackle them. If I have no tasks scheduled for today, suggest which unscheduled tasks I should work on.',
+    suggest: 'Look at my existing tasks (both pending and recently completed). Suggest 3-5 new tasks I might want to add based on patterns you see. For each suggestion, give a clear task title and brief reasoning. Format each as a bullet point starting with the task title in bold.',
+    improve: null, // handled separately with text input
+    summarize: null // handled separately with text input
+  };
+
+  function handleQuickAction(action) {
+    if (action === 'improve') {
+      inputEl.value = '';
+      inputEl.placeholder = 'Paste the text you want to improve...';
+      inputEl.focus();
+      inputEl.dataset.mode = 'improve';
+      return;
+    }
+    if (action === 'summarize') {
+      inputEl.value = '';
+      inputEl.placeholder = 'Paste the text you want to summarize...';
+      inputEl.focus();
+      inputEl.dataset.mode = 'summarize';
+      return;
+    }
+    var prompt = quickPrompts[action];
+    if (prompt) {
+      runChat(prompt);
+    }
+  }
+
+  // ─── Message rendering ───
+  function addMessage(role, content) {
+    // Hide welcome on first message
+    if (welcomeEl) welcomeEl.style.display = 'none';
+
+    var msgEl = document.createElement('div');
+    msgEl.className = 'ai-msg ai-msg-' + role;
+
+    var avatarEl = document.createElement('div');
+    avatarEl.className = 'ai-msg-avatar';
+    avatarEl.textContent = role === 'user' ? 'U' : 'AI';
+
+    var bubbleEl = document.createElement('div');
+    bubbleEl.className = 'ai-msg-bubble';
+    if (content) {
+      bubbleEl.innerHTML = renderMarkdown(content);
+    }
+
+    msgEl.appendChild(avatarEl);
+    msgEl.appendChild(bubbleEl);
+    messagesEl.appendChild(msgEl);
+    scrollToBottom();
+    return msgEl;
+  }
+
+  function addTypingIndicator() {
+    var el = document.createElement('div');
+    el.className = 'ai-msg ai-msg-assistant';
+    el.innerHTML = '<div class="ai-msg-avatar">AI</div><div class="ai-msg-bubble"><div class="ai-typing"><span class="ai-typing-dot"></span><span class="ai-typing-dot"></span><span class="ai-typing-dot"></span></div></div>';
+    messagesEl.appendChild(el);
+    scrollToBottom();
+    return el;
+  }
+
+  function addCopyButton(bubbleEl, text) {
+    var btn = document.createElement('button');
+    btn.className = 'ai-copy-btn';
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy';
+    btn.addEventListener('click', function() {
+      navigator.clipboard.writeText(text).then(function() {
+        btn.classList.add('copied');
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied';
+        setTimeout(function() {
+          btn.classList.remove('copied');
+          btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy';
+        }, 2000);
+      }).catch(function() {});
+    });
+    bubbleEl.appendChild(btn);
+  }
+
+  function detectAndRenderTaskCards(bubbleEl, text) {
+    // Detect bold items that look like task suggestions (e.g., "**Task title**")
+    var boldPattern = /\*\*([^*]+)\*\*/g;
+    var matches = [];
+    var match;
+    while ((match = boldPattern.exec(text)) !== null) {
+      var title = match[1].trim();
+      // Skip short matches or ones that look like labels
+      if (title.length > 5 && title.length < 200 && title.indexOf(':') === -1) {
+        matches.push(title);
+      }
+    }
+
+    if (matches.length === 0) return;
+
+    var cardsContainer = document.createElement('div');
+    cardsContainer.style.marginTop = '8px';
+
+    matches.forEach(function(taskTitle) {
+      var card = document.createElement('div');
+      card.className = 'ai-task-card';
+
+      var titleSpan = document.createElement('span');
+      titleSpan.className = 'ai-task-card-title';
+      titleSpan.textContent = taskTitle;
+
+      var addBtn = document.createElement('button');
+      addBtn.className = 'ai-task-card-add';
+      addBtn.innerHTML = '+';
+      addBtn.title = 'Add as task';
+      addBtn.addEventListener('click', function() {
+        addTaskFromSuggestion(taskTitle, card);
+      });
+
+      card.appendChild(titleSpan);
+      card.appendChild(addBtn);
+      cardsContainer.appendChild(card);
+    });
+
+    bubbleEl.appendChild(cardsContainer);
+  }
+
+  function addTaskFromSuggestion(title, cardEl) {
+    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
+      addMessage('assistant', 'Please sign in to add tasks.');
+      return;
+    }
+
+    // Dispatch a custom event to create the task (todo-list.html listens for this)
+    var event = new CustomEvent('dm-ai-create-task', { detail: { title: title } });
+    window.dispatchEvent(event);
+
+    // Update the card UI
+    var addBtn = cardEl.querySelector('.ai-task-card-add');
+    if (addBtn) {
+      addBtn.style.display = 'none';
+      var addedSpan = document.createElement('span');
+      addedSpan.className = 'ai-task-card-added';
+      addedSpan.textContent = 'Added';
+      cardEl.appendChild(addedSpan);
+    }
+  }
+
+  // ─── Simple markdown renderer ───
+  function renderMarkdown(text) {
+    if (!text) return '';
+    var html = text
+      // Escape HTML
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      // Bold
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      // Italic
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      // Inline code
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      // Headers
+      .replace(/^### (.+)$/gm, '<strong style="font-size:0.85rem">$1</strong>')
+      .replace(/^## (.+)$/gm, '<strong style="font-size:0.88rem">$1</strong>')
+      .replace(/^# (.+)$/gm, '<strong style="font-size:0.92rem">$1</strong>')
+      // Unordered lists
+      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+      // Ordered lists
+      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+      // Paragraphs (double newline)
+      .replace(/\n\n/g, '</p><p>')
+      // Single newlines
+      .replace(/\n/g, '<br>');
+
+    // Wrap consecutive <li> in <ul>
+    html = html.replace(/(<li>.*?<\/li>(?:<br>)?)+/g, function(match) {
+      return '<ul>' + match.replace(/<br>/g, '') + '</ul>';
+    });
+
+    return '<p>' + html + '</p>';
+  }
+
+  function scrollToBottom() {
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  // ─── Session storage for messages ───
+  function saveMessages() {
+    try {
+      // Truncate in memory to prevent unbounded growth
+      if (chatHistory.length > 50) {
+        chatHistory = chatHistory.slice(-50);
+      }
+      var toSave = chatHistory.slice(-20);
+      sessionStorage.setItem(SS_KEY_MESSAGES, JSON.stringify(toSave));
+    } catch(e) {}
+  }
+
+  function loadMessages() {
+    try {
+      var saved = sessionStorage.getItem(SS_KEY_MESSAGES);
+      if (saved) {
+        var parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed)) return;
+        chatHistory = parsed.filter(function(msg) {
+          return msg && (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string';
+        });
+        chatHistory.forEach(function(msg) {
+          addMessage(msg.role, msg.content);
+        });
+      }
+    } catch(e) {}
+  }
+
+  // ─── Enable/Disable ───
+  function isAiEnabled() {
+    return localStorage.getItem(LS_KEY_ENABLED) === '1';
+  }
+
+  function setAiEnabled(enabled) {
+    localStorage.setItem(LS_KEY_ENABLED, enabled ? '1' : '0');
+    enabledToggle.checked = enabled;
+    if (enabled) {
+      fab.style.display = '';
+      quickActions.style.display = '';
+      inputArea.style.display = '';
+      notSupportedEl.style.display = 'none';
+      if (!hasWebGPU) {
+        notSupportedEl.style.display = '';
+        quickActions.style.display = 'none';
+        inputArea.style.display = 'none';
+      }
+    } else {
+      fab.style.display = 'none';
+      unloadEngine();
+      closePanel();
+    }
+    // Notify other components
+    window.dispatchEvent(new CustomEvent('dm-ai-state-changed', { detail: { enabled: enabled } }));
+  }
+
+  // ─── Panel open/close ───
+  var closingTimeout = null;
+
+  function openPanel() {
+    if (closingTimeout) { clearTimeout(closingTimeout); closingTimeout = null; }
+    panel.style.display = '';
+    panel.classList.remove('closing');
+    try { sessionStorage.setItem(SS_KEY_PANEL, '1'); } catch(e) {}
+    setTimeout(function() { inputEl.focus({ preventScroll: true }); }, 100);
+  }
+
+  function closePanel() {
+    if (closingTimeout) { clearTimeout(closingTimeout); closingTimeout = null; }
+    panel.classList.add('closing');
+    closingTimeout = setTimeout(function() {
+      panel.style.display = 'none';
+      panel.classList.remove('closing');
+      closingTimeout = null;
+    }, 200);
+    try { sessionStorage.setItem(SS_KEY_PANEL, '0'); } catch(e) {}
+  }
+
+  function togglePanel() {
+    if (panel.style.display === 'none') {
+      openPanel();
+    } else {
+      closePanel();
+    }
+  }
+
+  // ─── Send message ───
+  function sendMessage() {
+    var text = inputEl.value.trim();
+    if (!text || isGenerating) return;
+
+    var mode = inputEl.dataset.mode;
+    inputEl.value = '';
+    inputEl.dataset.mode = '';
+    inputEl.placeholder = 'Ask me anything...';
+    updateInputHeight();
+    sendBtn.disabled = true;
+
+    if (mode === 'improve') {
+      runChat('Please improve the following text. Make it clearer, more concise, and better written. Return only the improved version:\n\n' + text);
+    } else if (mode === 'summarize') {
+      runChat('Please summarize the following text concisely:\n\n' + text);
+    } else {
+      runChat(text);
+    }
+  }
+
+  // ─── Auto-resize textarea ───
+  function updateInputHeight() {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  }
+
+  // ─── Clear chat ───
+  function clearChat() {
+    chatHistory = [];
+    messagesEl.innerHTML = '';
+    if (welcomeEl) {
+      messagesEl.appendChild(welcomeEl);
+      welcomeEl.style.display = '';
+    }
+    try { sessionStorage.removeItem(SS_KEY_MESSAGES); } catch(e) {}
+    if (engine) {
+      try { engine.resetChat(); } catch(e) {}
+    }
+  }
+
+  // ─── Event listeners ───
+
+  // FAB click
+  fab.addEventListener('click', togglePanel);
+
+  // Close
+  panelClose.addEventListener('click', closePanel);
+
+  // Settings toggle
+  settingsBtn.addEventListener('click', function() {
+    settingsPanel.style.display = settingsPanel.style.display === 'none' ? '' : 'none';
+  });
+
+  // Enable/disable toggle
+  enabledToggle.addEventListener('change', function() {
+    setAiEnabled(enabledToggle.checked);
+  });
+
+  // Unload button
+  unloadBtn.addEventListener('click', function() {
+    unloadEngine();
+    addMessage('assistant', 'Model unloaded. GPU memory has been freed. The model will reload on your next message.');
+  });
+
+  // Clear chat
+  clearBtn.addEventListener('click', clearChat);
+
+  // Quick actions
+  quickActions.addEventListener('click', function(e) {
+    var btn = e.target.closest('.ai-quick-btn');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    if (action) handleQuickAction(action);
+  });
+
+  // Send message
+  sendBtn.addEventListener('click', sendMessage);
+  inputEl.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  inputEl.addEventListener('input', function() {
+    updateInputHeight();
+    sendBtn.disabled = !inputEl.value.trim() || isGenerating;
+  });
+
+  // Stop generation
+  stopBtn.addEventListener('click', function() {
+    if (abortController) {
+      abortController.stop();
+    }
+  });
+
+  // Keyboard shortcuts: Escape to close, A to toggle
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && panel.style.display !== 'none') {
+      closePanel();
+      return;
+    }
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      if (!isAiEnabled()) return;
+      e.preventDefault();
+      togglePanel();
+    }
+  });
+
+  // ─── Initialization ───
+  checkWebGPU();
+
+  // Restore enabled state
+  var enabled = isAiEnabled();
+  enabledToggle.checked = enabled;
+  if (enabled) {
+    fab.style.display = '';
+    if (!hasWebGPU) {
+      notSupportedEl.style.display = '';
+    }
+  }
+
+  // Restore messages
+  loadMessages();
+
+  // Restore panel state
+  try {
+    if (enabled && sessionStorage.getItem(SS_KEY_PANEL) === '1') {
+      openPanel();
+    }
+  } catch(e) {}
+
+  // ─── Public API (shared with ai-chat.html page) ───
+  window.dmAI = {
+    open: openPanel,
+    close: closePanel,
+    toggle: togglePanel,
+    isEnabled: isAiEnabled,
+    setEnabled: setAiEnabled,
+    getStatus: function() { return aiStatus; },
+    // Engine sharing: the dedicated AI page delegates to these
+    _getEngine: function() {
+      return engine ? Promise.resolve(engine) : Promise.reject(new Error('Engine not loaded'));
+    },
+    _loadEngine: function() {
+      return loadEngine();
+    },
+    _buildSystemPrompt: buildSystemPrompt
+  };
+
+})();
+</script>

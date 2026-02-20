@@ -121,6 +121,8 @@
 
 {{ partial "keyboard-shortcuts.html" . }}
 
+{{ partial "ai-companion.html" . }}
+
 <!-- Quick Capture modal logic -->
 <script>
 (function() {
@@ -1382,6 +1384,7 @@
     tags: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>',
     dashboard: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>',
     review: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V5"></path><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"></path><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"></path><path d="M18 18a4 4 0 0 0 2-7.464"></path><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"></path><path d="M6 18a4 4 0 0 1-2-7.464"></path><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"></path></svg>',
+    ai: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path></svg>',
     trash: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>'
   };
 
@@ -1579,6 +1582,12 @@
       '<a href="' + sectionUrl('dashboard') + '"' + dashboardActive + '>' + ICONS.dashboard + 'Dashboard</a>' +
       '</li>';
 
+    // Add AI entry (static)
+    var aiActive = window.location.pathname.indexOf('/docs/ai') !== -1 ? ' class="active"' : '';
+    html += '<li class="sidebar-item sidebar-ai" data-section="ai">' +
+      '<a href="' + sectionUrl('ai') + '"' + aiActive + '>' + ICONS.ai + 'AI</a>' +
+      '</li>';
+
     // Add Trash entry (static)
     var trashActive = window.location.pathname.indexOf('/docs/trash') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item sidebar-trash" data-section="trash">' +
@@ -1627,6 +1636,11 @@
     var dashboardActive = window.location.pathname.indexOf('/docs/dashboard') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item" data-section="dashboard">' +
       '<a href="' + sectionUrl('dashboard') + '"' + dashboardActive + '>' + ICONS.dashboard + 'Dashboard</a>' +
+      '</li>';
+
+    var aiActive = window.location.pathname.indexOf('/docs/ai') !== -1 ? ' class="active"' : '';
+    html += '<li class="sidebar-item sidebar-ai" data-section="ai">' +
+      '<a href="' + sectionUrl('ai') + '"' + aiActive + '>' + ICONS.ai + 'AI</a>' +
       '</li>';
 
     existingUl.innerHTML = html;

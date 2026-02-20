@@ -3232,6 +3232,16 @@
   window.addEventListener('dm-todos-updated', loadTodos);
   window.addEventListener('dm-sync-complete', loadTodos);
 
+  // Listen for AI-suggested task creation
+  window.addEventListener('dm-ai-create-task', function(e) {
+    var detail = e.detail || {};
+    var title = (detail.title || '').trim();
+    if (!title) return;
+    createTodo(title, null, null, null, null, detail.category || null, true, null, null, function() {
+      loadTodos();
+    });
+  });
+
   // Listen for Pomodoro timer stop — store tracked time and re-render
   window.addEventListener('dm-pomodoro-stopped', function(e) {
     var detail = e.detail || {};

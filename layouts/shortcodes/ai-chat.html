@@ -1,0 +1,829 @@
+<!-- AI Chat: Full-page AI companion interface -->
+<!-- Shares engine and chat history with the floating panel via window.dmAI -->
+
+<div class="ai-page" id="ai-page">
+  <!-- Auth gate -->
+  <div class="ai-page-auth" id="ai-page-auth" style="display: none;">
+    <div class="ai-page-auth-card">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ai)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
+      </svg>
+      <h3>Sign in to use AI Companion</h3>
+      <p>AI features require authentication to access your task data.</p>
+      <button type="button" class="ai-page-signin-btn" id="ai-page-signin-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <!-- Main content (shown when signed in) -->
+  <div class="ai-page-content" id="ai-page-content" style="display: none;">
+    <!-- Header with toggle and status -->
+    <div class="ai-page-header">
+      <div class="ai-page-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ai)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
+        </svg>
+        <div>
+          <h2>AI Companion</h2>
+          <p class="ai-page-subtitle">Powered by Qwen2.5-0.5B running locally in your browser</p>
+        </div>
+      </div>
+      <div class="ai-page-header-actions">
+        <span class="ai-page-status" id="ai-page-status"></span>
+        <label class="ai-toggle-switch ai-page-toggle">
+          <input type="checkbox" id="ai-page-enabled-toggle">
+          <span class="ai-toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <!-- Not supported warning -->
+    <div class="ai-page-warning" id="ai-page-warning" style="display:none;">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <line x1="12" y1="8" x2="12" y2="12"></line>
+        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+      </svg>
+      <span>WebGPU is not supported in your browser. AI Companion requires Chrome 113+ or Edge 113+.</span>
+    </div>
+
+    <!-- Disabled state -->
+    <div class="ai-page-disabled" id="ai-page-disabled" style="display:none;">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
+      </svg>
+      <h3>AI Companion is disabled</h3>
+      <p>Enable it with the toggle above to start using AI features.</p>
+      <p class="ai-page-disabled-detail">First use downloads ~350 MB (cached for future visits). Requires ~1 GB GPU memory and WebGPU support.</p>
+    </div>
+
+    <!-- Download progress -->
+    <div class="ai-page-download" id="ai-page-download" style="display:none;">
+      <div class="ai-page-download-text" id="ai-page-download-text">Loading AI model...</div>
+      <div class="ai-download-bar">
+        <div class="ai-download-fill" id="ai-page-download-fill" style="width:0%"></div>
+      </div>
+      <div class="ai-page-download-detail" id="ai-page-download-detail"></div>
+    </div>
+
+    <!-- Task context summary -->
+    <div class="ai-page-context" id="ai-page-context" style="display:none;">
+      <div class="ai-page-context-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        Task Context
+      </div>
+      <div class="ai-page-context-body" id="ai-page-context-body"></div>
+    </div>
+
+    <!-- Quick actions (bigger on full page) -->
+    <div class="ai-page-actions" id="ai-page-actions" style="display:none;">
+      <button type="button" class="ai-page-action-btn" data-action="plan">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        <div>
+          <strong>Plan my day</strong>
+          <span>Get a prioritized schedule based on your tasks</span>
+        </div>
+      </button>
+      <button type="button" class="ai-page-action-btn" data-action="suggest">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+        <div>
+          <strong>Suggest tasks</strong>
+          <span>Get recommendations based on your task patterns</span>
+        </div>
+      </button>
+      <button type="button" class="ai-page-action-btn" data-action="improve">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <div>
+          <strong>Improve text</strong>
+          <span>Polish and rewrite text for clarity</span>
+        </div>
+      </button>
+      <button type="button" class="ai-page-action-btn" data-action="summarize">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="17" y1="18" x2="3" y2="18"></line></svg>
+        <div>
+          <strong>Summarize</strong>
+          <span>Condense long text into key points</span>
+        </div>
+      </button>
+    </div>
+
+    <!-- Chat area -->
+    <div class="ai-page-chat" id="ai-page-chat" style="display:none;">
+      <div class="ai-page-messages" id="ai-page-messages">
+        <div class="ai-page-welcome" id="ai-page-welcome">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ai)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
+          </svg>
+          <p>I can help you plan your day, suggest tasks, improve text, or answer questions.</p>
+          <p class="ai-welcome-hint">Use the quick actions above or type a message below.</p>
+        </div>
+      </div>
+      <div class="ai-page-input-area">
+        <div class="ai-input-wrap">
+          <textarea class="ai-input ai-page-input" id="ai-page-input" placeholder="Ask me anything..." rows="1"></textarea>
+          <button type="button" class="ai-send-btn" id="ai-page-send-btn" title="Send" aria-label="Send" disabled>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+          </button>
+        </div>
+        <div class="ai-input-hint">
+          <span><kbd>Enter</kbd> send &middot; <kbd>Shift+Enter</kbd> newline &middot; <kbd>A</kbd> toggle side panel</span>
+          <button type="button" class="ai-stop-btn" id="ai-page-stop-btn" style="display:none;">Stop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.ai-page {
+  max-width: 800px;
+}
+.ai-page-auth {
+  display: flex;
+  justify-content: center;
+  padding: 3rem 1rem;
+}
+.ai-page-auth-card {
+  text-align: center;
+  padding: 2rem;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  max-width: 400px;
+}
+.ai-page-auth-card h3 {
+  margin: 1rem 0 0.5rem;
+  font-size: 1.1rem;
+}
+.ai-page-auth-card p {
+  color: var(--gray-500);
+  font-size: 0.85rem;
+  margin-bottom: 1.5rem;
+}
+.ai-page-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ai-page-signin-btn:hover {
+  background: var(--gray-100);
+  border-color: var(--gray-400);
+}
+
+/* Header */
+.ai-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--gray-200);
+}
+.ai-page-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ai-page-title h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+.ai-page-subtitle {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+}
+.ai-page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ai-page-status {
+  font-size: 0.72rem;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 10px;
+  display: none;
+}
+.ai-page-status.ready {
+  display: inline-block;
+  background: var(--color-success-bg);
+  color: var(--color-success);
+}
+.ai-page-status.loading {
+  display: inline-block;
+  background: rgba(0, 105, 255, 0.08);
+  color: var(--color-link);
+}
+.ai-page-toggle {
+  margin-top: 4px;
+}
+
+/* Warning */
+.ai-page-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-danger);
+  border-radius: 8px;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+  font-size: 0.82rem;
+  margin-bottom: 1rem;
+}
+
+/* Disabled state */
+.ai-page-disabled {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--gray-500);
+}
+.ai-page-disabled h3 {
+  margin: 1rem 0 0.5rem;
+  color: var(--body-font-color);
+}
+.ai-page-disabled p {
+  font-size: 0.85rem;
+  margin: 4px 0;
+}
+.ai-page-disabled-detail {
+  font-size: 0.75rem !important;
+  color: var(--gray-400) !important;
+  margin-top: 8px !important;
+}
+
+/* Download */
+.ai-page-download {
+  padding: 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+}
+.ai-page-download-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.ai-page-download-detail {
+  font-size: 0.72rem;
+  color: var(--gray-500);
+  margin-top: 6px;
+}
+
+/* Task context */
+.ai-page-context {
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.ai-page-context-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+}
+.ai-page-context-body {
+  padding: 10px 14px;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  line-height: 1.5;
+}
+.ai-page-context-stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  margin: 2px 4px 2px 0;
+  border-radius: 6px;
+  background: var(--gray-100);
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+/* Quick actions (full page — bigger cards) */
+.ai-page-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+@media (max-width: 600px) {
+  .ai-page-actions {
+    grid-template-columns: 1fr;
+  }
+}
+.ai-page-action-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.ai-page-action-btn:hover {
+  background: var(--ai-accent-bg);
+  border-color: var(--accent-ai);
+}
+.ai-page-action-btn svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent-ai);
+}
+.ai-page-action-btn div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ai-page-action-btn strong {
+  font-size: 0.85rem;
+}
+.ai-page-action-btn span {
+  font-size: 0.72rem;
+  color: var(--gray-500);
+}
+
+/* Chat area */
+.ai-page-chat {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 400px;
+  max-height: 600px;
+}
+.ai-page-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ai-page-welcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--gray-500);
+  flex: 1;
+}
+.ai-page-welcome p {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  max-width: 360px;
+}
+.ai-page-input-area {
+  padding: 12px 16px;
+  border-top: 1px solid var(--gray-200);
+}
+.ai-page-input {
+  border-radius: 10px 0 0 10px;
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  // ─── DOM refs ───
+  var pageAuth = document.getElementById('ai-page-auth');
+  var pageContent = document.getElementById('ai-page-content');
+  var pageSigninBtn = document.getElementById('ai-page-signin-btn');
+  var pageEnabledToggle = document.getElementById('ai-page-enabled-toggle');
+  var pageDisabled = document.getElementById('ai-page-disabled');
+  var pageWarning = document.getElementById('ai-page-warning');
+  var pageContext = document.getElementById('ai-page-context');
+  var pageContextBody = document.getElementById('ai-page-context-body');
+  var pageActions = document.getElementById('ai-page-actions');
+  var pageChat = document.getElementById('ai-page-chat');
+  var pageMessages = document.getElementById('ai-page-messages');
+  var pageWelcome = document.getElementById('ai-page-welcome');
+  var pageInput = document.getElementById('ai-page-input');
+  var pageSendBtn = document.getElementById('ai-page-send-btn');
+  var pageStopBtn = document.getElementById('ai-page-stop-btn');
+  var pageStatus = document.getElementById('ai-page-status');
+  var pageDownload = document.getElementById('ai-page-download');
+  var pageDownloadText = document.getElementById('ai-page-download-text');
+  var pageDownloadFill = document.getElementById('ai-page-download-fill');
+  var pageDownloadDetail = document.getElementById('ai-page-download-detail');
+
+  if (!pageAuth || !pageContent) return;
+
+  var LS_KEY_ENABLED = 'dm-ai-enabled';
+  var SS_KEY_MESSAGES = 'dm-ai-messages';
+  var hasWebGPU = typeof navigator !== 'undefined' && !!navigator.gpu;
+  var isPageGenerating = false;
+
+  // ─── Auth ───
+  function updatePageAuth(user) {
+    if (user) {
+      pageAuth.style.display = 'none';
+      pageContent.style.display = '';
+      updatePageState();
+    } else {
+      pageAuth.style.display = '';
+      pageContent.style.display = 'none';
+    }
+  }
+
+  if (pageSigninBtn) {
+    pageSigninBtn.addEventListener('click', function() {
+      if (!window.dmAuth || !window.dmGoogleProvider) return;
+      if (window.dmIsLocalhost) {
+        window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
+      } else {
+        window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+          console.error('AI page sign-in error:', err);
+        });
+      }
+    });
+  }
+
+  if (window.dmAuth) {
+    function subscribePageAuth() {
+      window.dmAuth.onAuthStateChanged(updatePageAuth);
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribePageAuth);
+    } else {
+      subscribePageAuth();
+    }
+  }
+
+  // ─── State management ───
+  function isAiEnabled() {
+    return localStorage.getItem(LS_KEY_ENABLED) === '1';
+  }
+
+  function updatePageState() {
+    var enabled = isAiEnabled();
+    pageEnabledToggle.checked = enabled;
+
+    if (!hasWebGPU) {
+      pageWarning.style.display = '';
+      pageDisabled.style.display = '';
+      pageActions.style.display = 'none';
+      pageChat.style.display = 'none';
+      pageContext.style.display = 'none';
+      return;
+    }
+
+    pageWarning.style.display = 'none';
+
+    if (!enabled) {
+      pageDisabled.style.display = '';
+      pageActions.style.display = 'none';
+      pageChat.style.display = 'none';
+      pageContext.style.display = 'none';
+      return;
+    }
+
+    pageDisabled.style.display = 'none';
+    pageActions.style.display = '';
+    pageChat.style.display = '';
+    loadTaskContext();
+    loadPageMessages();
+  }
+
+  // ─── Enable/disable toggle ───
+  pageEnabledToggle.addEventListener('change', function() {
+    var enabled = pageEnabledToggle.checked;
+    localStorage.setItem(LS_KEY_ENABLED, enabled ? '1' : '0');
+    window.dispatchEvent(new CustomEvent('dm-ai-state-changed', { detail: { enabled: enabled } }));
+    updatePageState();
+    // Also update the side panel's toggle
+    var sideToggle = document.getElementById('ai-enabled-toggle');
+    if (sideToggle) sideToggle.checked = enabled;
+    // Show/hide FAB
+    var fab = document.getElementById('ai-fab');
+    if (fab) fab.style.display = enabled ? '' : 'none';
+  });
+
+  // Listen for state changes from the side panel
+  window.addEventListener('dm-ai-state-changed', function(e) {
+    pageEnabledToggle.checked = e.detail.enabled;
+    updatePageState();
+  });
+
+  // ─── Task context ───
+  function loadTaskContext() {
+    if (!window.dmSync || !window.dmSync.getAllTodos) {
+      pageContext.style.display = 'none';
+      return;
+    }
+    window.dmSync.getAllTodos().then(function(todos) {
+      if (!todos || todos.length === 0) {
+        pageContext.style.display = 'none';
+        return;
+      }
+      pageContext.style.display = '';
+      var pending = todos.filter(function(t) { return !t.done; });
+      var completed = todos.filter(function(t) { return t.done; });
+      var todayStr = new Date().toISOString().split('T')[0];
+      var todayTasks = pending.filter(function(t) { return t.scheduledDate === todayStr; });
+      var overdue = pending.filter(function(t) { return t.scheduledDate && t.scheduledDate < todayStr; });
+
+      var html = '';
+      html += '<span class="ai-page-context-stat">' + pending.length + ' pending</span>';
+      html += '<span class="ai-page-context-stat">' + completed.length + ' completed</span>';
+      if (todayTasks.length > 0) {
+        html += '<span class="ai-page-context-stat" style="color:var(--color-link)">' + todayTasks.length + ' today</span>';
+      }
+      if (overdue.length > 0) {
+        html += '<span class="ai-page-context-stat" style="color:var(--color-danger)">' + overdue.length + ' overdue</span>';
+      }
+      pageContextBody.innerHTML = html;
+    }).catch(function() {
+      pageContext.style.display = 'none';
+    });
+  }
+
+  // ─── Chat integration (delegates to the side panel engine via window.dmAI internals) ───
+  // The full-page chat shares the same engine and chat history as the side panel.
+  // We'll delegate message sending to the panel's runChat, but render in this page's messages area.
+
+  function loadPageMessages() {
+    try {
+      var saved = sessionStorage.getItem(SS_KEY_MESSAGES);
+      if (saved) {
+        var messages = JSON.parse(saved);
+        if (!Array.isArray(messages)) return;
+        messages = messages.filter(function(msg) {
+          return msg && (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string';
+        });
+        if (messages.length > 0 && pageWelcome) {
+          pageWelcome.style.display = 'none';
+        }
+        // Clear existing messages (except welcome)
+        var children = pageMessages.querySelectorAll('.ai-msg');
+        children.forEach(function(c) { c.remove(); });
+        messages.forEach(function(msg) {
+          addPageMessage(msg.role, msg.content);
+        });
+      }
+    } catch(e) {}
+  }
+
+  function addPageMessage(role, content) {
+    if (pageWelcome) pageWelcome.style.display = 'none';
+    var msgEl = document.createElement('div');
+    msgEl.className = 'ai-msg ai-msg-' + role;
+
+    var avatarEl = document.createElement('div');
+    avatarEl.className = 'ai-msg-avatar';
+    avatarEl.textContent = role === 'user' ? 'U' : 'AI';
+
+    var bubbleEl = document.createElement('div');
+    bubbleEl.className = 'ai-msg-bubble';
+    if (content) {
+      bubbleEl.innerHTML = renderPageMarkdown(content);
+    }
+
+    msgEl.appendChild(avatarEl);
+    msgEl.appendChild(bubbleEl);
+    pageMessages.appendChild(msgEl);
+    pageMessages.scrollTop = pageMessages.scrollHeight;
+    return msgEl;
+  }
+
+  function addPageTypingIndicator() {
+    var el = document.createElement('div');
+    el.className = 'ai-msg ai-msg-assistant';
+    el.innerHTML = '<div class="ai-msg-avatar">AI</div><div class="ai-msg-bubble"><div class="ai-typing"><span class="ai-typing-dot"></span><span class="ai-typing-dot"></span><span class="ai-typing-dot"></span></div></div>';
+    pageMessages.appendChild(el);
+    pageMessages.scrollTop = pageMessages.scrollHeight;
+    return el;
+  }
+
+  function renderPageMarkdown(text) {
+    if (!text) return '';
+    var html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/^### (.+)$/gm, '<strong style="font-size:0.85rem">$1</strong>')
+      .replace(/^## (.+)$/gm, '<strong style="font-size:0.88rem">$1</strong>')
+      .replace(/^# (.+)$/gm, '<strong style="font-size:0.92rem">$1</strong>')
+      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
+      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
+      .replace(/\n\n/g, '</p><p>')
+      .replace(/\n/g, '<br>');
+    html = html.replace(/(<li>.*?<\/li>(?:<br>)?)+/g, function(match) {
+      return '<ul>' + match.replace(/<br>/g, '') + '</ul>';
+    });
+    return '<p>' + html + '</p>';
+  }
+
+  // ─── Page-level send (uses shared engine from ai-companion.html) ───
+  function sendPageMessage() {
+    var text = pageInput.value.trim();
+    if (!text || isPageGenerating) return;
+
+    var mode = pageInput.dataset.mode;
+    pageInput.value = '';
+    pageInput.dataset.mode = '';
+    pageInput.placeholder = 'Ask me anything...';
+    pageInput.style.height = 'auto';
+    pageSendBtn.disabled = true;
+    isPageGenerating = true;
+    pageStopBtn.style.display = '';
+
+    var userMessage = text;
+    if (mode === 'improve') {
+      userMessage = 'Please improve the following text. Make it clearer, more concise, and better written. Return only the improved version:\n\n' + text;
+    } else if (mode === 'summarize') {
+      userMessage = 'Please summarize the following text concisely:\n\n' + text;
+    }
+
+    addPageMessage('user', text);
+
+    // Also send to the side panel's chat history
+    var chatHistory = [];
+    try {
+      var saved = sessionStorage.getItem(SS_KEY_MESSAGES);
+      if (saved) chatHistory = JSON.parse(saved);
+    } catch(e) {}
+    chatHistory.push({ role: 'user', content: userMessage });
+
+    var typingEl = addPageTypingIndicator();
+
+    // Use the engine from the side panel
+    function getEngine() {
+      if (!window.dmAI) {
+        return Promise.reject(new Error('AI engine not available. Please ensure AI is enabled.'));
+      }
+      // Try to get existing engine; if not loaded yet, trigger a load
+      return window.dmAI._getEngine().catch(function() {
+        // Show download progress on this page while loading
+        pageDownload.style.display = '';
+        pageDownloadText.textContent = 'Loading AI model...';
+        pageDownloadDetail.textContent = 'This may take a moment on first use (~350 MB download)';
+        pageStatus.className = 'ai-page-status loading';
+        pageStatus.textContent = 'Loading...';
+        pageStatus.style.display = '';
+        return window.dmAI._loadEngine();
+      }).then(function(eng) {
+        pageDownload.style.display = 'none';
+        pageStatus.className = 'ai-page-status ready';
+        pageStatus.textContent = 'Ready';
+        return eng;
+      });
+    }
+
+    function getTaskContext() {
+      return new Promise(function(resolve) {
+        if (!window.dmSync || !window.dmSync.getAllTodos) { resolve([]); return; }
+        window.dmSync.getAllTodos().then(function(t) { resolve(t || []); }).catch(function() { resolve([]); });
+      });
+    }
+
+    function buildSystemPrompt(tasks) {
+      if (window.dmAI && window.dmAI._buildSystemPrompt) {
+        return window.dmAI._buildSystemPrompt(tasks);
+      }
+      // Fallback minimal prompt
+      return 'You are a helpful AI companion for a productivity app. Keep responses concise and actionable.';
+    }
+
+    var stopped = false;
+
+    getEngine().then(function(engine) {
+      return getTaskContext().then(function(tasks) {
+        var systemPrompt = buildSystemPrompt(tasks);
+        var messages = [{ role: 'system', content: systemPrompt }];
+        var recent = chatHistory.slice(-10);
+        messages = messages.concat(recent);
+
+        return engine.chat.completions.create({
+          messages: messages,
+          stream: true,
+          temperature: 0.7,
+          max_tokens: 1024
+        });
+      }).then(function(chunks) {
+        if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+        var msgEl = addPageMessage('assistant', '');
+        var bubbleEl = msgEl.querySelector('.ai-msg-bubble');
+        var fullText = '';
+
+        if (chunks[Symbol.asyncIterator]) {
+          var iterator = chunks[Symbol.asyncIterator]();
+          function processIterator() {
+            return iterator.next().then(function(result) {
+              if (result.done || stopped) {
+                chatHistory.push({ role: 'assistant', content: fullText });
+                try { sessionStorage.setItem(SS_KEY_MESSAGES, JSON.stringify(chatHistory.slice(-20))); } catch(e) {}
+                bubbleEl.innerHTML = renderPageMarkdown(fullText);
+                isPageGenerating = false;
+                pageSendBtn.disabled = !pageInput.value.trim();
+                pageStopBtn.style.display = 'none';
+                return;
+              }
+              var chunk = result.value;
+              var delta = (chunk.choices && chunk.choices[0] && chunk.choices[0].delta) ? (chunk.choices[0].delta.content || '') : '';
+              if (delta) {
+                fullText += delta;
+                bubbleEl.innerHTML = renderPageMarkdown(fullText);
+                pageMessages.scrollTop = pageMessages.scrollHeight;
+              }
+              return processIterator();
+            });
+          }
+          return processIterator();
+        } else {
+          throw new Error('Unexpected streaming response format from WebLLM');
+        }
+      });
+    }).catch(function(err) {
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+      addPageMessage('assistant', 'Error: ' + (err.message || err));
+      isPageGenerating = false;
+      pageSendBtn.disabled = !pageInput.value.trim();
+      pageStopBtn.style.display = 'none';
+    });
+
+    pageStopBtn.addEventListener('click', function() { stopped = true; }, { once: true });
+  }
+
+  // ─── Quick actions ───
+  pageActions.addEventListener('click', function(e) {
+    var btn = e.target.closest('.ai-page-action-btn');
+    if (!btn) return;
+    var action = btn.dataset.action;
+    if (action === 'improve') {
+      pageInput.placeholder = 'Paste the text you want to improve...';
+      pageInput.dataset.mode = 'improve';
+      pageInput.focus();
+    } else if (action === 'summarize') {
+      pageInput.placeholder = 'Paste the text you want to summarize...';
+      pageInput.dataset.mode = 'summarize';
+      pageInput.focus();
+    } else if (action === 'plan') {
+      pageInput.value = 'Look at my tasks for today and any overdue tasks. Create a prioritized plan for my day.';
+      sendPageMessage();
+    } else if (action === 'suggest') {
+      pageInput.value = 'Look at my tasks and suggest 3-5 new tasks I should add based on patterns you see.';
+      sendPageMessage();
+    }
+  });
+
+  // ─── Input events ───
+  pageSendBtn.addEventListener('click', sendPageMessage);
+  pageInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendPageMessage();
+    }
+  });
+  pageInput.addEventListener('input', function() {
+    pageInput.style.height = 'auto';
+    pageInput.style.height = Math.min(pageInput.scrollHeight, 120) + 'px';
+    pageSendBtn.disabled = !pageInput.value.trim() || isPageGenerating;
+  });
+
+  // ─── Sync events ───
+  window.addEventListener('dm-todos-updated', loadTaskContext);
+  window.addEventListener('dm-sync-complete', loadTaskContext);
+
+  // ─── Engine load progress (from ai-companion.html) ───
+  window.addEventListener('dm-ai-load-progress', function(e) {
+    var d = e.detail || {};
+    if (pageDownload.style.display === 'none') return;
+    pageDownloadFill.style.width = (d.pct || 0) + '%';
+    pageDownloadText.textContent = d.text || 'Loading...';
+    if (d.pct > 0 && d.pct < 100) {
+      pageDownloadDetail.textContent = d.pct + '% complete';
+    }
+  });
+
+})();
+</script>
