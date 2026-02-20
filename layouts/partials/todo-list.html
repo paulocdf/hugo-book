@@ -17,10 +17,10 @@
           <button type="button" class="todo-add-pomo-minus" id="todo-add-pomo-minus" title="Remove pomodoro" aria-label="Decrease pomodoro count">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"></line></svg>
           </button>
-          <button type="button" class="todo-add-pomodoro-btn" id="todo-add-pomodoro-btn" title="Short session (long-press to change)" aria-label="Pomodoro count">
-            <svg class="todo-add-pomodoro-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
+          <button type="button" class="todo-add-pomodoro-btn" id="todo-add-pomodoro-btn" title="Short session (click tomato to switch)" aria-label="Pomodoro count">
+            <svg class="todo-add-pomodoro-icon todo-pomo-icon-short" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
+            <svg class="todo-add-pomodoro-icon todo-pomo-icon-long" width="16" height="16" viewBox="0 0 24 24" fill="none" style="display:none;"><path d="M10 5c-.3-.8 0-1.6.5-1.8.5-.2.9.1 1.2.4.3-.3.7-.6 1.2-.4.5.2.8 1 .5 1.8" fill="#8aad7d"/><path d="M13.6 4.5c.5-.3 1.2-.2 1.6.2.3.4.2.9-.1 1.2" stroke="#8aad7d" stroke-width="0.8" fill="none"/><ellipse cx="12" cy="14" rx="8" ry="8.5" fill="#c4553a" stroke="#a8412e" stroke-width="0.8"/></svg>
             <span class="todo-add-pomodoro-count" id="todo-add-pomodoro-count">1</span>
-            <span class="todo-add-pomo-mode">S</span>
           </button>
           <button type="button" class="todo-add-pomo-plus" id="todo-add-pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"></line><line x1="6" y1="12" x2="18" y2="12"></line></svg>
@@ -445,56 +445,12 @@
   min-width: 14px;
   text-align: center;
 }
-.todo-add-pomo-mode {
-  font-size: 0.6rem;
-  font-weight: 700;
-  color: var(--gray-400);
-  margin-left: -1px;
-  text-transform: uppercase;
-  line-height: 1;
+/* Pomodoro icon click-to-toggle transition */
+.todo-add-pomodoro-icon {
+  transition: transform 0.2s ease;
 }
-/* Pomodoro length config popover */
-.todo-add-pomo-config {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  z-index: 25;
-  margin-top: 4px;
-  padding: 8px 10px;
-  background: var(--body-background);
-  border: 1px solid var(--gray-200);
-  border-radius: 10px;
-  box-shadow: 0 4px 16px var(--shadow-color, rgba(0,0,0,0.1));
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  animation: todo-popover-in 0.15s ease-out;
-  white-space: nowrap;
-}
-.todo-add-pomo-config-label {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--gray-500);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.todo-add-pomo-config-input {
-  width: 50px;
-  padding: 4px 6px;
-  border: 1px solid var(--gray-200);
-  border-radius: 6px;
-  font-size: 0.8rem;
-  text-align: center;
-  background: var(--body-background);
-  color: var(--body-font-color);
-  outline: none;
-}
-.todo-add-pomo-config-input:focus {
-  border-color: var(--color-link);
-}
-.todo-add-pomo-config-unit {
-  font-size: 0.72rem;
-  color: var(--gray-400);
+.todo-add-pomodoro-btn:active .todo-add-pomodoro-icon {
+  transform: scale(0.85);
 }
 /* ─── Custom minutes override input ─── */
 .todo-add-custom-min {
@@ -2274,10 +2230,15 @@
       addPomodoroBtn.classList.remove('has-count');
       addPomoMinusBtn.disabled = true;
     }
-    // Update mode indicator on the pomodoro button
-    addPomodoroBtn.title = (_addFormPomoMode === 'long' ? 'Long' : 'Short') + ' session (long-press to change)';
-    var modeEl = addPomodoroBtn.querySelector('.todo-add-pomo-mode');
-    if (modeEl) modeEl.textContent = _addFormPomoMode === 'long' ? 'L' : 'S';
+    // Swap tomato icon based on mode
+    var isLong = _addFormPomoMode === 'long';
+    var shortIcon = addPomodoroBtn.querySelector('.todo-pomo-icon-short');
+    var longIcon = addPomodoroBtn.querySelector('.todo-pomo-icon-long');
+    if (shortIcon) shortIcon.style.display = isLong ? 'none' : '';
+    if (longIcon) longIcon.style.display = isLong ? '' : 'none';
+    var workMin = isLong ? _globalPomoLongWork : _globalPomoShortWork;
+    var breakMin = isLong ? _globalPomoLongBreak : _globalPomoShortBreak;
+    addPomodoroBtn.title = (isLong ? 'Long' : 'Short') + ' session (' + workMin + '/' + breakMin + 'min) \u2014 click tomato to switch';
   }
 
   // Plus button: increment pomodoro count
@@ -2298,34 +2259,11 @@
     }
   });
 
-  // Long-press: open pomodoro config popover (change session length)
-  var _pomodoroLongPressTimer = null;
-  addPomodoroBtn.addEventListener('mousedown', function(e) {
-    if (e.button !== 0) return; // only left button
-    _pomodoroLongPressTimer = setTimeout(function() {
-      _pomodoroLongPressTimer = null;
-      showPomodoroConfigPopover();
-    }, 600);
-  });
-  addPomodoroBtn.addEventListener('mouseup', function() {
-    if (_pomodoroLongPressTimer) { clearTimeout(_pomodoroLongPressTimer); _pomodoroLongPressTimer = null; }
-  });
-  addPomodoroBtn.addEventListener('mouseleave', function() {
-    if (_pomodoroLongPressTimer) { clearTimeout(_pomodoroLongPressTimer); _pomodoroLongPressTimer = null; }
-  });
-
-  // Touch long-press support
-  addPomodoroBtn.addEventListener('touchstart', function(e) {
-    _pomodoroLongPressTimer = setTimeout(function() {
-      _pomodoroLongPressTimer = null;
-      showPomodoroConfigPopover();
-    }, 600);
-  }, { passive: true });
-  addPomodoroBtn.addEventListener('touchend', function() {
-    if (_pomodoroLongPressTimer) { clearTimeout(_pomodoroLongPressTimer); _pomodoroLongPressTimer = null; }
-  });
-  addPomodoroBtn.addEventListener('touchcancel', function() {
-    if (_pomodoroLongPressTimer) { clearTimeout(_pomodoroLongPressTimer); _pomodoroLongPressTimer = null; }
+  // Click on pomodoro button: toggle between short/long mode
+  addPomodoroBtn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    _addFormPomoMode = _addFormPomoMode === 'long' ? 'short' : 'long';
+    updatePomodoroCountDisplay();
   });
 
   function closePomodoroConfigPopover() {
@@ -2333,55 +2271,6 @@
       _pomodoroConfigPopover.remove();
     }
     _pomodoroConfigPopover = null;
-  }
-
-  function showPomodoroConfigPopover() {
-    closePomodoroConfigPopover();
-    closeAddFormPopover();
-    hideCatPopover();
-
-    var pop = document.createElement('div');
-    pop.className = 'todo-add-pomo-config';
-
-    var label = document.createElement('div');
-    label.style.cssText = 'font-size: 11px; color: var(--color-hint); margin-bottom: 6px;';
-    label.textContent = 'Session mode';
-    pop.appendChild(label);
-
-    var btnRow = document.createElement('div');
-    btnRow.style.cssText = 'display: flex; gap: 4px;';
-
-    function makeBtn(mode, labelText, workMin, breakMin) {
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.textContent = labelText + ' (' + workMin + '/' + breakMin + ')';
-      b.style.cssText = 'padding: 4px 10px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 12px; cursor: pointer; background: ' + (_addFormPomoMode === mode ? 'var(--color-link)' : 'var(--color-bg)') + '; color: ' + (_addFormPomoMode === mode ? '#fff' : 'var(--color-text)') + ';';
-      b.addEventListener('click', function(e) {
-        e.stopPropagation();
-        _addFormPomoMode = mode;
-        updatePomodoroCountDisplay();
-        closePomodoroConfigPopover();
-      });
-      return b;
-    }
-
-    btnRow.appendChild(makeBtn('short', 'Short', _globalPomoShortWork, _globalPomoShortBreak));
-    btnRow.appendChild(makeBtn('long', 'Long', _globalPomoLongWork, _globalPomoLongBreak));
-    pop.appendChild(btnRow);
-
-    addMainRow.appendChild(pop);
-    _pomodoroConfigPopover = pop;
-
-    // Dismiss on outside click
-    function onDocClick(e) {
-      if (pop && !pop.contains(e.target) && e.target !== addPomodoroBtn) {
-        closePomodoroConfigPopover();
-        document.removeEventListener('click', onDocClick, true);
-      }
-    }
-    setTimeout(function() {
-      document.addEventListener('click', onDocClick, true);
-    }, 0);
   }
 
   // Initialize pomodoro count display

@@ -27,26 +27,27 @@
     <button type="button" class="single-note-create-btn">Create Page</button>
   </div>
 
+  <div class="single-note-top-actions" style="display: none;">
+    {{ if ne $destination "inbox" }}
+    <button type="button" class="single-note-merge-btn note-action-btn note-action-btn-edit" style="display: none;" title="Merge notes">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v12"></path><path d="M16 6v6"></path><path d="M16 12a4 4 0 0 1-4 4H8"></path><circle cx="8" cy="6" r="2"></circle><circle cx="16" cy="6" r="2"></circle><circle cx="8" cy="18" r="2"></circle></svg>
+    </button>
+    {{ end }}
+    <button type="button" class="single-note-history-btn note-action-btn" title="Version History">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+    </button>
+    <button type="button" class="single-note-review-btn note-action-btn" title="Create Flashcard">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V5"></path><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"></path><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"></path><path d="M18 18a4 4 0 0 0 2-7.464"></path><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"></path><path d="M6 18a4 4 0 0 1-2-7.464"></path><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"></path></svg>
+    </button>
+    <button type="button" class="single-note-pin-btn note-action-btn" title="Pin note">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>
+    </button>
+    <button type="button" class="single-note-edit-btn note-action-btn note-action-btn-edit" title="Edit">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+    </button>
+  </div>
+
   <div class="single-note-content" style="display: none;">
-    <div class="single-note-top-actions">
-      {{ if ne $destination "inbox" }}
-      <button type="button" class="single-note-merge-btn note-action-btn note-action-btn-edit" style="display: none;" title="Merge notes">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v12"></path><path d="M16 6v6"></path><path d="M16 12a4 4 0 0 1-4 4H8"></path><circle cx="8" cy="6" r="2"></circle><circle cx="16" cy="6" r="2"></circle><circle cx="8" cy="18" r="2"></circle></svg>
-      </button>
-      {{ end }}
-      <button type="button" class="single-note-history-btn note-action-btn" title="Version History">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-      </button>
-      <button type="button" class="single-note-review-btn note-action-btn" title="Create Flashcard">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V5"></path><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"></path><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"></path><path d="M18 18a4 4 0 0 0 2-7.464"></path><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"></path><path d="M6 18a4 4 0 0 1-2-7.464"></path><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"></path></svg>
-      </button>
-      <button type="button" class="single-note-pin-btn note-action-btn" title="Pin note">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>
-      </button>
-      <button type="button" class="single-note-edit-btn note-action-btn note-action-btn-edit" title="Edit">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-      </button>
-    </div>
     {{ if eq $destination "inbox" }}
     {{ partial "todo-list.html" . }}
     {{ end }}
@@ -138,8 +139,11 @@
   font-size: 0.9em;
 }
 .single-note-body img { max-width: 100%; border-radius: 8px; }
-.single-note-content {
+.single-note {
   position: relative;
+}
+.single-note-content {
+  /* no position: relative needed anymore */
 }
 .single-note-top-actions {
   position: absolute;
@@ -205,6 +209,7 @@
     var loadingEl = container.querySelector('.single-note-loading');
     var emptyEl = container.querySelector('.single-note-empty');
     var contentEl = container.querySelector('.single-note-content');
+    var topActionsEl = container.querySelector('.single-note-top-actions');
     var bodyEl = container.querySelector('.single-note-body');
     var signinBtn = container.querySelector('.single-note-signin-btn');
     var createBtn = container.querySelector('.single-note-create-btn');
@@ -225,6 +230,7 @@
       loadingEl.style.display = state === 'loading' ? '' : 'none';
       emptyEl.style.display = state === 'empty' ? '' : 'none';
       contentEl.style.display = state === 'content' ? '' : 'none';
+      topActionsEl.style.display = state === 'content' ? '' : 'none';
     }
 
     function renderNote(note) {

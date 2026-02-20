@@ -237,32 +237,47 @@
 .pomodoro-subtask-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 2px 0;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 4px;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: background 0.15s;
 }
 .pomodoro-subtask-item:hover {
-  opacity: 0.8;
+  background: var(--gray-100);
 }
-.pomodoro-subtask-item input[type="checkbox"] {
-  width: 13px;
-  height: 13px;
-  margin: 0;
+.pomodoro-subtask-item .pomo-subtask-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-link);
   flex-shrink: 0;
-  cursor: pointer;
-  accent-color: var(--color-link);
+}
+.pomodoro-subtask-item.done .pomo-subtask-dot {
+  background: var(--color-success, #34a853);
+}
+.pomodoro-subtask-item .pomo-subtask-check {
+  flex-shrink: 0;
+  color: var(--color-success, #34a853);
+  display: none;
+}
+.pomodoro-subtask-item.done .pomo-subtask-check {
+  display: inline;
+}
+.pomodoro-subtask-item.done .pomo-subtask-dot {
+  display: none;
 }
 .pomodoro-subtask-item label {
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--body-font-color);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-size: 0.68rem;
 }
 .pomodoro-subtask-item.done label {
   text-decoration: line-through;
-  opacity: 0.5;
+  color: var(--text-faint);
 }
 </style>
 
@@ -742,10 +757,11 @@
       subs.forEach(function(sub) {
         var row = document.createElement('div');
         row.className = 'pomodoro-subtask-item' + (sub.done ? ' done' : '');
-        row.innerHTML = '<input type="checkbox"' + (sub.done ? ' checked' : '') + '><label>' + escapeHtmlPomo(sub.title) + '</label>';
-        var cb = row.querySelector('input');
-        cb.addEventListener('change', function() {
-          var newDone = cb.checked;
+        var checkSvg = '<svg class="pomo-subtask-check" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        row.innerHTML = '<span class="pomo-subtask-dot"></span>' + checkSvg + '<label>' + escapeHtmlPomo(sub.title) + '</label>';
+        row.addEventListener('click', function() {
+          var newDone = !sub.done;
+          sub.done = newDone;
           row.className = 'pomodoro-subtask-item' + (newDone ? ' done' : '');
           toggleSubtaskDone(sub, newDone);
         });
