@@ -455,7 +455,7 @@
     if (!el) return;
 
     var total = todos.length;
-    var done = todos.filter(function(t) { return t.done; });
+    var done = todos.filter(function(t) { return t.status === 'archived' || t.status === 'done'; });
     var doneCount = done.length;
     var totalEst = 0, totalActual = 0;
     var estCount = 0; // tasks with both est and actual for accuracy
@@ -523,7 +523,7 @@
     if (!el) return;
 
     // Group completed todos by category
-    var done = todos.filter(function(t) { return t.done && t.actualMin; });
+    var done = todos.filter(function(t) { return (t.status === 'archived' || t.status === 'done') && t.actualMin; });
     if (!done.length) {
       el.innerHTML = '<div class="dashboard-no-data">Complete tasks with time tracking to see comparisons.</div>';
       return;
@@ -601,7 +601,7 @@
     var el = document.getElementById('dashboard-categories');
     if (!el) return;
 
-    var done = todos.filter(function(t) { return t.done && t.actualMin; });
+    var done = todos.filter(function(t) { return (t.status === 'archived' || t.status === 'done') && t.actualMin; });
     if (!done.length) {
       el.innerHTML = '<div class="dashboard-no-data">Complete tasks to see category breakdown.</div>';
       return;
@@ -649,7 +649,7 @@
     var el = document.getElementById('dashboard-activity');
     if (!el) return;
 
-    var done = todos.filter(function(t) { return t.done && t.completedAt; });
+    var done = todos.filter(function(t) { return (t.status === 'archived' || t.status === 'done') && t.completedAt; });
     if (!done.length) {
       el.innerHTML = '<div class="dashboard-no-data">Complete tasks to see activity log.</div>';
       return;
@@ -721,9 +721,16 @@
     window.dmSync.getAllTodos().then(function(todos) {
       if (!todos) todos = [];
 
+      // Migrate legacy todos: backfill status field from done boolean
+      todos.forEach(function(t) {
+        if (!t.status) {
+          t.status = t.done ? 'done' : 'active';
+        }
+      });
+
       // Filter to only leaf tasks (no children) for accurate stats
       // But keep all for display purposes
-      var hasCompleted = todos.some(function(t) { return t.done; });
+      var hasCompleted = todos.some(function(t) { return t.status === 'archived' || t.status === 'done'; });
 
       if (!todos.length || !hasCompleted) {
         showState('empty');

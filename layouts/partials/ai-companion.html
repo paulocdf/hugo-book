@@ -957,6 +957,8 @@
     var sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
 
     tasks.forEach(function(t) {
+      // Skip deleted tasks — they should not appear in AI context
+      if ((t.status || 'active') === 'deleted') return;
       if (t.done) {
         if (t.completedAt && t.completedAt > sevenDaysAgo) {
           completedRecent.push(t);

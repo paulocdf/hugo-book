@@ -113,6 +113,8 @@
         el.innerHTML = '<em style="font-size: 0.85rem; color: var(--gray-500);">No tasks yet. Add tasks in your Inbox to see insights here.</em>';
         return;
       }
+      // Filter out deleted tasks — they should not affect counts or stats
+      todos = todos.filter(function(t) { return (t.status || 'active') !== 'deleted'; });
       var done = 0, totalEst = 0, totalActual = 0;
       todos.forEach(function(t) {
         if (t.done) {

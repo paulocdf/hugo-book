@@ -161,7 +161,7 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-  var DB_VERSION = 7;
+  var DB_VERSION = 8;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -203,14 +203,19 @@
           var todoStore = db.createObjectStore(STORE_TODOS, { keyPath: 'id' });
           todoStore.createIndex('parentId', 'parentId', { unique: false });
           todoStore.createIndex('done', 'done', { unique: false });
+          todoStore.createIndex('status', 'status', { unique: false });
           todoStore.createIndex('order', 'order', { unique: false });
           todoStore.createIndex('updatedAt', 'updatedAt', { unique: false });
           todoStore.createIndex('reminderAt', 'reminderAt', { unique: false });
         } else {
-          // Upgrading existing todos store — add reminderAt index if missing
+          // Upgrading existing todos store — add missing indexes
           var existingStore = tx.objectStore(STORE_TODOS);
           if (!existingStore.indexNames.contains('reminderAt')) {
             existingStore.createIndex('reminderAt', 'reminderAt', { unique: false });
+          }
+          // v8: add status index for task lifecycle (active/done/archived/deleted)
+          if (!existingStore.indexNames.contains('status')) {
+            existingStore.createIndex('status', 'status', { unique: false });
           }
         }
         // Offline write queue store (v4)
@@ -664,6 +669,8 @@
     var updatedAt = data.updatedAt ? data.updatedAt.toMillis() : 0;
     var completedAt = data.completedAt ? data.completedAt.toMillis() : null;
     var reminderAt = data.reminderAt ? data.reminderAt.toMillis() : null;
+    // Derive status from explicit field or fall back to done boolean for legacy docs
+    var status = data.status || (data.done ? 'done' : 'active');
     return {
       id: doc.id,
       userId: data.userId || '',
@@ -673,7 +680,9 @@
       category: data.category || null,
       pomodoroCount: data.pomodoroCount || 1,
       pomodoroLength: data.pomodoroLength || null,
-      done: !!data.done,
+      breakLength: data.breakLength || null,
+      done: (status === 'done' || status === 'archived'),
+      status: status,
       parentId: data.parentId || null,
       order: data.order || 0,
       scheduledDate: data.scheduledDate || null,

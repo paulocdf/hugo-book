@@ -822,6 +822,10 @@
   color: var(--color-danger);
   background: var(--color-danger-bg);
 }
+.todo-item-action-btn.archive:hover {
+  color: var(--color-link);
+  background: rgba(66, 133, 244, 0.1);
+}
 
 /* Subtask collapse toggle */
 .todo-subtask-toggle {
@@ -2420,6 +2424,12 @@
       html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
       html += '</button>';
     }
+    // Archive button (only for done tasks)
+    if (todo.done) {
+      html += '<button type="button" class="todo-item-action-btn archive" data-archive-id="' + todo.id + '" title="Archive task" aria-label="Archive task">';
+      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>';
+      html += '</button>';
+    }
     html += '<button type="button" class="todo-item-action-btn delete" data-delete-id="' + todo.id + '" title="Delete task" aria-label="Delete task">';
     html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
     html += '</button>';
@@ -2431,10 +2441,16 @@
   function render() {
     container.style.display = '';
 
+    // Filter to only active and done tasks (exclude archived and deleted)
+    var visibleTodos = allTodos.filter(function(t) {
+      var s = t.status || 'active';
+      return s === 'active' || s === 'done';
+    });
+
     // Separate parents and children
     var parents = [];
     var childrenMap = {}; // parentId -> [children]
-    allTodos.forEach(function(t) {
+    visibleTodos.forEach(function(t) {
       if (t.parentId) {
         if (!childrenMap[t.parentId]) childrenMap[t.parentId] = [];
         childrenMap[t.parentId].push(t);
@@ -2631,24 +2647,24 @@
       html += buildDayGroup('_unscheduled', { label: 'Unscheduled', cssClass: '', badge: '' }, unscheduled);
     }
 
-    // Clear all completed bar (shown when there are completed tasks)
-    var completedCount = 0;
-    allTodos.forEach(function(t) { if (t.done) completedCount++; });
-    if (completedCount > 0) {
+    // Archive all completed bar (shown when there are completed/done tasks)
+    var doneStatusCount = 0;
+    visibleTodos.forEach(function(t) { if (t.status === 'done') doneStatusCount++; });
+    if (doneStatusCount > 0) {
       html += '<div class="todo-clear-all-bar">';
-      html += '<span class="todo-clear-all-count">' + completedCount + ' completed</span>';
-      html += '<button type="button" class="todo-clear-all-btn" id="todo-clear-all" title="Permanently delete all completed tasks">';
-      html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
-      html += ' Clear all';
+      html += '<span class="todo-clear-all-count">' + doneStatusCount + ' completed</span>';
+      html += '<button type="button" class="todo-clear-all-btn" id="todo-archive-all" title="Archive all completed tasks">';
+      html += '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>';
+      html += ' Archive all';
       html += '</button>';
       html += '</div>';
     }
 
     itemsEl.innerHTML = html;
 
-    // Summary
+    // Summary (counts visible tasks only — active + done, not archived/deleted)
     var totalEst = 0, totalActual = 0, doneCount = 0, totalCount = 0;
-    allTodos.forEach(function(t) {
+    visibleTodos.forEach(function(t) {
       // Only count leaf tasks (no children or subtasks themselves)
       var hasChildren = childrenMap[t.id] && childrenMap[t.id].length > 0;
       if (!hasChildren) {
@@ -2783,9 +2799,18 @@
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         var todoId = btn.getAttribute('data-delete-id');
-        showDeleteConfirm('Permanently delete this task?', function() {
+        showDeleteConfirm('Permanently delete this task? It will not count toward your stats.', function() {
           deleteTodo(todoId);
         });
+      });
+    });
+
+    // Archive button (individual done tasks)
+    itemsEl.querySelectorAll('[data-archive-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-archive-id');
+        archiveTodo(todoId);
       });
     });
 
@@ -2829,20 +2854,20 @@
       });
     });
 
-    // Clear all completed button
-    var clearAllBtn = document.getElementById('todo-clear-all');
-    if (clearAllBtn) {
-      clearAllBtn.addEventListener('click', function(e) {
+    // Archive all completed button
+    var archiveAllBtn = document.getElementById('todo-archive-all');
+    if (archiveAllBtn) {
+      archiveAllBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        var completedIds = [];
+        var doneIds = [];
         allTodos.forEach(function(t) {
-          if (t.done) completedIds.push(t.id);
+          if (t.status === 'done') doneIds.push(t.id);
         });
-        if (completedIds.length === 0) return;
-        var msg = 'Permanently delete ' + completedIds.length + ' completed task' + (completedIds.length > 1 ? 's' : '') + '?';
+        if (doneIds.length === 0) return;
+        var msg = 'Archive ' + doneIds.length + ' completed task' + (doneIds.length > 1 ? 's' : '') + '? They will be preserved in your stats and archive.';
         showDeleteConfirm(msg, function() {
-          clearAllCompleted(completedIds);
-        }, 'Clear Completed');
+          archiveAllCompleted(doneIds);
+        }, 'Archive All');
       });
     }
   }
@@ -3269,6 +3294,7 @@
       pomodoroLength: pLength,
       breakLength: breakLength || null,
       done: false,
+      status: 'active',
       parentId: parentId || null,
       order: order,
       scheduledDate: scheduledDate || null,
@@ -3293,6 +3319,7 @@
       pomodoroLength: pLength,
       breakLength: breakLength || null,
       done: false,
+      status: 'active',
       parentId: parentId || null,
       order: order,
       scheduledDate: scheduledDate || null,
@@ -3328,6 +3355,7 @@
   function completeTodo(todo, actualMin, category) {
     var updateData = {
       done: true,
+      status: 'done',
       actualMin: actualMin,
       category: category,
       completedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -3336,6 +3364,7 @@
 
     // Optimistic local update
     todo.done = true;
+    todo.status = 'done';
     todo.actualMin = actualMin;
     todo.category = category;
     todo.completedAt = Date.now();
@@ -3361,6 +3390,7 @@
         showTodoError('Failed to complete task — check console');
         // Revert local state so UI reflects the failure
         todo.done = false;
+        todo.status = 'active';
         todo.actualMin = null;
         todo.category = null;
         todo.completedAt = null;
@@ -3394,6 +3424,7 @@
 
     var updateData = {
       done: true,
+      status: 'done',
       actualMin: totalActual,
       category: categories.join(', ') || null,
       completedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -3402,6 +3433,7 @@
 
     // Optimistic local update
     parent.done = true;
+    parent.status = 'done';
     parent.actualMin = totalActual;
     parent.category = categories.join(', ') || null;
     parent.completedAt = Date.now();
@@ -3431,6 +3463,7 @@
   function reopenTodo(todo) {
     var updateData = {
       done: false,
+      status: 'active',
       actualMin: null,
       category: null,
       completedAt: null,
@@ -3439,6 +3472,7 @@
 
     // Optimistic local update
     todo.done = false;
+    todo.status = 'active';
     todo.actualMin = null;
     todo.category = null;
     todo.completedAt = null;
@@ -3470,7 +3504,7 @@
   }
 
   function deleteTodo(todoId) {
-    // Also delete children
+    // Also soft-delete children
     var toDelete = [todoId];
     allTodos.forEach(function(t) {
       if (t.parentId === todoId) toDelete.push(t.id);
@@ -3481,22 +3515,30 @@
     var chain = Promise.resolve();
     toDelete.forEach(function(id) {
       chain = chain.then(function() {
+        var todo = allTodos.find(function(t) { return t.id === id; });
+        if (!todo) return Promise.resolve();
+        var updateData = {
+          done: false,
+          status: 'deleted',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        // Optimistic local update
+        todo.done = false;
+        todo.status = 'deleted';
+        todo.updatedAt = Date.now();
         return window.dmSync.firestoreWrite({
           collection: 'todos',
           docId: id,
-          op: 'delete',
-          data: null,
+          op: 'update',
+          data: updateData,
           localOp: function() {
-            return window.dmSync.deleteTodo(id);
+            return window.dmSync.putTodo(todo);
           }
         });
       });
     });
 
     chain.then(function() {
-      allTodos = allTodos.filter(function(t) {
-        return toDelete.indexOf(t.id) === -1;
-      });
       render();
     }).catch(function(err) {
       console.error('Error deleting todo:', err);
@@ -3504,32 +3546,79 @@
     });
   }
 
-  function clearAllCompleted(ids) {
+  function archiveAllCompleted(ids) {
     if (!window.dmSync || ids.length === 0) return;
 
     var chain = Promise.resolve();
     ids.forEach(function(id) {
       chain = chain.then(function() {
+        var todo = allTodos.find(function(t) { return t.id === id; });
+        if (!todo) return Promise.resolve();
+        var updateData = {
+          status: 'archived',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        // Optimistic local update
+        todo.status = 'archived';
+        todo.updatedAt = Date.now();
         return window.dmSync.firestoreWrite({
           collection: 'todos',
           docId: id,
-          op: 'delete',
-          data: null,
+          op: 'update',
+          data: updateData,
           localOp: function() {
-            return window.dmSync.deleteTodo(id);
+            return window.dmSync.putTodo(todo);
           }
         });
       });
     });
 
     chain.then(function() {
-      allTodos = allTodos.filter(function(t) {
-        return ids.indexOf(t.id) === -1;
-      });
       render();
     }).catch(function(err) {
-      console.error('Error clearing completed:', err);
-      showTodoError('Failed to clear completed tasks — check console');
+      console.error('Error archiving completed:', err);
+      showTodoError('Failed to archive completed tasks — check console');
+    });
+  }
+
+  function archiveTodo(todoId) {
+    // Archive a single task and its children
+    var toArchive = [todoId];
+    allTodos.forEach(function(t) {
+      if (t.parentId === todoId) toArchive.push(t.id);
+    });
+
+    if (!window.dmSync) return;
+
+    var chain = Promise.resolve();
+    toArchive.forEach(function(id) {
+      chain = chain.then(function() {
+        var todo = allTodos.find(function(t) { return t.id === id; });
+        if (!todo) return Promise.resolve();
+        var updateData = {
+          status: 'archived',
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        // Optimistic local update
+        todo.status = 'archived';
+        todo.updatedAt = Date.now();
+        return window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: id,
+          op: 'update',
+          data: updateData,
+          localOp: function() {
+            return window.dmSync.putTodo(todo);
+          }
+        });
+      });
+    });
+
+    chain.then(function() {
+      render();
+    }).catch(function(err) {
+      console.error('Error archiving todo:', err);
+      showTodoError('Failed to archive task — check console');
     });
   }
 
@@ -3596,6 +3685,23 @@
     if (!window.dmSync) return;
 
     window.dmSync.getAllTodos().then(function(todos) {
+      // Migrate legacy todos: backfill status field from done boolean
+      var needsMigration = [];
+      todos.forEach(function(t) {
+        if (!t.status) {
+          // Legacy done=true tasks become 'done' (still visible) so user can review/archive them
+          t.status = t.done ? 'done' : 'active';
+          t.done = t.status === 'done';
+          needsMigration.push(t);
+        }
+      });
+      // Persist migrated todos to IDB (fire-and-forget)
+      if (needsMigration.length > 0 && window.dmSync) {
+        console.log('[todo-list] Migrating ' + needsMigration.length + ' legacy tasks to status field');
+        needsMigration.forEach(function(t) {
+          window.dmSync.putTodo(t);
+        });
+      }
       allTodos = todos;
       render();
     });

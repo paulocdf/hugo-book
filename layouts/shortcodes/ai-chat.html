@@ -671,7 +671,7 @@
         return;
       }
       pageContext.style.display = '';
-      var pending = todos.filter(function(t) { return !t.done; });
+      var pending = todos.filter(function(t) { return !t.done && (t.status || 'active') !== 'deleted'; });
       var completed = todos.filter(function(t) { return t.done; });
       var todayStr = new Date().toISOString().split('T')[0];
       var todayTasks = pending.filter(function(t) { return t.scheduledDate === todayStr; });

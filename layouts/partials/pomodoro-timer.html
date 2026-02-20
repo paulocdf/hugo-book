@@ -779,6 +779,7 @@
 
   function toggleSubtaskDone(sub, newDone) {
     sub.done = newDone;
+    sub.status = newDone ? 'done' : 'active';
     sub.updatedAt = Date.now();
     if (newDone) sub.completedAt = Date.now();
     else sub.completedAt = null;
@@ -786,6 +787,7 @@
     if (window.dmSync) {
       var updateData = {
         done: newDone,
+        status: newDone ? 'done' : 'active',
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
       if (newDone) updateData.completedAt = firebase.firestore.FieldValue.serverTimestamp();
