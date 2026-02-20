@@ -96,6 +96,10 @@
 
   <!-- Input area -->
   <div class="ai-input-area" id="ai-input-area">
+    <div class="ai-mode-badge" id="ai-mode-badge" style="display:none;">
+      <span id="ai-mode-badge-text"></span>
+      <button type="button" class="ai-mode-badge-cancel" id="ai-mode-badge-cancel" aria-label="Cancel mode">&times;</button>
+    </div>
     <div class="ai-input-wrap">
       <textarea class="ai-input" id="ai-input" placeholder="Ask me anything..." rows="1"></textarea>
       <button type="button" class="ai-send-btn" id="ai-send-btn" title="Send" aria-label="Send" disabled>
@@ -533,6 +537,52 @@
   font-weight: 600;
 }
 
+/* Code blocks */
+.ai-code-block {
+  margin: 6px 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--code-bg, #f6f8fa);
+  overflow-x: auto;
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+.ai-code-block code {
+  background: none;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+.ai-msg-bubble h3,
+.ai-msg-bubble h4,
+.ai-msg-bubble h5,
+.ai-msg-bubble h6 {
+  margin: 8px 0 4px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.ai-msg-bubble hr {
+  border: none;
+  border-top: 1px solid var(--gray-200);
+  margin: 8px 0;
+}
+
+/* Streaming cursor */
+.ai-msg-bubble.streaming::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 0.9em;
+  background: var(--accent-ai);
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: ai-cursor-blink 0.8s step-end infinite;
+}
+@keyframes ai-cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* Typing indicator */
 .ai-typing {
   display: flex;
@@ -628,6 +678,59 @@
   padding: 12px 16px;
   border-top: 1px solid var(--gray-200);
   flex-shrink: 0;
+}
+.ai-mode-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  padding: 4px 8px;
+  background: var(--ai-accent-bg, rgba(0, 150, 136, 0.08));
+  border: 1px solid var(--accent-ai);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--accent-ai);
+}
+.ai-mode-badge-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--accent-ai);
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 0;
+  padding: 0;
+  margin-left: auto;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.ai-mode-badge-cancel:hover {
+  opacity: 1;
+}
+.ai-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border: 1px solid var(--accent-ai);
+  border-radius: 6px;
+  background: var(--ai-accent-bg, rgba(0, 150, 136, 0.08));
+  color: var(--accent-ai);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ai-retry-btn:hover {
+  background: var(--accent-ai);
+  color: #fff;
 }
 .ai-input-wrap {
   display: flex;
@@ -778,6 +881,9 @@
   var modelStatusRow = document.getElementById('ai-model-status-row');
   var unloadBtn = document.getElementById('ai-unload-btn');
   var notSupportedEl = document.getElementById('ai-not-supported');
+  var modeBadge = document.getElementById('ai-mode-badge');
+  var modeBadgeText = document.getElementById('ai-mode-badge-text');
+  var modeBadgeCancel = document.getElementById('ai-mode-badge-cancel');
 
   if (!fab || !panel) return;
 
@@ -798,19 +904,21 @@
   var abortController = null;
   var hasWebGPU = typeof navigator !== 'undefined' && !!navigator.gpu;
 
-  // ─── System prompt builder ───
+  // ─── System prompt builder (optimized for Qwen2.5-0.5B) ───
   function buildSystemPrompt(tasks) {
     var now = new Date();
     var todayStr = now.toISOString().split('T')[0];
     var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
 
-    var prompt = 'You are a helpful AI companion for a personal productivity app called Digital Memory. ';
-    prompt += 'Today is ' + dayName + ', ' + todayStr + '. ';
-    prompt += 'You help the user plan their day, suggest tasks, improve text, and summarize content. ';
-    prompt += 'Keep responses concise and actionable. Use markdown formatting when helpful.\n\n';
+    var prompt = 'You are a productivity assistant. Today: ' + dayName + ', ' + todayStr + '.\n';
+    prompt += 'Rules:\n';
+    prompt += '- Be concise. Use bullet points with dashes.\n';
+    prompt += '- Keep replies under 150 words.\n';
+    prompt += '- When suggesting tasks, wrap each task title in **bold**.\n';
+    prompt += '- Do not repeat the user\'s message back.\n\n';
 
     if (!tasks || tasks.length === 0) {
-      prompt += 'The user has no tasks right now.\n';
+      prompt += 'The user has no tasks.\n';
       return prompt;
     }
 
@@ -833,83 +941,55 @@
       }
     });
 
-    prompt += 'USER\'S TASKS:\n';
+    // Build task context — most important info last (recency bias for small models)
+    if (completedRecent.length > 0) {
+      prompt += 'Done recently: ' + completedRecent.slice(0, 5).map(function(t) { return t.title; }).join(', ') + '\n';
+    }
 
+    if (pending.length > 0) {
+      var unscheduled = pending.filter(function(t) { return !t.scheduledDate; });
+      var futureTasks = pending.filter(function(t) { return t.scheduledDate && t.scheduledDate > todayStr; });
+
+      if (unscheduled.length > 0) {
+        prompt += '\nBacklog (' + unscheduled.length + '):\n';
+        unscheduled.slice(0, 7).forEach(function(t) {
+          prompt += '- ' + t.title;
+          if (t.category) prompt += ' [' + t.category + ']';
+          prompt += '\n';
+        });
+        if (unscheduled.length > 7) prompt += '- +' + (unscheduled.length - 7) + ' more\n';
+      }
+
+      if (futureTasks.length > 0) {
+        prompt += '\nUpcoming (' + futureTasks.length + '):\n';
+        futureTasks.slice(0, 5).forEach(function(t) {
+          prompt += '- ' + t.title + ' (' + t.scheduledDate + ')';
+          prompt += '\n';
+        });
+        if (futureTasks.length > 5) prompt += '- +' + (futureTasks.length - 5) + ' more\n';
+      }
+    }
+
+    // Overdue and Today last — most important, strongest recency signal
     if (overdue.length > 0) {
-      prompt += '\nOverdue (' + overdue.length + '):\n';
+      prompt += '\nOVERDUE (' + overdue.length + '):\n';
       overdue.forEach(function(t) {
         prompt += '- ' + t.title;
-        if (t.category) prompt += ' [' + t.category + ']';
-        if (t.scheduledDate) prompt += ' (scheduled: ' + t.scheduledDate + ')';
-        if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
+        if (t.scheduledDate) prompt += ' (was: ' + t.scheduledDate + ')';
         prompt += '\n';
       });
     }
 
     if (pending.length > 0) {
-      // Show pending tasks scheduled for today
       var todayTasks = pending.filter(function(t) { return t.scheduledDate === todayStr; });
-      var futureTasks = pending.filter(function(t) { return t.scheduledDate && t.scheduledDate > todayStr; });
-      var unscheduled = pending.filter(function(t) { return !t.scheduledDate; });
-
       if (todayTasks.length > 0) {
-        prompt += '\nToday (' + todayTasks.length + '):\n';
+        prompt += '\nTODAY (' + todayTasks.length + '):\n';
         todayTasks.forEach(function(t) {
           prompt += '- ' + t.title;
-          if (t.category) prompt += ' [' + t.category + ']';
           if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
           prompt += '\n';
         });
       }
-
-      if (futureTasks.length > 0) {
-        prompt += '\nUpcoming (' + futureTasks.length + '):\n';
-        futureTasks.slice(0, 10).forEach(function(t) {
-          prompt += '- ' + t.title;
-          if (t.category) prompt += ' [' + t.category + ']';
-          if (t.scheduledDate) prompt += ' (scheduled: ' + t.scheduledDate + ')';
-          prompt += '\n';
-        });
-        if (futureTasks.length > 10) {
-          prompt += '- ...and ' + (futureTasks.length - 10) + ' more\n';
-        }
-      }
-
-      if (unscheduled.length > 0) {
-        prompt += '\nUnscheduled (' + unscheduled.length + '):\n';
-        unscheduled.slice(0, 15).forEach(function(t) {
-          prompt += '- ' + t.title;
-          if (t.category) prompt += ' [' + t.category + ']';
-          if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
-          prompt += '\n';
-        });
-        if (unscheduled.length > 15) {
-          prompt += '- ...and ' + (unscheduled.length - 15) + ' more\n';
-        }
-      }
-    }
-
-    if (completedRecent.length > 0) {
-      prompt += '\nRecently completed (last 7 days, ' + completedRecent.length + '):\n';
-      completedRecent.slice(0, 10).forEach(function(t) {
-        prompt += '- ' + t.title;
-        if (t.category) prompt += ' [' + t.category + ']';
-        prompt += '\n';
-      });
-      if (completedRecent.length > 10) {
-        prompt += '- ...and ' + (completedRecent.length - 10) + ' more\n';
-      }
-    }
-
-    // Category summary
-    var catCounts = {};
-    pending.forEach(function(t) {
-      var c = t.category || 'uncategorized';
-      catCounts[c] = (catCounts[c] || 0) + 1;
-    });
-    var cats = Object.keys(catCounts);
-    if (cats.length > 0) {
-      prompt += '\nCategories in use: ' + cats.map(function(c) { return c + ' (' + catCounts[c] + ')'; }).join(', ') + '\n';
     }
 
     return prompt;
@@ -1016,7 +1096,32 @@
       loadingPromise = null;
       downloadEl.style.display = 'none';
       setStatus('error', 'Load failed');
-      addMessage('assistant', 'Failed to load AI model: ' + (err.message || err) + '. Make sure WebGPU is enabled and try again.');
+      var errMsg = (err.message || String(err));
+      var errLower = errMsg.toLowerCase();
+      var friendlyMsg = 'Failed to load the AI model.';
+      if (errLower.indexOf('webgpu') !== -1 || errLower.indexOf('gpu') !== -1) {
+        friendlyMsg += ' WebGPU is not available in your browser. Try Chrome 113+ or Edge 113+.';
+      } else if (errLower.indexOf('network') !== -1 || errLower.indexOf('fetch') !== -1) {
+        friendlyMsg += ' Network error — check your connection and try again.';
+      } else {
+        friendlyMsg += ' ' + errMsg;
+      }
+      var msgEl = addMessage('assistant', friendlyMsg);
+      var retryBtn = document.createElement('button');
+      retryBtn.className = 'ai-retry-btn';
+      retryBtn.textContent = 'Retry';
+      retryBtn.addEventListener('click', function() {
+        retryBtn.disabled = true;
+        retryBtn.textContent = 'Retrying...';
+        loadEngine().then(function() {
+          if (retryBtn.parentNode) retryBtn.parentNode.removeChild(retryBtn);
+        }).catch(function() {
+          retryBtn.disabled = false;
+          retryBtn.textContent = 'Retry';
+        });
+      });
+      var bubble = msgEl.querySelector('.ai-msg-bubble');
+      if (bubble) bubble.appendChild(retryBtn);
       throw err;
     });
     return loadingPromise;
@@ -1066,7 +1171,7 @@
         messages: messages,
         stream: true,
         temperature: 0.7,
-        max_tokens: 1024
+        max_tokens: 512
       }).then(function(chunks) {
         // Remove typing indicator
         if (typingEl && typingEl.parentNode) {
@@ -1076,9 +1181,12 @@
         // Create assistant message element
         var msgEl = addMessage('assistant', '');
         var bubbleEl = msgEl.querySelector('.ai-msg-bubble');
+        bubbleEl.classList.add('streaming');
         var fullText = '';
+        var rafPending = false;
 
         function finalizeStream() {
+          bubbleEl.classList.remove('streaming');
           chatHistory.push({ role: 'assistant', content: fullText });
           saveMessages();
           bubbleEl.innerHTML = renderMarkdown(fullText);
@@ -1106,8 +1214,14 @@
               }
               if (delta) {
                 fullText += delta;
-                bubbleEl.innerHTML = renderMarkdown(fullText);
-                scrollToBottom();
+                if (!rafPending) {
+                  rafPending = true;
+                  requestAnimationFrame(function() {
+                    rafPending = false;
+                    bubbleEl.innerHTML = renderMarkdown(fullText);
+                    scrollToBottom();
+                  });
+                }
               }
               return processIterator();
             });
@@ -1121,8 +1235,20 @@
       if (typingEl && typingEl.parentNode) {
         typingEl.parentNode.removeChild(typingEl);
       }
-      if (!err.message || err.message.indexOf('not supported') === -1) {
-        addMessage('assistant', 'Something went wrong: ' + (err.message || err));
+      var errRaw = (err.message || String(err));
+      var errLower = errRaw.toLowerCase();
+      if (errLower.indexOf('not supported') !== -1) {
+        // Suppress — loadEngine already displayed this
+      } else {
+        var friendlyMsg = 'Something went wrong.';
+        if (errLower.indexOf('network') !== -1 || errLower.indexOf('fetch') !== -1) {
+          friendlyMsg = 'Network error — check your connection and try again.';
+        } else if (errLower.indexOf('context') !== -1 || errLower.indexOf('token') !== -1) {
+          friendlyMsg = 'The conversation is too long. Try clearing the chat and starting fresh.';
+        } else {
+          friendlyMsg += ' ' + errRaw;
+        }
+        addMessage('assistant', friendlyMsg);
       }
       isGenerating = false;
       sendBtn.disabled = !inputEl.value.trim();
@@ -1133,11 +1259,25 @@
 
   // ─── Quick action prompts ───
   var quickPrompts = {
-    plan: 'Look at my tasks for today and any overdue tasks. Create a prioritized plan for my day. Include estimated time for each task and suggest an order to tackle them. If I have no tasks scheduled for today, suggest which unscheduled tasks I should work on.',
-    suggest: 'Look at my existing tasks (both pending and recently completed). Suggest 3-5 new tasks I might want to add based on patterns you see. For each suggestion, give a clear task title and brief reasoning. Format each as a bullet point starting with the task title in bold.',
+    plan: 'Look at my tasks for today and overdue. Create a prioritized plan with suggested order. If no tasks today, pick from my backlog.',
+    suggest: 'Suggest 3-5 new tasks based on my existing tasks. For each, give the title in **bold** and a one-line reason.',
     improve: null, // handled separately with text input
     summarize: null // handled separately with text input
   };
+
+  function showModeBadge(label) {
+    if (modeBadge) {
+      modeBadgeText.textContent = label;
+      modeBadge.style.display = '';
+    }
+  }
+
+  function hideModeBadge() {
+    if (modeBadge) {
+      modeBadge.style.display = 'none';
+      modeBadgeText.textContent = '';
+    }
+  }
 
   function handleQuickAction(action) {
     if (action === 'improve') {
@@ -1145,6 +1285,7 @@
       inputEl.placeholder = 'Paste the text you want to improve...';
       inputEl.focus();
       inputEl.dataset.mode = 'improve';
+      showModeBadge('Improve mode');
       return;
     }
     if (action === 'summarize') {
@@ -1152,6 +1293,7 @@
       inputEl.placeholder = 'Paste the text you want to summarize...';
       inputEl.focus();
       inputEl.dataset.mode = 'summarize';
+      showModeBadge('Summarize mode');
       return;
     }
     var prompt = quickPrompts[action];
@@ -1181,7 +1323,7 @@
     msgEl.appendChild(avatarEl);
     msgEl.appendChild(bubbleEl);
     messagesEl.appendChild(msgEl);
-    scrollToBottom();
+    scrollToBottom(true);
     return msgEl;
   }
 
@@ -1190,7 +1332,7 @@
     el.className = 'ai-msg ai-msg-assistant';
     el.innerHTML = '<div class="ai-msg-avatar">AI</div><div class="ai-msg-bubble"><div class="ai-typing"><span class="ai-typing-dot"></span><span class="ai-typing-dot"></span><span class="ai-typing-dot"></span></div></div>';
     messagesEl.appendChild(el);
-    scrollToBottom();
+    scrollToBottom(true);
     return el;
   }
 
@@ -1274,43 +1416,92 @@
     }
   }
 
-  // ─── Simple markdown renderer ───
+  // ─── Markdown renderer (shared via window.dmAI) ───
   function renderMarkdown(text) {
     if (!text) return '';
+
+    // Escape HTML
     var html = text
-      // Escape HTML
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      // Bold
-      .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      // Italic
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-      // Inline code
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      // Headers
-      .replace(/^### (.+)$/gm, '<strong style="font-size:0.85rem">$1</strong>')
-      .replace(/^## (.+)$/gm, '<strong style="font-size:0.88rem">$1</strong>')
-      .replace(/^# (.+)$/gm, '<strong style="font-size:0.92rem">$1</strong>')
-      // Unordered lists
-      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
-      // Ordered lists
-      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
-      // Paragraphs (double newline)
-      .replace(/\n\n/g, '</p><p>')
-      // Single newlines
-      .replace(/\n/g, '<br>');
+      .replace(/>/g, '&gt;');
 
-    // Wrap consecutive <li> in <ul>
-    html = html.replace(/(<li>.*?<\/li>(?:<br>)?)+/g, function(match) {
-      return '<ul>' + match.replace(/<br>/g, '') + '</ul>';
+    // Code blocks (triple backtick) — extract before other processing
+    var codeBlocks = [];
+    html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, function(_, lang, code) {
+      var idx = codeBlocks.length;
+      codeBlocks.push('<pre class="ai-code-block"><code>' + code.replace(/\n$/, '') + '</code></pre>');
+      return '\x00CB' + idx + '\x00';
     });
+
+    // Inline code (protect from further processing)
+    var inlineCode = [];
+    html = html.replace(/`([^`]+)`/g, function(_, code) {
+      var idx = inlineCode.length;
+      inlineCode.push('<code>' + code + '</code>');
+      return '\x00IC' + idx + '\x00';
+    });
+
+    // Bold and italic
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+
+    // Horizontal rule
+    html = html.replace(/^---+$/gm, '<hr>');
+
+    // Headers (proper semantic elements)
+    html = html.replace(/^#### (.+)$/gm, '<h6>$1</h6>');
+    html = html.replace(/^### (.+)$/gm, '<h5>$1</h5>');
+    html = html.replace(/^## (.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^# (.+)$/gm, '<h3>$1</h3>');
+
+    // Process line by line for lists
+    var lines = html.split('\n');
+    var result = [];
+    var inUl = false;
+    var inOl = false;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var ulMatch = line.match(/^[-*] (.+)$/);
+      var olMatch = line.match(/^\d+\. (.+)$/);
+
+      if (ulMatch) {
+        if (inOl) { result.push('</ol>'); inOl = false; }
+        if (!inUl) { result.push('<ul>'); inUl = true; }
+        result.push('<li>' + ulMatch[1] + '</li>');
+      } else if (olMatch) {
+        if (inUl) { result.push('</ul>'); inUl = false; }
+        if (!inOl) { result.push('<ol>'); inOl = true; }
+        result.push('<li>' + olMatch[1] + '</li>');
+      } else {
+        if (inUl) { result.push('</ul>'); inUl = false; }
+        if (inOl) { result.push('</ol>'); inOl = false; }
+        result.push(line);
+      }
+    }
+    if (inUl) result.push('</ul>');
+    if (inOl) result.push('</ol>');
+
+    html = result.join('\n');
+
+    // Paragraphs and line breaks
+    html = html.replace(/\n\n/g, '</p><p>');
+    html = html.replace(/\n/g, '<br>');
+
+    // Restore code blocks and inline code
+    html = html.replace(/\x00CB(\d+)\x00/g, function(_, idx) { return codeBlocks[parseInt(idx)]; });
+    html = html.replace(/\x00IC(\d+)\x00/g, function(_, idx) { return inlineCode[parseInt(idx)]; });
 
     return '<p>' + html + '</p>';
   }
 
-  function scrollToBottom() {
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+  function scrollToBottom(force) {
+    // Only auto-scroll if user is near the bottom (within 80px) or forced
+    var atBottom = force || (messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 80);
+    if (atBottom) {
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
   }
 
   // ─── Session storage for messages ───
@@ -1335,7 +1526,8 @@
           return msg && (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string';
         });
         chatHistory.forEach(function(msg) {
-          addMessage(msg.role, msg.content);
+          var msgEl = addMessage(msg.role, msg.content);
+          msgEl.style.animation = 'none'; // Skip entrance animation for restored messages
         });
       }
     } catch(e) {}
@@ -1407,6 +1599,7 @@
     inputEl.value = '';
     inputEl.dataset.mode = '';
     inputEl.placeholder = 'Ask me anything...';
+    hideModeBadge();
     updateInputHeight();
     sendBtn.disabled = true;
 
@@ -1433,6 +1626,9 @@
       messagesEl.appendChild(welcomeEl);
       welcomeEl.style.display = '';
     }
+    inputEl.dataset.mode = '';
+    inputEl.placeholder = 'Ask me anything...';
+    hideModeBadge();
     try { sessionStorage.removeItem(SS_KEY_MESSAGES); } catch(e) {}
     if (engine) {
       try { engine.resetChat(); } catch(e) {}
@@ -1465,6 +1661,16 @@
 
   // Clear chat
   clearBtn.addEventListener('click', clearChat);
+
+  // Mode badge cancel
+  if (modeBadgeCancel) {
+    modeBadgeCancel.addEventListener('click', function() {
+      inputEl.dataset.mode = '';
+      inputEl.placeholder = 'Ask me anything...';
+      hideModeBadge();
+      inputEl.focus();
+    });
+  }
 
   // Quick actions
   quickActions.addEventListener('click', function(e) {
@@ -1546,7 +1752,8 @@
     _loadEngine: function() {
       return loadEngine();
     },
-    _buildSystemPrompt: buildSystemPrompt
+    _buildSystemPrompt: buildSystemPrompt,
+    _renderMarkdown: renderMarkdown
   };
 
 })();

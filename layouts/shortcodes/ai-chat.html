@@ -32,6 +32,10 @@
       </div>
       <div class="ai-page-header-actions">
         <span class="ai-page-status" id="ai-page-status"></span>
+        <button type="button" class="ai-page-clear-btn" id="ai-page-clear-btn" title="Clear chat" aria-label="Clear chat">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Clear
+        </button>
         <label class="ai-toggle-switch ai-page-toggle">
           <input type="checkbox" id="ai-page-enabled-toggle">
           <span class="ai-toggle-slider"></span>
@@ -121,6 +125,10 @@
         </div>
       </div>
       <div class="ai-page-input-area">
+        <div class="ai-mode-badge" id="ai-page-mode-badge" style="display:none;">
+          <span id="ai-page-mode-badge-text"></span>
+          <button type="button" class="ai-mode-badge-cancel" id="ai-page-mode-badge-cancel" aria-label="Cancel mode">&times;</button>
+        </div>
         <div class="ai-input-wrap">
           <textarea class="ai-input ai-page-input" id="ai-page-input" placeholder="Ask me anything..." rows="1"></textarea>
           <button type="button" class="ai-send-btn" id="ai-page-send-btn" title="Send" aria-label="Send" disabled>
@@ -225,8 +233,51 @@
   background: rgba(0, 105, 255, 0.08);
   color: var(--color-link);
 }
+.ai-page-status.error {
+  display: inline-block;
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+.ai-page-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border: 1px solid var(--accent-ai);
+  border-radius: 6px;
+  background: var(--ai-accent-bg, rgba(0, 150, 136, 0.08));
+  color: var(--accent-ai);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.ai-page-retry-btn:hover {
+  background: var(--accent-ai);
+  color: #fff;
+}
 .ai-page-toggle {
   margin-top: 4px;
+}
+.ai-page-clear-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--gray-500);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.ai-page-clear-btn:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+  background: var(--color-danger-bg);
 }
 
 /* Warning */
@@ -404,6 +455,32 @@
 .ai-page-input {
   border-radius: 10px 0 0 10px;
 }
+.ai-page-input-area .ai-mode-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  margin-bottom: 6px;
+  background: var(--accent-ai, #00897b);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  width: fit-content;
+}
+.ai-page-input-area .ai-mode-badge-cancel {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 2px;
+  opacity: 0.8;
+}
+.ai-page-input-area .ai-mode-badge-cancel:hover {
+  opacity: 1;
+}
 </style>
 
 <script>
@@ -427,10 +504,14 @@
   var pageSendBtn = document.getElementById('ai-page-send-btn');
   var pageStopBtn = document.getElementById('ai-page-stop-btn');
   var pageStatus = document.getElementById('ai-page-status');
+  var pageClearBtn = document.getElementById('ai-page-clear-btn');
   var pageDownload = document.getElementById('ai-page-download');
   var pageDownloadText = document.getElementById('ai-page-download-text');
   var pageDownloadFill = document.getElementById('ai-page-download-fill');
   var pageDownloadDetail = document.getElementById('ai-page-download-detail');
+  var pageModeBadge = document.getElementById('ai-page-mode-badge');
+  var pageModeBadgeText = document.getElementById('ai-page-mode-badge-text');
+  var pageModeBadgeCancel = document.getElementById('ai-page-mode-badge-cancel');
 
   if (!pageAuth || !pageContent) return;
 
@@ -583,7 +664,8 @@
         var children = pageMessages.querySelectorAll('.ai-msg');
         children.forEach(function(c) { c.remove(); });
         messages.forEach(function(msg) {
-          addPageMessage(msg.role, msg.content);
+          var msgEl = addPageMessage(msg.role, msg.content);
+          msgEl.style.animation = 'none'; // Skip entrance animation for restored messages
         });
       }
     } catch(e) {}
@@ -621,25 +703,19 @@
   }
 
   function renderPageMarkdown(text) {
+    // Delegate to the shared renderer from ai-companion.html
+    if (window.dmAI && window.dmAI._renderMarkdown) {
+      return window.dmAI._renderMarkdown(text);
+    }
+    // Fallback: minimal rendering
     if (!text) return '';
-    var html = text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
+    return '<p>' + text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
       .replace(/\*([^*]+)\*/g, '<em>$1</em>')
       .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/^### (.+)$/gm, '<strong style="font-size:0.85rem">$1</strong>')
-      .replace(/^## (.+)$/gm, '<strong style="font-size:0.88rem">$1</strong>')
-      .replace(/^# (.+)$/gm, '<strong style="font-size:0.92rem">$1</strong>')
-      .replace(/^[-*] (.+)$/gm, '<li>$1</li>')
-      .replace(/^\d+\. (.+)$/gm, '<li>$1</li>')
       .replace(/\n\n/g, '</p><p>')
-      .replace(/\n/g, '<br>');
-    html = html.replace(/(<li>.*?<\/li>(?:<br>)?)+/g, function(match) {
-      return '<ul>' + match.replace(/<br>/g, '') + '</ul>';
-    });
-    return '<p>' + html + '</p>';
+      .replace(/\n/g, '<br>') + '</p>';
   }
 
   // ─── Page-level send (uses shared engine from ai-companion.html) ───
@@ -651,6 +727,7 @@
     pageInput.value = '';
     pageInput.dataset.mode = '';
     pageInput.placeholder = 'Ask me anything...';
+    if (pageModeBadge) pageModeBadge.style.display = 'none';
     pageInput.style.height = 'auto';
     pageSendBtn.disabled = true;
     isPageGenerating = true;
@@ -710,7 +787,7 @@
         return window.dmAI._buildSystemPrompt(tasks);
       }
       // Fallback minimal prompt
-      return 'You are a helpful AI companion for a productivity app. Keep responses concise and actionable.';
+      return 'You are a productivity assistant. Be concise. Use bullet points with dashes. Keep replies under 150 words. When suggesting tasks, wrap each title in **bold**.';
     }
 
     var stopped = false;
@@ -726,20 +803,23 @@
           messages: messages,
           stream: true,
           temperature: 0.7,
-          max_tokens: 1024
+          max_tokens: 512
         });
       }).then(function(chunks) {
         if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
 
         var msgEl = addPageMessage('assistant', '');
         var bubbleEl = msgEl.querySelector('.ai-msg-bubble');
+        bubbleEl.classList.add('streaming');
         var fullText = '';
+        var rafPending = false;
 
         if (chunks[Symbol.asyncIterator]) {
           var iterator = chunks[Symbol.asyncIterator]();
           function processIterator() {
             return iterator.next().then(function(result) {
               if (result.done || stopped) {
+                bubbleEl.classList.remove('streaming');
                 chatHistory.push({ role: 'assistant', content: fullText });
                 try { sessionStorage.setItem(SS_KEY_MESSAGES, JSON.stringify(chatHistory.slice(-20))); } catch(e) {}
                 bubbleEl.innerHTML = renderPageMarkdown(fullText);
@@ -752,8 +832,16 @@
               var delta = (chunk.choices && chunk.choices[0] && chunk.choices[0].delta) ? (chunk.choices[0].delta.content || '') : '';
               if (delta) {
                 fullText += delta;
-                bubbleEl.innerHTML = renderPageMarkdown(fullText);
-                pageMessages.scrollTop = pageMessages.scrollHeight;
+                if (!rafPending) {
+                  rafPending = true;
+                  requestAnimationFrame(function() {
+                    rafPending = false;
+                    bubbleEl.innerHTML = renderPageMarkdown(fullText);
+                    // Smart scroll: only auto-scroll if near bottom
+                    var atBottom = pageMessages.scrollHeight - pageMessages.scrollTop - pageMessages.clientHeight < 80;
+                    if (atBottom) pageMessages.scrollTop = pageMessages.scrollHeight;
+                  });
+                }
               }
               return processIterator();
             });
@@ -765,7 +853,51 @@
       });
     }).catch(function(err) {
       if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
-      addPageMessage('assistant', 'Error: ' + (err.message || err));
+      pageDownload.style.display = 'none';
+      var errMsg = (err.message || String(err)).toLowerCase();
+      var isLoadError = errMsg.indexOf('load') !== -1 || errMsg.indexOf('not available') !== -1 || errMsg.indexOf('webgpu') !== -1;
+      var friendlyMsg = 'Something went wrong.';
+      if (errMsg.indexOf('not supported') !== -1) {
+        addPageMessage('assistant', 'WebGPU is not supported in your browser. AI Companion requires Chrome 113+ or Edge 113+.');
+      } else if (errMsg.indexOf('network') !== -1 || errMsg.indexOf('fetch') !== -1) {
+        friendlyMsg = 'Network error — check your connection and try again.';
+        addPageMessage('assistant', friendlyMsg);
+      } else if (errMsg.indexOf('context') !== -1 || errMsg.indexOf('token') !== -1) {
+        friendlyMsg = 'The conversation is too long. Try clearing the chat and starting fresh.';
+        addPageMessage('assistant', friendlyMsg);
+      } else if (isLoadError) {
+        friendlyMsg = 'Failed to load the AI model. ' + (err.message || String(err));
+        var msgEl = addPageMessage('assistant', friendlyMsg);
+        var retryBtn = document.createElement('button');
+        retryBtn.className = 'ai-page-retry-btn';
+        retryBtn.textContent = 'Retry';
+        retryBtn.addEventListener('click', function() {
+          retryBtn.disabled = true;
+          retryBtn.textContent = 'Retrying...';
+          if (window.dmAI && window.dmAI._loadEngine) {
+            window.dmAI._loadEngine().then(function() {
+              if (retryBtn.parentNode) retryBtn.parentNode.removeChild(retryBtn);
+              pageStatus.className = 'ai-page-status ready';
+              pageStatus.textContent = 'Ready';
+              pageStatus.style.display = '';
+            }).catch(function() {
+              retryBtn.disabled = false;
+              retryBtn.textContent = 'Retry';
+            });
+          } else {
+            retryBtn.disabled = false;
+            retryBtn.textContent = 'Retry';
+          }
+        });
+        var bubble = msgEl.querySelector('.ai-msg-bubble');
+        if (bubble) bubble.appendChild(retryBtn);
+        pageStatus.className = 'ai-page-status error';
+        pageStatus.textContent = 'Load failed';
+        pageStatus.style.display = '';
+      } else {
+        friendlyMsg += ' ' + (err.message || String(err));
+        addPageMessage('assistant', friendlyMsg);
+      }
       isPageGenerating = false;
       pageSendBtn.disabled = !pageInput.value.trim();
       pageStopBtn.style.display = 'none';
@@ -783,15 +915,17 @@
       pageInput.placeholder = 'Paste the text you want to improve...';
       pageInput.dataset.mode = 'improve';
       pageInput.focus();
+      if (pageModeBadge) { pageModeBadgeText.textContent = 'Improve mode'; pageModeBadge.style.display = ''; }
     } else if (action === 'summarize') {
       pageInput.placeholder = 'Paste the text you want to summarize...';
       pageInput.dataset.mode = 'summarize';
       pageInput.focus();
+      if (pageModeBadge) { pageModeBadgeText.textContent = 'Summarize mode'; pageModeBadge.style.display = ''; }
     } else if (action === 'plan') {
-      pageInput.value = 'Look at my tasks for today and any overdue tasks. Create a prioritized plan for my day.';
+      pageInput.value = 'Look at my tasks for today and overdue. Create a prioritized plan with suggested order. If no tasks today, pick from my backlog.';
       sendPageMessage();
     } else if (action === 'suggest') {
-      pageInput.value = 'Look at my tasks and suggest 3-5 new tasks I should add based on patterns you see.';
+      pageInput.value = 'Suggest 3-5 new tasks based on my existing tasks. For each, give the title in **bold** and a one-line reason.';
       sendPageMessage();
     }
   });
@@ -809,6 +943,40 @@
     pageInput.style.height = Math.min(pageInput.scrollHeight, 120) + 'px';
     pageSendBtn.disabled = !pageInput.value.trim() || isPageGenerating;
   });
+
+  // ─── Mode badge cancel ───
+  if (pageModeBadgeCancel) {
+    pageModeBadgeCancel.addEventListener('click', function() {
+      pageInput.dataset.mode = '';
+      pageInput.placeholder = 'Ask me anything...';
+      if (pageModeBadge) pageModeBadge.style.display = 'none';
+      pageInput.focus();
+    });
+  }
+
+  // ─── Clear chat ───
+  if (pageClearBtn) {
+    pageClearBtn.addEventListener('click', function() {
+      // Clear page messages
+      var children = pageMessages.querySelectorAll('.ai-msg');
+      children.forEach(function(c) { c.remove(); });
+      if (pageWelcome) {
+        pageWelcome.style.display = '';
+      }
+      // Reset mode badge
+      pageInput.dataset.mode = '';
+      pageInput.placeholder = 'Ask me anything...';
+      if (pageModeBadge) pageModeBadge.style.display = 'none';
+      // Clear session storage
+      try { sessionStorage.removeItem(SS_KEY_MESSAGES); } catch(e) {}
+      // Reset engine chat if available
+      if (window.dmAI && window.dmAI._getEngine) {
+        window.dmAI._getEngine().then(function(eng) {
+          try { eng.resetChat(); } catch(e) {}
+        }).catch(function() {});
+      }
+    });
+  }
 
   // ─── Sync events ───
   window.addEventListener('dm-todos-updated', loadTaskContext);
