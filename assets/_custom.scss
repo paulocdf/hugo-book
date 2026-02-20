@@ -1372,6 +1372,15 @@ aside nav ul a:hover {
     white-space: nowrap;
   }
 
+  .sidebar-settings-group-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: var(--gray-400);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 0 0;
+  }
+
   .sidebar-settings-control {
     display: flex;
     align-items: center;

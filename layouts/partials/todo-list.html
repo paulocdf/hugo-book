@@ -6,20 +6,6 @@
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
       Tasks
     </h3>
-    <div class="todo-list-actions">
-      <button type="button" class="single-note-history-btn note-action-btn" title="Version History">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-      </button>
-      <button type="button" class="single-note-review-btn note-action-btn" title="Create Flashcard">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V5"></path><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"></path><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"></path><path d="M18 18a4 4 0 0 0 2-7.464"></path><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"></path><path d="M6 18a4 4 0 0 1-2-7.464"></path><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"></path></svg>
-      </button>
-      <button type="button" class="single-note-pin-btn note-action-btn" title="Pin note">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg>
-      </button>
-      <button type="button" class="single-note-edit-btn note-action-btn note-action-btn-edit" title="Edit">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-      </button>
-    </div>
   </div>
 
   <div class="todo-list-body" id="todo-list-body">
@@ -31,9 +17,10 @@
           <button type="button" class="todo-add-pomo-minus" id="todo-add-pomo-minus" title="Remove pomodoro" aria-label="Decrease pomodoro count">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"></line></svg>
           </button>
-          <button type="button" class="todo-add-pomodoro-btn" id="todo-add-pomodoro-btn" title="Pomodoros (long-press for settings)" aria-label="Pomodoro count">
+          <button type="button" class="todo-add-pomodoro-btn" id="todo-add-pomodoro-btn" title="Short session (long-press to change)" aria-label="Pomodoro count">
             <svg class="todo-add-pomodoro-icon" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
             <span class="todo-add-pomodoro-count" id="todo-add-pomodoro-count">1</span>
+            <span class="todo-add-pomo-mode">S</span>
           </button>
           <button type="button" class="todo-add-pomo-plus" id="todo-add-pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"></line><line x1="6" y1="12" x2="18" y2="12"></line></svg>
@@ -116,40 +103,6 @@
 }
 .todo-list-title svg {
   color: var(--color-link);
-}
-.todo-list-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.todo-list-actions .note-action-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid transparent;
-  border-radius: 8px;
-  background: none;
-  color: var(--gray-400);
-  cursor: pointer;
-  transition: color 0.2s, background 0.2s, border-color 0.2s;
-  line-height: 0;
-}
-.todo-list-actions .note-action-btn:hover {
-  color: var(--body-font-color);
-  background: var(--gray-200);
-  border-color: var(--gray-300);
-}
-.todo-list-actions .note-action-btn-edit:hover {
-  color: var(--color-link);
-  background: rgba(0, 105, 255, 0.06);
-  border-color: rgba(0, 105, 255, 0.2);
-}
-.todo-list-actions .note-action-btn-active {
-  color: var(--color-link);
-  background: rgba(0, 105, 255, 0.08);
-  border-color: rgba(0, 105, 255, 0.25);
 }
 
 .todo-list-body {
@@ -491,6 +444,14 @@
   font-weight: 700;
   min-width: 14px;
   text-align: center;
+}
+.todo-add-pomo-mode {
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--gray-400);
+  margin-left: -1px;
+  text-transform: uppercase;
+  line-height: 1;
 }
 /* Pomodoro length config popover */
 .todo-add-pomo-config {
@@ -1140,32 +1101,45 @@
   color: var(--color-link);
 }
 
-/* Pomodoro start button */
-.todo-item-action-btn.pomodoro-start {
+/* Inline pomodoro start/pause/stop in meta row (always visible) */
+.todo-item-pomo-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 105, 255, 0.06);
   color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, transform 0.1s;
+  line-height: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
-.todo-item-action-btn.pomodoro-start:hover {
-  background: rgba(0, 105, 255, 0.08);
-  color: var(--accent-blue);
+.todo-item-pomo-inline:hover {
+  background: rgba(0, 105, 255, 0.14);
+  color: var(--accent-blue, var(--color-link));
+  transform: scale(1.1);
 }
-.todo-item-action-btn.pomodoro-start.active {
-  color: var(--accent-blue);
-  opacity: 1;
+.todo-item-pomo-inline.active {
+  color: var(--accent-blue, var(--color-link));
+  background: rgba(0, 105, 255, 0.1);
   animation: pomo-btn-pulse 2s ease-in-out infinite;
+}
+.todo-item-pomo-inline.pomo-stop {
+  color: var(--color-danger, #ea4335);
+  background: rgba(234, 67, 53, 0.06);
+}
+.todo-item-pomo-inline.pomo-stop:hover {
+  background: rgba(234, 67, 53, 0.14);
+  color: var(--color-danger, #ea4335);
 }
 @keyframes pomo-btn-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
-}
-
-/* Pomodoro stop button on todo item */
-.todo-item-action-btn.pomodoro-stop {
-  color: var(--color-danger, #ea4335);
-  opacity: 1;
-}
-.todo-item-action-btn.pomodoro-stop:hover {
-  background: rgba(234, 67, 53, 0.1);
-  color: var(--color-danger, #ea4335);
 }
 
 /* Reminder info text under task title */
@@ -1434,19 +1408,30 @@
   var _addFormPomodoroCount = _defaultPomodoroCount; // Number of pomodoro sessions for new task
   var _pomodoroConfigPopover = null; // Currently open pomodoro config popover
 
-  // Global pomodoro length (minutes per session) — stored in localStorage
-  var _globalPomodoroLength = 25;
+  // Global pomodoro mode settings — short & long work/break durations (minutes)
+  var _globalPomoShortWork = 25;
+  try { var stored = parseInt(localStorage.getItem('dm-pomo-short-work'), 10); if (stored > 0) _globalPomoShortWork = stored; } catch(e) {}
+  var _globalPomoShortBreak = 5;
+  try { var stored = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (stored > 0) _globalPomoShortBreak = stored; } catch(e) {}
+  var _globalPomoLongWork = 50;
+  try { var stored = parseInt(localStorage.getItem('dm-pomo-long-work'), 10); if (stored > 0) _globalPomoLongWork = stored; } catch(e) {}
+  var _globalPomoLongBreak = 10;
+  try { var stored = parseInt(localStorage.getItem('dm-pomo-long-break'), 10); if (stored > 0) _globalPomoLongBreak = stored; } catch(e) {}
+  // Migrate old single-key format
   try {
-    var stored = parseInt(localStorage.getItem('dm-pomodoro-length'), 10);
-    if (stored > 0) _globalPomodoroLength = stored;
+    var _oldLen = parseInt(localStorage.getItem('dm-pomodoro-length'), 10);
+    if (_oldLen > 0) { _globalPomoShortWork = _oldLen; localStorage.removeItem('dm-pomodoro-length'); }
   } catch(e) {}
+  // Current add-form pomodoro mode ("short"|"long")
+  var _addFormPomoMode = 'short';
 
   // Listen for settings changes from sidebar settings panel
   window.addEventListener('dm-settings-changed', function(e) {
     var detail = e.detail || {};
-    if (detail.key === 'dm-pomodoro-length' && detail.value > 0) {
-      _globalPomodoroLength = detail.value;
-    }
+    if (detail.key === 'dm-pomo-short-work' && detail.value > 0) _globalPomoShortWork = detail.value;
+    if (detail.key === 'dm-pomo-short-break' && detail.value > 0) _globalPomoShortBreak = detail.value;
+    if (detail.key === 'dm-pomo-long-work' && detail.value > 0) _globalPomoLongWork = detail.value;
+    if (detail.key === 'dm-pomo-long-break' && detail.value > 0) _globalPomoLongBreak = detail.value;
     if (detail.key === 'dm-default-pomo-count' && detail.value >= 0) {
       _defaultPomodoroCount = detail.value;
     }
@@ -2284,6 +2269,10 @@
       addPomodoroBtn.classList.remove('has-count');
       addPomoMinusBtn.disabled = true;
     }
+    // Update mode indicator on the pomodoro button
+    addPomodoroBtn.title = (_addFormPomoMode === 'long' ? 'Long' : 'Short') + ' session (long-press to change)';
+    var modeEl = addPomodoroBtn.querySelector('.todo-add-pomo-mode');
+    if (modeEl) modeEl.textContent = _addFormPomoMode === 'long' ? 'L' : 'S';
   }
 
   // Plus button: increment pomodoro count
@@ -2351,42 +2340,32 @@
 
     var label = document.createElement('div');
     label.style.cssText = 'font-size: 11px; color: var(--color-hint); margin-bottom: 6px;';
-    label.textContent = 'Session length (minutes)';
+    label.textContent = 'Session mode';
     pop.appendChild(label);
 
-    var input = document.createElement('input');
-    input.type = 'number';
-    input.min = '1';
-    input.max = '120';
-    input.value = _globalPomodoroLength;
-    input.style.cssText = 'width: 60px; padding: 4px 6px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 13px; background: var(--color-bg); color: var(--color-text);';
-    pop.appendChild(input);
+    var btnRow = document.createElement('div');
+    btnRow.style.cssText = 'display: flex; gap: 4px;';
 
-    var saveBtn = document.createElement('button');
-    saveBtn.type = 'button';
-    saveBtn.textContent = 'Save';
-    saveBtn.style.cssText = 'margin-left: 6px; padding: 4px 10px; border: none; border-radius: 4px; background: var(--color-link); color: #fff; font-size: 12px; cursor: pointer;';
-    pop.appendChild(saveBtn);
-
-    function saveLength() {
-      var val = parseInt(input.value, 10);
-      if (val > 0 && val <= 120) {
-        _globalPomodoroLength = val;
-        try { localStorage.setItem('dm-pomodoro-length', val); } catch(e) {}
+    function makeBtn(mode, labelText, workMin, breakMin) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = labelText + ' (' + workMin + '/' + breakMin + ')';
+      b.style.cssText = 'padding: 4px 10px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 12px; cursor: pointer; background: ' + (_addFormPomoMode === mode ? 'var(--color-link)' : 'var(--color-bg)') + '; color: ' + (_addFormPomoMode === mode ? '#fff' : 'var(--color-text)') + ';';
+      b.addEventListener('click', function(e) {
+        e.stopPropagation();
+        _addFormPomoMode = mode;
+        updatePomodoroCountDisplay();
         closePomodoroConfigPopover();
-      }
+      });
+      return b;
     }
 
-    saveBtn.addEventListener('click', function(e) { e.stopPropagation(); saveLength(); });
-    input.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); saveLength(); }
-      if (e.key === 'Escape') { e.preventDefault(); closePomodoroConfigPopover(); }
-    });
+    btnRow.appendChild(makeBtn('short', 'Short', _globalPomoShortWork, _globalPomoShortBreak));
+    btnRow.appendChild(makeBtn('long', 'Long', _globalPomoLongWork, _globalPomoLongBreak));
+    pop.appendChild(btnRow);
 
     addMainRow.appendChild(pop);
     _pomodoroConfigPopover = pop;
-    input.focus();
-    input.select();
 
     // Dismiss on outside click
     function onDocClick(e) {
@@ -2458,7 +2437,7 @@
 
     if (todo.estimatedMin) {
       var pCount = todo.pomodoroCount || 1;
-      var pLen = todo.pomodoroLength || _globalPomodoroLength;
+      var pLen = todo.pomodoroLength || _globalPomoShortWork;
       if (pCount > 1) {
         html += '<span class="todo-item-estimate">' + pCount + '× ' + pLen + 'min</span>';
       } else {
@@ -2481,6 +2460,32 @@
         timerLabel = (timerRunning ? '' : 'paused ') + sessionInfo.current + '/' + sessionInfo.total;
       }
       html += '<span class="todo-item-timer-active' + (timerRunning ? '' : ' paused') + '"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ' + timerLabel + '</span>';
+    }
+
+    // Inline pomodoro start/pause/stop buttons (always visible for undone tasks)
+    if (!todo.done) {
+      var isTimerActive = window.dmPomodoro && window.dmPomodoro.isActive(todo.id);
+      var isTimerRunning = isTimerActive && window.dmPomodoro.isTimerRunning();
+      if (isTimerActive) {
+        // Pause/Resume button
+        var pomoBtnTitle = isTimerRunning ? 'Pause timer' : 'Resume timer';
+        html += '<button type="button" class="todo-item-pomo-inline pomodoro-start active" data-pomodoro-id="' + todo.id + '" title="' + pomoBtnTitle + '" aria-label="' + pomoBtnTitle + '">';
+        if (isTimerRunning) {
+          html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="3" width="5" height="18" rx="1"></rect><rect x="14" y="3" width="5" height="18" rx="1"></rect></svg>';
+        } else {
+          html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+        }
+        html += '</button>';
+        // Stop button
+        html += '<button type="button" class="todo-item-pomo-inline pomo-stop" data-pomodoro-stop-id="' + todo.id + '" title="Stop &amp; record time" aria-label="Stop timer">';
+        html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>';
+        html += '</button>';
+      } else {
+        // Start button (no active timer)
+        html += '<button type="button" class="todo-item-pomo-inline pomodoro-start" data-pomodoro-id="' + todo.id + '" title="Start Pomodoro" aria-label="Start Pomodoro">';
+        html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+        html += '</button>';
+      }
     }
     if (todo.category) {
       html += '<span class="todo-item-category">' + escapeHtml(todo.category) + '</span>';
@@ -2505,28 +2510,6 @@
     // Action buttons
     html += '<div class="todo-item-actions">';
     if (!todo.done) {
-      // Pomodoro timer button
-      var isTimerActive = window.dmPomodoro && window.dmPomodoro.isActive(todo.id);
-      var isTimerRunning = isTimerActive && window.dmPomodoro.isTimerRunning();
-      var pomoBtnTitle = isTimerRunning ? 'Pause timer' : (isTimerActive ? 'Resume timer' : 'Start Pomodoro');
-      html += '<button type="button" class="todo-item-action-btn pomodoro-start' + (isTimerActive ? ' active' : '') + '" data-pomodoro-id="' + todo.id + '" title="' + pomoBtnTitle + '" aria-label="' + pomoBtnTitle + '">';
-      if (isTimerRunning) {
-        // Pause icon
-        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
-      } else if (isTimerActive) {
-        // Play/resume icon (timer paused)
-        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
-      } else {
-        // Clock icon (no timer)
-        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
-      }
-      html += '</button>';
-      // Stop timer button (only visible when timer is active for this task)
-      if (isTimerActive) {
-        html += '<button type="button" class="todo-item-action-btn pomodoro-stop" data-pomodoro-stop-id="' + todo.id + '" title="Stop &amp; record time" aria-label="Stop timer">';
-        html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>';
-        html += '</button>';
-      }
       var hasReminder = todo.reminderAt && !todo.reminderFired;
       html += '<button type="button" class="todo-item-action-btn reminder-bell' + (hasReminder ? ' has-reminder' : '') + '" data-reminder-id="' + todo.id + '" title="' + (hasReminder ? 'Edit reminder' : 'Set reminder') + '" aria-label="Set reminder">';
       if (hasReminder) {
@@ -2785,8 +2768,8 @@
     });
 
     if (totalCount > 0) {
-      var pomEst = (totalEst / _globalPomodoroLength).toFixed(1);
-      var pomActual = (totalActual / _globalPomodoroLength).toFixed(1);
+      var pomEst = (totalEst / _globalPomoShortWork).toFixed(1);
+      var pomActual = (totalActual / _globalPomoShortWork).toFixed(1);
       summaryEl.innerHTML =
         '<span class="todo-summary-item"><strong>' + doneCount + '/' + totalCount + '</strong> tasks done</span>' +
         (totalEst ? '<span class="todo-summary-item">Est: <strong>' + totalEst + 'min</strong> (' + pomEst + ' pom)</span>' : '') +
@@ -2932,7 +2915,7 @@
     });
 
     // Pomodoro stop button on todo item
-    itemsEl.querySelectorAll('.pomodoro-stop[data-pomodoro-stop-id]').forEach(function(btn) {
+    itemsEl.querySelectorAll('[data-pomodoro-stop-id]').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         if (window.dmPomodoro) {
@@ -3354,7 +3337,7 @@
     return minOrder - 1;
   }
 
-  function createTodo(title, estimatedMin, parentId, scheduledDate, reminderAtMs, category, atTop, pomodoroCount, pomodoroLength, onDone, source) {
+  function createTodo(title, estimatedMin, parentId, scheduledDate, reminderAtMs, category, atTop, pomodoroCount, pomodoroLength, onDone, source, breakLength) {
     if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
       showTodoError('Not signed in — please sign in to add tasks');
       if (onDone) onDone();
@@ -3370,7 +3353,7 @@
     }
 
     var pCount = pomodoroCount || 1;
-    var pLength = pomodoroLength || _globalPomodoroLength;
+    var pLength = pomodoroLength || (_addFormPomoMode === 'long' ? _globalPomoLongWork : _globalPomoShortWork);
 
     var todoData = {
       userId: user.uid,
@@ -3380,6 +3363,7 @@
       category: category || null,
       pomodoroCount: pCount,
       pomodoroLength: pLength,
+      breakLength: breakLength || null,
       done: false,
       parentId: parentId || null,
       order: order,
@@ -3403,6 +3387,7 @@
       category: category || null,
       pomodoroCount: pCount,
       pomodoroLength: pLength,
+      breakLength: breakLength || null,
       done: false,
       parentId: parentId || null,
       order: order,
@@ -3650,7 +3635,8 @@
     if (!title) { addTitleInput.focus(); return; }
     var customMin = addCustomMinInput.value ? parseInt(addCustomMinInput.value, 10) : null;
     var pomCount = _addFormPomodoroCount;
-    var pomLen = _globalPomodoroLength;
+    var pomLen = _addFormPomoMode === 'long' ? _globalPomoLongWork : _globalPomoShortWork;
+    var pomBreakLen = _addFormPomoMode === 'long' ? _globalPomoLongBreak : _globalPomoShortBreak;
     var est;
     if (customMin != null && customMin >= 0) {
       est = customMin;
@@ -3666,7 +3652,7 @@
     addBtn.disabled = true;
     createTodo(title, est, null, scheduledDate, reminderAtMs, category, true, pomCount, pomLen, function() {
       addBtn.disabled = false;
-    });
+    }, null, pomBreakLen);
     addTitleInput.value = '';
     addCustomMinInput.value = '';
     // Reset pomodoro count to default but keep date and category sticky for rapid task creation

@@ -2216,10 +2216,33 @@
       footer.className = 'sidebar-settings-footer';
       footer.innerHTML =
         '<div class="sidebar-settings-panel" id="sidebar-settings-panel" style="display:none;">' +
+          '<div class="sidebar-settings-group-label">Short session</div>' +
           '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-pomo-duration">Pomodoro duration</label>' +
+            '<label class="sidebar-settings-label" for="setting-pomo-short-work">Work</label>' +
             '<div class="sidebar-settings-control">' +
-              '<input type="number" id="setting-pomo-duration" class="sidebar-settings-input" min="1" max="120" value="25">' +
+              '<input type="number" id="setting-pomo-short-work" class="sidebar-settings-input" min="1" max="120" value="25">' +
+              '<span class="sidebar-settings-unit">min</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-pomo-short-break">Break</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<input type="number" id="setting-pomo-short-break" class="sidebar-settings-input" min="1" max="60" value="5">' +
+              '<span class="sidebar-settings-unit">min</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-group-label" style="margin-top:4px;">Long session</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-pomo-long-work">Work</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<input type="number" id="setting-pomo-long-work" class="sidebar-settings-input" min="1" max="120" value="50">' +
+              '<span class="sidebar-settings-unit">min</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-pomo-long-break">Break</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<input type="number" id="setting-pomo-long-break" class="sidebar-settings-input" min="1" max="60" value="10">' +
               '<span class="sidebar-settings-unit">min</span>' +
             '</div>' +
           '</div>' +
@@ -2260,9 +2283,24 @@
     var panel = document.getElementById('sidebar-settings-panel');
     if (!toggle || !panel) return;
 
-    // Read current values from localStorage
-    var pomoDuration = 25;
-    try { var v = parseInt(localStorage.getItem('dm-pomodoro-length'), 10); if (v > 0) pomoDuration = v; } catch(e) {}
+    // ─── Migrate old single-key format ───
+    var oldLen = null;
+    try { var v = parseInt(localStorage.getItem('dm-pomodoro-length'), 10); if (v > 0) oldLen = v; } catch(e) {}
+    if (oldLen) {
+      // Use old value as the short-work default if no short-work key exists yet
+      try { if (!localStorage.getItem('dm-pomo-short-work')) localStorage.setItem('dm-pomo-short-work', oldLen); } catch(e) {}
+      try { localStorage.removeItem('dm-pomodoro-length'); } catch(e) {}
+    }
+
+    // ─── Read all mode values from localStorage ───
+    var shortWork = 25;
+    try { var v = parseInt(localStorage.getItem('dm-pomo-short-work'), 10); if (v > 0) shortWork = v; } catch(e) {}
+    var shortBreak = 5;
+    try { var v = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (v > 0) shortBreak = v; } catch(e) {}
+    var longWork = 50;
+    try { var v = parseInt(localStorage.getItem('dm-pomo-long-work'), 10); if (v > 0) longWork = v; } catch(e) {}
+    var longBreak = 10;
+    try { var v = parseInt(localStorage.getItem('dm-pomo-long-break'), 10); if (v > 0) longBreak = v; } catch(e) {}
 
     var defaultPomoCount = 1;
     try { var v = parseInt(localStorage.getItem('dm-default-pomo-count'), 10); if (v >= 0) defaultPomoCount = v; } catch(e) {}
@@ -2270,11 +2308,17 @@
     var autoSchedule = true;
     try { var v = localStorage.getItem('dm-auto-schedule-today'); if (v === 'false') autoSchedule = false; } catch(e) {}
 
-    var durInput = document.getElementById('setting-pomo-duration');
+    var shortWorkInput = document.getElementById('setting-pomo-short-work');
+    var shortBreakInput = document.getElementById('setting-pomo-short-break');
+    var longWorkInput = document.getElementById('setting-pomo-long-work');
+    var longBreakInput = document.getElementById('setting-pomo-long-break');
     var countInput = document.getElementById('setting-pomo-count');
     var scheduleToggle = document.getElementById('setting-auto-schedule');
 
-    if (durInput) durInput.value = pomoDuration;
+    if (shortWorkInput) shortWorkInput.value = shortWork;
+    if (shortBreakInput) shortBreakInput.value = shortBreak;
+    if (longWorkInput) longWorkInput.value = longWork;
+    if (longBreakInput) longBreakInput.value = longBreak;
     if (countInput) countInput.value = defaultPomoCount;
     if (scheduleToggle) scheduleToggle.checked = autoSchedule;
 
@@ -2285,18 +2329,24 @@
       panel.style.display = panel.style.display === 'none' ? '' : 'none';
     });
 
-    // Save on change — Pomodoro duration
-    if (durInput) {
-      durInput.addEventListener('change', function() {
-        var val = parseInt(durInput.value, 10);
-        if (val > 0 && val <= 120) {
-          try { localStorage.setItem('dm-pomodoro-length', val); } catch(e) {}
-          window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-pomodoro-length', value: val } }));
+    // Helper: save a numeric setting on change
+    function bindNumericSetting(inputEl, lsKey, min, max, fallback) {
+      if (!inputEl) return;
+      inputEl.addEventListener('change', function() {
+        var val = parseInt(inputEl.value, 10);
+        if (val >= min && val <= max) {
+          try { localStorage.setItem(lsKey, val); } catch(e) {}
+          window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: lsKey, value: val } }));
         } else {
-          durInput.value = pomoDuration;
+          inputEl.value = fallback;
         }
       });
     }
+
+    bindNumericSetting(shortWorkInput, 'dm-pomo-short-work', 1, 120, shortWork);
+    bindNumericSetting(shortBreakInput, 'dm-pomo-short-break', 1, 60, shortBreak);
+    bindNumericSetting(longWorkInput, 'dm-pomo-long-work', 1, 120, longWork);
+    bindNumericSetting(longBreakInput, 'dm-pomo-long-break', 1, 60, longBreak);
 
     // Save on change — Default Pomodoro count
     if (countInput) {

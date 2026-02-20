@@ -26,6 +26,12 @@
     </button>
   </div>
   <div class="pomodoro-timer-session" id="pomodoro-session">Session 1</div>
+  <div class="pomodoro-timer-info" id="pomodoro-info" style="display:none;">
+    <span id="pomodoro-started-at"></span>
+    <span id="pomodoro-remaining"></span>
+    <span id="pomodoro-est-finish"></span>
+  </div>
+  <div class="pomodoro-timer-subtasks" id="pomodoro-subtasks" style="display:none;"></div>
 </div>
 
 <style>
@@ -198,6 +204,66 @@
     width: 190px;
   }
 }
+/* Info section: started-at, remaining, est. finish */
+.pomodoro-timer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--gray-200);
+  font-size: 0.65rem;
+  color: var(--text-faint);
+  line-height: 1.4;
+}
+.pomodoro-timer-info span::before {
+  display: inline-block;
+  width: 56px;
+  font-weight: 600;
+  color: var(--gray-400);
+}
+#pomodoro-started-at::before { content: 'Started'; }
+#pomodoro-remaining::before { content: 'Left'; }
+#pomodoro-est-finish::before { content: 'Finish'; }
+/* Subtask checklist inside pomodoro popup */
+.pomodoro-timer-subtasks {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--gray-200);
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 0.7rem;
+}
+.pomodoro-subtask-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 0;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.pomodoro-subtask-item:hover {
+  opacity: 0.8;
+}
+.pomodoro-subtask-item input[type="checkbox"] {
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--color-link);
+}
+.pomodoro-subtask-item label {
+  cursor: pointer;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pomodoro-subtask-item.done label {
+  text-decoration: line-through;
+  opacity: 0.5;
+}
 </style>
 
 <script>
@@ -221,6 +287,11 @@
   var stopBtn = document.getElementById('pomodoro-stop');
   var closeBtn = document.getElementById('pomodoro-close');
   var sessionEl = document.getElementById('pomodoro-session');
+  var infoEl = document.getElementById('pomodoro-info');
+  var startedAtEl = document.getElementById('pomodoro-started-at');
+  var remainingEl = document.getElementById('pomodoro-remaining');
+  var estFinishEl = document.getElementById('pomodoro-est-finish');
+  var subtasksEl = document.getElementById('pomodoro-subtasks');
 
   var activeTodoId = null;
   var activeTodoTitle = '';
@@ -232,6 +303,7 @@
   var sessionCount = 1;
   var totalSessions = 1; // total pomodoro sessions for this task
   var accumulatedWorkSeconds = 0; // total work seconds done for this todo
+  var startedAt = null; // Date.now() when timer started
 
   function formatTime(s) {
     var m = Math.floor(s / 60);
@@ -255,11 +327,43 @@
     sessionText += ' \u00b7 ' + Math.round(accumulatedWorkSeconds / 60) + 'min tracked';
     sessionEl.textContent = sessionText;
 
+    // Update info section
+    if (startedAt) {
+      infoEl.style.display = '';
+      var startDate = new Date(startedAt);
+      startedAtEl.textContent = padTime(startDate.getHours()) + ':' + padTime(startDate.getMinutes());
+
+      // Calculate total remaining seconds across all sessions
+      var remainingSec = secondsLeft;
+      if (phase === 'work') {
+        // remaining work in current session + remaining sessions (work + break each)
+        var sessionsLeft = totalSessions - sessionCount;
+        remainingSec += sessionsLeft * (WORK_SECONDS + BREAK_SECONDS);
+      } else {
+        // break phase: remaining break + remaining work sessions
+        var sessionsLeft = totalSessions - sessionCount; // sessions after current
+        remainingSec += sessionsLeft * (WORK_SECONDS + BREAK_SECONDS);
+      }
+
+      var remMin = Math.ceil(remainingSec / 60);
+      if (remMin >= 60) {
+        remainingEl.textContent = Math.floor(remMin / 60) + 'h ' + (remMin % 60) + 'm';
+      } else {
+        remainingEl.textContent = remMin + 'm';
+      }
+
+      var finishMs = Date.now() + remainingSec * 1000;
+      var finishDate = new Date(finishMs);
+      estFinishEl.textContent = '~' + padTime(finishDate.getHours()) + ':' + padTime(finishDate.getMinutes());
+    }
+
     // Update document title while running
     if (isRunning) {
       document.title = formatTime(secondsLeft) + ' \u2014 ' + (phase === 'work' ? 'Work' : 'Break') + ' | Digital Memory';
     }
   }
+
+  function padTime(n) { return (n < 10 ? '0' : '') + n; }
 
   function showPlayIcon() {
     playIcon.style.display = '';
@@ -426,6 +530,7 @@
     categoryEl.style.display = 'none';
     categoryEl.textContent = '';
     showPlayIcon();
+    clearInfoAndSubtasks();
 
     // Restore page title
     var cleanTitle = document.title.replace(/^\d{2}:\d{2} \u2014 (Work|Break) \| /, '');
@@ -453,6 +558,7 @@
     timerEl.style.display = 'none';
     categoryEl.style.display = 'none';
     categoryEl.textContent = '';
+    clearInfoAndSubtasks();
     showPlayIcon();
 
     // Restore page title
@@ -567,6 +673,73 @@
     hasCustomPos = false;
   }
 
+  // ── Subtask loading for pomodoro popup ──
+  function loadSubtasks(todoId) {
+    if (!window.dmSync || !window.dmSync.getAllTodos) return;
+    window.dmSync.getAllTodos().then(function(todos) {
+      if (activeTodoId !== todoId) return; // timer was stopped meanwhile
+      var subs = (todos || []).filter(function(t) { return t.parentId === todoId; });
+      if (subs.length === 0) { subtasksEl.style.display = 'none'; return; }
+      subs.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      subtasksEl.innerHTML = '';
+      subs.forEach(function(sub) {
+        var row = document.createElement('div');
+        row.className = 'pomodoro-subtask-item' + (sub.done ? ' done' : '');
+        row.innerHTML = '<input type="checkbox"' + (sub.done ? ' checked' : '') + '><label>' + escapeHtmlPomo(sub.title) + '</label>';
+        var cb = row.querySelector('input');
+        cb.addEventListener('change', function() {
+          var newDone = cb.checked;
+          row.className = 'pomodoro-subtask-item' + (newDone ? ' done' : '');
+          toggleSubtaskDone(sub, newDone);
+        });
+        subtasksEl.appendChild(row);
+      });
+      subtasksEl.style.display = '';
+    }).catch(function() {});
+  }
+
+  function escapeHtmlPomo(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function toggleSubtaskDone(sub, newDone) {
+    sub.done = newDone;
+    sub.updatedAt = Date.now();
+    if (newDone) sub.completedAt = Date.now();
+    else sub.completedAt = null;
+
+    if (window.dmSync) {
+      var updateData = {
+        done: newDone,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (newDone) updateData.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+      else updateData.completedAt = null;
+
+      window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: sub.id,
+        op: 'update',
+        data: updateData,
+        localOp: function() { return window.dmSync.putTodo(sub); }
+      }).then(function() {
+        // Notify todo list to re-render
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+      }).catch(function(err) {
+        console.error('Error toggling subtask:', err);
+      });
+    }
+  }
+
+  function clearInfoAndSubtasks() {
+    startedAt = null;
+    infoEl.style.display = 'none';
+    subtasksEl.innerHTML = '';
+    subtasksEl.style.display = 'none';
+  }
+
   // ── Public API ──
   window.dmPomodoro = {
     start: function(todoId, todoTitle) {
@@ -584,6 +757,7 @@
 
       // Set defaults
       WORK_SECONDS = 25 * 60;
+      BREAK_SECONDS = 5 * 60;
       totalSessions = 1;
 
       function initAndStart() {
@@ -592,6 +766,7 @@
         totalPhaseSeconds = WORK_SECONDS;
         sessionCount = 1;
         accumulatedWorkSeconds = 0;
+        startedAt = Date.now();
         isRunning = false;
         showPlayIcon();
         updateDisplay();
@@ -599,6 +774,10 @@
         timerEl.style.display = '';
         startTimer();
       }
+
+      // Clear subtasks from previous run
+      subtasksEl.innerHTML = '';
+      subtasksEl.style.display = 'none';
 
       if (window.dmSync && window.dmSync.getTodo) {
         window.dmSync.getTodo(todoId).then(function(todo) {
@@ -610,10 +789,18 @@
             if (todo.pomodoroLength && todo.pomodoroLength > 0) {
               WORK_SECONDS = todo.pomodoroLength * 60;
             }
+            if (todo.breakLength && todo.breakLength > 0) {
+              BREAK_SECONDS = todo.breakLength * 60;
+            } else {
+              // Fall back to global short-break default
+              try { var v = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (v > 0) BREAK_SECONDS = v * 60; } catch(e) {}
+            }
             if (todo.pomodoroCount && todo.pomodoroCount > 0) {
               totalSessions = todo.pomodoroCount;
             }
           }
+          // Load subtasks
+          loadSubtasks(todoId);
           initAndStart();
         }).catch(function() {
           initAndStart();
@@ -643,6 +830,9 @@
     },
     getSessionInfo: function() {
       return { current: sessionCount, total: totalSessions };
+    },
+    getStartedAt: function() {
+      return startedAt;
     }
   };
 })();
