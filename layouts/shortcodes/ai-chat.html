@@ -131,6 +131,9 @@
         </div>
         <div class="ai-input-wrap">
           <textarea class="ai-input ai-page-input" id="ai-page-input" placeholder="Ask me anything..." rows="1"></textarea>
+          <button type="button" class="ai-mic-btn" id="ai-page-mic-btn" title="Voice input" aria-label="Voice input" style="display:none;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+          </button>
           <button type="button" class="ai-send-btn" id="ai-page-send-btn" title="Send" aria-label="Send" disabled>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
           </button>
@@ -481,6 +484,50 @@
 .ai-page-input-area .ai-mode-badge-cancel:hover {
   opacity: 1;
 }
+.ai-task-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  margin: 4px 0;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  transition: background 0.15s;
+}
+.ai-task-card:hover {
+  background: var(--gray-100);
+}
+.ai-task-card-title {
+  flex: 1;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+.ai-task-card-add {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--accent-ai);
+  border-radius: 6px;
+  background: none;
+  color: var(--accent-ai);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 0;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.ai-task-card-add:hover {
+  background: var(--accent-ai);
+  color: #fff;
+}
+.ai-task-card-added {
+  font-size: 0.72rem;
+  color: var(--color-success);
+  font-weight: 500;
+}
 </style>
 
 <script>
@@ -512,6 +559,7 @@
   var pageModeBadge = document.getElementById('ai-page-mode-badge');
   var pageModeBadgeText = document.getElementById('ai-page-mode-badge-text');
   var pageModeBadgeCancel = document.getElementById('ai-page-mode-badge-cancel');
+  var pageMicBtn = document.getElementById('ai-page-mic-btn');
 
   if (!pageAuth || !pageContent) return;
 
@@ -718,6 +766,14 @@
       .replace(/\n/g, '<br>') + '</p>';
   }
 
+  // ─── Task-creation intent detection (delegates to ai-companion.html shared functions) ───
+  function detectPageTaskIntent(text) {
+    if (window.dmAI && window.dmAI._detectTaskIntent) {
+      return window.dmAI._detectTaskIntent(text);
+    }
+    return null;
+  }
+
   // ─── Page-level send (uses shared engine from ai-companion.html) ───
   function sendPageMessage() {
     var text = pageInput.value.trim();
@@ -730,36 +786,84 @@
     if (pageModeBadge) pageModeBadge.style.display = 'none';
     pageInput.style.height = 'auto';
     pageSendBtn.disabled = true;
+
+    if (mode === 'improve' || mode === 'summarize') {
+      // No task detection for improve/summarize modes
+      isPageGenerating = true;
+      pageStopBtn.style.display = '';
+
+      var userMessage = mode === 'improve'
+        ? 'Please improve the following text. Make it clearer, more concise, and better written. Return only the improved version:\n\n' + text
+        : 'Please summarize the following text concisely:\n\n' + text;
+
+      addPageMessage('user', text);
+
+      var chatHistory = [];
+      try {
+        var saved = sessionStorage.getItem(SS_KEY_MESSAGES);
+        if (saved) chatHistory = JSON.parse(saved);
+      } catch(e) {}
+      chatHistory.push({ role: 'user', content: userMessage });
+
+      var typingEl = addPageTypingIndicator();
+      _doPageChat(userMessage, chatHistory, typingEl);
+      return;
+    }
+
+    // Check for task-creation intent
+    var rawTitle = detectPageTaskIntent(text);
+    if (rawTitle && window.dmDb && window.dmAuth && window.dmAuth.currentUser && window.dmAI) {
+      var details = window.dmAI._parseTaskDetails(rawTitle);
+
+      var event = new CustomEvent('dm-ai-create-task', {
+        detail: {
+          title: details.title,
+          scheduledDate: details.scheduledDate,
+          estimatedMin: details.estimatedMin,
+          category: details.category,
+          source: 'ai'
+        }
+      });
+      window.dispatchEvent(event);
+
+      addPageMessage('user', text);
+      var confirmText = window.dmAI._buildTaskConfirmation(details);
+      addPageMessage('assistant', confirmText);
+
+      var chatHistory = [];
+      try {
+        var saved = sessionStorage.getItem(SS_KEY_MESSAGES);
+        if (saved) chatHistory = JSON.parse(saved);
+      } catch(e) {}
+      chatHistory.push({ role: 'user', content: text });
+      chatHistory.push({ role: 'assistant', content: confirmText });
+      try { sessionStorage.setItem(SS_KEY_MESSAGES, JSON.stringify(chatHistory.slice(-20))); } catch(e) {}
+      return;
+    }
+
+    // Normal AI chat
     isPageGenerating = true;
     pageStopBtn.style.display = '';
 
-    var userMessage = text;
-    if (mode === 'improve') {
-      userMessage = 'Please improve the following text. Make it clearer, more concise, and better written. Return only the improved version:\n\n' + text;
-    } else if (mode === 'summarize') {
-      userMessage = 'Please summarize the following text concisely:\n\n' + text;
-    }
-
     addPageMessage('user', text);
 
-    // Also send to the side panel's chat history
     var chatHistory = [];
     try {
       var saved = sessionStorage.getItem(SS_KEY_MESSAGES);
       if (saved) chatHistory = JSON.parse(saved);
     } catch(e) {}
-    chatHistory.push({ role: 'user', content: userMessage });
+    chatHistory.push({ role: 'user', content: text });
 
     var typingEl = addPageTypingIndicator();
+    _doPageChat(text, chatHistory, typingEl);
+  }
 
-    // Use the engine from the side panel
+  function _doPageChat(userMessage, chatHistory, typingEl) {
     function getEngine() {
       if (!window.dmAI) {
         return Promise.reject(new Error('AI engine not available. Please ensure AI is enabled.'));
       }
-      // Try to get existing engine; if not loaded yet, trigger a load
       return window.dmAI._getEngine().catch(function() {
-        // Show download progress on this page while loading
         pageDownload.style.display = '';
         pageDownloadText.textContent = 'Loading AI model...';
         pageDownloadDetail.textContent = 'This may take a moment on first use (~350 MB download)';
@@ -786,7 +890,6 @@
       if (window.dmAI && window.dmAI._buildSystemPrompt) {
         return window.dmAI._buildSystemPrompt(tasks);
       }
-      // Fallback minimal prompt
       return 'You are a productivity assistant. Be concise. Use bullet points with dashes. Keep replies under 150 words. When suggesting tasks, wrap each title in **bold**.';
     }
 
@@ -823,6 +926,7 @@
                 chatHistory.push({ role: 'assistant', content: fullText });
                 try { sessionStorage.setItem(SS_KEY_MESSAGES, JSON.stringify(chatHistory.slice(-20))); } catch(e) {}
                 bubbleEl.innerHTML = renderPageMarkdown(fullText);
+                detectPageTaskCards(bubbleEl, fullText);
                 isPageGenerating = false;
                 pageSendBtn.disabled = !pageInput.value.trim();
                 pageStopBtn.style.display = 'none';
@@ -992,6 +1096,139 @@
       pageDownloadDetail.textContent = d.pct + '% complete';
     }
   });
+
+  // ─── Voice input (Web Speech API) ───
+  var PageSpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var pageRecognition = null;
+  var isPageRecording = false;
+
+  if (PageSpeechAPI && pageMicBtn) {
+    pageMicBtn.style.display = '';
+
+    pageRecognition = new PageSpeechAPI();
+    pageRecognition.continuous = false;
+    pageRecognition.interimResults = true;
+    pageRecognition.lang = navigator.language || 'en-US';
+
+    var _pageInterimStart = '';
+
+    pageRecognition.onstart = function() {
+      isPageRecording = true;
+      pageMicBtn.classList.add('recording');
+      pageMicBtn.title = 'Stop recording';
+      _pageInterimStart = pageInput.value;
+    };
+
+    pageRecognition.onresult = function(event) {
+      var interim = '';
+      var final = '';
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      if (final) {
+        var sep = _pageInterimStart && !_pageInterimStart.endsWith(' ') ? ' ' : '';
+        _pageInterimStart += sep + final;
+        pageInput.value = _pageInterimStart;
+      } else if (interim) {
+        var sep2 = _pageInterimStart && !_pageInterimStart.endsWith(' ') ? ' ' : '';
+        pageInput.value = _pageInterimStart + sep2 + interim;
+      }
+      pageInput.style.height = 'auto';
+      pageInput.style.height = Math.min(pageInput.scrollHeight, 120) + 'px';
+      pageSendBtn.disabled = !pageInput.value.trim() || isPageGenerating;
+    };
+
+    pageRecognition.onend = function() {
+      isPageRecording = false;
+      pageMicBtn.classList.remove('recording');
+      pageMicBtn.title = 'Voice input';
+      pageInput.focus();
+    };
+
+    pageRecognition.onerror = function(event) {
+      isPageRecording = false;
+      pageMicBtn.classList.remove('recording');
+      pageMicBtn.title = 'Voice input';
+      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        console.warn('[AI Page] Speech recognition error:', event.error);
+      }
+    };
+
+    pageMicBtn.addEventListener('click', function() {
+      if (isPageRecording) {
+        pageRecognition.stop();
+      } else {
+        try { pageRecognition.start(); } catch(e) {
+          pageRecognition.stop();
+        }
+      }
+    });
+  }
+
+  // ─── Task card detection (same logic as ai-companion.html) ───
+  function detectPageTaskCards(bubbleEl, text) {
+    var boldPattern = /\*\*([^*]+)\*\*/g;
+    var matches = [];
+    var match;
+    while ((match = boldPattern.exec(text)) !== null) {
+      var title = match[1].trim();
+      if (title.length > 5 && title.length < 200 && !/^[A-Za-z]{1,15}:/.test(title)) {
+        matches.push(title);
+      }
+    }
+
+    if (matches.length === 0) return;
+
+    var cardsContainer = document.createElement('div');
+    cardsContainer.style.marginTop = '8px';
+
+    matches.forEach(function(taskTitle) {
+      var card = document.createElement('div');
+      card.className = 'ai-task-card';
+
+      var titleSpan = document.createElement('span');
+      titleSpan.className = 'ai-task-card-title';
+      titleSpan.textContent = taskTitle;
+
+      var addBtn = document.createElement('button');
+      addBtn.className = 'ai-task-card-add';
+      addBtn.innerHTML = '+';
+      addBtn.title = 'Add as task';
+      addBtn.addEventListener('click', function() {
+        addPageTaskFromSuggestion(taskTitle, card);
+      });
+
+      card.appendChild(titleSpan);
+      card.appendChild(addBtn);
+      cardsContainer.appendChild(card);
+    });
+
+    bubbleEl.appendChild(cardsContainer);
+  }
+
+  function addPageTaskFromSuggestion(title, cardEl) {
+    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
+      addPageMessage('assistant', 'Please sign in to add tasks.');
+      return;
+    }
+
+    var event = new CustomEvent('dm-ai-create-task', { detail: { title: title, source: 'ai' } });
+    window.dispatchEvent(event);
+
+    var addBtn = cardEl.querySelector('.ai-task-card-add');
+    if (addBtn) {
+      addBtn.style.display = 'none';
+      var addedSpan = document.createElement('span');
+      addedSpan.className = 'ai-task-card-added';
+      addedSpan.textContent = 'Added';
+      cardEl.appendChild(addedSpan);
+    }
+  }
 
 })();
 </script>

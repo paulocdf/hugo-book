@@ -177,8 +177,28 @@
   var todoReminderChipText = document.getElementById('qc-todo-reminder-chip-text');
   var todoReminderClear = document.getElementById('qc-todo-reminder-clear');
 
+  // AI mode elements
+  var qcAiContainer = document.getElementById('qc-ai-container');
+  var qcAiMessages = document.getElementById('qc-ai-messages');
+  var qcAiWelcome = document.getElementById('qc-ai-welcome');
+  var qcAiInput = document.getElementById('qc-ai-input');
+  var qcAiSendBtn = document.getElementById('qc-ai-send-btn');
+  var qcAiStopBtn = document.getElementById('qc-ai-stop-btn');
+  var qcAiQuickActions = document.getElementById('qc-ai-quick-actions');
+  var qcAiStatusEl = document.getElementById('qc-ai-status');
+  var qcAiStatusText = document.getElementById('qc-ai-status-text');
+  var qcAiProgressFill = document.getElementById('qc-ai-progress-fill');
+  var qcAiStatusDetail = document.getElementById('qc-ai-status-detail');
+  var qcAiNotSupported = document.getElementById('qc-ai-not-supported');
+  var qcAiModeBadge = document.getElementById('qc-ai-mode-badge');
+  var qcAiModeBadgeText = document.getElementById('qc-ai-mode-badge-text');
+  var qcAiModeBadgeCancel = document.getElementById('qc-ai-mode-badge-cancel');
+  var qcAiMicBtn = document.getElementById('qc-ai-mic-btn');
+  var qcAiInputArea = document.getElementById('qc-ai-input-area');
+  var qcAiModeBtn = document.querySelector('.qc-mode-btn-ai');
+
   // State
-  var currentMode = 'note'; // 'note', 'code', or 'todo'
+  var currentMode = 'note'; // 'ai', 'note', 'code', or 'todo'
   var selectedLang = 'kotlin';
   var inboxMode = 'append'; // 'append' or 'new'
   var selectedDest = {
@@ -617,7 +637,7 @@
   });
 
   // Mode switching logic
-  var modes = ['note', 'code', 'todo'];
+  var modes = ['ai', 'note', 'code', 'todo'];
 
   function setMode(mode) {
     if (mode === currentMode) return;
@@ -634,13 +654,31 @@
     previewWrapper.style.display = 'none';
     notePreviewWrapper.style.display = 'none';
     if (todoFieldsEl) todoFieldsEl.style.display = 'none';
+    if (qcAiContainer) qcAiContainer.style.display = 'none';
 
-    if (mode === 'code') {
+    // Hide/show common elements based on AI vs other modes
+    var isAiMode = mode === 'ai';
+    titleInput.style.display = isAiMode ? 'none' : '';
+    document.getElementById('qc-editor-box').style.display = isAiMode ? 'none' : '';
+    // Hide Save/Cancel for AI mode, show for others
+    var actionsEl = modal.querySelector('.quick-capture-actions');
+    if (actionsEl) actionsEl.style.display = isAiMode ? 'none' : '';
+
+    if (mode === 'ai') {
+      if (qcAiContainer) qcAiContainer.style.display = '';
+      if (toolbar) toolbar.style.display = 'none';
+      input.classList.remove('code-mode');
+      dialog.classList.remove('code-mode');
+      dialog.classList.add('ai-mode');
+      // Focus AI input after a tick
+      setTimeout(function() { if (qcAiInput) qcAiInput.focus(); }, 50);
+    } else if (mode === 'code') {
       langRow.style.display = '';
       previewWrapper.style.display = '';
       if (toolbar) toolbar.style.display = 'none';
       input.classList.add('code-mode');
       dialog.classList.add('code-mode');
+      dialog.classList.remove('ai-mode');
       input.placeholder = 'Paste or type your code here...';
       titleInput.style.display = '';
       document.getElementById('qc-editor-box').style.display = '';
@@ -652,6 +690,7 @@
       document.getElementById('qc-editor-box').style.display = 'none';
       input.classList.remove('code-mode');
       dialog.classList.remove('code-mode');
+      dialog.classList.remove('ai-mode');
     } else {
       // note mode
       destRow.style.display = '';
@@ -659,6 +698,7 @@
       if (bookTitleRow) bookTitleRow.style.display = selectedDest.tag === 'book-note' ? '' : 'none';
       input.classList.remove('code-mode');
       dialog.classList.remove('code-mode');
+      dialog.classList.remove('ai-mode');
       input.placeholder = "What's on your mind?";
       titleInput.style.display = '';
       document.getElementById('qc-editor-box').style.display = '';
@@ -666,7 +706,9 @@
     }
 
     // Focus the primary input for the new mode
-    if (mode === 'todo') {
+    if (mode === 'ai') {
+      // already handled above
+    } else if (mode === 'todo') {
       if (todoTitleInput) todoTitleInput.focus();
     } else {
       titleInput.focus();
@@ -918,22 +960,25 @@
     }
   });
 
-  function openModal() {
+  function openModal(startMode) {
+    var mode = startMode || 'ai';
     // Reset state
-    currentMode = 'note';
+    currentMode = mode;
     selectedLang = 'kotlin';
     modeButtons.forEach(function(b) { b.classList.remove('active'); });
-    modeButtons[0].classList.add('active');
-    destRow.style.display = '';
-    langRow.style.display = 'none';
+    modeButtons.forEach(function(b) {
+      if (b.getAttribute('data-mode') === mode) b.classList.add('active');
+    });
+    destRow.style.display = mode === 'note' ? '' : 'none';
+    langRow.style.display = mode === 'code' ? '' : 'none';
     if (bookTitleRow) bookTitleRow.style.display = 'none';
     if (bookTitleInput) bookTitleInput.value = '';
     // Reset inbox new-note toggle
     inboxMode = 'append';
     if (inboxNewBtn) inboxNewBtn.classList.remove('active');
-    previewWrapper.style.display = 'none';
+    previewWrapper.style.display = mode === 'code' ? '' : 'none';
     notePreviewWrapper.style.display = 'none';
-    if (toolbar) toolbar.style.display = '';
+    if (toolbar) toolbar.style.display = mode === 'note' ? '' : 'none';
     langButtons.forEach(function(b) { b.classList.remove('active'); });
     langButtons[0].classList.add('active');
     // Reset destination to Inbox
@@ -943,10 +988,11 @@
     selectedDest.tag = destButtons[0].getAttribute('data-tag');
     input.classList.remove('code-mode');
     dialog.classList.remove('code-mode');
+    dialog.classList.remove('ai-mode');
     input.placeholder = "What's on your mind?";
 
     // Reset todo state
-    if (todoFieldsEl) todoFieldsEl.style.display = 'none';
+    if (todoFieldsEl) todoFieldsEl.style.display = mode === 'todo' ? '' : 'none';
     if (todoTitleInput) todoTitleInput.value = '';
     if (todoEstimateInput) todoEstimateInput.value = '';
     _qcTodoDate = null;
@@ -955,9 +1001,21 @@
     updateQcReminderChip();
     closeQcTodoPopover();
 
-    // Show note/code fields (default: note mode)
-    titleInput.style.display = '';
-    document.getElementById('qc-editor-box').style.display = '';
+    // AI mode setup
+    if (qcAiContainer) qcAiContainer.style.display = mode === 'ai' ? '' : 'none';
+
+    // Show/hide elements based on mode
+    var isAiMode = mode === 'ai';
+    titleInput.style.display = isAiMode ? 'none' : (mode === 'todo' ? 'none' : '');
+    document.getElementById('qc-editor-box').style.display = isAiMode ? 'none' : (mode === 'todo' ? 'none' : '');
+    var actionsEl = modal.querySelector('.quick-capture-actions');
+    if (actionsEl) actionsEl.style.display = isAiMode ? 'none' : '';
+    if (isAiMode) dialog.classList.add('ai-mode');
+    if (mode === 'code') {
+      input.classList.add('code-mode');
+      dialog.classList.add('code-mode');
+      input.placeholder = 'Paste or type your code here...';
+    }
 
     modal.classList.add('active');
     modal.setAttribute('aria-hidden', 'false');
@@ -965,7 +1023,15 @@
     input.value = '';
     if (previewPanel) previewPanel.innerHTML = '<div class="qc-preview-empty">Start typing to see highlighted preview...</div>';
     if (notePreviewPanel) notePreviewPanel.innerHTML = '<div class="qc-preview-empty">Start typing to see a preview...</div>';
-    titleInput.focus();
+
+    // Focus appropriate input
+    if (mode === 'ai') {
+      setTimeout(function() { if (qcAiInput) qcAiInput.focus(); }, 50);
+    } else if (mode === 'todo') {
+      if (todoTitleInput) todoTitleInput.focus();
+    } else {
+      titleInput.focus();
+    }
   }
 
   function closeModal() {
@@ -981,12 +1047,18 @@
     closeQcTodoPopover();
     isSaving = false;
     if (feedbackEl) feedbackEl.style.display = 'none';
+    // Stop AI generation if in progress
+    if (_qcAiAbort) { _qcAiAbort.stop(); _qcAiAbort = null; }
+    if (_qcAiRecognition && _qcAiRecording) { try { _qcAiRecognition.stop(); } catch(e) {} }
   }
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
   function submit() {
     if (isSaving) return;
+
+    // AI mode — not handled by submit
+    if (currentMode === 'ai') return;
 
     // Todo mode — different submit path
     if (currentMode === 'todo') {
@@ -1212,10 +1284,15 @@
   document.addEventListener('keydown', function(e) {
     // Global shortcut: E to open Quick Capture (when not typing)
     if (!modal.classList.contains('active')) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
       if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
         e.preventDefault();
         openModal();
+      }
+      // A opens Quick Capture in AI mode
+      if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        openModal('ai');
       }
       return;
     }
@@ -1259,6 +1336,530 @@
       }
     }
   });
+
+  // ─── Quick Capture AI Mode ───
+  // Delegates to window.dmAI for engine, rendering, task detection.
+  // Maintains its own chat history, messages DOM, and streaming state.
+
+  var _qcAiChatHistory = [];
+  var _qcAiIsGenerating = false;
+  var _qcAiAbort = null;
+  var _qcAiRecognition = null;
+  var _qcAiRecording = false;
+
+  // Session storage key for QC AI messages
+  var QC_AI_SS_KEY = 'dm-qc-ai-messages';
+
+  // Quick action prompts (same as side panel)
+  var _qcAiQuickPrompts = {
+    plan: 'Look at my tasks for today and overdue. Create a prioritized plan with suggested order. If no tasks today, pick from my backlog.',
+    suggest: 'Suggest 3-5 new tasks based on my existing tasks. For each, give the title in **bold** and a one-line reason.',
+    improve: null,
+    summarize: null
+  };
+
+  // ─── AI state visibility ───
+  function _qcAiUpdateVisibility() {
+    if (!qcAiModeBtn) return;
+    var enabled = window.dmAI && window.dmAI.isEnabled();
+    qcAiModeBtn.style.display = enabled ? '' : 'none';
+    // If we're currently in AI mode but AI got disabled, switch to note
+    if (!enabled && currentMode === 'ai') {
+      setMode('note');
+    }
+  }
+
+  // Listen for AI state changes
+  window.addEventListener('dm-ai-state-changed', function() {
+    _qcAiUpdateVisibility();
+  });
+
+  // Initial visibility check (deferred so ai-companion.html has time to init)
+  setTimeout(_qcAiUpdateVisibility, 100);
+
+  // ─── Helpers ───
+  function _qcAiScrollToBottom(force) {
+    if (!qcAiMessages) return;
+    var atBottom = force || (qcAiMessages.scrollHeight - qcAiMessages.scrollTop - qcAiMessages.clientHeight < 80);
+    if (atBottom) {
+      qcAiMessages.scrollTop = qcAiMessages.scrollHeight;
+    }
+  }
+
+  function _qcAiAddMessage(role, content) {
+    if (qcAiWelcome) qcAiWelcome.style.display = 'none';
+    var msgEl = document.createElement('div');
+    msgEl.className = 'qc-ai-msg qc-ai-msg-' + role;
+
+    var avatarEl = document.createElement('div');
+    avatarEl.className = 'qc-ai-msg-avatar';
+    avatarEl.textContent = role === 'user' ? 'U' : 'AI';
+
+    var bubbleEl = document.createElement('div');
+    bubbleEl.className = 'qc-ai-msg-bubble';
+    if (content && window.dmAI) {
+      bubbleEl.innerHTML = window.dmAI._renderMarkdown(content);
+    } else if (content) {
+      bubbleEl.textContent = content;
+    }
+
+    msgEl.appendChild(avatarEl);
+    msgEl.appendChild(bubbleEl);
+    qcAiMessages.appendChild(msgEl);
+    _qcAiScrollToBottom(true);
+    return msgEl;
+  }
+
+  function _qcAiAddTyping() {
+    var el = document.createElement('div');
+    el.className = 'qc-ai-msg qc-ai-msg-assistant';
+    el.innerHTML = '<div class="qc-ai-msg-avatar">AI</div><div class="qc-ai-msg-bubble"><div class="qc-ai-typing"><span class="qc-ai-typing-dot"></span><span class="qc-ai-typing-dot"></span><span class="qc-ai-typing-dot"></span></div></div>';
+    qcAiMessages.appendChild(el);
+    _qcAiScrollToBottom(true);
+    return el;
+  }
+
+  function _qcAiAddCopyBtn(bubbleEl, text) {
+    var btn = document.createElement('button');
+    btn.className = 'qc-ai-copy-btn';
+    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy';
+    btn.addEventListener('click', function() {
+      navigator.clipboard.writeText(text).then(function() {
+        btn.classList.add('copied');
+        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied';
+        setTimeout(function() {
+          btn.classList.remove('copied');
+          btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy';
+        }, 2000);
+      }).catch(function() {});
+    });
+    bubbleEl.appendChild(btn);
+  }
+
+  function _qcAiDetectTaskCards(bubbleEl, text) {
+    var boldPattern = /\*\*([^*]+)\*\*/g;
+    var matches = [];
+    var match;
+    while ((match = boldPattern.exec(text)) !== null) {
+      var title = match[1].trim();
+      if (title.length > 5 && title.length < 200 && !/^[A-Za-z]{1,15}:/.test(title)) {
+        matches.push(title);
+      }
+    }
+    if (matches.length === 0) return;
+
+    var container = document.createElement('div');
+    container.style.marginTop = '8px';
+
+    matches.forEach(function(taskTitle) {
+      var card = document.createElement('div');
+      card.className = 'qc-ai-task-card';
+
+      var titleSpan = document.createElement('span');
+      titleSpan.className = 'qc-ai-task-card-title';
+      titleSpan.textContent = taskTitle;
+
+      var addBtn = document.createElement('button');
+      addBtn.className = 'qc-ai-task-card-add';
+      addBtn.innerHTML = '+';
+      addBtn.title = 'Add as task';
+      addBtn.addEventListener('click', function() {
+        if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
+          _qcAiAddMessage('assistant', 'Please sign in to add tasks.');
+          return;
+        }
+        window.dispatchEvent(new CustomEvent('dm-ai-create-task', { detail: { title: taskTitle, source: 'ai' } }));
+        addBtn.style.display = 'none';
+        var addedSpan = document.createElement('span');
+        addedSpan.className = 'qc-ai-task-card-added';
+        addedSpan.textContent = 'Added';
+        card.appendChild(addedSpan);
+      });
+
+      card.appendChild(titleSpan);
+      card.appendChild(addBtn);
+      container.appendChild(card);
+    });
+
+    bubbleEl.appendChild(container);
+  }
+
+  // ─── Save / Load messages ───
+  function _qcAiSaveMessages() {
+    try {
+      if (_qcAiChatHistory.length > 50) {
+        _qcAiChatHistory = _qcAiChatHistory.slice(-50);
+      }
+      sessionStorage.setItem(QC_AI_SS_KEY, JSON.stringify(_qcAiChatHistory.slice(-20)));
+    } catch(e) {}
+  }
+
+  function _qcAiLoadMessages() {
+    try {
+      var saved = sessionStorage.getItem(QC_AI_SS_KEY);
+      if (saved) {
+        var parsed = JSON.parse(saved);
+        if (!Array.isArray(parsed)) return;
+        _qcAiChatHistory = parsed.filter(function(msg) {
+          return msg && (msg.role === 'user' || msg.role === 'assistant') && typeof msg.content === 'string';
+        });
+        _qcAiChatHistory.forEach(function(msg) {
+          var msgEl = _qcAiAddMessage(msg.role, msg.content);
+          msgEl.style.animation = 'none';
+        });
+      }
+    } catch(e) {}
+  }
+
+  // Restore messages on page load
+  _qcAiLoadMessages();
+
+  // ─── Get task context ───
+  function _qcAiGetTasks() {
+    return new Promise(function(resolve) {
+      if (!window.dmSync || !window.dmSync.getAllTodos) { resolve([]); return; }
+      window.dmSync.getAllTodos().then(function(todos) { resolve(todos || []); }).catch(function() { resolve([]); });
+    });
+  }
+
+  // ─── Core chat: run streaming completion via dmAI ───
+  function _qcAiRunChat(userMessage, systemOverride) {
+    if (_qcAiIsGenerating || !window.dmAI) return;
+    _qcAiIsGenerating = true;
+    if (qcAiSendBtn) qcAiSendBtn.disabled = true;
+    if (qcAiStopBtn) qcAiStopBtn.style.display = '';
+
+    _qcAiAddMessage('user', userMessage);
+    _qcAiChatHistory.push({ role: 'user', content: userMessage });
+
+    var typingEl = _qcAiAddTyping();
+
+    // Show status while loading
+    if (qcAiStatusEl) qcAiStatusEl.style.display = '';
+    if (qcAiStatusText) qcAiStatusText.textContent = 'Loading AI model...';
+
+    // Listen for progress
+    function onProgress(e) {
+      var d = e.detail || {};
+      if (qcAiProgressFill) qcAiProgressFill.style.width = (d.pct || 0) + '%';
+      if (qcAiStatusText) qcAiStatusText.textContent = d.text || 'Loading...';
+      if (d.pct > 0 && d.pct < 100 && qcAiStatusDetail) qcAiStatusDetail.textContent = d.pct + '% complete';
+    }
+    window.addEventListener('dm-ai-load-progress', onProgress);
+
+    var enginePromise = window.dmAI._loadEngine();
+
+    enginePromise.then(function() {
+      window.removeEventListener('dm-ai-load-progress', onProgress);
+      if (qcAiStatusEl) qcAiStatusEl.style.display = 'none';
+      if (qcAiProgressFill) qcAiProgressFill.style.width = '0%';
+      if (qcAiStatusDetail) qcAiStatusDetail.textContent = '';
+      return _qcAiGetTasks();
+    }).then(function(tasks) {
+      var systemPrompt = systemOverride || (window.dmAI._buildSystemPrompt ? window.dmAI._buildSystemPrompt(tasks) : '');
+      var messages = [{ role: 'system', content: systemPrompt }];
+      var recentHistory = _qcAiChatHistory.slice(-10);
+      messages = messages.concat(recentHistory);
+
+      var stopped = false;
+      _qcAiAbort = { stop: function() { stopped = true; } };
+
+      return window.dmAI._getEngine().then(function(engine) {
+        return engine.chat.completions.create({
+          messages: messages,
+          stream: true,
+          temperature: 0.7,
+          max_tokens: 512
+        }).then(function(chunks) {
+          if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+          var msgEl = _qcAiAddMessage('assistant', '');
+          var bubbleEl = msgEl.querySelector('.qc-ai-msg-bubble');
+          bubbleEl.classList.add('streaming');
+          var fullText = '';
+          var rafPending = false;
+
+          function finalizeStream() {
+            bubbleEl.classList.remove('streaming');
+            _qcAiChatHistory.push({ role: 'assistant', content: fullText });
+            _qcAiSaveMessages();
+            if (window.dmAI._renderMarkdown) {
+              bubbleEl.innerHTML = window.dmAI._renderMarkdown(fullText);
+            }
+            _qcAiAddCopyBtn(bubbleEl, fullText);
+            _qcAiDetectTaskCards(bubbleEl, fullText);
+            _qcAiIsGenerating = false;
+            if (qcAiSendBtn) qcAiSendBtn.disabled = !(qcAiInput && qcAiInput.value.trim());
+            if (qcAiStopBtn) qcAiStopBtn.style.display = 'none';
+            _qcAiAbort = null;
+          }
+
+          if (chunks[Symbol.asyncIterator]) {
+            var iterator = chunks[Symbol.asyncIterator]();
+            function processIterator() {
+              return iterator.next().then(function(result) {
+                if (result.done || stopped) { finalizeStream(); return; }
+                var chunk = result.value;
+                var delta = '';
+                if (chunk.choices && chunk.choices[0] && chunk.choices[0].delta) {
+                  delta = chunk.choices[0].delta.content || '';
+                }
+                if (delta) {
+                  fullText += delta;
+                  if (!rafPending) {
+                    rafPending = true;
+                    requestAnimationFrame(function() {
+                      rafPending = false;
+                      if (window.dmAI._renderMarkdown) {
+                        bubbleEl.innerHTML = window.dmAI._renderMarkdown(fullText);
+                      }
+                      _qcAiScrollToBottom();
+                    });
+                  }
+                }
+                return processIterator();
+              });
+            }
+            return processIterator();
+          } else {
+            throw new Error('Unexpected streaming response format');
+          }
+        });
+      });
+    }).catch(function(err) {
+      window.removeEventListener('dm-ai-load-progress', onProgress);
+      if (qcAiStatusEl) qcAiStatusEl.style.display = 'none';
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+      var errRaw = (err.message || String(err));
+      var errLower = errRaw.toLowerCase();
+      if (errLower.indexOf('not supported') === -1) {
+        var friendlyMsg = 'Something went wrong.';
+        if (errLower.indexOf('network') !== -1 || errLower.indexOf('fetch') !== -1) {
+          friendlyMsg = 'Network error — check your connection and try again.';
+        } else if (errLower.indexOf('context') !== -1 || errLower.indexOf('token') !== -1) {
+          friendlyMsg = 'The conversation is too long. Try clearing and starting fresh.';
+        } else {
+          friendlyMsg += ' ' + errRaw;
+        }
+        _qcAiAddMessage('assistant', friendlyMsg);
+      }
+      _qcAiIsGenerating = false;
+      if (qcAiSendBtn) qcAiSendBtn.disabled = !(qcAiInput && qcAiInput.value.trim());
+      if (qcAiStopBtn) qcAiStopBtn.style.display = 'none';
+      _qcAiAbort = null;
+    });
+  }
+
+  // ─── Send message ───
+  function _qcAiSendMessage() {
+    if (!qcAiInput || !window.dmAI) return;
+    var text = qcAiInput.value.trim();
+    if (!text || _qcAiIsGenerating) return;
+
+    var inputMode = qcAiInput.dataset.mode;
+    qcAiInput.value = '';
+    qcAiInput.dataset.mode = '';
+    qcAiInput.placeholder = 'Ask me anything...';
+    _qcAiHideModeBadge();
+    _qcAiUpdateInputHeight();
+    if (qcAiSendBtn) qcAiSendBtn.disabled = true;
+
+    if (inputMode === 'improve') {
+      _qcAiRunChat('Please improve the following text. Make it clearer, more concise, and better written. Return only the improved version:\n\n' + text);
+    } else if (inputMode === 'summarize') {
+      _qcAiRunChat('Please summarize the following text concisely:\n\n' + text);
+    } else {
+      // Check for task-creation intent
+      if (window.dmAI._detectTaskIntent) {
+        var rawTitle = window.dmAI._detectTaskIntent(text);
+        if (rawTitle && window.dmAI._parseTaskDetails) {
+          var details = window.dmAI._parseTaskDetails(rawTitle);
+          if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
+            window.dispatchEvent(new CustomEvent('dm-ai-create-task', {
+              detail: {
+                title: details.title,
+                scheduledDate: details.scheduledDate,
+                estimatedMin: details.estimatedMin,
+                category: details.category,
+                source: 'ai'
+              }
+            }));
+            _qcAiAddMessage('user', text);
+            _qcAiChatHistory.push({ role: 'user', content: text });
+            var confirmText = window.dmAI._buildTaskConfirmation(details);
+            _qcAiAddMessage('assistant', confirmText);
+            _qcAiChatHistory.push({ role: 'assistant', content: confirmText });
+            _qcAiSaveMessages();
+            return;
+          }
+        }
+      }
+      _qcAiRunChat(text);
+    }
+  }
+
+  // ─── Mode badge ───
+  function _qcAiShowModeBadge(label) {
+    if (qcAiModeBadge) {
+      if (qcAiModeBadgeText) qcAiModeBadgeText.textContent = label;
+      qcAiModeBadge.style.display = '';
+    }
+  }
+
+  function _qcAiHideModeBadge() {
+    if (qcAiModeBadge) {
+      qcAiModeBadge.style.display = 'none';
+      if (qcAiModeBadgeText) qcAiModeBadgeText.textContent = '';
+    }
+  }
+
+  // ─── Quick actions ───
+  function _qcAiHandleQuickAction(action) {
+    if (action === 'improve') {
+      if (qcAiInput) {
+        qcAiInput.value = '';
+        qcAiInput.placeholder = 'Paste the text you want to improve...';
+        qcAiInput.focus();
+        qcAiInput.dataset.mode = 'improve';
+      }
+      _qcAiShowModeBadge('Improve mode');
+      return;
+    }
+    if (action === 'summarize') {
+      if (qcAiInput) {
+        qcAiInput.value = '';
+        qcAiInput.placeholder = 'Paste the text you want to summarize...';
+        qcAiInput.focus();
+        qcAiInput.dataset.mode = 'summarize';
+      }
+      _qcAiShowModeBadge('Summarize mode');
+      return;
+    }
+    var prompt = _qcAiQuickPrompts[action];
+    if (prompt) _qcAiRunChat(prompt);
+  }
+
+  // ─── Auto-resize textarea ───
+  function _qcAiUpdateInputHeight() {
+    if (!qcAiInput) return;
+    qcAiInput.style.height = 'auto';
+    qcAiInput.style.height = Math.min(qcAiInput.scrollHeight, 120) + 'px';
+  }
+
+  // ─── Event listeners ───
+  if (qcAiSendBtn) {
+    qcAiSendBtn.addEventListener('click', _qcAiSendMessage);
+  }
+
+  if (qcAiInput) {
+    qcAiInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        _qcAiSendMessage();
+      }
+    });
+    qcAiInput.addEventListener('input', function() {
+      _qcAiUpdateInputHeight();
+      if (qcAiSendBtn) qcAiSendBtn.disabled = !qcAiInput.value.trim() || _qcAiIsGenerating;
+    });
+  }
+
+  if (qcAiStopBtn) {
+    qcAiStopBtn.addEventListener('click', function() {
+      if (_qcAiAbort) _qcAiAbort.stop();
+    });
+  }
+
+  if (qcAiQuickActions) {
+    qcAiQuickActions.addEventListener('click', function(e) {
+      var btn = e.target.closest('.qc-ai-quick-btn');
+      if (!btn) return;
+      var action = btn.dataset.action;
+      if (action) _qcAiHandleQuickAction(action);
+    });
+  }
+
+  if (qcAiModeBadgeCancel) {
+    qcAiModeBadgeCancel.addEventListener('click', function() {
+      if (qcAiInput) {
+        qcAiInput.dataset.mode = '';
+        qcAiInput.placeholder = 'Ask me anything...';
+        qcAiInput.focus();
+      }
+      _qcAiHideModeBadge();
+    });
+  }
+
+  // ─── Voice input (Web Speech API) ───
+  var _qcAiSpeechAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (_qcAiSpeechAPI && qcAiMicBtn) {
+    qcAiMicBtn.style.display = '';
+
+    _qcAiRecognition = new _qcAiSpeechAPI();
+    _qcAiRecognition.continuous = false;
+    _qcAiRecognition.interimResults = true;
+    _qcAiRecognition.lang = navigator.language || 'en-US';
+
+    var _qcAiInterimStart = '';
+
+    _qcAiRecognition.onstart = function() {
+      _qcAiRecording = true;
+      qcAiMicBtn.classList.add('recording');
+      qcAiMicBtn.title = 'Stop recording';
+      _qcAiInterimStart = qcAiInput ? qcAiInput.value : '';
+    };
+
+    _qcAiRecognition.onresult = function(event) {
+      var interim = '';
+      var final = '';
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      if (qcAiInput) {
+        if (final) {
+          var sep = _qcAiInterimStart && !_qcAiInterimStart.endsWith(' ') ? ' ' : '';
+          _qcAiInterimStart += sep + final;
+          qcAiInput.value = _qcAiInterimStart;
+        } else if (interim) {
+          var sep2 = _qcAiInterimStart && !_qcAiInterimStart.endsWith(' ') ? ' ' : '';
+          qcAiInput.value = _qcAiInterimStart + sep2 + interim;
+        }
+        _qcAiUpdateInputHeight();
+        if (qcAiSendBtn) qcAiSendBtn.disabled = !qcAiInput.value.trim() || _qcAiIsGenerating;
+      }
+    };
+
+    _qcAiRecognition.onend = function() {
+      _qcAiRecording = false;
+      qcAiMicBtn.classList.remove('recording');
+      qcAiMicBtn.title = 'Voice input';
+      if (qcAiInput) qcAiInput.focus();
+    };
+
+    _qcAiRecognition.onerror = function(event) {
+      _qcAiRecording = false;
+      qcAiMicBtn.classList.remove('recording');
+      qcAiMicBtn.title = 'Voice input';
+      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        console.warn('[QC AI] Speech recognition error:', event.error);
+      }
+    };
+
+    qcAiMicBtn.addEventListener('click', function() {
+      if (_qcAiRecording) {
+        _qcAiRecognition.stop();
+      } else {
+        try { _qcAiRecognition.start(); } catch(e) { _qcAiRecognition.stop(); }
+      }
+    });
+  }
 })();
 </script>
 
@@ -1385,7 +1986,8 @@
     dashboard: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>',
     review: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V5"></path><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"></path><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"></path><path d="M18 18a4 4 0 0 0 2-7.464"></path><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"></path><path d="M6 18a4 4 0 0 1-2-7.464"></path><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"></path></svg>',
     ai: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path></svg>',
-    trash: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>'
+    trash: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+    settings: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z"></path></svg>'
   };
 
   function getBaseUrl() {
@@ -1588,6 +2190,35 @@
       '<a href="' + sectionUrl('ai') + '"' + aiActive + '>' + ICONS.ai + 'AI</a>' +
       '</li>';
 
+    // Add Settings entry (expandable inline panel)
+    html += '<li class="sidebar-item sidebar-settings" data-section="settings">' +
+      '<a href="#" id="sidebar-settings-toggle">' + ICONS.settings + 'Settings</a>' +
+      '<div class="sidebar-settings-panel" id="sidebar-settings-panel" style="display:none;">' +
+        '<div class="sidebar-settings-row">' +
+          '<label class="sidebar-settings-label" for="setting-pomo-duration">Pomodoro duration</label>' +
+          '<div class="sidebar-settings-control">' +
+            '<input type="number" id="setting-pomo-duration" class="sidebar-settings-input" min="1" max="120" value="25">' +
+            '<span class="sidebar-settings-unit">min</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="sidebar-settings-row">' +
+          '<label class="sidebar-settings-label" for="setting-pomo-count">Default pomodoros</label>' +
+          '<div class="sidebar-settings-control">' +
+            '<input type="number" id="setting-pomo-count" class="sidebar-settings-input" min="0" max="20" value="1">' +
+          '</div>' +
+        '</div>' +
+        '<div class="sidebar-settings-row">' +
+          '<label class="sidebar-settings-label" for="setting-auto-schedule">Auto-schedule today</label>' +
+          '<div class="sidebar-settings-control">' +
+            '<label class="sidebar-settings-toggle-switch">' +
+              '<input type="checkbox" id="setting-auto-schedule" checked>' +
+              '<span class="sidebar-settings-toggle-slider"></span>' +
+            '</label>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '</li>';
+
     // Add Trash entry (static)
     var trashActive = window.location.pathname.indexOf('/docs/trash') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item sidebar-trash" data-section="trash">' +
@@ -1597,8 +2228,78 @@
     // Replace sidebar content
     existingUl.innerHTML = html;
 
+    // Initialize settings panel interactions
+    initSettingsPanel();
+
     // Cache sidebar HTML for instant restore on next navigation
     try { sessionStorage.setItem(SIDEBAR_CACHE_KEY, html); } catch (e) {}
+  }
+
+  // ─── Settings panel logic ───
+  function initSettingsPanel() {
+    var toggle = document.getElementById('sidebar-settings-toggle');
+    var panel = document.getElementById('sidebar-settings-panel');
+    if (!toggle || !panel) return;
+
+    // Read current values from localStorage
+    var pomoDuration = 25;
+    try { var v = parseInt(localStorage.getItem('dm-pomodoro-length'), 10); if (v > 0) pomoDuration = v; } catch(e) {}
+
+    var defaultPomoCount = 1;
+    try { var v = parseInt(localStorage.getItem('dm-default-pomo-count'), 10); if (v >= 0) defaultPomoCount = v; } catch(e) {}
+
+    var autoSchedule = true;
+    try { var v = localStorage.getItem('dm-auto-schedule-today'); if (v === 'false') autoSchedule = false; } catch(e) {}
+
+    var durInput = document.getElementById('setting-pomo-duration');
+    var countInput = document.getElementById('setting-pomo-count');
+    var scheduleToggle = document.getElementById('setting-auto-schedule');
+
+    if (durInput) durInput.value = pomoDuration;
+    if (countInput) countInput.value = defaultPomoCount;
+    if (scheduleToggle) scheduleToggle.checked = autoSchedule;
+
+    // Toggle panel visibility
+    toggle.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      panel.style.display = panel.style.display === 'none' ? '' : 'none';
+    });
+
+    // Save on change — Pomodoro duration
+    if (durInput) {
+      durInput.addEventListener('change', function() {
+        var val = parseInt(durInput.value, 10);
+        if (val > 0 && val <= 120) {
+          try { localStorage.setItem('dm-pomodoro-length', val); } catch(e) {}
+          window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-pomodoro-length', value: val } }));
+        } else {
+          durInput.value = pomoDuration;
+        }
+      });
+    }
+
+    // Save on change — Default Pomodoro count
+    if (countInput) {
+      countInput.addEventListener('change', function() {
+        var val = parseInt(countInput.value, 10);
+        if (val >= 0 && val <= 20) {
+          try { localStorage.setItem('dm-default-pomo-count', val); } catch(e) {}
+          window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-default-pomo-count', value: val } }));
+        } else {
+          countInput.value = defaultPomoCount;
+        }
+      });
+    }
+
+    // Save on change — Auto-schedule today
+    if (scheduleToggle) {
+      scheduleToggle.addEventListener('change', function() {
+        var val = scheduleToggle.checked;
+        try { localStorage.setItem('dm-auto-schedule-today', val ? 'true' : 'false'); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-auto-schedule-today', value: val } }));
+      });
+    }
   }
 
   function renderAuthPrompt() {

@@ -1,14 +1,6 @@
 <!-- AI Companion: In-browser LLM via WebLLM (Qwen2.5-0.5B) -->
 <!-- Floating side panel + engine management. Requires dm-sync for task context. -->
 
-<!-- FAB trigger button (hidden by default until AI is enabled) -->
-<button class="ai-fab" id="ai-fab" aria-label="AI Companion (A)" title="AI Companion" style="display:none;">
-  <svg class="ai-fab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
-  </svg>
-  <span class="ai-fab-tooltip">AI Companion <kbd>A</kbd></span>
-</button>
-
 <!-- Floating side panel (appended positioning — lives outside .book-page to avoid will-change issues) -->
 <div class="ai-panel" id="ai-panel" style="display:none;" role="dialog" aria-label="AI Companion">
   <div class="ai-panel-header">
@@ -52,6 +44,14 @@
       <span class="ai-settings-value" id="ai-model-status">Not loaded</span>
     </div>
     <button type="button" class="ai-settings-unload" id="ai-unload-btn" style="display:none;">Unload model (free GPU memory)</button>
+    <div class="ai-settings-context">
+      <label class="ai-settings-label" for="ai-custom-context">Custom context</label>
+      <p class="ai-settings-context-hint">Add personal context or instructions to make the AI more useful (e.g. your role, preferences, goals).</p>
+      <textarea class="ai-custom-context" id="ai-custom-context" placeholder="e.g. I'm a software engineer. I prefer short actionable tasks. My work hours are 9am-6pm." rows="3"></textarea>
+      <div class="ai-settings-context-actions">
+        <span class="ai-settings-context-saved" id="ai-context-saved" style="display:none;">Saved</span>
+      </div>
+    </div>
   </div>
 
   <!-- Download progress (shown during first model load) -->
@@ -102,6 +102,9 @@
     </div>
     <div class="ai-input-wrap">
       <textarea class="ai-input" id="ai-input" placeholder="Ask me anything..." rows="1"></textarea>
+      <button type="button" class="ai-mic-btn" id="ai-mic-btn" title="Voice input" aria-label="Voice input" style="display:none;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+      </button>
       <button type="button" class="ai-send-btn" id="ai-send-btn" title="Send" aria-label="Send" disabled>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
       </button>
@@ -124,63 +127,6 @@
 </div>
 
 <style>
-/* ─── AI FAB Button ─── */
-.ai-fab {
-  position: fixed;
-  bottom: 24px;
-  right: 92px; /* offset from Quick Capture FAB (52px + 2rem + 8px gap) */
-  z-index: 1100;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  border: none;
-  background: var(--accent-ai);
-  color: #fff;
-  cursor: pointer;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.18);
-  transition: transform 0.2s, box-shadow 0.2s, background 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 0;
-}
-.ai-fab:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.24);
-  background: var(--accent-ai-hover);
-}
-.ai-fab:active {
-  transform: translateY(0);
-}
-.ai-fab-tooltip {
-  position: absolute;
-  bottom: 100%;
-  right: 0;
-  margin-bottom: 8px;
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: var(--body-font-color);
-  color: var(--body-background);
-  font-size: 0.72rem;
-  white-space: nowrap;
-  pointer-events: none;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 0.2s, transform 0.2s;
-}
-.ai-fab:hover .ai-fab-tooltip {
-  opacity: 1;
-  transform: translateY(0);
-}
-.ai-fab-tooltip kbd {
-  display: inline-block;
-  padding: 1px 4px;
-  font-size: 0.65rem;
-  border-radius: 3px;
-  background: rgba(255,255,255,0.15);
-  margin-left: 4px;
-}
-
 /* ─── AI Side Panel ─── */
 .ai-panel {
   position: fixed;
@@ -372,6 +318,52 @@
 }
 
 /* ─── Download progress ─── */
+.ai-settings-context {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--gray-200);
+}
+.ai-settings-context-hint {
+  font-size: 0.72rem;
+  color: var(--text-secondary, var(--gray-500));
+  margin: 4px 0 8px 0;
+  line-height: 1.4;
+}
+.ai-custom-context {
+  width: 100%;
+  font-size: 0.8rem;
+  font-family: inherit;
+  line-height: 1.4;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  resize: vertical;
+  min-height: 60px;
+  max-height: 150px;
+  box-sizing: border-box;
+}
+.ai-custom-context:focus {
+  outline: none;
+  border-color: var(--accent-ai);
+  box-shadow: 0 0 0 2px rgba(0, 188, 180, 0.15);
+}
+.ai-custom-context::placeholder {
+  color: var(--gray-400);
+  font-size: 0.75rem;
+}
+.ai-settings-context-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  min-height: 18px;
+}
+.ai-settings-context-saved {
+  font-size: 0.7rem;
+  color: var(--color-success, #34a853);
+  font-weight: 500;
+}
 .ai-download {
   padding: 16px;
   border-bottom: 1px solid var(--gray-200);
@@ -778,6 +770,37 @@
   flex-shrink: 0;
   line-height: 0;
 }
+/* When mic button is visible, it sits between textarea and send */
+.ai-input-wrap .ai-mic-btn + .ai-send-btn {
+  border-radius: 0 9px 9px 0;
+}
+.ai-mic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 36px;
+  border: none;
+  border-left: 1px solid var(--gray-200);
+  background: transparent;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  flex-shrink: 0;
+  line-height: 0;
+}
+.ai-mic-btn:hover {
+  color: var(--accent-ai);
+  background: rgba(0, 188, 180, 0.06);
+}
+.ai-mic-btn.recording {
+  color: var(--color-danger, #ea4335);
+  animation: ai-mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes ai-mic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
 .ai-send-btn:hover:not(:disabled) {
   background: var(--accent-ai);
   color: #fff;
@@ -843,12 +866,6 @@
   .ai-panel {
     width: 100vw;
   }
-  .ai-fab {
-    right: 76px;
-    bottom: 20px;
-    width: 44px;
-    height: 44px;
-  }
 }
 </style>
 
@@ -857,7 +874,7 @@
   'use strict';
 
   // ─── DOM refs ───
-  var fab = document.getElementById('ai-fab');
+  var fab = null; // FAB removed — AI is now accessed via Quick Capture mode toggle
   var panel = document.getElementById('ai-panel');
   var panelClose = document.getElementById('ai-panel-close');
   var settingsBtn = document.getElementById('ai-settings-btn');
@@ -883,14 +900,18 @@
   var notSupportedEl = document.getElementById('ai-not-supported');
   var modeBadge = document.getElementById('ai-mode-badge');
   var modeBadgeText = document.getElementById('ai-mode-badge-text');
+  var customContextEl = document.getElementById('ai-custom-context');
+  var contextSavedEl = document.getElementById('ai-context-saved');
+  var micBtn = document.getElementById('ai-mic-btn');
   var modeBadgeCancel = document.getElementById('ai-mode-badge-cancel');
 
-  if (!fab || !panel) return;
+  if (!panel) return;
 
   // ─── Constants ───
   var MODEL_ID = 'Qwen2.5-0.5B-Instruct-q4f32_1-MLC';
   var CDN_URL = 'https://esm.run/@mlc-ai/web-llm';
   var LS_KEY_ENABLED = 'dm-ai-enabled';
+  var LS_KEY_CONTEXT = 'dm-ai-custom-context';
   var SS_KEY_MESSAGES = 'dm-ai-messages';
   var SS_KEY_PANEL = 'dm-ai-panel-open';
 
@@ -916,6 +937,13 @@
     prompt += '- Keep replies under 150 words.\n';
     prompt += '- When suggesting tasks, wrap each task title in **bold**.\n';
     prompt += '- Do not repeat the user\'s message back.\n\n';
+
+    // Inject custom context from settings
+    var customCtx = '';
+    try { customCtx = (localStorage.getItem(LS_KEY_CONTEXT) || '').trim(); } catch(e) {}
+    if (customCtx) {
+      prompt += 'User context: ' + customCtx + '\n\n';
+    }
 
     if (!tasks || tasks.length === 0) {
       prompt += 'The user has no tasks.\n';
@@ -1361,7 +1389,7 @@
     while ((match = boldPattern.exec(text)) !== null) {
       var title = match[1].trim();
       // Skip short matches or ones that look like labels
-      if (title.length > 5 && title.length < 200 && title.indexOf(':') === -1) {
+      if (title.length > 5 && title.length < 200 && !/^[A-Za-z]{1,15}:/.test(title)) {
         matches.push(title);
       }
     }
@@ -1402,7 +1430,7 @@
     }
 
     // Dispatch a custom event to create the task (todo-list.html listens for this)
-    var event = new CustomEvent('dm-ai-create-task', { detail: { title: title } });
+    var event = new CustomEvent('dm-ai-create-task', { detail: { title: title, source: 'ai' } });
     window.dispatchEvent(event);
 
     // Update the card UI
@@ -1542,7 +1570,6 @@
     localStorage.setItem(LS_KEY_ENABLED, enabled ? '1' : '0');
     enabledToggle.checked = enabled;
     if (enabled) {
-      fab.style.display = '';
       quickActions.style.display = '';
       inputArea.style.display = '';
       notSupportedEl.style.display = 'none';
@@ -1552,11 +1579,10 @@
         inputArea.style.display = 'none';
       }
     } else {
-      fab.style.display = 'none';
       unloadEngine();
       closePanel();
     }
-    // Notify other components
+    // Notify other components (Quick Capture listens for this to show/hide AI mode)
     window.dispatchEvent(new CustomEvent('dm-ai-state-changed', { detail: { enabled: enabled } }));
   }
 
@@ -1591,6 +1617,232 @@
   }
 
   // ─── Send message ───
+  // ─── Task-creation intent detection & NLP parsing ───
+
+  var taskIntentPatterns = [
+    /^(?:add|create|make|new)\s+(?:a\s+)?task\s*[:;\-–—]\s*(.+)/i,
+    /^(?:add|create|make|new)\s+(?:a\s+)?task\s+(?:called|named|titled)\s+(.+)/i,
+    /^(?:add|create|make|new)\s+(?:a\s+)?task\s+(?:to|for)\s+(.+)/i,
+    /^(?:add|create|make|new)\s+(?:a\s+)?task\s+(.+)/i,
+    /^(?:add)\s+(.+?)\s+(?:to\s+(?:my\s+)?(?:tasks|todos?|inbox|list))\s*$/i,
+    /^(?:remind\s+me\s+to)\s+(.+)/i,
+    /^(?:todo|task)\s*[:;\-–—]\s*(.+)/i
+  ];
+
+  function detectTaskIntent(text) {
+    for (var i = 0; i < taskIntentPatterns.length; i++) {
+      var m = taskIntentPatterns[i].exec(text.trim());
+      if (m && m[1]) {
+        var title = m[1].trim().replace(/\.+$/, '').trim();
+        if (title.length >= 3 && title.length < 200) {
+          return title;
+        }
+      }
+    }
+    return null;
+  }
+
+  // ─── Date parsing from natural language ───
+  function _fmtDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function _nextWeekday(dayIndex) {
+    // dayIndex: 0=Sun, 1=Mon, ..., 6=Sat
+    var d = new Date();
+    var diff = (dayIndex - d.getDay() + 7) % 7;
+    if (diff === 0) diff = 7; // "next Monday" when today is Monday means +7
+    d.setDate(d.getDate() + diff);
+    return d;
+  }
+
+  var _dayNames = { sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6 };
+
+  function parseDate(text) {
+    var lower = text.toLowerCase();
+
+    // "today"
+    if (/\b(today)\b/.test(lower)) {
+      return { date: _fmtDate(new Date()), matched: 'today' };
+    }
+    // "tonight"
+    if (/\b(tonight)\b/.test(lower)) {
+      return { date: _fmtDate(new Date()), matched: 'tonight' };
+    }
+    // "day after tomorrow" (must be checked BEFORE "tomorrow")
+    if (/\bday\s+after\s+tomorrow\b/.test(lower)) {
+      var d2 = new Date(); d2.setDate(d2.getDate() + 2);
+      return { date: _fmtDate(d2), matched: 'day after tomorrow' };
+    }
+    // "tomorrow" / "tmr" / "tmrw"
+    if (/\b(tomorrow|tmrw?)\b/.test(lower)) {
+      var d = new Date(); d.setDate(d.getDate() + 1);
+      return { date: _fmtDate(d), matched: 'tomorrow' };
+    }
+    // "next week"
+    if (/\bnext\s+week\b/.test(lower)) {
+      var d3 = new Date(); d3.setDate(d3.getDate() + 7);
+      return { date: _fmtDate(d3), matched: 'next week' };
+    }
+    // "next <day>" or "on <day>" or "this <day>"
+    var dayMatch = lower.match(/\b(?:next|on|this)\s+(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat)\b/);
+    if (dayMatch) {
+      var idx = _dayNames[dayMatch[1]];
+      if (idx !== undefined) {
+        return { date: _fmtDate(_nextWeekday(idx)), matched: dayMatch[0] };
+      }
+    }
+    // standalone day name at end: "... friday"
+    var trailingDay = lower.match(/\b(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat)$/);
+    if (trailingDay) {
+      var idx2 = _dayNames[trailingDay[1]];
+      if (idx2 !== undefined) {
+        return { date: _fmtDate(_nextWeekday(idx2)), matched: trailingDay[1] };
+      }
+    }
+    // "in N days"
+    var inDays = lower.match(/\bin\s+(\d+)\s+days?\b/);
+    if (inDays) {
+      var d4 = new Date(); d4.setDate(d4.getDate() + parseInt(inDays[1]));
+      return { date: _fmtDate(d4), matched: inDays[0] };
+    }
+    return null;
+  }
+
+  // ─── Time estimate parsing ───
+  function parseEstimate(text) {
+    var lower = text.toLowerCase();
+    // "30 min" / "30 minutes" / "30m"
+    var minMatch = lower.match(/\b(\d+)\s*(?:min(?:utes?)?|m)\b/);
+    if (minMatch) {
+      var mins = parseInt(minMatch[1]);
+      if (mins > 0 && mins <= 480) return { minutes: mins, matched: minMatch[0] };
+    }
+    // "1 hour" / "2 hours" / "1h" / "1.5 hours"
+    var hrMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(?:hours?|hrs?|h)\b/);
+    if (hrMatch) {
+      var hrs = parseFloat(hrMatch[1]);
+      if (hrs > 0 && hrs <= 8) return { minutes: Math.round(hrs * 60), matched: hrMatch[0] };
+    }
+    // "1 pomodoro" / "2 pomodoros"
+    var pomMatch = lower.match(/\b(\d+)\s*(?:pomodoros?|poms?)\b/);
+    if (pomMatch) {
+      var poms = parseInt(pomMatch[1]);
+      if (poms > 0 && poms <= 16) return { minutes: poms * 25, matched: pomMatch[0] };
+    }
+    return null;
+  }
+
+  // ─── Category inference from keywords ───
+  var _categoryKeywords = {
+    work: ['work', 'meeting', 'email', 'report', 'presentation', 'project', 'deadline', 'client', 'office', 'standup', 'sprint', 'deploy', 'release', 'review pr', 'code review', 'jira', 'slack'],
+    health: ['gym', 'workout', 'exercise', 'run', 'jog', 'yoga', 'doctor', 'dentist', 'appointment', 'medication', 'vitamin', 'meditate', 'stretch', 'walk'],
+    personal: ['call mom', 'call dad', 'birthday', 'gift', 'family', 'friend', 'date', 'party', 'wedding', 'anniversary'],
+    finance: ['pay', 'bill', 'invoice', 'budget', 'tax', 'bank', 'transfer', 'rent', 'mortgage', 'insurance'],
+    errands: ['buy', 'grocery', 'groceries', 'shop', 'shopping', 'pick up', 'pickup', 'return', 'drop off', 'laundry', 'clean', 'repair', 'fix'],
+    learning: ['read', 'study', 'course', 'tutorial', 'learn', 'practice', 'book', 'chapter', 'research', 'lecture'],
+    admin: ['organize', 'sort', 'file', 'paperwork', 'register', 'renew', 'update', 'backup', 'cancel subscription']
+  };
+
+  function inferCategory(text) {
+    var lower = text.toLowerCase();
+    // First check if user's existing categories match words in the title
+    // (loaded dynamically from todos — best match wins)
+    if (window.dmSync && window.dmSync.getAllTodos) {
+      // We can't do async here, so we skip dynamic lookup and rely on keyword map
+    }
+    var bestCat = null;
+    var bestLen = 0;
+    for (var cat in _categoryKeywords) {
+      var keywords = _categoryKeywords[cat];
+      for (var i = 0; i < keywords.length; i++) {
+        if (lower.indexOf(keywords[i]) !== -1 && keywords[i].length > bestLen) {
+          bestCat = cat;
+          bestLen = keywords[i].length;
+        }
+      }
+    }
+    return bestCat;
+  }
+
+  // ─── Clean title: remove date/time/estimate phrases ───
+  function cleanTaskTitle(title, parsedDate, parsedEstimate) {
+    var cleaned = title;
+    // Remove date phrases
+    if (parsedDate) {
+      // Remove common preposition+date patterns
+      cleaned = cleaned.replace(new RegExp('\\s*(?:for|on|by|before|due|scheduled\\s+for|scheduled)?\\s*\\b' + parsedDate.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'), '');
+    }
+    // Remove estimate phrases
+    if (parsedEstimate) {
+      cleaned = cleaned.replace(new RegExp('\\s*(?:for|taking|takes|about|around|~)?\\s*\\b' + parsedEstimate.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'), '');
+    }
+    // Clean up leftover artifacts
+    cleaned = cleaned.replace(/\s*[-–—,]\s*$/, '').replace(/^\s*[-–—,]\s*/, '').trim();
+    // Strip leading prepositions left over after date/estimate removal
+    cleaned = cleaned.replace(/^(to|for|on|by|at|in)\s+/i, '').trim();
+    return cleaned || title;
+  }
+
+  // ─── Parse full task from natural language ───
+  function parseTaskDetails(rawTitle) {
+    var parsedDate = parseDate(rawTitle);
+    var parsedEstimate = parseEstimate(rawTitle);
+    var category = inferCategory(rawTitle);
+    var title = cleanTaskTitle(rawTitle, parsedDate, parsedEstimate);
+
+    return {
+      title: title,
+      scheduledDate: parsedDate ? parsedDate.date : null,
+      estimatedMin: parsedEstimate ? parsedEstimate.minutes : null,
+      category: category
+    };
+  }
+
+  function createTaskDirectly(details) {
+    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
+      return false;
+    }
+    var event = new CustomEvent('dm-ai-create-task', {
+      detail: {
+        title: details.title,
+        scheduledDate: details.scheduledDate,
+        estimatedMin: details.estimatedMin,
+        category: details.category,
+        source: 'ai'
+      }
+    });
+    window.dispatchEvent(event);
+    return true;
+  }
+
+  function buildTaskConfirmation(details) {
+    var parts = ['Done — added **' + details.title + '**'];
+    var meta = [];
+    if (details.scheduledDate) {
+      // Format the date nicely
+      var today = _fmtDate(new Date());
+      var tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+      var tmrStr = _fmtDate(tmr);
+      if (details.scheduledDate === today) meta.push('today');
+      else if (details.scheduledDate === tmrStr) meta.push('tomorrow');
+      else {
+        var dp = details.scheduledDate.split('-');
+        var dd = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]));
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        meta.push(days[dd.getDay()] + ' ' + months[dd.getMonth()] + ' ' + dd.getDate());
+      }
+    }
+    if (details.category) meta.push(details.category);
+    if (details.estimatedMin) meta.push(details.estimatedMin + ' min');
+
+    if (meta.length > 0) {
+      parts.push(' (' + meta.join(', ') + ')');
+    }
+    return parts.join('') + '.';
+  }
+
   function sendMessage() {
     var text = inputEl.value.trim();
     if (!text || isGenerating) return;
@@ -1608,6 +1860,21 @@
     } else if (mode === 'summarize') {
       runChat('Please summarize the following text concisely:\n\n' + text);
     } else {
+      // Check for task-creation intent
+      var rawTitle = detectTaskIntent(text);
+      if (rawTitle) {
+        var details = parseTaskDetails(rawTitle);
+        if (createTaskDirectly(details)) {
+          // Show user message + instant confirmation (no AI call)
+          addMessage('user', text);
+          chatHistory.push({ role: 'user', content: text });
+          var confirmText = buildTaskConfirmation(details);
+          addMessage('assistant', confirmText);
+          chatHistory.push({ role: 'assistant', content: confirmText });
+          saveMessages();
+          return;
+        }
+      }
       runChat(text);
     }
   }
@@ -1637,9 +1904,6 @@
 
   // ─── Event listeners ───
 
-  // FAB click
-  fab.addEventListener('click', togglePanel);
-
   // Close
   panelClose.addEventListener('click', closePanel);
 
@@ -1658,6 +1922,22 @@
     unloadEngine();
     addMessage('assistant', 'Model unloaded. GPU memory has been freed. The model will reload on your next message.');
   });
+
+  // Custom context auto-save
+  var _contextSaveTimeout = null;
+  if (customContextEl) {
+    try { customContextEl.value = localStorage.getItem(LS_KEY_CONTEXT) || ''; } catch(e) {}
+    customContextEl.addEventListener('input', function() {
+      if (_contextSaveTimeout) clearTimeout(_contextSaveTimeout);
+      _contextSaveTimeout = setTimeout(function() {
+        try { localStorage.setItem(LS_KEY_CONTEXT, customContextEl.value); } catch(e) {}
+        if (contextSavedEl) {
+          contextSavedEl.style.display = '';
+          setTimeout(function() { contextSavedEl.style.display = 'none'; }, 1500);
+        }
+      }, 600);
+    });
+  }
 
   // Clear chat
   clearBtn.addEventListener('click', clearChat);
@@ -1700,17 +1980,85 @@
     }
   });
 
-  // Keyboard shortcuts: Escape to close, A to toggle
+  // ─── Voice input (Web Speech API) ───
+  var SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+  var recognition = null;
+  var isRecording = false;
+
+  if (SpeechRecognitionAPI && micBtn) {
+    micBtn.style.display = '';
+
+    recognition = new SpeechRecognitionAPI();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = navigator.language || 'en-US';
+
+    var _interimStart = '';
+
+    recognition.onstart = function() {
+      isRecording = true;
+      micBtn.classList.add('recording');
+      micBtn.title = 'Stop recording';
+      _interimStart = inputEl.value;
+    };
+
+    recognition.onresult = function(event) {
+      var interim = '';
+      var final = '';
+      for (var i = event.resultIndex; i < event.results.length; i++) {
+        var transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      // Append final results; show interim as preview
+      if (final) {
+        var sep = _interimStart && !_interimStart.endsWith(' ') ? ' ' : '';
+        _interimStart += sep + final;
+        inputEl.value = _interimStart;
+      } else if (interim) {
+        var sep2 = _interimStart && !_interimStart.endsWith(' ') ? ' ' : '';
+        inputEl.value = _interimStart + sep2 + interim;
+      }
+      updateInputHeight();
+      sendBtn.disabled = !inputEl.value.trim() || isGenerating;
+    };
+
+    recognition.onend = function() {
+      isRecording = false;
+      micBtn.classList.remove('recording');
+      micBtn.title = 'Voice input';
+      inputEl.focus();
+    };
+
+    recognition.onerror = function(event) {
+      isRecording = false;
+      micBtn.classList.remove('recording');
+      micBtn.title = 'Voice input';
+      if (event.error !== 'aborted' && event.error !== 'no-speech') {
+        console.warn('[AI] Speech recognition error:', event.error);
+      }
+    };
+
+    micBtn.addEventListener('click', function() {
+      if (isRecording) {
+        recognition.stop();
+      } else {
+        try { recognition.start(); } catch(e) {
+          // Already started
+          recognition.stop();
+        }
+      }
+    });
+  }
+
+  // Keyboard shortcuts: Escape to close side panel
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && panel.style.display !== 'none') {
       closePanel();
       return;
-    }
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-    if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
-      if (!isAiEnabled()) return;
-      e.preventDefault();
-      togglePanel();
     }
   });
 
@@ -1721,7 +2069,6 @@
   var enabled = isAiEnabled();
   enabledToggle.checked = enabled;
   if (enabled) {
-    fab.style.display = '';
     if (!hasWebGPU) {
       notSupportedEl.style.display = '';
     }
@@ -1753,7 +2100,10 @@
       return loadEngine();
     },
     _buildSystemPrompt: buildSystemPrompt,
-    _renderMarkdown: renderMarkdown
+    _renderMarkdown: renderMarkdown,
+    _detectTaskIntent: detectTaskIntent,
+    _parseTaskDetails: parseTaskDetails,
+    _buildTaskConfirmation: buildTaskConfirmation
   };
 
 })();
