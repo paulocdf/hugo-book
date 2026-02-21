@@ -464,15 +464,7 @@
     // Auth handling
     if (signinBtn) {
       signinBtn.addEventListener('click', function() {
-        if (window.dmAuth && window.dmGoogleProvider) {
-          if (window.dmIsLocalhost || window.dmIsMobile) {
-            window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
-          } else {
-            window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
-              console.error('Sign-in error:', err);
-            });
-          }
-        }
+        window.dmSignIn();
       });
     }
 

@@ -88,6 +88,14 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Never intercept navigation requests — let the browser handle page loads
+  // directly. This is critical for Firebase Auth signInWithRedirect: the
+  // OAuth redirect back from firebaseapp.com carries auth state in the URL
+  // fragment, and serving a cached page would swallow the credential.
+  if (request.mode === "navigate") {
+    return;
+  }
+
   /**
    * @param {Response} response
    * @returns {Promise<Response>}

@@ -276,15 +276,7 @@
   // ── Auth gating ──
   if (signinBtn) {
     signinBtn.addEventListener('click', function() {
-      if (window.dmAuth && window.dmGoogleProvider) {
-      if (window.dmIsLocalhost || window.dmIsMobile) {
-        window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
-      } else {
-        window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
-          console.error('Tag cloud sign-in error:', err);
-        });
-      }
-      }
+      window.dmSignIn();
     });
   }
 

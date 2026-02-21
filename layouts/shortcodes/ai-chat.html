@@ -582,14 +582,7 @@
 
   if (pageSigninBtn) {
     pageSigninBtn.addEventListener('click', function() {
-      if (!window.dmAuth || !window.dmGoogleProvider) return;
-      if (window.dmIsLocalhost || window.dmIsMobile) {
-        window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
-      } else {
-        window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
-          console.error('AI page sign-in error:', err);
-        });
-      }
+      window.dmSignIn();
     });
   }
 
