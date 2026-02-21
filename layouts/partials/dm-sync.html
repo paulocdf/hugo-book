@@ -179,6 +179,32 @@
   var _draining = false;
   var _drainAttempts = 0;
   var MAX_DRAIN_ATTEMPTS = 3; // Give up after 3 failed drain cycles
+  var _quotaCooldownUntil = 0; // Timestamp: suppress Firestore until this time
+  var QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown on quota errors
+
+  function isQuotaError(err) {
+    return err && (err.code === 'resource-exhausted' || (err.message && err.message.indexOf('Quota exceeded') !== -1));
+  }
+
+  function enterQuotaCooldown() {
+    _quotaCooldownUntil = Date.now() + QUOTA_COOLDOWN_MS;
+    console.warn('[dm-sync] Firestore quota exceeded — working offline for ' + (QUOTA_COOLDOWN_MS / 60000) + ' min');
+    showQuotaWarning();
+  }
+
+  function isInQuotaCooldown() {
+    return _quotaCooldownUntil > Date.now();
+  }
+
+  function showQuotaWarning() {
+    var indicator = document.getElementById('dm-offline-indicator');
+    if (!indicator) return;
+    indicator.style.display = '';
+    indicator.querySelector('.dm-offline-text').textContent = 'Cloud quota exceeded — working offline';
+    indicator.classList.add('dm-offline--show');
+    var dismissBtn = document.getElementById('dm-offline-dismiss');
+    if (dismissBtn) dismissBtn.style.display = '';
+  }
 
   // ─── IndexedDB Wrapper ───
 
@@ -449,8 +475,8 @@
     var localPromise = opts.localOp ? opts.localOp() : Promise.resolve();
 
     return localPromise.then(function() {
-      if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser || !_isOnline) {
-        // Offline or no Firestore — queue for later
+      if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser || !_isOnline || isInQuotaCooldown()) {
+        // Offline, no Firestore, or quota cooldown — queue for later
         console.log('[dm-sync] Queuing offline write:', opts.op, opts.collection, opts.docId);
         return queueWrite({
           collection: opts.collection,
@@ -476,7 +502,11 @@
       }
 
       return fsPromise.catch(function(err) {
-        // Firestore write failed (maybe went offline mid-write) — queue it
+        // Detect quota exhaustion — enter cooldown to stop hammering Firestore
+        if (isQuotaError(err)) {
+          enterQuotaCooldown();
+        }
+        // Firestore write failed — queue it
         console.warn('[dm-sync] Firestore write failed, queuing:', err.message);
         return queueWrite({
           collection: opts.collection,
@@ -496,7 +526,7 @@
    */
   function drainQueue() {
     if (_draining) return Promise.resolve();
-    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser || !_isOnline) {
+    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser || !_isOnline || isInQuotaCooldown()) {
       return Promise.resolve();
     }
     _draining = true;
@@ -544,6 +574,12 @@
               console.warn('[dm-sync] Removing unrecoverable queued op (' + err.code + '):', entry.collection, entry.docId);
               return removeQueued(entry.queueId);
             }
+            // Quota exhausted — enter cooldown, stop draining, preserve queue
+            if (isQuotaError(err)) {
+              enterQuotaCooldown();
+              failed = true;
+              return;
+            }
             console.warn('[dm-sync] Queue drain failed at entry, will retry:', err.message);
             failed = true;
           });
@@ -563,19 +599,13 @@
           }
         }
 
-        // If some failed, retry after a delay (up to MAX_DRAIN_ATTEMPTS)
-        if (failed) {
+        // If some failed (not quota), retry with exponential backoff
+        if (failed && !isInQuotaCooldown()) {
           _drainAttempts++;
-          if (_drainAttempts >= MAX_DRAIN_ATTEMPTS) {
-            console.warn('[dm-sync] Queue drain failed ' + _drainAttempts + ' times, clearing stuck entries');
-            clearQueue().then(function() {
-              _drainAttempts = 0;
-              updateOfflineIndicator();
-            });
-          } else {
-            setTimeout(drainQueue, 10000);
-          }
-        } else {
+          var delay = Math.min(10000 * Math.pow(2, _drainAttempts - 1), 300000); // 10s, 20s, 40s... up to 5 min
+          console.log('[dm-sync] Retrying queue drain in ' + (delay / 1000) + 's (attempt ' + _drainAttempts + ')');
+          setTimeout(drainQueue, delay);
+        } else if (!failed) {
           _drainAttempts = 0;
         }
       });
@@ -716,6 +746,13 @@
         });
 
         return idbGetAll(STORE_NOTES).then(function(localNotes) {
+          // Get pending queue entries to protect un-synced local items
+          return getAllQueued().then(function(queueEntries) {
+          var pendingIds = {};
+          queueEntries.forEach(function(q) {
+            if (q.op === 'set') pendingIds[q.docId] = true;
+          });
+
           var localMap = {};
           localNotes.forEach(function(n) { localMap[n.id] = n; });
 
@@ -732,9 +769,10 @@
           });
 
           // Find notes to delete locally (exist locally but not remotely)
+          // Skip items with pending writes in the queue — they haven't synced yet
           var toDelete = [];
           localNotes.forEach(function(ln) {
-            if (!remoteMap[ln.id]) {
+            if (!remoteMap[ln.id] && !pendingIds[ln.id]) {
               toDelete.push(ln.id);
             }
           });
@@ -753,6 +791,7 @@
             var elapsed = Date.now() - startTime;
             console.log('[dm-sync] Notes sync complete in ' + elapsed + 'ms. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
             return { upserted: toUpsert.length, deleted: toDelete.length };
+          });
           });
         });
       });
@@ -774,6 +813,13 @@
         });
 
         return idbGetAll(STORE_TODOS).then(function(localTodos) {
+          // Get pending queue entries to protect un-synced local items
+          return getAllQueued().then(function(queueEntries) {
+          var pendingIds = {};
+          queueEntries.forEach(function(q) {
+            if (q.op === 'set') pendingIds[q.docId] = true;
+          });
+
           var localMap = {};
           localTodos.forEach(function(t) { localMap[t.id] = t; });
 
@@ -788,9 +834,10 @@
             }
           });
 
+          // Skip items with pending writes in the queue — they haven't synced yet
           var toDelete = [];
           localTodos.forEach(function(lt) {
-            if (!remoteMap[lt.id]) {
+            if (!remoteMap[lt.id] && !pendingIds[lt.id]) {
               toDelete.push(lt.id);
             }
           });
@@ -807,6 +854,7 @@
             var elapsed = Date.now() - startTime;
             console.log('[dm-sync] Todos sync complete in ' + elapsed + 'ms. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
             return { upserted: toUpsert.length, deleted: toDelete.length };
+          });
           });
         });
       });
@@ -835,6 +883,11 @@
 
   function syncAll(userId) {
     if (_syncing) return Promise.resolve();
+    if (isInQuotaCooldown()) {
+      console.log('[dm-sync] Skipping sync — quota cooldown active');
+      window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      return Promise.resolve();
+    }
     _syncing = true;
 
     return syncNotes(userId)
@@ -851,8 +904,14 @@
         });
       })
       .catch(function(err) {
-        console.error('[dm-sync] Sync error:', err);
         _syncing = false;
+        if (isQuotaError(err)) {
+          enterQuotaCooldown();
+          // Still dispatch sync-complete so UI renders from cached IDB data
+          window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+          return;
+        }
+        console.error('[dm-sync] Sync error:', err);
         throw err;
       });
   }
@@ -1999,6 +2058,11 @@
     firestoreWrite: firestoreWrite,
     drainQueue: drainQueue,
     isOnline: function() { return _isOnline; },
+    getCachedUserId: function() {
+      return idbGet(STORE_META, 'currentUserId').then(function(meta) {
+        return meta ? meta.value : null;
+      });
+    },
     getQueuedCount: function() {
       return getAllQueued().then(function(entries) { return entries.length; });
     },

@@ -4149,13 +4149,27 @@
   }
 
   function createTodo(title, estimatedMin, parentId, scheduledDate, reminderAtMs, category, atTop, pomodoroCount, pomodoroLength, onDone, source, breakLength, bujoType) {
-    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
-      showTodoError('Not signed in — please sign in to add tasks');
+    if (!window.dmSync) {
+      showTodoError('Data layer not ready — please reload');
       if (onDone) onDone();
       return;
     }
 
-    var user = window.dmAuth.currentUser;
+    // Get userId: prefer live auth, fall back to cached identity for offline use
+    var userIdPromise;
+    if (window.dmAuth && window.dmAuth.currentUser) {
+      userIdPromise = Promise.resolve(window.dmAuth.currentUser.uid);
+    } else {
+      userIdPromise = window.dmSync.getCachedUserId();
+    }
+
+    userIdPromise.then(function(userId) {
+      if (!userId) {
+        showTodoError('Not signed in — please sign in to add tasks');
+        if (onDone) onDone();
+        return;
+      }
+
     var order = atTop ? getMinOrder(parentId || null) : getNextOrder(parentId || null);
 
     // Request notification permission early if setting a reminder
@@ -4167,7 +4181,7 @@
     var pLength = pomodoroLength || (_addFormPomoMode === 'long' ? _globalPomoLongWork : _globalPomoShortWork);
 
     var todoData = {
-      userId: user.uid,
+      userId: userId,
       title: title,
       estimatedMin: estimatedMin || (pCount * pLength),
       actualMin: null,
@@ -4180,13 +4194,13 @@
       parentId: parentId || null,
       order: order,
       scheduledDate: scheduledDate || null,
-      reminderAt: reminderAtMs ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
+      reminderAt: reminderAtMs && typeof firebase !== 'undefined' ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
       reminderFired: false,
       source: source || null,
       bujoType: bujoType || 'task',
       bujoState: 'open',
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      createdAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
+      updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
       completedAt: null
     };
 
@@ -4194,7 +4208,7 @@
     var newDocId = window.dmDb ? window.dmDb.collection('todos').doc().id : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
     var localTodo = {
       id: newDocId,
-      userId: user.uid,
+      userId: userId,
       title: title,
       estimatedMin: estimatedMin || (pCount * pLength),
       actualMin: null,
@@ -4217,28 +4231,28 @@
       completedAt: null
     };
 
-    if (window.dmSync) {
-      window.dmSync.firestoreWrite({
-        collection: 'todos',
-        docId: newDocId,
-        op: 'set',
-        data: todoData,
-        localOp: function() {
-          allTodos.push(localTodo);
-          return window.dmSync.putTodo(localTodo);
-        }
-      }).then(function() {
-        _justAddedIds[newDocId] = true;
-        if (onDone) onDone();
-        render();
-        // Clear flash class after animation completes
-        setTimeout(function() { delete _justAddedIds[newDocId]; }, 1600);
-      }).catch(function(err) {
-        console.error('Error creating todo:', err);
-        showTodoError('Failed to add task — check console');
-        if (onDone) onDone();
-      });
-    }
+    window.dmSync.firestoreWrite({
+      collection: 'todos',
+      docId: newDocId,
+      op: 'set',
+      data: todoData,
+      localOp: function() {
+        allTodos.push(localTodo);
+        return window.dmSync.putTodo(localTodo);
+      }
+    }).then(function() {
+      _justAddedIds[newDocId] = true;
+      if (onDone) onDone();
+      render();
+      // Clear flash class after animation completes
+      setTimeout(function() { delete _justAddedIds[newDocId]; }, 1600);
+    }).catch(function(err) {
+      console.error('Error creating todo:', err);
+      showTodoError('Failed to add task — check console');
+      if (onDone) onDone();
+    });
+
+    }); // end userIdPromise.then
   }
 
   function completeTodo(todo, actualMin, category) {
