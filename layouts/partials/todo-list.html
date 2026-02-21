@@ -83,27 +83,10 @@
     <!-- Summary -->
     <div class="todo-summary" id="todo-summary" style="display: none;"></div>
   </div>
-
-  <!-- Spotlight task capture overlay -->
-  <div class="todo-spotlight" id="todo-spotlight" style="display: none;">
-    <div class="todo-spotlight-backdrop" id="todo-spotlight-backdrop"></div>
-    <div class="todo-spotlight-dialog">
-      <div class="todo-spotlight-input-wrap">
-        <svg class="todo-spotlight-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-        <input type="text" id="todo-spotlight-input" class="todo-spotlight-input" placeholder="What needs to be done?" autocomplete="off" maxlength="280" />
-        <kbd class="todo-spotlight-esc">Esc</kbd>
-      </div>
-      <div class="todo-spotlight-meta" id="todo-spotlight-meta">
-        <div class="todo-spotlight-chips" id="todo-spotlight-chips"></div>
-      </div>
-      <div class="todo-spotlight-footer">
-        <span class="todo-spotlight-hint">
-          <kbd>Enter</kbd> add task &middot; <kbd>Esc</kbd> close
-        </span>
-      </div>
-    </div>
-  </div>
 </div>
+
+<!-- Backdrop for elevated add-form focus mode (outside .todo-list to avoid overflow:hidden clipping) -->
+<div class="todo-add-backdrop" id="todo-add-backdrop"></div>
 
 <!-- Delete modal is created dynamically via JS and appended to document.body -->
 
@@ -595,123 +578,42 @@
   50% { opacity: 0.4; transform: scale(1.3); }
 }
 
-/* ─── Spotlight task capture overlay ─── */
-.todo-spotlight {
+/* ─── Elevated add-form focus mode ─── */
+.todo-add-backdrop {
+  display: none;
   position: fixed;
   inset: 0;
-  z-index: 1200;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 18vh;
-}
-.todo-spotlight-backdrop {
-  position: absolute;
-  inset: 0;
+  z-index: 1199;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
-.todo-spotlight-dialog {
-  position: relative;
+.todo-add-backdrop.visible {
+  display: block;
+}
+.todo-add-form.elevated {
+  position: fixed;
+  z-index: 1200;
+  top: 18vh;
+  left: 50%;
+  transform: translateX(-50%);
   width: 92%;
   max-width: 560px;
   background: var(--body-background, #fff);
   border: 1px solid var(--gray-200, #e5e5e5);
   border-radius: 14px;
   box-shadow: 0 24px 64px rgba(0,0,0,0.3);
-  animation: todo-spotlight-in 0.18s ease-out;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0;
+  animation: todo-form-elevate 0.18s ease-out;
 }
-@keyframes todo-spotlight-in {
-  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+@keyframes todo-form-elevate {
+  from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
-.todo-spotlight-input-wrap {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--gray-200, #e5e5e5);
-}
-.todo-spotlight-icon {
-  flex-shrink: 0;
-  color: var(--color-link, #0069ff);
-}
-.todo-spotlight-input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  font-size: 1.05rem;
-  font-family: inherit;
-  color: var(--body-font-color);
-}
-.todo-spotlight-input::placeholder {
-  color: var(--gray-400, #aaa);
-}
-.todo-spotlight-esc {
-  flex-shrink: 0;
-  font-size: 0.65rem;
-  font-family: 'Inter', sans-serif;
-  color: var(--gray-400, #aaa);
-  background: var(--gray-100, #f5f5f5);
-  border: 1px solid var(--gray-200, #e5e5e5);
-  border-radius: 4px;
-  padding: 2px 6px;
-  line-height: 1.4;
-}
-.todo-spotlight-meta {
-  padding: 0.5rem 1rem;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  min-height: 36px;
-}
-.todo-spotlight-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.todo-spotlight-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-size: 0.72rem;
-  font-weight: 500;
-  background: var(--gray-100, #f5f5f5);
-  color: var(--body-font-color);
-  border: 1px solid var(--gray-200, #e5e5e5);
-}
-.todo-spotlight-chip svg {
-  flex-shrink: 0;
-}
-.todo-spotlight-footer {
-  padding: 0.5rem 1rem;
-  border-top: 1px solid var(--gray-200, #e5e5e5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.todo-spotlight-hint {
-  font-size: 0.7rem;
-  color: var(--gray-400, #aaa);
-}
-.todo-spotlight-hint kbd {
-  font-size: 0.62rem;
-  font-family: 'Inter', sans-serif;
-  background: var(--gray-100, #f5f5f5);
-  border: 1px solid var(--gray-200, #e5e5e5);
-  border-radius: 3px;
-  padding: 1px 4px;
-  margin: 0 1px;
-  line-height: 1.4;
+.todo-add-form.elevated .todo-add-row-main {
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 2px rgba(0, 105, 255, 0.08);
 }
 
 /* Day group headers */
@@ -1994,9 +1896,7 @@
             updateReminderChip();
           }
         }
-        _suppressSpotlight = true;
         addTitleInput.focus();
-        _suppressSpotlight = false;
       }
     };
 
@@ -2441,9 +2341,7 @@
         } else {
           addTitleInput.placeholder = 'What needs to be done?';
         }
-        _suppressSpotlight = true;
         addTitleInput.focus();
-        _suppressSpotlight = false;
       });
     });
   }
@@ -4703,7 +4601,7 @@
   // ─── Add form ───
   function addFromForm() {
     var title = addTitleInput.value.trim();
-    if (!title) { _suppressSpotlight = true; addTitleInput.focus(); _suppressSpotlight = false; return; }
+    if (!title) { addTitleInput.focus(); return; }
     var customMin = addCustomMinInput.value ? parseInt(addCustomMinInput.value, 10) : null;
     var pomCount = _addFormPomodoroCount;
     var pomLen = _addFormPomoMode === 'long' ? _globalPomoLongWork : _globalPomoShortWork;
@@ -4748,21 +4646,19 @@
     closeAddFormPopover();
     hideCatPopover();
     closePomodoroConfigPopover();
-    _suppressSpotlight = true;
     addTitleInput.focus();
-    _suppressSpotlight = false;
   }
 
   addBtn.addEventListener('click', addFromForm);
   // Prevent Enter in custom min input from submitting; Tab moves focus to title
   addCustomMinInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); _suppressSpotlight = true; addTitleInput.focus(); _suppressSpotlight = false; }
+    if (e.key === 'Enter') { e.preventDefault(); addTitleInput.focus(); }
   });
   addTitleInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
       var title = addTitleInput.value.trim();
-    if (!title) { _suppressSpotlight = true; addTitleInput.focus(); _suppressSpotlight = false; return; }
+      if (!title) { addTitleInput.focus(); return; }
       // If no category set yet, prompt user to pick one first
       if (!_addFormCategory) {
         _addFormCategoryPrompted = true;
@@ -4771,106 +4667,40 @@
       }
       addFromForm();
     }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      collapseForm();
+      addTitleInput.blur();
+    }
   });
 
-  // ─── Spotlight task capture overlay ───
-  var spotlightEl = document.getElementById('todo-spotlight');
-  var spotlightBackdrop = document.getElementById('todo-spotlight-backdrop');
-  var spotlightInput = document.getElementById('todo-spotlight-input');
-  var spotlightChips = document.getElementById('todo-spotlight-chips');
-  var _spotlightOpen = false;
-  var _suppressSpotlight = false; // guard to prevent focus-loop when programmatically focusing addTitleInput
+  // ─── Elevated add-form focus mode ───
+  var addFormEl = document.getElementById('todo-add-form');
+  var addBackdrop = document.getElementById('todo-add-backdrop');
+  var _formElevated = false;
 
-  function openSpotlight() {
-    if (_spotlightOpen) return;
-    _spotlightOpen = true;
-    spotlightEl.style.display = 'flex';
-    updateSpotlightChips();
-    setTimeout(function() {
-      spotlightInput.value = addTitleInput.value || '';
-      spotlightInput.focus();
-    }, 30);
+  function elevateForm() {
+    if (_formElevated) return;
+    _formElevated = true;
+    addFormEl.classList.add('elevated');
+    addBackdrop.classList.add('visible');
   }
 
-  function closeSpotlight() {
-    if (!_spotlightOpen) return;
-    _spotlightOpen = false;
-    spotlightEl.style.display = 'none';
-    // Transfer any text back to the inline input
-    if (spotlightInput.value.trim()) {
-      addTitleInput.value = spotlightInput.value;
-    }
-    spotlightInput.value = '';
+  function collapseForm() {
+    if (!_formElevated) return;
+    _formElevated = false;
+    addFormEl.classList.remove('elevated');
+    addBackdrop.classList.remove('visible');
   }
 
-  function updateSpotlightChips() {
-    if (!spotlightChips) return;
-    var html = '';
-    // Date chip
-    if (_addFormDate) {
-      var today = getTodayStr();
-      var tomorrow = getDateOffset(1);
-      var dateLabel = _addFormDate === today ? 'Today' : (_addFormDate === tomorrow ? 'Tomorrow' : _addFormDate);
-      html += '<span class="todo-spotlight-chip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> ' + escapeHtml(dateLabel) + '</span>';
-    }
-    // Category chip
-    if (_addFormCategory) {
-      html += '<span class="todo-spotlight-chip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg> ' + escapeHtml(_addFormCategory) + '</span>';
-    }
-    // BuJo type chip
-    var typeLabel = _addFormBujoType === 'event' ? 'Event' : (_addFormBujoType === 'note' ? 'Note' : 'Task');
-    var typeIcon = _addFormBujoType === 'event'
-      ? '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg>'
-      : (_addFormBujoType === 'note'
-        ? '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>'
-        : '<svg width="10" height="10" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg>');
-    html += '<span class="todo-spotlight-chip">' + typeIcon + ' ' + typeLabel + '</span>';
-    // Pomodoro chip
-    var pomLabel = _addFormPomodoroCount + ' pom';
-    html += '<span class="todo-spotlight-chip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg> ' + pomLabel + '</span>';
-    spotlightChips.innerHTML = html;
-  }
-
-  function submitFromSpotlight() {
-    var title = spotlightInput.value.trim();
-    if (!title) { spotlightInput.focus(); return; }
-    // Transfer to the inline input and submit via existing addFromForm
-    addTitleInput.value = title;
-    // If no category, prompt category in the spotlight context
-    if (!_addFormCategory) {
-      _addFormCategoryPrompted = true;
-      closeSpotlight();
-      showCatPopover();
-      return;
-    }
-    closeSpotlight();
-    addFromForm();
-  }
-
-  // Open spotlight when clicking on the inline title input
   addTitleInput.addEventListener('focus', function() {
-    if (_suppressSpotlight) return;
-    openSpotlight();
+    elevateForm();
   });
 
-  // Spotlight keyboard handlers
-  if (spotlightInput) {
-    spotlightInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        submitFromSpotlight();
-      }
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        closeSpotlight();
-      }
-    });
-  }
-
-  // Close spotlight on backdrop click
-  if (spotlightBackdrop) {
-    spotlightBackdrop.addEventListener('click', function() {
-      closeSpotlight();
+  if (addBackdrop) {
+    addBackdrop.addEventListener('click', function() {
+      collapseForm();
+      addTitleInput.blur();
     });
   }
 
