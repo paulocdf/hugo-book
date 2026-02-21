@@ -145,7 +145,12 @@
 
   <!-- All cards list (schedule) -->
   <div class="review-schedule" id="review-schedule" style="display: none;">
-    <h3 class="review-schedule-title">All Flashcards</h3>
+    <div class="review-schedule-header">
+      <h3 class="review-schedule-title">All Flashcards</h3>
+      <button type="button" class="review-export-btn" id="review-export-btn" title="Export flashcards">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+      </button>
+    </div>
     <div class="review-schedule-list" id="review-schedule-list"></div>
   </div>
 </div>
@@ -525,7 +530,27 @@
 .review-schedule-title {
   font-size: 1rem;
   font-weight: 600;
+  margin: 0;
+}
+.review-schedule-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 1rem;
+}
+.review-export-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-400);
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+}
+.review-export-btn:hover {
+  color: var(--color-link);
+  background: var(--gray-100);
 }
 .review-schedule-list {
   display: flex;
@@ -1184,5 +1209,13 @@
     if (!window.dmSync) return Promise.reject(new Error('Sync not ready'));
     return window.dmSync.createReviewCard(front, back, tags);
   };
+
+  // ─── Export button ───
+  var reviewExportBtn = document.getElementById('review-export-btn');
+  if (reviewExportBtn) {
+    reviewExportBtn.addEventListener('click', function() {
+      if (window.dmExport) window.dmExport.open('cards');
+    });
+  }
 })();
 </script>

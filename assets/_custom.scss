@@ -80,6 +80,45 @@
 }
 
 // ======================================
+// Export toolbar button (top-right, next to theme toggle)
+// ======================================
+.export-toolbar-btn {
+  position: fixed;
+  top: 1rem;
+  right: 4.5rem; // next to theme toggle (which is at right: 1.5rem, 40px wide)
+  z-index: 100;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border-medium);
+  background: var(--surface-2);
+  color: var(--body-font-color);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px var(--shadow-color);
+
+  &:hover {
+    background: var(--surface-3);
+    border-color: var(--accent-blue);
+    transform: scale(1.08);
+    box-shadow: 0 4px 16px var(--shadow-color);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+
+  @media print {
+    display: none !important;
+  }
+}
+
+// ======================================
 // Layout: full-width container, sidebar flush left
 // ======================================
 .container {
@@ -3802,6 +3841,13 @@ html.sidebar-collapsed {
   .theme-toggle {
     top: 0.5rem;
     right: 0.75rem;
+    width: 36px;
+    height: 36px;
+  }
+
+  .export-toolbar-btn {
+    top: 0.5rem;
+    right: 3.5rem;
     width: 36px;
     height: 36px;
   }

@@ -1,0 +1,1126 @@
+<!-- Export Modal: bulk & single-item export of notes, tasks, and review cards -->
+<div class="export-modal" id="export-modal" aria-hidden="true" style="display: none;">
+  <div class="export-modal-backdrop" id="export-modal-backdrop"></div>
+  <div class="export-modal-dialog">
+    <div class="export-modal-header">
+      <h3>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        Export
+      </h3>
+      <button type="button" class="export-modal-close" id="export-modal-close" title="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Scope selector -->
+    <div class="export-section">
+      <label class="export-label">What to export</label>
+      <div class="export-scope-grid" id="export-scope-grid">
+        <button type="button" class="export-scope-btn active" data-scope="vault">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+          </svg>
+          Entire Vault
+        </button>
+        <button type="button" class="export-scope-btn" data-scope="notes">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+          </svg>
+          All Notes
+        </button>
+        <button type="button" class="export-scope-btn" data-scope="tasks">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+          All Tasks
+        </button>
+        <button type="button" class="export-scope-btn" data-scope="cards">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 18V5"></path>
+            <path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path>
+          </svg>
+          Flashcards
+        </button>
+        <button type="button" class="export-scope-btn" data-scope="books">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          Books
+        </button>
+        <button type="button" class="export-scope-btn" data-scope="topics">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+          </svg>
+          Topics
+        </button>
+        <button type="button" class="export-scope-btn" data-scope="snippets">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="16 18 22 12 16 6"></polyline>
+            <polyline points="8 6 2 12 8 18"></polyline>
+          </svg>
+          Snippets
+        </button>
+        <button type="button" class="export-scope-btn" data-scope="inbox">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline>
+            <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path>
+          </svg>
+          Inbox
+        </button>
+      </div>
+    </div>
+
+    <!-- Format selector -->
+    <div class="export-section">
+      <label class="export-label">Format</label>
+      <div class="export-format-row" id="export-format-row">
+        <button type="button" class="export-format-btn active" data-format="markdown">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+          </svg>
+          Markdown (.md)
+        </button>
+        <button type="button" class="export-format-btn" data-format="pdf">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="9" y1="15" x2="15" y2="15"></line>
+          </svg>
+          PDF (print)
+        </button>
+      </div>
+    </div>
+
+    <!-- Options -->
+    <div class="export-section">
+      <label class="export-option">
+        <input type="checkbox" id="export-include-attachments" checked>
+        <span>Include attachments</span>
+      </label>
+      <label class="export-option">
+        <input type="checkbox" id="export-include-metadata" checked>
+        <span>Include metadata (dates, tags, status)</span>
+      </label>
+    </div>
+
+    <!-- Preview count -->
+    <div class="export-preview" id="export-preview">
+      <span class="export-preview-text" id="export-preview-text">Calculating...</span>
+    </div>
+
+    <!-- Actions -->
+    <div class="export-actions">
+      <button type="button" class="export-cancel-btn" id="export-cancel-btn">Cancel</button>
+      <button type="button" class="export-submit-btn" id="export-submit-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+        <span id="export-submit-text">Export</span>
+      </button>
+    </div>
+
+    <!-- Progress overlay -->
+    <div class="export-progress" id="export-progress" style="display: none;">
+      <div class="export-progress-bar-track">
+        <div class="export-progress-bar" id="export-progress-bar"></div>
+      </div>
+      <div class="export-progress-text" id="export-progress-text">Preparing export...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Print-only container for PDF export -->
+<div id="export-print-container" class="export-print-container"></div>
+
+<style>
+/* ─── Export Modal ─── */
+.export-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.export-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+.export-modal-dialog {
+  position: relative;
+  background: var(--body-background);
+  border-radius: 16px;
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  width: 520px;
+  max-width: calc(100vw - 2rem);
+  max-height: calc(100vh - 4rem);
+  overflow-y: auto;
+  padding: 1.5rem;
+}
+.export-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+}
+.export-modal-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.export-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-500);
+  padding: 4px;
+  border-radius: 6px;
+}
+.export-modal-close:hover { color: var(--body-font-color); background: var(--gray-100); }
+
+/* Sections */
+.export-section {
+  margin-bottom: 1rem;
+}
+.export-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+}
+
+/* Scope grid */
+.export-scope-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.export-scope-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 4px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--gray-500);
+  font-size: 0.72rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.export-scope-btn:hover {
+  border-color: var(--color-link);
+  color: var(--body-font-color);
+}
+.export-scope-btn.active {
+  border-color: var(--color-link);
+  background: color-mix(in srgb, var(--color-link) 8%, transparent);
+  color: var(--color-link);
+  font-weight: 600;
+}
+
+/* Format row */
+.export-format-row {
+  display: flex;
+  gap: 8px;
+}
+.export-format-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--gray-500);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.export-format-btn:hover {
+  border-color: var(--color-link);
+  color: var(--body-font-color);
+}
+.export-format-btn.active {
+  border-color: var(--color-link);
+  background: color-mix(in srgb, var(--color-link) 8%, transparent);
+  color: var(--color-link);
+  font-weight: 600;
+}
+
+/* Options */
+.export-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--body-font-color);
+  cursor: pointer;
+  margin-bottom: 0.4rem;
+}
+.export-option input[type="checkbox"] {
+  accent-color: var(--color-link);
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+/* Preview */
+.export-preview {
+  padding: 0.6rem 0.8rem;
+  background: var(--gray-100);
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.82rem;
+  color: var(--gray-500);
+}
+
+/* Actions */
+.export-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.export-cancel-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.export-cancel-btn:hover { background: var(--gray-100); }
+.export-submit-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.export-submit-btn:hover { opacity: 0.9; }
+.export-submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Progress */
+.export-progress {
+  position: absolute;
+  inset: 0;
+  background: var(--body-background);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 2rem;
+}
+.export-progress-bar-track {
+  width: 100%;
+  max-width: 300px;
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.export-progress-bar {
+  height: 100%;
+  background: var(--color-link);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.3s;
+}
+.export-progress-text {
+  font-size: 0.85rem;
+  color: var(--gray-500);
+}
+
+/* ─── Print-only container ─── */
+.export-print-container {
+  display: none;
+}
+@media print {
+  /* Hide everything except print container */
+  body > *:not(.export-print-container) {
+    display: none !important;
+  }
+  .export-print-container {
+    display: block !important;
+  }
+  .export-print-container h1 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+    page-break-after: avoid;
+  }
+  .export-print-container h2 {
+    font-size: 1.2rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+    page-break-after: avoid;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 4px;
+  }
+  .export-print-container h3 {
+    font-size: 1rem;
+    margin-top: 1rem;
+    page-break-after: avoid;
+  }
+  .export-print-container .export-print-meta {
+    font-size: 0.8rem;
+    color: #666;
+    margin-bottom: 1rem;
+  }
+  .export-print-container .export-print-section {
+    page-break-before: always;
+  }
+  .export-print-container .export-print-section:first-child {
+    page-break-before: auto;
+  }
+  .export-print-container .export-print-item {
+    page-break-inside: avoid;
+    margin-bottom: 1.5rem;
+  }
+  .export-print-container .export-print-card {
+    border: 1px solid #ccc;
+    padding: 0.8rem;
+    border-radius: 6px;
+    margin-bottom: 0.8rem;
+    page-break-inside: avoid;
+  }
+  .export-print-container .export-print-card-label {
+    font-weight: 600;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 4px;
+  }
+  .export-print-container pre {
+    background: #f6f6f6;
+    padding: 0.8rem;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .export-print-container .export-print-todo {
+    padding: 4px 0;
+    border-bottom: 1px solid #eee;
+  }
+  .export-print-container .export-print-todo-done {
+    text-decoration: line-through;
+    color: #999;
+  }
+  .export-print-container img {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 600px) {
+  .export-scope-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .export-modal-dialog {
+    padding: 1rem;
+  }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  // ─── State ───
+  var state = {
+    scope: 'vault',
+    format: 'markdown',
+    includeAttachments: true,
+    includeMetadata: true,
+    exporting: false
+  };
+
+  // ─── DOM refs ───
+  var modal = document.getElementById('export-modal');
+  var backdrop = document.getElementById('export-modal-backdrop');
+  var closeBtn = document.getElementById('export-modal-close');
+  var cancelBtn = document.getElementById('export-cancel-btn');
+  var submitBtn = document.getElementById('export-submit-btn');
+  var submitText = document.getElementById('export-submit-text');
+  var scopeGrid = document.getElementById('export-scope-grid');
+  var formatRow = document.getElementById('export-format-row');
+  var previewText = document.getElementById('export-preview-text');
+  var progressEl = document.getElementById('export-progress');
+  var progressBar = document.getElementById('export-progress-bar');
+  var progressText = document.getElementById('export-progress-text');
+  var attachCheckbox = document.getElementById('export-include-attachments');
+  var metaCheckbox = document.getElementById('export-include-metadata');
+  var printContainer = document.getElementById('export-print-container');
+
+  // ─── Modal open/close ───
+  function openModal(presetScope) {
+    if (presetScope) {
+      state.scope = presetScope;
+      updateScopeButtons();
+    }
+    modal.style.display = '';
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+    updatePreview();
+  }
+
+  function closeModal() {
+    if (state.exporting) return;
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+    progressEl.style.display = 'none';
+    progressBar.style.width = '0%';
+  }
+
+  backdrop.addEventListener('click', closeModal);
+  closeBtn.addEventListener('click', closeModal);
+  cancelBtn.addEventListener('click', closeModal);
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && modal.style.display !== 'none') closeModal();
+  });
+
+  // ─── Scope buttons ───
+  scopeGrid.addEventListener('click', function(e) {
+    var btn = e.target.closest('.export-scope-btn');
+    if (!btn) return;
+    state.scope = btn.dataset.scope;
+    updateScopeButtons();
+    updatePreview();
+  });
+
+  function updateScopeButtons() {
+    var btns = scopeGrid.querySelectorAll('.export-scope-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].dataset.scope === state.scope);
+    }
+  }
+
+  // ─── Format buttons ───
+  formatRow.addEventListener('click', function(e) {
+    var btn = e.target.closest('.export-format-btn');
+    if (!btn) return;
+    state.format = btn.dataset.format;
+    var btns = formatRow.querySelectorAll('.export-format-btn');
+    for (var i = 0; i < btns.length; i++) {
+      btns[i].classList.toggle('active', btns[i].dataset.format === state.format);
+    }
+    updateSubmitText();
+  });
+
+  function updateSubmitText() {
+    submitText.textContent = state.format === 'pdf' ? 'Print / Save PDF' : 'Export';
+  }
+
+  // ─── Options ───
+  attachCheckbox.addEventListener('change', function() {
+    state.includeAttachments = this.checked;
+  });
+  metaCheckbox.addEventListener('change', function() {
+    state.includeMetadata = this.checked;
+  });
+
+  // ─── Preview ───
+  function updatePreview() {
+    gatherData(state.scope).then(function(data) {
+      var parts = [];
+      if (data.notes.length) parts.push(data.notes.length + ' note' + (data.notes.length !== 1 ? 's' : ''));
+      if (data.todos.length) parts.push(data.todos.length + ' task' + (data.todos.length !== 1 ? 's' : ''));
+      if (data.cards.length) parts.push(data.cards.length + ' flashcard' + (data.cards.length !== 1 ? 's' : ''));
+      previewText.textContent = parts.length ? parts.join(', ') + ' will be exported' : 'Nothing to export';
+      submitBtn.disabled = !parts.length;
+    });
+  }
+
+  // ─── Data gathering ───
+  function gatherData(scope) {
+    var sync = window.dmSync;
+    if (!sync) return Promise.resolve({ notes: [], todos: [], cards: [] });
+
+    switch (scope) {
+      case 'vault':
+        return Promise.all([
+          sync.getAllNotes(),
+          sync.getAllTodos(),
+          sync.getReviewCards(false)
+        ]).then(function(r) { return { notes: r[0], todos: r[1], cards: r[2] }; });
+      case 'notes':
+        return sync.getAllNotes().then(function(n) { return { notes: n, todos: [], cards: [] }; });
+      case 'tasks':
+        return sync.getAllTodos().then(function(t) { return { notes: [], todos: t, cards: [] }; });
+      case 'cards':
+        return sync.getReviewCards(false).then(function(c) { return { notes: [], todos: [], cards: c }; });
+      case 'books':
+        return sync.getNotesByDestination('book-note').then(function(n) { return { notes: n, todos: [], cards: [] }; });
+      case 'topics':
+        return sync.getNotesByDestination('topic').then(function(n) { return { notes: n, todos: [], cards: [] }; });
+      case 'snippets':
+        return sync.getNotesByDestination('snippets').then(function(n) { return { notes: n, todos: [], cards: [] }; });
+      case 'inbox':
+        return sync.getNotesByDestination('inbox').then(function(n) { return { notes: n, todos: [], cards: [] }; });
+      default:
+        return Promise.resolve({ notes: [], todos: [], cards: [] });
+    }
+  }
+
+  // ─── Markdown generators ───
+  function noteToMarkdown(note, includeMetadata) {
+    var lines = [];
+    lines.push('# ' + (note.title || 'Untitled'));
+    if (includeMetadata) {
+      var meta = [];
+      if (note.destination) meta.push('Section: ' + destinationLabel(note.destination));
+      if (note.bookTitle) meta.push('Book: ' + note.bookTitle);
+      if (note.language) meta.push('Language: ' + note.language);
+      if (note.tags && note.tags.length) meta.push('Tags: ' + note.tags.join(', '));
+      if (note.createdAt) meta.push('Created: ' + formatDate(note.createdAt));
+      if (note.updatedAt) meta.push('Updated: ' + formatDate(note.updatedAt));
+      if (meta.length) {
+        lines.push('');
+        lines.push('> ' + meta.join(' | '));
+      }
+    }
+    lines.push('');
+    if (note.mode === 'code' && note.content) {
+      lines.push('```' + (note.language || ''));
+      lines.push(note.content);
+      lines.push('```');
+    } else {
+      lines.push(note.content || '');
+    }
+    return lines.join('\n');
+  }
+
+  function todoToMarkdownLine(todo) {
+    var check = todo.done ? '[x]' : '[ ]';
+    var parts = ['- ' + check + ' ' + (todo.title || 'Untitled')];
+    if (todo.category) parts[0] += ' `' + todo.category + '`';
+    if (todo.estimatedMin) parts[0] += ' (' + todo.estimatedMin + 'min)';
+    return parts[0];
+  }
+
+  function todosToMarkdown(todos, includeMetadata) {
+    // Group by scheduledDate
+    var byDate = {};
+    var noDate = [];
+    todos.forEach(function(t) {
+      if (t.parentId) return; // skip subtasks; rendered under parent
+      if (t.scheduledDate) {
+        if (!byDate[t.scheduledDate]) byDate[t.scheduledDate] = [];
+        byDate[t.scheduledDate].push(t);
+      } else {
+        noDate.push(t);
+      }
+    });
+    // Build subtask map
+    var subtaskMap = {};
+    todos.forEach(function(t) {
+      if (t.parentId) {
+        if (!subtaskMap[t.parentId]) subtaskMap[t.parentId] = [];
+        subtaskMap[t.parentId].push(t);
+      }
+    });
+    // Sort subtasks by order
+    Object.keys(subtaskMap).forEach(function(pid) {
+      subtaskMap[pid].sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+    });
+
+    var lines = ['# Tasks'];
+    if (includeMetadata) {
+      var done = todos.filter(function(t) { return t.done; }).length;
+      lines.push('');
+      lines.push('> ' + todos.length + ' total, ' + done + ' completed');
+    }
+
+    var dates = Object.keys(byDate).sort();
+    dates.forEach(function(d) {
+      lines.push('');
+      lines.push('## ' + d);
+      byDate[d].sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      byDate[d].forEach(function(t) {
+        lines.push(todoToMarkdownLine(t));
+        if (subtaskMap[t.id]) {
+          subtaskMap[t.id].forEach(function(st) {
+            lines.push('  ' + todoToMarkdownLine(st));
+          });
+        }
+      });
+    });
+
+    if (noDate.length) {
+      lines.push('');
+      lines.push('## Unscheduled');
+      noDate.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      noDate.forEach(function(t) {
+        lines.push(todoToMarkdownLine(t));
+        if (subtaskMap[t.id]) {
+          subtaskMap[t.id].forEach(function(st) {
+            lines.push('  ' + todoToMarkdownLine(st));
+          });
+        }
+      });
+    }
+
+    return lines.join('\n');
+  }
+
+  function cardsToMarkdown(cards, includeMetadata) {
+    var lines = ['# Flashcards'];
+    if (includeMetadata) {
+      lines.push('');
+      lines.push('> ' + cards.length + ' card' + (cards.length !== 1 ? 's' : ''));
+    }
+    cards.forEach(function(card, i) {
+      lines.push('');
+      lines.push('## Card ' + (i + 1));
+      if (includeMetadata && card.tags && card.tags.length) {
+        lines.push('');
+        lines.push('> Tags: ' + card.tags.join(', '));
+      }
+      lines.push('');
+      lines.push('**Front:** ' + (card.front || ''));
+      lines.push('');
+      lines.push('**Back:** ' + (card.back || ''));
+      if (includeMetadata) {
+        var meta = [];
+        if (card.easeFactor) meta.push('Ease: ' + card.easeFactor.toFixed(2));
+        if (card.interval) meta.push('Interval: ' + card.interval + 'd');
+        if (card.repetitions != null) meta.push('Reps: ' + card.repetitions);
+        if (card.nextReviewAt) meta.push('Next review: ' + formatDate(card.nextReviewAt));
+        if (meta.length) {
+          lines.push('');
+          lines.push('> ' + meta.join(' | '));
+        }
+      }
+    });
+    return lines.join('\n');
+  }
+
+  // ─── Helpers ───
+  function destinationLabel(dest) {
+    var labels = { 'book-note': 'Books', 'topic': 'Topics', 'inbox': 'Inbox', 'snippets': 'Snippets' };
+    return labels[dest] || dest;
+  }
+
+  function formatDate(ts) {
+    if (!ts) return '';
+    var d = new Date(typeof ts === 'number' ? ts : ts);
+    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  }
+
+  function safeName(str) {
+    return (str || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 80);
+  }
+
+  // ─── Fetch attachment blobs ───
+  function fetchAttachmentBlobs(noteIds, onProgress) {
+    if (!state.includeAttachments || !noteIds.length) return Promise.resolve({});
+    var sync = window.dmSync;
+    if (!sync) return Promise.resolve({});
+
+    var blobMap = {}; // noteId -> [{ fileName, blob }]
+    var fetched = 0;
+
+    return Promise.all(noteIds.map(function(noteId) {
+      return sync.getAttachmentsForNote(noteId).then(function(attachments) {
+        if (!attachments || !attachments.length) return;
+        return Promise.all(attachments.map(function(att) {
+          return fetch(att.downloadUrl).then(function(resp) {
+            if (!resp.ok) throw new Error('Failed to fetch ' + att.fileName);
+            return resp.blob();
+          }).then(function(blob) {
+            if (!blobMap[noteId]) blobMap[noteId] = [];
+            blobMap[noteId].push({ fileName: att.fileName, blob: blob, fileType: att.fileType });
+            fetched++;
+            if (onProgress) onProgress(fetched);
+          }).catch(function(err) {
+            console.warn('[export] Could not fetch attachment:', att.fileName, err);
+          });
+        }));
+      });
+    })).then(function() { return blobMap; });
+  }
+
+  // ─── Markdown ZIP export ───
+  function exportMarkdownZip(data) {
+    state.exporting = true;
+    progressEl.style.display = '';
+    progressText.textContent = 'Gathering content...';
+    progressBar.style.width = '10%';
+
+    var includeMetadata = state.includeMetadata;
+    var noteIds = data.notes.map(function(n) { return n.id; });
+
+    // Fetch attachments
+    var attachPromise = fetchAttachmentBlobs(noteIds, function(count) {
+      progressText.textContent = 'Downloading attachments (' + count + ')...';
+    });
+
+    attachPromise.then(function(blobMap) {
+      progressBar.style.width = '50%';
+      progressText.textContent = 'Building ZIP...';
+
+      /* global JSZip */
+      var zip = new JSZip();
+      var exportDate = new Date().toISOString().split('T')[0];
+
+      // ─── Notes ───
+      if (data.notes.length) {
+        var notesFolder = zip.folder('notes');
+
+        // Group notes by destination
+        var byDest = {};
+        data.notes.forEach(function(n) {
+          var dest = n.destination || 'other';
+          if (!byDest[dest]) byDest[dest] = [];
+          byDest[dest].push(n);
+        });
+
+        Object.keys(byDest).forEach(function(dest) {
+          var destFolder = notesFolder.folder(destinationLabel(dest).toLowerCase());
+          var notes = byDest[dest];
+
+          // Sub-group books by bookTitle, snippets by language
+          if (dest === 'book-note') {
+            var byBook = {};
+            notes.forEach(function(n) {
+              var bk = n.bookTitle || 'Unknown Book';
+              if (!byBook[bk]) byBook[bk] = [];
+              byBook[bk].push(n);
+            });
+            Object.keys(byBook).sort().forEach(function(bookTitle) {
+              var bookFolder = destFolder.folder(safeName(bookTitle));
+              byBook[bookTitle].forEach(function(n) {
+                bookFolder.file(safeName(n.title) + '.md', noteToMarkdown(n, includeMetadata));
+                addAttachmentsToFolder(bookFolder, n.id, blobMap);
+              });
+            });
+          } else if (dest === 'snippets') {
+            var byLang = {};
+            notes.forEach(function(n) {
+              var lang = n.language || 'other';
+              if (!byLang[lang]) byLang[lang] = [];
+              byLang[lang].push(n);
+            });
+            Object.keys(byLang).sort().forEach(function(lang) {
+              var langFolder = destFolder.folder(safeName(lang));
+              byLang[lang].forEach(function(n) {
+                langFolder.file(safeName(n.title) + '.md', noteToMarkdown(n, includeMetadata));
+                addAttachmentsToFolder(langFolder, n.id, blobMap);
+              });
+            });
+          } else {
+            notes.forEach(function(n) {
+              destFolder.file(safeName(n.title) + '.md', noteToMarkdown(n, includeMetadata));
+              addAttachmentsToFolder(destFolder, n.id, blobMap);
+            });
+          }
+        });
+      }
+
+      // ─── Tasks ───
+      if (data.todos.length) {
+        zip.file('tasks.md', todosToMarkdown(data.todos, includeMetadata));
+      }
+
+      // ─── Flashcards ───
+      if (data.cards.length) {
+        zip.file('flashcards.md', cardsToMarkdown(data.cards, includeMetadata));
+      }
+
+      progressBar.style.width = '80%';
+      progressText.textContent = 'Compressing...';
+
+      return zip.generateAsync({ type: 'blob' }, function(metadata) {
+        progressBar.style.width = (80 + metadata.percent * 0.2).toFixed(0) + '%';
+      });
+    }).then(function(blob) {
+      var exportDate = new Date().toISOString().split('T')[0];
+      var fileName = 'digital-memory-' + state.scope + '-' + exportDate + '.zip';
+      downloadBlob(blob, fileName);
+      progressBar.style.width = '100%';
+      progressText.textContent = 'Done!';
+      setTimeout(function() {
+        state.exporting = false;
+        closeModal();
+      }, 800);
+    }).catch(function(err) {
+      console.error('[export] ZIP export failed:', err);
+      progressText.textContent = 'Export failed: ' + err.message;
+      state.exporting = false;
+      setTimeout(function() {
+        progressEl.style.display = 'none';
+      }, 3000);
+    });
+  }
+
+  function addAttachmentsToFolder(folder, noteId, blobMap) {
+    if (!blobMap[noteId]) return;
+    var attachFolder = folder.folder('attachments');
+    blobMap[noteId].forEach(function(att) {
+      attachFolder.file(att.fileName, att.blob);
+    });
+  }
+
+  // ─── Single-item Markdown export (direct download, no ZIP) ───
+  function exportSingleMarkdown(content, filename) {
+    var blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+    downloadBlob(blob, filename);
+  }
+
+  // ─── PDF export (browser print) ───
+  function exportPdf(data) {
+    var includeMetadata = state.includeMetadata;
+    var html = '';
+
+    // Notes
+    if (data.notes.length) {
+      var byDest = {};
+      data.notes.forEach(function(n) {
+        var dest = n.destination || 'other';
+        if (!byDest[dest]) byDest[dest] = [];
+        byDest[dest].push(n);
+      });
+
+      Object.keys(byDest).forEach(function(dest, di) {
+        html += '<div class="export-print-section">';
+        html += '<h1>' + escHtml(destinationLabel(dest)) + '</h1>';
+
+        var notes = byDest[dest];
+        // Sub-group for books
+        if (dest === 'book-note') {
+          var byBook = {};
+          notes.forEach(function(n) {
+            var bk = n.bookTitle || 'Unknown Book';
+            if (!byBook[bk]) byBook[bk] = [];
+            byBook[bk].push(n);
+          });
+          Object.keys(byBook).sort().forEach(function(bookTitle) {
+            html += '<h2>' + escHtml(bookTitle) + '</h2>';
+            byBook[bookTitle].forEach(function(n) { html += noteToHtml(n, includeMetadata); });
+          });
+        } else if (dest === 'snippets') {
+          var byLang = {};
+          notes.forEach(function(n) {
+            var lang = n.language || 'other';
+            if (!byLang[lang]) byLang[lang] = [];
+            byLang[lang].push(n);
+          });
+          Object.keys(byLang).sort().forEach(function(lang) {
+            html += '<h2>' + escHtml(lang) + '</h2>';
+            byLang[lang].forEach(function(n) { html += noteToHtml(n, includeMetadata); });
+          });
+        } else {
+          notes.forEach(function(n) { html += noteToHtml(n, includeMetadata); });
+        }
+
+        html += '</div>';
+      });
+    }
+
+    // Tasks
+    if (data.todos.length) {
+      html += '<div class="export-print-section">';
+      html += '<h1>Tasks</h1>';
+      html += todosToHtml(data.todos, includeMetadata);
+      html += '</div>';
+    }
+
+    // Flashcards
+    if (data.cards.length) {
+      html += '<div class="export-print-section">';
+      html += '<h1>Flashcards</h1>';
+      data.cards.forEach(function(card, i) {
+        html += '<div class="export-print-card">';
+        html += '<div class="export-print-card-label">Card ' + (i + 1);
+        if (includeMetadata && card.tags && card.tags.length) {
+          html += ' &mdash; ' + escHtml(card.tags.join(', '));
+        }
+        html += '</div>';
+        html += '<p><strong>Q:</strong> ' + escHtml(card.front || '') + '</p>';
+        html += '<p><strong>A:</strong> ' + escHtml(card.back || '') + '</p>';
+        html += '</div>';
+      });
+      html += '</div>';
+    }
+
+    printContainer.innerHTML = html;
+    setTimeout(function() { window.print(); }, 100);
+  }
+
+  function noteToHtml(note, includeMetadata) {
+    var h = '<div class="export-print-item">';
+    h += '<h3>' + escHtml(note.title || 'Untitled') + '</h3>';
+    if (includeMetadata) {
+      var meta = [];
+      if (note.tags && note.tags.length) meta.push('Tags: ' + note.tags.join(', '));
+      if (note.createdAt) meta.push('Created: ' + formatDate(note.createdAt));
+      if (meta.length) h += '<div class="export-print-meta">' + escHtml(meta.join(' | ')) + '</div>';
+    }
+    if (note.mode === 'code') {
+      h += '<pre><code>' + escHtml(note.content || '') + '</code></pre>';
+    } else if (note.content) {
+      // Render markdown to HTML if marked is available
+      if (typeof marked !== 'undefined' && marked.parse) {
+        try { h += marked.parse(note.content); } catch(e) { h += '<p>' + escHtml(note.content) + '</p>'; }
+      } else {
+        h += '<p>' + escHtml(note.content).replace(/\n/g, '<br>') + '</p>';
+      }
+    }
+    h += '</div>';
+    return h;
+  }
+
+  function todosToHtml(todos, includeMetadata) {
+    var h = '';
+    // Group by date
+    var byDate = {};
+    var noDate = [];
+    var subtaskMap = {};
+    todos.forEach(function(t) {
+      if (t.parentId) {
+        if (!subtaskMap[t.parentId]) subtaskMap[t.parentId] = [];
+        subtaskMap[t.parentId].push(t);
+        return;
+      }
+      if (t.scheduledDate) {
+        if (!byDate[t.scheduledDate]) byDate[t.scheduledDate] = [];
+        byDate[t.scheduledDate].push(t);
+      } else {
+        noDate.push(t);
+      }
+    });
+    Object.keys(subtaskMap).forEach(function(pid) {
+      subtaskMap[pid].sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+    });
+
+    function todoItemHtml(t, indent) {
+      var cls = t.done ? ' export-print-todo-done' : '';
+      var prefix = indent ? '&nbsp;&nbsp;&nbsp;&nbsp;' : '';
+      var check = t.done ? '&#9745;' : '&#9744;';
+      var extra = '';
+      if (t.category) extra += ' <em>[' + escHtml(t.category) + ']</em>';
+      if (t.estimatedMin) extra += ' <em>(' + t.estimatedMin + 'min)</em>';
+      return '<div class="export-print-todo' + cls + '">' + prefix + check + ' ' + escHtml(t.title || '') + extra + '</div>';
+    }
+
+    var dates = Object.keys(byDate).sort();
+    dates.forEach(function(d) {
+      h += '<h2>' + escHtml(d) + '</h2>';
+      byDate[d].sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      byDate[d].forEach(function(t) {
+        h += todoItemHtml(t, false);
+        if (subtaskMap[t.id]) subtaskMap[t.id].forEach(function(st) { h += todoItemHtml(st, true); });
+      });
+    });
+    if (noDate.length) {
+      h += '<h2>Unscheduled</h2>';
+      noDate.forEach(function(t) {
+        h += todoItemHtml(t, false);
+        if (subtaskMap[t.id]) subtaskMap[t.id].forEach(function(st) { h += todoItemHtml(st, true); });
+      });
+    }
+    return h;
+  }
+
+  function escHtml(str) {
+    var d = document.createElement('div');
+    d.textContent = str;
+    return d.innerHTML;
+  }
+
+  // ─── Download helper ───
+  function downloadBlob(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  }
+
+  // ─── Submit handler ───
+  submitBtn.addEventListener('click', function() {
+    if (state.exporting) return;
+    gatherData(state.scope).then(function(data) {
+      if (!data.notes.length && !data.todos.length && !data.cards.length) return;
+      if (state.format === 'pdf') {
+        exportPdf(data);
+      } else {
+        exportMarkdownZip(data);
+      }
+    });
+  });
+
+  // ─── Public API ───
+  window.dmExport = {
+    /** Open the export modal. Optional scope preset: 'vault', 'notes', 'tasks', 'cards', 'books', 'topics', 'snippets', 'inbox' */
+    open: function(scope) {
+      openModal(scope || 'vault');
+    },
+
+    /** Export a single note as Markdown (direct download, no modal) */
+    exportNote: function(note) {
+      var md = noteToMarkdown(note, true);
+      exportSingleMarkdown(md, safeName(note.title) + '.md');
+    },
+
+    /** Export a single note as PDF (opens print dialog) */
+    printNote: function(note) {
+      printContainer.innerHTML = noteToHtml(note, true);
+      setTimeout(function() { window.print(); }, 100);
+    },
+
+    /** Export a single flashcard as Markdown */
+    exportCard: function(card) {
+      var md = cardsToMarkdown([card], true);
+      exportSingleMarkdown(md, 'flashcard-' + (card.id || 'export') + '.md');
+    }
+  };
+
+})();
+</script>

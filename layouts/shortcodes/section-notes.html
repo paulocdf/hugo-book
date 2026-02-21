@@ -151,7 +151,8 @@
   flex-shrink: 0;
 }
 .section-notes-delete,
-.section-notes-edit {
+.section-notes-edit,
+.section-notes-export {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -165,7 +166,8 @@
   flex-shrink: 0;
   color: var(--gray-400);
 }
-.section-notes-edit:hover {
+.section-notes-edit:hover,
+.section-notes-export:hover {
   color: var(--color-link);
   background: rgba(0, 105, 255, 0.06);
   border-color: rgba(0, 105, 255, 0.2);
@@ -305,6 +307,7 @@
         + '</div>'
         + '</div>'
         + '<div class="section-notes-card-actions">'
+        + '<button type="button" class="section-notes-export" data-export-id="' + note.id + '" title="Export note"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>'
         + '<button type="button" class="' + pinBtnClass + '" data-pin-id="' + note.id + '" title="' + pinTitle + '">' + pinIcon + '</button>'
         + '<button type="button" class="section-notes-edit" data-id="' + note.id + '" title="Edit note">' + editIcon + '</button>'
         + '<button type="button" class="section-notes-delete" data-id="' + note.id + '" title="Delete note">' + deleteIcon + '</button>'
@@ -443,6 +446,20 @@
                   }
                 });
               }
+            });
+          }
+        });
+      });
+
+      // Export buttons (single-note)
+      listEl.querySelectorAll('.section-notes-export').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          e.stopPropagation();
+          var noteId = btn.getAttribute('data-export-id');
+          if (noteId && window.dmSync && window.dmExport) {
+            window.dmSync.getNote(noteId).then(function(note) {
+              if (note) window.dmExport.exportNote(note);
             });
           }
         });
