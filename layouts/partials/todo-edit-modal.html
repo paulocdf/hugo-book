@@ -104,9 +104,9 @@
   position: relative;
   background: var(--body-background);
   border-radius: 14px;
-  padding: 1.5rem;
+  padding: 1.75rem;
   width: 94%;
-  max-width: 460px;
+  max-width: 560px;
   box-shadow: 0 24px 64px rgba(0,0,0,0.3);
   animation: todo-edit-in 0.2s ease-out;
   max-height: 90vh;
@@ -144,7 +144,7 @@
 }
 .todo-edit-input {
   width: 100%;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border: 1.5px solid var(--gray-200);
   border-radius: 8px;
   background: var(--body-background);
@@ -162,10 +162,10 @@
 .todo-edit-title-area {
   resize: none;
   overflow: hidden;
-  min-height: 38px;
+  min-height: 42px;
   max-height: 200px;
   line-height: 1.4;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 500;
 }
 .todo-edit-row {
@@ -424,14 +424,18 @@
   color: var(--gray-500);
 }
 
-@media screen and (max-width: 500px) {
+@media screen and (max-width: 600px) {
   .todo-edit-dialog {
     width: 96%;
-    padding: 1rem;
+    padding: 1.25rem;
+    border-radius: 12px;
   }
   .todo-edit-row {
     flex-direction: column;
     gap: 0;
+  }
+  .todo-edit-bujo-toggle {
+    flex-wrap: wrap;
   }
 }
 </style>
