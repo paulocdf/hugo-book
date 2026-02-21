@@ -823,6 +823,14 @@
 .todo-drag-active {
   opacity: 0.9;
 }
+/* Nesting drop target indicator — shown after hover-hold delay */
+.todo-item-group.todo-nest-target {
+  outline: 2px solid var(--color-link);
+  outline-offset: -2px;
+  border-radius: 8px;
+  background: rgba(0, 105, 255, 0.06);
+  transition: outline-color 0.15s, background 0.15s;
+}
 .todo-item.done {
   opacity: 0.6;
 }
@@ -3756,20 +3764,51 @@
 
   // ─── Drag-and-drop reordering (SortableJS) ───
   var _sortableInstances = [];
+  var _nestTimer = null;
+  var _nestTargetEl = null;   // .todo-item-group currently highlighted for nesting
+  var _nestTargetId = null;   // id of the target parent
+  var _nestDraggedId = null;  // id of the item being dragged
+  var NEST_HOLD_MS = 500;
+
+  function clearNestState() {
+    if (_nestTimer) { clearTimeout(_nestTimer); _nestTimer = null; }
+    if (_nestTargetEl) { _nestTargetEl.classList.remove('todo-nest-target'); }
+    _nestTargetEl = null;
+    _nestTargetId = null;
+  }
+
+  function canNestInto(draggedId, targetId) {
+    if (!draggedId || !targetId || draggedId === targetId) return false;
+    var dragged = allTodos.find(function(t) { return t.id === draggedId; });
+    var target = allTodos.find(function(t) { return t.id === targetId; });
+    if (!dragged || !target) return false;
+    // Don't nest if dragged item already has children (would create multi-level nesting)
+    var draggedHasChildren = allTodos.some(function(t) { return t.parentId === draggedId; });
+    if (draggedHasChildren) return false;
+    // Don't nest if dragged is already a subtask of this target
+    if (dragged.parentId === targetId) return false;
+    // Don't nest done/migrated/scheduled tasks
+    if (dragged.done || dragged.bujoState === 'migrated' || dragged.bujoState === 'scheduled') return false;
+    if (target.done || target.bujoState === 'migrated' || target.bujoState === 'scheduled') return false;
+    // Don't nest into a subtask (target must be a top-level parent)
+    if (target.parentId) return false;
+    return true;
+  }
 
   function initSortable() {
     // Destroy previous instances
     _sortableInstances.forEach(function(s) { try { s.destroy(); } catch(e) {} });
     _sortableInstances = [];
+    clearNestState();
 
     if (typeof Sortable === 'undefined') return;
 
     // Sortable for parent tasks across day groups
     itemsEl.querySelectorAll('.todo-day-group-items').forEach(function(groupEl) {
       var s = Sortable.create(groupEl, {
-        group: 'parent-todos',
+        group: { name: 'parent-todos', pull: true, put: ['parent-todos', 'subtasks'] },
         handle: '.todo-drag-handle',
-        draggable: '.todo-item-group',
+        draggable: '.todo-item-group, .todo-item',
         ghostClass: 'todo-drag-ghost',
         chosenClass: 'todo-drag-chosen',
         dragClass: 'todo-drag-active',
@@ -3777,8 +3816,40 @@
         fallbackOnBody: true,
         swapThreshold: 0.65,
         filter: '.done, .migrated, .scheduled',
+        onStart: function(evt) {
+          _nestDraggedId = evt.item.getAttribute('data-group-id');
+        },
+        onMove: function(evt) {
+          // evt.related is the element being hovered over
+          var relatedGroup = evt.related ? evt.related.closest('.todo-item-group') : null;
+          var relatedId = relatedGroup ? relatedGroup.getAttribute('data-group-id') : null;
+
+          // If hovering over a different target than before, reset timer
+          if (relatedId !== _nestTargetId || !relatedId) {
+            clearNestState();
+            if (relatedId && canNestInto(_nestDraggedId, relatedId)) {
+              _nestTargetId = relatedId;
+              _nestTimer = setTimeout(function() {
+                // Find the element fresh (it may have moved in DOM)
+                var el = itemsEl.querySelector('.todo-item-group[data-group-id="' + _nestTargetId + '"]');
+                if (el) {
+                  _nestTargetEl = el;
+                  el.classList.add('todo-nest-target');
+                }
+              }, NEST_HOLD_MS);
+            }
+          }
+        },
         onEnd: function(evt) {
-          handleParentDrop(evt);
+          var nestTargetId = _nestTargetEl ? _nestTargetId : null;
+          clearNestState();
+          _nestDraggedId = null;
+
+          if (nestTargetId) {
+            handleNestDrop(evt, nestTargetId);
+          } else {
+            handleParentDrop(evt);
+          }
         }
       });
       _sortableInstances.push(s);
@@ -3787,6 +3858,7 @@
     // Sortable for subtasks within each parent
     itemsEl.querySelectorAll('.todo-subtasks').forEach(function(subEl) {
       var s = Sortable.create(subEl, {
+        group: { name: 'subtasks', pull: true, put: true },
         handle: '.todo-drag-handle',
         draggable: '.todo-item',
         ghostClass: 'todo-drag-ghost',
@@ -3803,10 +3875,13 @@
   }
 
   function handleParentDrop(evt) {
-    var itemGroupEl = evt.item; // .todo-item-group
-    var todoId = itemGroupEl.getAttribute('data-group-id');
+    var itemGroupEl = evt.item; // .todo-item-group or .todo-item (if un-nesting subtask)
+    var todoId = itemGroupEl.getAttribute('data-group-id') || itemGroupEl.getAttribute('data-todo-id');
     var todo = allTodos.find(function(t) { return t.id === todoId; });
     if (!todo) return;
+
+    // Detect un-nesting: a .todo-item was dropped into a parent container
+    var isUnnesting = itemGroupEl.classList.contains('todo-item') && todo.parentId;
 
     // Determine new day group from the target container
     var targetGroupItems = evt.to; // .todo-day-group-items
@@ -3820,12 +3895,19 @@
     }
 
     // Calculate new order based on position among siblings
-    var siblings = targetGroupItems.querySelectorAll('.todo-item-group');
+    var siblings = targetGroupItems.querySelectorAll('.todo-item-group, .todo-item');
     var newOrder = calculateOrderForPosition(siblings, evt.newIndex, todoId);
 
     // Build update
     var updates = { order: newOrder, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
     var localUpdates = { order: newOrder, updatedAt: Date.now() };
+
+    // Un-nesting: clear parentId to promote subtask to top-level task
+    if (isUnnesting) {
+      updates.parentId = null;
+      localUpdates.parentId = null;
+      todo.parentId = null;
+    }
 
     // Update scheduledDate if moved to a different group
     if (todo.scheduledDate !== newScheduledDate) {
@@ -3851,20 +3933,111 @@
     render();
   }
 
+  function handleNestDrop(evt, targetParentId) {
+    var itemGroupEl = evt.item; // .todo-item-group
+    var todoId = itemGroupEl.getAttribute('data-group-id');
+    var todo = allTodos.find(function(t) { return t.id === todoId; });
+    var targetParent = allTodos.find(function(t) { return t.id === targetParentId; });
+    if (!todo || !targetParent) { render(); return; }
+
+    // Calculate order: append as last subtask of the target parent
+    var newOrder = getNextOrder(targetParentId);
+
+    // Inherit parent's scheduledDate
+    var newScheduledDate = targetParent.scheduledDate || null;
+
+    var updates = {
+      parentId: targetParentId,
+      order: newOrder,
+      scheduledDate: newScheduledDate,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    var localUpdates = {
+      parentId: targetParentId,
+      order: newOrder,
+      scheduledDate: newScheduledDate,
+      updatedAt: Date.now()
+    };
+
+    // Apply locally
+    todo.parentId = targetParentId;
+    todo.order = newOrder;
+    todo.scheduledDate = newScheduledDate;
+    todo.updatedAt = Date.now();
+
+    // Write to Firestore
+    updateTodoField(todoId, updates, localUpdates);
+
+    // Re-render to show the task nested under its new parent
+    render();
+  }
+
   function handleSubtaskDrop(evt) {
     var itemEl = evt.item; // .todo-item
     var todoId = itemEl.getAttribute('data-todo-id');
     var todo = allTodos.find(function(t) { return t.id === todoId; });
     if (!todo) return;
 
-    // Calculate new order based on position among siblings
+    // Detect un-nesting: subtask was dragged out of .todo-subtasks into .todo-day-group-items
+    var droppedInParentList = evt.to.classList.contains('todo-day-group-items');
+    if (droppedInParentList) {
+      // Determine new day group
+      var dayGroupEl = evt.to.closest('.todo-day-group');
+      var targetDayKey = dayGroupEl ? dayGroupEl.getAttribute('data-day-group') : null;
+      var newScheduledDate = (targetDayKey && targetDayKey !== '_unscheduled') ? targetDayKey : null;
+
+      var siblings = evt.to.querySelectorAll('.todo-item-group, .todo-item');
+      var newOrder = calculateOrderForPosition(siblings, evt.newIndex, todoId);
+
+      var updates = {
+        parentId: null,
+        order: newOrder,
+        scheduledDate: newScheduledDate,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      var localUpdates = {
+        parentId: null,
+        order: newOrder,
+        scheduledDate: newScheduledDate,
+        updatedAt: Date.now()
+      };
+
+      todo.parentId = null;
+      todo.order = newOrder;
+      todo.scheduledDate = newScheduledDate;
+      todo.updatedAt = Date.now();
+
+      updateTodoField(todoId, updates, localUpdates);
+      render();
+      return;
+    }
+
+    // Normal subtask reorder or re-parenting within subtask containers
+    var newParentId = evt.to.getAttribute('data-parent-id');
     var siblings = evt.to.querySelectorAll('.todo-item');
     var newOrder = calculateOrderForPosition(siblings, evt.newIndex, todoId);
+
+    var updates = { order: newOrder, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+    var localUpdates = { order: newOrder, updatedAt: Date.now() };
+
+    // Re-parenting: subtask moved from one parent to another
+    if (newParentId && todo.parentId !== newParentId) {
+      updates.parentId = newParentId;
+      localUpdates.parentId = newParentId;
+      todo.parentId = newParentId;
+      // Inherit new parent's scheduledDate
+      var newParent = allTodos.find(function(t) { return t.id === newParentId; });
+      if (newParent && todo.scheduledDate !== newParent.scheduledDate) {
+        updates.scheduledDate = newParent.scheduledDate;
+        localUpdates.scheduledDate = newParent.scheduledDate;
+        todo.scheduledDate = newParent.scheduledDate;
+      }
+    }
 
     todo.order = newOrder;
     todo.updatedAt = Date.now();
 
-    updateTodoField(todoId, { order: newOrder, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { order: newOrder, updatedAt: Date.now() });
+    updateTodoField(todoId, updates, localUpdates);
 
     render();
   }
