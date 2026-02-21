@@ -3808,7 +3808,7 @@
       var s = Sortable.create(groupEl, {
         group: { name: 'parent-todos', pull: true, put: ['parent-todos', 'subtasks'] },
         handle: '.todo-drag-handle',
-        draggable: '.todo-item-group, .todo-item',
+        draggable: '.todo-item-group',
         ghostClass: 'todo-drag-ghost',
         chosenClass: 'todo-drag-chosen',
         dragClass: 'todo-drag-active',
@@ -3895,7 +3895,7 @@
     }
 
     // Calculate new order based on position among siblings
-    var siblings = targetGroupItems.querySelectorAll('.todo-item-group, .todo-item');
+    var siblings = targetGroupItems.querySelectorAll(':scope > .todo-item-group, :scope > .todo-item');
     var newOrder = calculateOrderForPosition(siblings, evt.newIndex, todoId);
 
     // Build update
@@ -3986,7 +3986,7 @@
       var targetDayKey = dayGroupEl ? dayGroupEl.getAttribute('data-day-group') : null;
       var newScheduledDate = (targetDayKey && targetDayKey !== '_unscheduled') ? targetDayKey : null;
 
-      var siblings = evt.to.querySelectorAll('.todo-item-group, .todo-item');
+      var siblings = evt.to.querySelectorAll(':scope > .todo-item-group, :scope > .todo-item');
       var newOrder = calculateOrderForPosition(siblings, evt.newIndex, todoId);
 
       var updates = {
