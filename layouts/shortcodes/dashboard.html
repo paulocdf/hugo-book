@@ -432,11 +432,7 @@
     contentEl.style.display = state === 'content' ? '' : 'none';
   }
 
-  function formatDate(ts) {
-    var d = new Date(ts);
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return months[d.getMonth()] + ' ' + d.getDate();
-  }
+  var formatDate = window.dmFormat ? window.dmFormat.dateShort : function(ts) { return ''; };
 
   function formatDayOfWeek(ts) {
     var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];

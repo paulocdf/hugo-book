@@ -70,12 +70,7 @@
     return getBaseUrl() + '/docs/view/?id=' + encodeURIComponent(noteId);
   }
 
-  function formatDate(ms) {
-    if (!ms) return '';
-    var d = new Date(ms);
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
-  }
+  var formatDate = window.dmFormat ? window.dmFormat.date : function(ms) { return ''; };
 
   function escapeHtml(str) {
     if (!str) return '';

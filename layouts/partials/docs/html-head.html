@@ -89,6 +89,84 @@
 })();
 </script>
 
+<!-- Centralized date / format utilities (available to all pages) -->
+<script>
+(function() {
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function toDate(v) {
+    if (!v) return null;
+    if (v instanceof Date) return v;
+    return new Date(typeof v === 'number' ? v : v);
+  }
+
+  // "Jan 5, 2026"
+  function date(ms) {
+    var d = toDate(ms);
+    if (!d) return '';
+    return MONTHS[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+  }
+
+  // "Jan 5" (no year — for dashboard charts, chips, etc.)
+  function dateShort(ms) {
+    var d = toDate(ms);
+    if (!d) return '';
+    return MONTHS[d.getMonth()] + ' ' + d.getDate();
+  }
+
+  // "Today" / "Tomorrow" / "Jan 5" — takes YYYY-MM-DD string
+  function dateChip(dateStr) {
+    if (!dateStr) return '';
+    var today = _yyyymmdd(new Date());
+    var tom = _yyyymmdd(new Date(Date.now() + 86400000));
+    if (dateStr === today) return 'Today';
+    if (dateStr === tom) return 'Tomorrow';
+    var p = dateStr.split('-');
+    var d = new Date(parseInt(p[0]), parseInt(p[1]) - 1, parseInt(p[2]));
+    return MONTHS[d.getMonth()] + ' ' + d.getDate();
+  }
+
+  // "2m ago" / "3h ago" / "Yesterday" / "Jan 5, 2026"
+  function relativeDate(ms) {
+    var d = toDate(ms);
+    if (!d) return '';
+    var now = Date.now();
+    var diff = now - d.getTime();
+    if (diff < 0) return date(ms);
+    var sec = Math.floor(diff / 1000);
+    if (sec < 60) return 'Just now';
+    var min = Math.floor(sec / 60);
+    if (min < 60) return min + 'm ago';
+    var hr = Math.floor(min / 60);
+    if (hr < 24) return hr + 'h ago';
+    var days = Math.floor(hr / 24);
+    if (days === 1) return 'Yesterday';
+    if (days < 7) return days + 'd ago';
+    return date(ms);
+  }
+
+  // "Updated 3h ago" / "Updated Jan 5, 2026"
+  function updatedLabel(ms) {
+    if (!ms) return '';
+    return 'Updated ' + relativeDate(ms);
+  }
+
+  function _yyyymmdd(d) {
+    var m = d.getMonth() + 1;
+    var day = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+
+  window.dmFormat = {
+    date: date,
+    dateShort: dateShort,
+    dateChip: dateChip,
+    relativeDate: relativeDate,
+    updatedLabel: updatedLabel
+  };
+})();
+</script>
+
 <!-- Configure marked.js to match Hugo's heading rendering -->
 <script>
 (function() {

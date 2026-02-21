@@ -742,11 +742,7 @@
     return labels[dest] || dest;
   }
 
-  function formatDate(ts) {
-    if (!ts) return '';
-    var d = new Date(typeof ts === 'number' ? ts : ts);
-    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  }
+  var formatDate = window.dmFormat ? window.dmFormat.date : function(ts) { return ''; };
 
   function safeName(str) {
     return (str || 'untitled').replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 80);

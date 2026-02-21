@@ -28,6 +28,7 @@
   </div>
 
   <div class="single-note-top-actions" style="display: none;">
+    <span class="single-note-date"></span>
     {{ if ne $destination "inbox" }}
     <button type="button" class="single-note-merge-btn note-action-btn note-action-btn-edit" style="display: none;" title="Merge notes">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6v12"></path><path d="M16 6v6"></path><path d="M16 12a4 4 0 0 1-4 4H8"></path><circle cx="8" cy="6" r="2"></circle><circle cx="16" cy="6" r="2"></circle><circle cx="8" cy="18" r="2"></circle></svg>
@@ -160,6 +161,11 @@
   position: static;
   flex-shrink: 0;
 }
+.single-note-date {
+  font-size: 0.8rem;
+  color: var(--gray-400);
+  white-space: nowrap;
+}
 .single-note-content {
   /* no position: relative needed anymore */
 }
@@ -237,6 +243,7 @@
     var pinBtn = container.querySelector('.single-note-pin-btn');
     var exportBtn = container.querySelector('.single-note-export-btn');
     var mergeBtn = container.querySelector('.single-note-merge-btn');
+    var dateEl = container.querySelector('.single-note-date');
     var snAttachSection = document.getElementById('sn-attachments');
     var snAttachList = document.getElementById('sn-attachments-list');
 
@@ -273,6 +280,11 @@
     function renderNote(note) {
       currentNote = note;
       var content = note.content || '';
+
+      // Update date label
+      if (dateEl && window.dmFormat) {
+        dateEl.textContent = note.updatedAt ? window.dmFormat.updatedLabel(note.updatedAt) : window.dmFormat.date(note.createdAt);
+      }
 
       // Strip leading top-level heading if present
       content = content.replace(/^\s*#\s+.+\n*/, '');

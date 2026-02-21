@@ -467,12 +467,7 @@
     contentEl.style.display = state === 'content' ? '' : 'none';
   }
 
-  function formatDate(ms) {
-    if (!ms) return '';
-    var d = new Date(ms);
-    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-    return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
-  }
+  var formatDate = window.dmFormat ? window.dmFormat.date : function(ms) { return ''; };
 
   function getDestinationLabel(note) {
     if (note.destination === 'book-note' && note.bookTitle) return note.bookTitle;
@@ -486,7 +481,7 @@
   function renderNote(note) {
     currentNote = note;
     titleEl.textContent = note.title;
-    dateEl.textContent = formatDate(note.createdAt);
+    dateEl.textContent = note.updatedAt ? window.dmFormat.updatedLabel(note.updatedAt) : formatDate(note.createdAt);
     destEl.textContent = getDestinationLabel(note);
 
     // Tags
