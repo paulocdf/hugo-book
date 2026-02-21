@@ -4982,7 +4982,7 @@
   // Global shortcut: T to focus the task input
   document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-    if (e.key === 'n' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+    if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
       var todoList = document.getElementById('todo-list');
       if (!todoList || todoList.style.display === 'none') return;
       e.preventDefault();
