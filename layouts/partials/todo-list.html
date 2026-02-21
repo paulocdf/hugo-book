@@ -584,9 +584,7 @@
   position: fixed;
   inset: 0;
   z-index: 1199;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  background: rgba(0, 0, 0, 0.55);
 }
 .todo-add-backdrop.visible {
   display: block;
@@ -594,14 +592,14 @@
 .todo-add-form.elevated {
   position: fixed;
   z-index: 1200;
-  top: 18vh;
+  top: 16vh;
   left: 50%;
   transform: translateX(-50%);
-  width: 92%;
-  max-width: 560px;
+  width: 94%;
+  max-width: 680px;
   background: var(--body-background, #fff);
   border-radius: 14px;
-  padding: 0.75rem 1rem;
+  padding: 1rem 1.25rem;
   margin-bottom: 0;
   animation: todo-form-elevate 0.18s ease-out;
 }
@@ -612,6 +610,17 @@
 .todo-add-form.elevated .todo-add-row-main {
   border-color: var(--color-link);
   box-shadow: 0 0 0 2px rgba(0, 105, 255, 0.08);
+}
+.todo-add-form.elevated .todo-add-title {
+  padding: 12px 14px;
+  font-size: 1rem;
+}
+.todo-add-form.elevated .todo-add-pomodoro-group {
+  height: 42px;
+}
+.todo-add-form.elevated .todo-add-row-icons {
+  gap: 8px;
+  padding-top: 4px;
 }
 
 /* Day group headers */
@@ -4676,10 +4685,16 @@
   var addFormEl = document.getElementById('todo-add-form');
   var addBackdrop = document.getElementById('todo-add-backdrop');
   var _formElevated = false;
+  var _formPlaceholder = null;
 
   function elevateForm() {
     if (_formElevated) return;
     _formElevated = true;
+    // Insert a placeholder to preserve layout space
+    _formPlaceholder = document.createElement('div');
+    _formPlaceholder.style.height = addFormEl.offsetHeight + 'px';
+    _formPlaceholder.style.marginBottom = getComputedStyle(addFormEl).marginBottom;
+    addFormEl.parentNode.insertBefore(_formPlaceholder, addFormEl);
     addFormEl.classList.add('elevated');
     addBackdrop.classList.add('visible');
   }
@@ -4689,6 +4704,10 @@
     _formElevated = false;
     addFormEl.classList.remove('elevated');
     addBackdrop.classList.remove('visible');
+    if (_formPlaceholder && _formPlaceholder.parentNode) {
+      _formPlaceholder.parentNode.removeChild(_formPlaceholder);
+      _formPlaceholder = null;
+    }
   }
 
   addTitleInput.addEventListener('focus', function() {
@@ -4701,6 +4720,16 @@
       addTitleInput.blur();
     });
   }
+
+  // Document-level Escape to close elevated form from any focus context
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && _formElevated) {
+      e.preventDefault();
+      e.stopPropagation();
+      collapseForm();
+      addTitleInput.blur();
+    }
+  });
 
   // ─── Load todos ───
   function loadTodos() {
