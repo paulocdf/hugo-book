@@ -1375,6 +1375,73 @@
     getVolume: getSoundVolume
   };
 
+  // ── Push Notification Scheduling (PWA / Service Worker) ──
+  var notifPermission = typeof Notification !== 'undefined' ? Notification.permission : 'denied';
+  var notifIconUrl = '';
+  (function() {
+    var m = document.querySelector('link[rel="manifest"]');
+    var base = m ? m.getAttribute('href').replace('/manifest.json', '') : '';
+    notifIconUrl = base + '/favicon.png';
+  })();
+
+  function requestNotificationPermission() {
+    if (typeof Notification === 'undefined') return;
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().then(function(perm) {
+        notifPermission = perm;
+      });
+    } else {
+      notifPermission = Notification.permission;
+    }
+  }
+
+  function scheduleNotification(delaySec, phaseLabel) {
+    if (notifPermission !== 'granted') return;
+    var title = phaseLabel === 'work' ? 'Work Session Complete' : 'Break Over';
+    var body = activeTodoTitle || 'Pomodoro timer finished';
+    if (phaseLabel === 'work') {
+      body = activeTodoTitle ? activeTodoTitle + ' — time for a break!' : 'Time for a break!';
+    } else {
+      body = activeTodoTitle ? activeTodoTitle + ' — ready to focus?' : 'Ready to focus?';
+    }
+
+    // Try service worker first (works when app is backgrounded / screen locked)
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'schedule-notification',
+        delay: delaySec * 1000,
+        title: title,
+        body: body,
+        tag: 'pomodoro-phase-end',
+        icon: notifIconUrl
+      });
+      return;
+    }
+
+    // Fallback: in-page setTimeout + Notification API (only works if tab is open)
+    if (typeof Notification !== 'undefined' && notifPermission === 'granted') {
+      window._pomoNotifTimeout = setTimeout(function() {
+        try { new Notification(title, { body: body, icon: notifIconUrl, tag: 'pomodoro-phase-end' }); }
+        catch(e) { /* Notification constructor not supported on this device */ }
+      }, delaySec * 1000);
+    }
+  }
+
+  function cancelScheduledNotification() {
+    // Cancel via service worker
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'cancel-notification',
+        tag: 'pomodoro-phase-end'
+      });
+    }
+    // Cancel fallback timeout
+    if (window._pomoNotifTimeout) {
+      clearTimeout(window._pomoNotifTimeout);
+      window._pomoNotifTimeout = null;
+    }
+  }
+
   function tick() {
     if (secondsLeft <= 0) {
       clearInterval(intervalId);
@@ -1434,6 +1501,8 @@
     updateDisplay();
     saveState();
     notifyStateChanged();
+    // Schedule push notification for when this phase ends
+    scheduleNotification(secondsLeft, phase);
   }
 
   function pauseTimer() {
@@ -1443,6 +1512,7 @@
     }
     isRunning = false;
     showPlayIcon();
+    cancelScheduledNotification();
     // Accumulate partial work time
     if (phase === 'work') {
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
@@ -1461,6 +1531,7 @@
       intervalId = null;
     }
     isRunning = false;
+    cancelScheduledNotification();
     // If resetting during work, accumulate partial work time
     if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
@@ -1480,6 +1551,7 @@
       intervalId = null;
     }
     isRunning = false;
+    cancelScheduledNotification();
 
     if (phase === 'work') {
       // Accumulate partial work time
@@ -1515,6 +1587,7 @@
       intervalId = null;
     }
     isRunning = false;
+    cancelScheduledNotification();
 
     // Accumulate any remaining partial work
     if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
@@ -1564,6 +1637,7 @@
       intervalId = null;
     }
     isRunning = false;
+    cancelScheduledNotification();
     timerEl.style.display = 'none';
     categoryEl.style.display = 'none';
     categoryEl.textContent = '';
@@ -2474,6 +2548,17 @@
     }
   });
 
+  // ── Re-schedule notification when app is backgrounded / foregrounded ──
+  document.addEventListener('visibilitychange', function() {
+    if (!activeTodoId || !isRunning) return;
+    if (document.hidden) {
+      // Going to background — ensure service worker has the notification scheduled
+      scheduleNotification(secondsLeft, phase);
+    }
+    // When returning to foreground, the in-page setInterval keeps running,
+    // so no action needed — the next tick() will reconcile state.
+  });
+
   // ── Public API ──
   window.dmPomodoro = {
     start: function(todoId, todoTitle) {
@@ -2510,6 +2595,8 @@
         updateDisplay();
         resetPosition();
         timerEl.style.display = '';
+        // Request notification permission on first timer start (needs user gesture)
+        requestNotificationPermission();
         startTimer();
       }
 

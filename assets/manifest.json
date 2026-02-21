@@ -1,15 +1,22 @@
 {
   "name": "{{ .Site.Title }}",
   "short_name": "{{ .Site.Title }}",
-  "start_url": "{{ "/" | relURL }}",
-  "scope": "{{ "/" | relURL }}",
+  "description": "Personal knowledge management with tasks, notes, spaced repetition, and focus tools",
+  "start_url": "{{ .Site.BaseURL }}",
+  "scope": "{{ .Site.BaseURL }}",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#161921",
+  "theme_color": "#161921",
   "icons": [
     {
-      "src": "{{ "/favicon.svg" | relURL }}",
-      "sizes": "512x512"
+      "src": "{{ .Site.BaseURL }}favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "{{ .Site.BaseURL }}favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
     }
   ]
 }
