@@ -4945,6 +4945,10 @@
     document.body.appendChild(addFormEl);
     addFormEl.classList.add('elevated');
     addBackdrop.classList.add('visible');
+    // Re-focus the input after DOM relocation (appendChild drops browser focus)
+    requestAnimationFrame(function() {
+      addTitleInput.focus();
+    });
   }
 
   function collapseForm() {
