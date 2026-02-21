@@ -99,12 +99,12 @@
 </script>
 
 <!-- Quick Capture FAB (Floating Action Button) -->
-<button class="quick-capture-fab" id="quick-capture-btn" aria-label="Quick Capture (E)" title="Quick Capture">
+<button class="quick-capture-fab" id="quick-capture-btn" aria-label="Quick Capture (Q)" title="Quick Capture">
   <svg class="fab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <path d="M12 20h9"></path>
     <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
   </svg>
-  <span class="fab-tooltip">Quick Capture <kbd>E</kbd></span>
+  <span class="fab-tooltip">Quick Capture <kbd>Q</kbd></span>
 </button>
 
 <!-- Export button (top-right, next to theme toggle) -->
@@ -1337,10 +1337,10 @@
   backdrop.addEventListener('click', closeModal);
 
   document.addEventListener('keydown', function(e) {
-    // Global shortcut: E to open Quick Capture (when not typing)
+    // Global shortcut: Q to open Quick Capture (when not typing)
     if (!modal.classList.contains('active')) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-      if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (e.key === 'q' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         openModal();
       }
@@ -1348,6 +1348,14 @@
       if (e.key === 'a' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         openModal('ai');
+      }
+      // E opens note edit modal (clicks the edit button in note-viewer)
+      if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        var editBtn = document.getElementById('note-viewer-edit');
+        if (editBtn && editBtn.offsetParent !== null) {
+          e.preventDefault();
+          editBtn.click();
+        }
       }
       return;
     }
