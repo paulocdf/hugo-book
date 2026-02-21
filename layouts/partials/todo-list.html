@@ -592,35 +592,35 @@
 .todo-add-form.elevated {
   position: fixed;
   z-index: 1200;
-  top: 16vh;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
-  width: 94%;
-  max-width: 680px;
+  transform: translate(-50%, -50%);
+  width: 96%;
+  max-width: 780px;
   background: var(--body-background, #fff);
-  border-radius: 14px;
-  padding: 1rem 1.25rem;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
   margin-bottom: 0;
   animation: todo-form-elevate 0.18s ease-out;
 }
 @keyframes todo-form-elevate {
-  from { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.98); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  from { opacity: 0; transform: translate(-50%, -50%) translateY(-8px) scale(0.98); }
+  to   { opacity: 1; transform: translate(-50%, -50%) translateY(0) scale(1); }
 }
 .todo-add-form.elevated .todo-add-row-main {
   border-color: var(--color-link);
   box-shadow: 0 0 0 2px rgba(0, 105, 255, 0.08);
 }
 .todo-add-form.elevated .todo-add-title {
-  padding: 12px 14px;
-  font-size: 1rem;
+  padding: 14px 16px;
+  font-size: 1.1rem;
 }
 .todo-add-form.elevated .todo-add-pomodoro-group {
-  height: 42px;
+  height: 46px;
 }
 .todo-add-form.elevated .todo-add-row-icons {
-  gap: 8px;
-  padding-top: 4px;
+  gap: 10px;
+  padding-top: 6px;
 }
 
 /* Day group headers */
@@ -4606,7 +4606,7 @@
   }
 
   // ─── Add form ───
-  function addFromForm() {
+  function addFromForm(keepOpen) {
     var title = addTitleInput.value.trim();
     if (!title) { addTitleInput.focus(); return; }
     var customMin = addCustomMinInput.value ? parseInt(addCustomMinInput.value, 10) : null;
@@ -4653,10 +4653,15 @@
     closeAddFormPopover();
     hideCatPopover();
     closePomodoroConfigPopover();
-    addTitleInput.focus();
+    if (keepOpen) {
+      addTitleInput.focus();
+    } else {
+      collapseForm();
+      addTitleInput.blur();
+    }
   }
 
-  addBtn.addEventListener('click', addFromForm);
+  addBtn.addEventListener('click', function() { addFromForm(false); });
   // Prevent Enter in custom min input from submitting; Tab moves focus to title
   addCustomMinInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); addTitleInput.focus(); }
@@ -4672,7 +4677,9 @@
         showCatPopover();
         return;
       }
-      addFromForm();
+      // Cmd+Enter or Shift+Enter → submit and keep form open for rapid add
+      var keepOpen = e.metaKey || e.shiftKey;
+      addFromForm(keepOpen);
     }
     if (e.key === 'Escape') {
       e.preventDefault();
