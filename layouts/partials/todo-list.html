@@ -75,6 +75,13 @@
           <button type="button" class="todo-add-chip-clear" id="todo-add-category-chip-clear" aria-label="Clear category">&times;</button>
         </span>
       </div>
+      <div class="todo-add-hints" id="todo-add-hints">
+        <span><kbd>Enter</kbd> to add</span>
+        <span class="todo-add-hints-sep">&middot;</span>
+        <span><kbd>&#x21E7;Enter</kbd> to add another</span>
+        <span class="todo-add-hints-sep">&middot;</span>
+        <span><kbd>Esc</kbd> to close</span>
+      </div>
     </div>
 
     <!-- Todo items rendered here -->
@@ -621,6 +628,32 @@
 .todo-add-form.elevated .todo-add-row-icons {
   gap: 10px;
   padding-top: 6px;
+}
+/* Keyboard shortcut hints — only visible in elevated mode */
+.todo-add-hints {
+  display: none;
+}
+.todo-add-form.elevated .todo-add-hints {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding-top: 10px;
+  font-size: 0.72rem;
+  color: var(--gray-400);
+}
+.todo-add-hints kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: var(--gray-100);
+  font-family: inherit;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+.todo-add-hints-sep {
+  color: var(--gray-300);
 }
 
 /* Day group headers */
