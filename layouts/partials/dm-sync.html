@@ -183,7 +183,14 @@
   var QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown on quota errors
 
   function isQuotaError(err) {
-    return err && (err.code === 'resource-exhausted' || (err.message && err.message.indexOf('Quota exceeded') !== -1));
+    if (!err) return false;
+    // Firestore gRPC code for quota exhaustion
+    if (err.code === 'resource-exhausted') return true;
+    // HTTP 429 mapped by Firebase JS SDK
+    if (err.code === 429 || err.status === 429) return true;
+    // Message-based detection for edge cases
+    var msg = (err.message || '').toLowerCase();
+    return msg.indexOf('quota exceeded') !== -1 || msg.indexOf('quota has been exceeded') !== -1 || msg.indexOf('resource exhausted') !== -1;
   }
 
   function enterQuotaCooldown() {
@@ -618,6 +625,12 @@
   // ─── Online/Offline Detection ───
 
   function updateOfflineIndicator() {
+    // If quota cooldown is active, always show quota warning (don't let other states overwrite it)
+    if (isInQuotaCooldown()) {
+      showQuotaWarning();
+      return;
+    }
+
     getAllQueued().then(function(entries) {
       var indicator = document.getElementById('dm-offline-indicator');
       if (!indicator) return;
@@ -2130,8 +2143,26 @@
             updateOfflineIndicator();
           });
         }).catch(function(err) {
-          console.warn('[dm-sync] Initial sync failed, using cached data if available');
+          console.warn('[dm-sync] Initial sync failed:', err);
+          if (isQuotaError(err)) {
+            enterQuotaCooldown();
+          } else {
+            // Show a generic sync-failed indicator so user knows data is from cache
+            var indicator = document.getElementById('dm-offline-indicator');
+            if (indicator) {
+              indicator.style.display = '';
+              indicator.querySelector('.dm-offline-text').textContent = 'Sync failed — using cached data';
+              indicator.classList.add('dm-offline--show');
+              var dismissBtn = document.getElementById('dm-offline-dismiss');
+              if (dismissBtn) dismissBtn.style.display = '';
+            }
+          }
           window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+          // Still start background sync so it can retry
+          if (user) {
+            startBackgroundSync(user.uid);
+            scheduleAllReminders();
+          }
         });
       } else {
         stopBackgroundSync();

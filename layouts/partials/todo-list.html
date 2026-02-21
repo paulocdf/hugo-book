@@ -4749,6 +4749,9 @@
     _formPlaceholder.style.height = addFormEl.offsetHeight + 'px';
     _formPlaceholder.style.marginBottom = getComputedStyle(addFormEl).marginBottom;
     addFormEl.parentNode.insertBefore(_formPlaceholder, addFormEl);
+    // Move form to document.body so position:fixed is relative to viewport
+    // (ancestors with will-change:transform create a containing block that breaks fixed positioning)
+    document.body.appendChild(addFormEl);
     addFormEl.classList.add('elevated');
     addBackdrop.classList.add('visible');
   }
@@ -4758,7 +4761,9 @@
     _formElevated = false;
     addFormEl.classList.remove('elevated');
     addBackdrop.classList.remove('visible');
+    // Move form back to its original DOM position (before the placeholder)
     if (_formPlaceholder && _formPlaceholder.parentNode) {
+      _formPlaceholder.parentNode.insertBefore(addFormEl, _formPlaceholder);
       _formPlaceholder.parentNode.removeChild(_formPlaceholder);
       _formPlaceholder = null;
     }
