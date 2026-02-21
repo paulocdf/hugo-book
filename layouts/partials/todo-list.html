@@ -162,6 +162,7 @@
   border: 1px solid var(--gray-300);
   border-radius: 10px;
   transition: border-color 0.2s, box-shadow 0.2s;
+  cursor: text;
 }
 .todo-add-row-main:focus-within {
   border-color: var(--color-link);
@@ -4961,6 +4962,30 @@
 
   addTitleInput.addEventListener('focus', function() {
     elevateForm();
+  });
+
+  // Click anywhere on the form row (not just the input) to focus the title input
+  var addRowMain = document.querySelector('.todo-add-row-main');
+  if (addRowMain) {
+    addRowMain.addEventListener('click', function(e) {
+      // Don't steal focus from buttons/other interactive elements inside the row
+      var tag = e.target.tagName;
+      if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || e.target.closest('button')) return;
+      addTitleInput.focus();
+    });
+  }
+
+  // Global shortcut: T to focus the task input
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (e.key === 't' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      var todoList = document.getElementById('todo-list');
+      if (!todoList || todoList.style.display === 'none') return;
+      e.preventDefault();
+      // Scroll the input into view if needed
+      addTitleInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      addTitleInput.focus();
+    }
   });
 
   if (addBackdrop) {
