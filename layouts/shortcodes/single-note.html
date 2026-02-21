@@ -145,6 +145,21 @@
 .single-note {
   position: relative;
 }
+.single-note-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.single-note-title-row > h1 {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.single-note-title-row .single-note-top-actions {
+  position: static;
+  flex-shrink: 0;
+}
 .single-note-content {
   /* no position: relative needed anymore */
 }
@@ -228,6 +243,24 @@
     var currentNote = null;
     var allDestNotes = [];
     var selfTriggeredSync = false;
+
+    // Relocate action bar to sit inline with the page <h1> heading
+    // (matches note-viewer pattern: title + actions in one flex row)
+    var articleEl = container.closest('.markdown');
+    if (articleEl && topActionsEl) {
+      var pageH1 = articleEl.querySelector(':scope > h1');
+      if (pageH1) {
+        var titleRow = document.createElement('div');
+        titleRow.className = 'single-note-title-row';
+        pageH1.parentNode.insertBefore(titleRow, pageH1);
+        titleRow.appendChild(pageH1);
+        titleRow.appendChild(topActionsEl);
+        // Remove absolute positioning — now flex-aligned
+        topActionsEl.style.position = '';
+        topActionsEl.style.top = '';
+        topActionsEl.style.right = '';
+      }
+    }
 
     function showState(state) {
       authEl.style.display = state === 'auth' ? '' : 'none';
