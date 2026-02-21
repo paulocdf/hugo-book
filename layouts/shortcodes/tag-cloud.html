@@ -277,41 +277,48 @@
   if (signinBtn) {
     signinBtn.addEventListener('click', function() {
       if (window.dmAuth && window.dmGoogleProvider) {
-        if (window.dmIsLocalhost) {
-          window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
-        } else {
-          window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
-            console.error('Tag cloud sign-in error:', err);
-          });
-        }
+      if (window.dmIsLocalhost || window.dmIsMobile) {
+        window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
+      } else {
+        window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+          console.error('Tag cloud sign-in error:', err);
+        });
+      }
       }
     });
   }
 
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
-      if (user) {
-        showState('loading');
-        // Wait for sync, then load
-        var loaded = false;
-        function onSync() {
-          if (loaded) return;
-          loaded = true;
-          loadFromCache();
+    function subscribeTagCloudAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          showState('loading');
+          // Wait for sync, then load
+          var loaded = false;
+          function onSync() {
+            if (loaded) return;
+            loaded = true;
+            loadFromCache();
+          }
+          window.addEventListener('dm-sync-complete', onSync);
+          // Also try loading from cache immediately (may already be synced)
+          setTimeout(function() {
+            if (!loaded) loadFromCache();
+          }, 500);
+        } else {
+          showState('auth');
+          cloudEl.innerHTML = '';
+          notesEl.innerHTML = '';
+          filterInfoEl.style.display = 'none';
+          activeTag = null;
         }
-        window.addEventListener('dm-sync-complete', onSync);
-        // Also try loading from cache immediately (may already be synced)
-        setTimeout(function() {
-          if (!loaded) loadFromCache();
-        }, 500);
-      } else {
-        showState('auth');
-        cloudEl.innerHTML = '';
-        notesEl.innerHTML = '';
-        filterInfoEl.style.display = 'none';
-        activeTag = null;
-      }
-    });
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeTagCloudAuth);
+    } else {
+      subscribeTagCloudAuth();
+    }
   } else {
     showState('auth');
   }

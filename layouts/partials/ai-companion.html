@@ -931,12 +931,18 @@
     var todayStr = now.toISOString().split('T')[0];
     var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
 
-    var prompt = 'You are a productivity assistant. Today: ' + dayName + ', ' + todayStr + '.\n';
+    var prompt = 'You are a proactive productivity assistant and executive task manager. Today: ' + dayName + ', ' + todayStr + '.\n';
     prompt += 'Rules:\n';
     prompt += '- Be concise. Use bullet points with dashes.\n';
     prompt += '- Keep replies under 150 words.\n';
     prompt += '- When suggesting tasks, wrap each task title in **bold**.\n';
-    prompt += '- Do not repeat the user\'s message back.\n\n';
+    prompt += '- Do not repeat the user\'s message back.\n';
+    prompt += '- Be proactive: suggest improvements, don\'t just answer passively.\n';
+    prompt += '- If a task is vague (e.g. "clean house"), suggest breaking it into specific subtasks.\n';
+    prompt += '- If tasks have no deadline, recommend when to schedule them.\n';
+    prompt += '- When a task involves a deliverable (PR, report, presentation), suggest follow-up tasks like review, notify stakeholders, or documentation.\n';
+    prompt += '- If the user mentions a goal, suggest actionable next steps as tasks.\n';
+    prompt += '- Flag overdue tasks and suggest rescheduling or prioritizing them.\n\n';
 
     // Inject custom context from settings
     var customCtx = '';
@@ -946,7 +952,7 @@
     }
 
     if (!tasks || tasks.length === 0) {
-      prompt += 'The user has no tasks.\n';
+      prompt += 'The user has no tasks. Suggest they start by adding tasks for today.\n';
       return prompt;
     }
 
@@ -981,10 +987,11 @@
       var futureTasks = pending.filter(function(t) { return t.scheduledDate && t.scheduledDate > todayStr; });
 
       if (unscheduled.length > 0) {
-        prompt += '\nBacklog (' + unscheduled.length + '):\n';
+        prompt += '\nBacklog/Unscheduled (' + unscheduled.length + ' — suggest scheduling these):\n';
         unscheduled.slice(0, 7).forEach(function(t) {
           prompt += '- ' + t.title;
           if (t.category) prompt += ' [' + t.category + ']';
+          if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
           prompt += '\n';
         });
         if (unscheduled.length > 7) prompt += '- +' + (unscheduled.length - 7) + ' more\n';
@@ -1002,7 +1009,7 @@
 
     // Overdue and Today last — most important, strongest recency signal
     if (overdue.length > 0) {
-      prompt += '\nOVERDUE (' + overdue.length + '):\n';
+      prompt += '\nOVERDUE (' + overdue.length + ' — urge user to reschedule or complete):\n';
       overdue.forEach(function(t) {
         prompt += '- ' + t.title;
         if (t.scheduledDate) prompt += ' (was: ' + t.scheduledDate + ')';
@@ -1289,8 +1296,8 @@
 
   // ─── Quick action prompts ───
   var quickPrompts = {
-    plan: 'Look at my tasks for today and overdue. Create a prioritized plan with suggested order. If no tasks today, pick from my backlog.',
-    suggest: 'Suggest 3-5 new tasks based on my existing tasks. For each, give the title in **bold** and a one-line reason.',
+    plan: 'Look at my tasks for today and overdue. Create a prioritized plan with suggested order. If any tasks are vague, suggest breaking them into subtasks. If no tasks today, pick from my backlog and suggest scheduling them. Flag anything overdue that should be rescheduled.',
+    suggest: 'Suggest 3-5 new tasks based on my existing tasks. For each, give the title in **bold** and a one-line reason. Consider follow-up tasks for existing work (e.g., if I have a PR task, suggest code review or documentation). If I have unscheduled tasks, suggest when to do them.',
     improve: null, // handled separately with text input
     summarize: null // handled separately with text input
   };
@@ -1622,13 +1629,18 @@
   // ─── Task-creation intent detection & NLP parsing ───
 
   var taskIntentPatterns = [
-    /^(?:add|create|make|new)\s+(?:a\s+)?task\s*[:;\-–—]\s*(.+)/i,
-    /^(?:add|create|make|new)\s+(?:a\s+)?task\s+(?:called|named|titled)\s+(.+)/i,
-    /^(?:add|create|make|new)\s+(?:a\s+)?task\s+(?:to|for)\s+(.+)/i,
-    /^(?:add|create|make|new)\s+(?:a\s+)?task\s+(.+)/i,
+    /^(?:add|create|make|new|schedule)\s+(?:a\s+)?task\s*[:;\-–—]\s*(.+)/i,
+    /^(?:add|create|make|new|schedule)\s+(?:a\s+)?task\s+(?:called|named|titled)\s+(.+)/i,
+    /^(?:add|create|make|new|schedule)\s+(?:a\s+)?task\s+(?:to|for)\s+(.+)/i,
+    /^(?:add|create|make|new|schedule)\s+(?:a\s+)?task\s+(.+)/i,
     /^(?:add)\s+(.+?)\s+(?:to\s+(?:my\s+)?(?:tasks|todos?|inbox|list))\s*$/i,
     /^(?:remind\s+me\s+to)\s+(.+)/i,
-    /^(?:todo|task)\s*[:;\-–—]\s*(.+)/i
+    /^(?:todo|task)\s*[:;\-–—]\s*(.+)/i,
+    /^(?:schedule)\s+(.+)/i,
+    /^(?:i\s+need\s+to|i\s+have\s+to|i\s+should|i\s+must|i\s+gotta)\s+(.+)/i,
+    /^(?:plan)\s+(?:a\s+)?(?:task\s+)?(?:to|for)\s+(.+)/i,
+    /^(?:don'?t\s+(?:let\s+me\s+)?forget\s+to)\s+(.+)/i,
+    /^(?:put|set)\s+(?:a\s+)?(?:task|reminder)\s+(?:to|for)\s+(.+)/i
   ];
 
   function detectTaskIntent(text) {
@@ -1660,53 +1672,142 @@
 
   var _dayNames = { sunday: 0, sun: 0, monday: 1, mon: 1, tuesday: 2, tue: 2, tues: 2, wednesday: 3, wed: 3, thursday: 4, thu: 4, thur: 4, thurs: 4, friday: 5, fri: 5, saturday: 6, sat: 6 };
 
+  // ─── Time-of-day parsing helper ───
+  function _parseTimeOfDay(text) {
+    var lower = text.toLowerCase();
+    // "at 5pm", "at 5:30pm", "at 17:00", "at 5 pm", "at 5:30 p.m."
+    var timeMatch = lower.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*([ap]\.?m\.?)?/i);
+    if (timeMatch) {
+      var hour = parseInt(timeMatch[1]);
+      var min = timeMatch[2] ? parseInt(timeMatch[2]) : 0;
+      var ampm = timeMatch[3] ? timeMatch[3].replace(/\./g, '').toLowerCase() : null;
+      if (ampm === 'pm' && hour < 12) hour += 12;
+      if (ampm === 'am' && hour === 12) hour = 0;
+      // If no AM/PM and hour <= 7, assume PM (business hours heuristic)
+      if (!ampm && hour >= 1 && hour <= 7) hour += 12;
+      if (hour >= 0 && hour <= 23 && min >= 0 && min <= 59) {
+        return { hour: hour, minute: min, matched: timeMatch[0] };
+      }
+    }
+    // "morning", "afternoon", "evening", "night" as standalone time hints
+    if (/\b(?:in\s+the\s+)?morning\b/.test(lower)) {
+      var mMatch = lower.match(/\b(?:in\s+the\s+)?morning\b/);
+      return { hour: 9, minute: 0, matched: mMatch[0] };
+    }
+    if (/\b(?:in\s+the\s+)?afternoon\b/.test(lower)) {
+      var aMatch = lower.match(/\b(?:in\s+the\s+)?afternoon\b/);
+      return { hour: 14, minute: 0, matched: aMatch[0] };
+    }
+    if (/\b(?:in\s+the\s+)?evening\b/.test(lower)) {
+      var eMatch = lower.match(/\b(?:in\s+the\s+)?evening\b/);
+      return { hour: 19, minute: 0, matched: eMatch[0] };
+    }
+    if (/\b(?:at\s+)?night\b/.test(lower)) {
+      var nMatch = lower.match(/\b(?:at\s+)?night\b/);
+      return { hour: 21, minute: 0, matched: nMatch[0] };
+    }
+    return null;
+  }
+
+  // ─── Priority parsing ───
+  function _parsePriority(text) {
+    var lower = text.toLowerCase();
+    // Explicit priority mentions
+    if (/\b(?:high\s+priority|urgent|asap|important|critical)\b/.test(lower)) {
+      var m = lower.match(/\b(high\s+priority|urgent|asap|important|critical)\b/);
+      return { level: 'high', matched: m[0] };
+    }
+    if (/\b(?:low\s+priority|whenever|no\s+rush|not\s+urgent)\b/.test(lower)) {
+      var m2 = lower.match(/\b(low\s+priority|whenever|no\s+rush|not\s+urgent)\b/);
+      return { level: 'low', matched: m2[0] };
+    }
+    // Exclamation marks as urgency signal
+    if (/!!+/.test(text)) {
+      return { level: 'high', matched: text.match(/!!+/)[0] };
+    }
+    return null;
+  }
+
   function parseDate(text) {
     var lower = text.toLowerCase();
+    var timeInfo = _parseTimeOfDay(text);
 
     // "today"
     if (/\b(today)\b/.test(lower)) {
-      return { date: _fmtDate(new Date()), matched: 'today' };
+      return { date: _fmtDate(new Date()), matched: 'today', time: timeInfo };
     }
     // "tonight"
     if (/\b(tonight)\b/.test(lower)) {
-      return { date: _fmtDate(new Date()), matched: 'tonight' };
+      return { date: _fmtDate(new Date()), matched: 'tonight', time: timeInfo || { hour: 21, minute: 0, matched: 'tonight' } };
     }
     // "day after tomorrow" (must be checked BEFORE "tomorrow")
     if (/\bday\s+after\s+tomorrow\b/.test(lower)) {
       var d2 = new Date(); d2.setDate(d2.getDate() + 2);
-      return { date: _fmtDate(d2), matched: 'day after tomorrow' };
+      return { date: _fmtDate(d2), matched: 'day after tomorrow', time: timeInfo };
     }
     // "tomorrow" / "tmr" / "tmrw"
     if (/\b(tomorrow|tmrw?)\b/.test(lower)) {
       var d = new Date(); d.setDate(d.getDate() + 1);
-      return { date: _fmtDate(d), matched: 'tomorrow' };
+      return { date: _fmtDate(d), matched: 'tomorrow', time: timeInfo };
     }
-    // "next week"
+    // "this weekend"
+    if (/\bthis\s+weekend\b/.test(lower)) {
+      var dw = new Date();
+      var daysTillSat = (6 - dw.getDay() + 7) % 7;
+      if (daysTillSat === 0) daysTillSat = 7;
+      dw.setDate(dw.getDate() + daysTillSat);
+      return { date: _fmtDate(dw), matched: 'this weekend', time: timeInfo };
+    }
+    // "next week" -> next Monday
     if (/\bnext\s+week\b/.test(lower)) {
-      var d3 = new Date(); d3.setDate(d3.getDate() + 7);
-      return { date: _fmtDate(d3), matched: 'next week' };
+      var d3 = _nextWeekday(1); // Monday
+      return { date: _fmtDate(d3), matched: 'next week', time: timeInfo };
+    }
+    // "next month"
+    if (/\bnext\s+month\b/.test(lower)) {
+      var dm = new Date(); dm.setMonth(dm.getMonth() + 1); dm.setDate(1);
+      return { date: _fmtDate(dm), matched: 'next month', time: timeInfo };
+    }
+    // "end of week" -> Friday
+    if (/\b(?:end\s+of\s+(?:the\s+)?week|eow)\b/.test(lower)) {
+      var eow = _nextWeekday(5); // Friday
+      return { date: _fmtDate(eow), matched: lower.match(/\b(?:end\s+of\s+(?:the\s+)?week|eow)\b/)[0], time: timeInfo };
+    }
+    // "end of day" / "eod" -> today
+    if (/\b(?:end\s+of\s+(?:the\s+)?day|eod)\b/.test(lower)) {
+      return { date: _fmtDate(new Date()), matched: lower.match(/\b(?:end\s+of\s+(?:the\s+)?day|eod)\b/)[0], time: timeInfo || { hour: 17, minute: 0, matched: 'eod' } };
     }
     // "next <day>" or "on <day>" or "this <day>"
     var dayMatch = lower.match(/\b(?:next|on|this)\s+(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat)\b/);
     if (dayMatch) {
       var idx = _dayNames[dayMatch[1]];
       if (idx !== undefined) {
-        return { date: _fmtDate(_nextWeekday(idx)), matched: dayMatch[0] };
+        return { date: _fmtDate(_nextWeekday(idx)), matched: dayMatch[0], time: timeInfo };
       }
     }
-    // standalone day name at end: "... friday"
-    var trailingDay = lower.match(/\b(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat)$/);
+    // standalone day name at end or followed by time: "... friday", "friday at 5pm"
+    var trailingDay = lower.match(/\b(sunday|sun|monday|mon|tuesday|tue|tues|wednesday|wed|thursday|thu|thur|thurs|friday|fri|saturday|sat)\b(?:\s+at\s+|$)/);
     if (trailingDay) {
       var idx2 = _dayNames[trailingDay[1]];
       if (idx2 !== undefined) {
-        return { date: _fmtDate(_nextWeekday(idx2)), matched: trailingDay[1] };
+        return { date: _fmtDate(_nextWeekday(idx2)), matched: trailingDay[1], time: timeInfo };
       }
     }
     // "in N days"
     var inDays = lower.match(/\bin\s+(\d+)\s+days?\b/);
     if (inDays) {
       var d4 = new Date(); d4.setDate(d4.getDate() + parseInt(inDays[1]));
-      return { date: _fmtDate(d4), matched: inDays[0] };
+      return { date: _fmtDate(d4), matched: inDays[0], time: timeInfo };
+    }
+    // "in N weeks"
+    var inWeeks = lower.match(/\bin\s+(\d+)\s+weeks?\b/);
+    if (inWeeks) {
+      var d5 = new Date(); d5.setDate(d5.getDate() + parseInt(inWeeks[1]) * 7);
+      return { date: _fmtDate(d5), matched: inWeeks[0], time: timeInfo };
+    }
+    // If only time was found (no date reference), assume today
+    if (timeInfo) {
+      return { date: _fmtDate(new Date()), matched: '', time: timeInfo };
     }
     return null;
   }
@@ -1767,17 +1868,25 @@
     return bestCat;
   }
 
-  // ─── Clean title: remove date/time/estimate phrases ───
-  function cleanTaskTitle(title, parsedDate, parsedEstimate) {
+  // ─── Clean title: remove date/time/estimate/priority phrases ───
+  function cleanTaskTitle(title, parsedDate, parsedEstimate, parsedPriority) {
     var cleaned = title;
     // Remove date phrases
-    if (parsedDate) {
+    if (parsedDate && parsedDate.matched) {
       // Remove common preposition+date patterns
       cleaned = cleaned.replace(new RegExp('\\s*(?:for|on|by|before|due|scheduled\\s+for|scheduled)?\\s*\\b' + parsedDate.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'), '');
+    }
+    // Remove time phrases (e.g., "at 5pm", "morning")
+    if (parsedDate && parsedDate.time && parsedDate.time.matched) {
+      cleaned = cleaned.replace(new RegExp('\\s*\\b' + parsedDate.time.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'), '');
     }
     // Remove estimate phrases
     if (parsedEstimate) {
       cleaned = cleaned.replace(new RegExp('\\s*(?:for|taking|takes|about|around|~)?\\s*\\b' + parsedEstimate.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'), '');
+    }
+    // Remove priority phrases
+    if (parsedPriority && parsedPriority.matched) {
+      cleaned = cleaned.replace(new RegExp('\\s*\\b' + parsedPriority.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i'), '');
     }
     // Clean up leftover artifacts
     cleaned = cleaned.replace(/\s*[-–—,]\s*$/, '').replace(/^\s*[-–—,]\s*/, '').trim();
@@ -1790,15 +1899,60 @@
   function parseTaskDetails(rawTitle) {
     var parsedDate = parseDate(rawTitle);
     var parsedEstimate = parseEstimate(rawTitle);
+    var parsedPriority = _parsePriority(rawTitle);
     var category = inferCategory(rawTitle);
-    var title = cleanTaskTitle(rawTitle, parsedDate, parsedEstimate);
+    var bujoType = detectBujoType(rawTitle);
+    var title = cleanTaskTitle(rawTitle, parsedDate, parsedEstimate, parsedPriority);
 
     return {
       title: title,
       scheduledDate: parsedDate ? parsedDate.date : null,
       estimatedMin: parsedEstimate ? parsedEstimate.minutes : null,
-      category: category
+      category: category,
+      priority: parsedPriority ? parsedPriority.level : null,
+      timeOfDay: parsedDate && parsedDate.time ? { hour: parsedDate.time.hour, minute: parsedDate.time.minute } : null,
+      bujoType: bujoType
     };
+  }
+
+  // ─── BuJo type detection from natural language ───
+  function detectBujoType(text) {
+    var lower = text.toLowerCase().trim();
+    // Event patterns: meetings, appointments, calls, events with dates/times
+    if (/\b(meeting|appointment|call|event|conference|standup|stand-up|sync|demo|interview|webinar|workshop|ceremony|party|dinner|lunch|breakfast|brunch|hangout|date night|concert|show|game|flight|check-?in)\b/i.test(lower)) {
+      return 'event';
+    }
+    // Note patterns: explicit note/idea/remember markers
+    if (/^(note|idea|remember|fyi|reminder|thought|insight|observation|til|learned|read that|heard that)\b/i.test(lower)) {
+      return 'note';
+    }
+    if (/\b(jot down|take note|keep in mind|don'?t forget that|worth noting)\b/i.test(lower)) {
+      return 'note';
+    }
+    return 'task';
+  }
+
+  // ─── Multi-action detection ───
+  function detectMultipleActions(rawTitle) {
+    // Detect comma/and-separated actions: "clean kitchen, do laundry, and buy groceries"
+    // Only trigger if there are at least 2 distinct actions
+    var lower = rawTitle.toLowerCase();
+
+    // Split on ", and ", " and ", or just ","
+    var parts = rawTitle.split(/\s*,\s+and\s+|\s*,\s*|\s+and\s+/i);
+
+    // Filter out empty/short parts and date/time phrases that might be split
+    var datePhrases = /^(today|tomorrow|tmrw?|tonight|next\s+\w+|on\s+\w+|this\s+\w+|in\s+\d+\s+\w+|\d+\s*(?:min|hour|h|m)\w*|morning|afternoon|evening|night|(?:sun|mon|tue|wed|thu|fri|sat)\w*)$/i;
+    var actions = parts.filter(function(p) {
+      var trimmed = p.trim();
+      return trimmed.length >= 3 && !datePhrases.test(trimmed);
+    }).map(function(p) { return p.trim(); });
+
+    // Only return as multi-action if 2+ valid actions found
+    if (actions.length >= 2) {
+      return actions;
+    }
+    return null;
   }
 
   function createTaskDirectly(details) {
@@ -1811,6 +1965,7 @@
         scheduledDate: details.scheduledDate,
         estimatedMin: details.estimatedMin,
         category: details.category,
+        bujoType: details.bujoType || 'task',
         source: 'ai'
       }
     });
@@ -1826,16 +1981,27 @@
       var today = _fmtDate(new Date());
       var tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
       var tmrStr = _fmtDate(tmr);
-      if (details.scheduledDate === today) meta.push('today');
-      else if (details.scheduledDate === tmrStr) meta.push('tomorrow');
+      var dateLabel;
+      if (details.scheduledDate === today) dateLabel = 'today';
+      else if (details.scheduledDate === tmrStr) dateLabel = 'tomorrow';
       else {
         var dp = details.scheduledDate.split('-');
         var dd = new Date(parseInt(dp[0]), parseInt(dp[1]) - 1, parseInt(dp[2]));
         var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
         var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        meta.push(days[dd.getDay()] + ' ' + months[dd.getMonth()] + ' ' + dd.getDate());
+        dateLabel = days[dd.getDay()] + ' ' + months[dd.getMonth()] + ' ' + dd.getDate();
       }
+      // Append time if available
+      if (details.timeOfDay) {
+        var h = details.timeOfDay.hour;
+        var m = details.timeOfDay.minute;
+        var ampm = h >= 12 ? 'pm' : 'am';
+        var displayH = h % 12 || 12;
+        dateLabel += ' at ' + displayH + (m > 0 ? ':' + String(m).padStart(2, '0') : '') + ampm;
+      }
+      meta.push(dateLabel);
     }
+    if (details.priority) meta.push(details.priority + ' priority');
     if (details.category) meta.push(details.category);
     if (details.estimatedMin) meta.push(details.estimatedMin + ' min');
 
@@ -1865,6 +2031,46 @@
       // Check for task-creation intent
       var rawTitle = detectTaskIntent(text);
       if (rawTitle) {
+        // Check for multiple actions in one sentence
+        var multiActions = detectMultipleActions(rawTitle);
+        if (multiActions && multiActions.length >= 2) {
+          // Parse shared date/time context from the full raw title
+          var sharedDate = parseDate(rawTitle);
+          var sharedScheduledDate = sharedDate ? sharedDate.date : null;
+          var confirmParts = [];
+          var allCreated = true;
+
+          multiActions.forEach(function(action) {
+            var details = parseTaskDetails(action);
+            // Use shared date if individual action has no date
+            if (!details.scheduledDate && sharedScheduledDate) {
+              details.scheduledDate = sharedScheduledDate;
+            }
+            if (!createTaskDirectly(details)) {
+              allCreated = false;
+            }
+            confirmParts.push('**' + details.title + '**');
+          });
+
+          if (allCreated) {
+            addMessage('user', text);
+            chatHistory.push({ role: 'user', content: text });
+            var confirmText = 'Done — added ' + multiActions.length + ' tasks: ' + confirmParts.join(', ') + '.';
+            if (sharedScheduledDate) {
+              var today = _fmtDate(new Date());
+              var tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+              var tmrStr = _fmtDate(tmr);
+              var dateLabel = sharedScheduledDate === today ? 'today' : (sharedScheduledDate === tmrStr ? 'tomorrow' : sharedScheduledDate);
+              confirmText += ' All scheduled for ' + dateLabel + '.';
+            }
+            addMessage('assistant', confirmText);
+            chatHistory.push({ role: 'assistant', content: confirmText });
+            saveMessages();
+            return;
+          }
+        }
+
+        // Single task creation
         var details = parseTaskDetails(rawTitle);
         if (createTaskDirectly(details)) {
           // Show user message + instant confirmation (no AI call)
@@ -2105,7 +2311,12 @@
     _renderMarkdown: renderMarkdown,
     _detectTaskIntent: detectTaskIntent,
     _parseTaskDetails: parseTaskDetails,
-    _buildTaskConfirmation: buildTaskConfirmation
+    _buildTaskConfirmation: buildTaskConfirmation,
+    _detectMultipleActions: detectMultipleActions,
+    _detectBujoType: detectBujoType,
+    _parseDate: parseDate,
+    _parseTimeOfDay: _parseTimeOfDay,
+    _fmtDate: _fmtDate
   };
 
 })();

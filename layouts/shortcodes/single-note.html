@@ -671,7 +671,7 @@
     if (signinBtn) {
       signinBtn.addEventListener('click', function() {
         if (window.dmAuth && window.dmGoogleProvider) {
-          if (window.dmIsLocalhost) {
+          if (window.dmIsLocalhost || window.dmIsMobile) {
             window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
           } else {
             window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
@@ -694,13 +694,20 @@
 
     // Auth state
     if (window.dmAuth) {
-      window.dmAuth.onAuthStateChanged(function(user) {
-        if (user) {
-          loadFromCache();
-        } else {
-          showState('auth');
-        }
-      });
+      function subscribeSingleNoteAuth() {
+        window.dmAuth.onAuthStateChanged(function(user) {
+          if (user) {
+            loadFromCache();
+          } else {
+            showState('auth');
+          }
+        });
+      }
+      if (window.dmAuthReady) {
+        window.dmAuthReady.then(subscribeSingleNoteAuth);
+      } else {
+        subscribeSingleNoteAuth();
+      }
     } else {
       showState('auth');
     }

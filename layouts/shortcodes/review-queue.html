@@ -1143,7 +1143,7 @@
   // Auth
   signinBtn.addEventListener('click', function() {
     if (window.dmAuth && window.dmGoogleProvider) {
-      if (window.dmIsLocalhost) {
+      if (window.dmIsLocalhost || window.dmIsMobile) {
         window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
       } else {
         window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
@@ -1155,13 +1155,20 @@
 
   // Auth state
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
-      if (user) {
-        loadQueue();
-      } else {
-        showState('auth');
-      }
-    });
+    function subscribeReviewAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          loadQueue();
+        } else {
+          showState('auth');
+        }
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeReviewAuth);
+    } else {
+      subscribeReviewAuth();
+    }
   } else {
     showState('auth');
   }

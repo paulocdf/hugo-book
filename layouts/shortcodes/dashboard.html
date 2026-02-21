@@ -753,11 +753,10 @@
   if (signinBtn) {
     signinBtn.addEventListener('click', function() {
       if (window.dmAuth && window.firebase) {
-        var provider = new firebase.auth.GoogleAuthProvider();
-        if (window.dmIsLocalhost) {
-          window.dmAuth.signInWithRedirect(provider);
+        if (window.dmIsLocalhost || window.dmIsMobile) {
+          window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
         } else {
-          window.dmAuth.signInWithPopup(provider).catch(function(err) {
+          window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
             console.error('[dashboard] Sign-in error:', err);
           });
         }
@@ -769,13 +768,20 @@
   window.addEventListener('dm-sync-complete', renderDashboard);
 
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
-      if (user) {
-        renderDashboard();
-      } else {
-        showState('auth');
-      }
-    });
+    function subscribeDashboardAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          renderDashboard();
+        } else {
+          showState('auth');
+        }
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeDashboardAuth);
+    } else {
+      subscribeDashboardAuth();
+    }
   }
 })();
 </script>

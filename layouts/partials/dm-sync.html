@@ -689,6 +689,8 @@
       reminderAt: reminderAt,
       reminderFired: !!data.reminderFired,
       source: data.source || null,
+      bujoType: data.bujoType || 'task',
+      bujoState: data.bujoState || (status === 'done' ? 'done' : 'open'),
       createdAt: createdAt,
       updatedAt: updatedAt,
       completedAt: completedAt
@@ -879,6 +881,14 @@
   // ─── Notification Chime (Web Audio API) ───
 
   function playReminderChime() {
+    // Use shared sound system if available (respects user's sound + volume preferences)
+    if (window.dmSounds) {
+      var soundId = 'chime';
+      try { var v = localStorage.getItem('dm-pomo-sound-work'); if (v) soundId = v; } catch(e) {}
+      window.dmSounds.play(soundId);
+      return;
+    }
+    // Fallback: original hardcoded chime
     try {
       var ctx = new (window.AudioContext || window.webkitAudioContext)();
       var notes = [
@@ -898,11 +908,8 @@
         osc.start(ctx.currentTime + n.start);
         osc.stop(ctx.currentTime + n.start + n.dur + 0.05);
       });
-      // Close context after sound finishes
       setTimeout(function() { ctx.close(); }, 600);
-    } catch(e) {
-      // Audio not available — silent fallback
-    }
+    } catch(e) {}
   }
 
   // ─── Persistent Reminder Banner ───

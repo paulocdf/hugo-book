@@ -61,21 +61,28 @@
   var logEl = document.getElementById('import-log');
   var statsEl = document.getElementById('import-stats');
 
-  window.dmAuth.onAuthStateChanged(function(user) {
-    if (user) {
-      signinView.style.display = 'none';
-      contentView.style.display = '';
-      avatarEl.src = user.photoURL || '';
-      usernameEl.textContent = user.displayName || user.email || '';
-      showStats(user);
-    } else {
-      signinView.style.display = '';
-      contentView.style.display = 'none';
-    }
-  });
+  function subscribeImportAuth() {
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        signinView.style.display = 'none';
+        contentView.style.display = '';
+        avatarEl.src = user.photoURL || '';
+        usernameEl.textContent = user.displayName || user.email || '';
+        showStats(user);
+      } else {
+        signinView.style.display = '';
+        contentView.style.display = 'none';
+      }
+    });
+  }
+  if (window.dmAuthReady) {
+    window.dmAuthReady.then(subscribeImportAuth);
+  } else {
+    subscribeImportAuth();
+  }
 
   signinBtn.addEventListener('click', function() {
-    if (window.dmIsLocalhost) {
+    if (window.dmIsLocalhost || window.dmIsMobile) {
       window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
     } else {
       window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {

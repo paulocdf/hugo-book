@@ -398,13 +398,13 @@
   if (signinBtn) {
     signinBtn.addEventListener('click', function() {
       if (window.dmAuth && window.dmGoogleProvider) {
-        if (window.dmIsLocalhost) {
-          window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
-        } else {
-          window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
-            console.error('Sign-in error:', err);
-          });
-        }
+      if (window.dmIsLocalhost || window.dmIsMobile) {
+        window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
+      } else {
+        window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+          console.error('Sign-in error:', err);
+        });
+      }
       }
     });
   }
@@ -418,13 +418,20 @@
 
   // Auth state
   if (window.dmAuth) {
-    window.dmAuth.onAuthStateChanged(function(user) {
-      if (user) {
-        loadFromCache();
-      } else {
-        showState('auth');
-      }
-    });
+    function subscribeTrashAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          loadFromCache();
+        } else {
+          showState('auth');
+        }
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeTrashAuth);
+    } else {
+      subscribeTrashAuth();
+    }
   } else {
     showState('auth');
   }

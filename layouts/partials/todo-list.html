@@ -19,7 +19,7 @@
           </button>
           <button type="button" class="todo-add-pomodoro-btn" id="todo-add-pomodoro-btn" title="Short session (click tomato to switch)" aria-label="Pomodoro count">
             <svg class="todo-add-pomodoro-icon todo-pomo-icon-short" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
-            <svg class="todo-add-pomodoro-icon todo-pomo-icon-long" width="16" height="16" viewBox="0 0 24 24" fill="none" style="display:none;"><path d="M10 5c-.3-.8 0-1.6.5-1.8.5-.2.9.1 1.2.4.3-.3.7-.6 1.2-.4.5.2.8 1 .5 1.8" fill="#8aad7d"/><path d="M13.6 4.5c.5-.3 1.2-.2 1.6.2.3.4.2.9-.1 1.2" stroke="#8aad7d" stroke-width="0.8" fill="none"/><ellipse cx="12" cy="14" rx="8" ry="8.5" fill="#c4553a" stroke="#a8412e" stroke-width="0.8"/></svg>
+            <svg class="todo-add-pomodoro-icon todo-pomo-icon-long" width="16" height="16" viewBox="0 0 24 28" fill="none" style="display:none;"><path d="M10.5 6c-.3-.8 0-1.5.5-1.7.4-.1.8.1 1 .5.2-.4.6-.6 1-.5.5.2.8 1 .5 1.7" fill="#4a7a3e"/><path d="M13.8 5.2c.4-.2.9 0 1.1.3.2.3.1.7-.2.9" stroke="#4a7a3e" stroke-width="0.7" fill="none" stroke-linecap="round"/><path d="M12 10.5 C11 9 9.5 7.8 7.5 7.8 C4.4 7.8 2.8 10.2 2.8 12.8 C2.8 15.5 4.5 18.5 7 21.5 C9 23.8 10.8 25.3 12 27 C13.2 25.3 15 23.8 17 21.5 C19.5 18.5 21.2 15.5 21.2 12.8 C21.2 10.2 19.6 7.8 16.5 7.8 C14.5 7.8 13 9 12 10.5Z" fill="#c4553a" stroke="#a8412e" stroke-width="0.7"/><ellipse cx="7.8" cy="12" rx="2.5" ry="2" fill="#d4776a" opacity="0.25"/></svg>
             <span class="todo-add-pomodoro-count" id="todo-add-pomodoro-count">1</span>
           </button>
           <button type="button" class="todo-add-pomo-plus" id="todo-add-pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
@@ -36,6 +36,17 @@
         </button>
       </div>
       <div class="todo-add-row-icons" id="todo-add-row-icons">
+        <div class="todo-add-bujo-type-toggle" id="todo-add-bujo-type-toggle">
+          <button type="button" class="todo-add-bujo-type-btn active" data-bujo-type="task" title="Task">
+            <svg width="12" height="12" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg>
+          </button>
+          <button type="button" class="todo-add-bujo-type-btn" data-bujo-type="event" title="Event">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg>
+          </button>
+          <button type="button" class="todo-add-bujo-type-btn" data-bujo-type="note" title="Note">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>
+          </button>
+        </div>
         <button type="button" class="todo-add-icon-btn" id="todo-add-date-icon" title="Schedule date" aria-label="Schedule date">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
         </button>
@@ -143,6 +154,42 @@
   padding-left: 2px;
   position: relative;
 }
+.todo-add-bujo-type-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--body-background);
+  margin-right: 2px;
+}
+.todo-add-bujo-type-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  line-height: 0;
+  padding: 0;
+}
+.todo-add-bujo-type-btn:hover {
+  color: var(--body-font-color);
+  background: var(--gray-100);
+}
+.todo-add-bujo-type-btn.active {
+  color: var(--body-font-color);
+  background: var(--gray-200);
+}
+.todo-add-bujo-type-btn[data-bujo-type="task"].active { color: #3d3d3d; }
+.todo-add-bujo-type-btn[data-bujo-type="event"].active { color: #4a7a9b; }
+.todo-add-bujo-type-btn[data-bujo-type="note"].active { color: #888888; }
 .todo-add-icon-btn {
   display: inline-flex;
   align-items: center;
@@ -637,8 +684,8 @@
 .todo-item {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 6px 10px;
   border-radius: 8px;
   transition: background 0.15s;
 }
@@ -704,13 +751,194 @@
   from { opacity: 0.3; transform: translateY(-8px); }
   to { opacity: 0.6; transform: translateY(0); }
 }
-.todo-item-checkbox {
-  margin-top: 3px;
-  width: 17px;
-  height: 17px;
+.todo-bujo-bullet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: 1px;
+  padding: 0;
+  border: 1.5px solid transparent;
+  background: none;
   cursor: pointer;
-  accent-color: var(--color-link);
   flex-shrink: 0;
+  border-radius: 4px;
+  transition: background 0.15s, border-color 0.2s;
+  position: relative;
+}
+.todo-bujo-bullet:hover {
+  background: var(--gray-100);
+}
+.todo-bujo-bullet svg {
+  display: block;
+}
+/* Task states */
+.todo-bujo-bullet.bujo-task-open svg { color: #3d3d3d; }
+.todo-bujo-bullet.bujo-task-done svg { color: #7a7a7a; }
+.todo-bujo-bullet.bujo-task-migrated svg { color: #8b6e4e; }
+.todo-bujo-bullet.bujo-task-scheduled svg { color: #5b7a8a; }
+
+/* Open task: subtle ring at rest to signal interactivity */
+.todo-bujo-bullet.bujo-task-open {
+  border: 1.5px solid rgba(61, 61, 61, 0.2);
+  border-radius: 50%;
+  transition: border-color 0.2s, background 0.15s;
+}
+.todo-bujo-bullet.bujo-task-open:hover {
+  border-color: rgba(122, 122, 122, 0.5);
+  background: rgba(122, 122, 122, 0.08);
+}
+
+/* Open task: dot/X swap on hover */
+.todo-bujo-bullet.bujo-task-open .bujo-icon-rest {
+  display: block;
+  transition: opacity 0.15s;
+}
+.todo-bujo-bullet.bujo-task-open .bujo-icon-hover {
+  display: none;
+  position: absolute;
+  color: #7a7a7a;
+}
+.todo-bujo-bullet.bujo-task-open:hover .bujo-icon-rest {
+  display: none;
+}
+.todo-bujo-bullet.bujo-task-open:hover .bujo-icon-hover {
+  display: block;
+}
+
+/* Done task: show dot on hover to hint "click to reopen" */
+.todo-bujo-bullet.bujo-task-done {
+  border: 1.5px solid transparent;
+  border-radius: 50%;
+  transition: border-color 0.2s, background 0.15s;
+}
+.todo-bujo-bullet.bujo-task-done:hover {
+  border-color: rgba(61, 61, 61, 0.2);
+  background: rgba(61, 61, 61, 0.06);
+}
+/* Event */
+.todo-bujo-bullet.bujo-event svg { color: #4a7a9b; }
+.todo-bujo-bullet.bujo-event .bujo-icon-rest { display: block; }
+.todo-bujo-bullet.bujo-event .bujo-icon-hover { display: none; position: absolute; color: #7a7a7a; }
+.todo-bujo-bullet.bujo-event:hover .bujo-icon-rest { display: none; }
+.todo-bujo-bullet.bujo-event:hover .bujo-icon-hover { display: block; }
+/* Event done — muted event blue to retain type identity */
+.todo-bujo-bullet.bujo-event-done svg { color: #7a9aab; }
+.todo-bujo-bullet.bujo-event-done .bujo-icon-rest { display: block; }
+.todo-bujo-bullet.bujo-event-done .bujo-icon-hover { display: none; position: absolute; color: #4a7a9b; }
+.todo-bujo-bullet.bujo-event-done:hover .bujo-icon-rest { display: none; }
+.todo-bujo-bullet.bujo-event-done:hover .bujo-icon-hover { display: block; }
+.todo-bujo-bullet.bujo-event-done:hover {
+  border-color: rgba(74, 122, 155, 0.2);
+  background: rgba(74, 122, 155, 0.06);
+}
+/* Note */
+.todo-bujo-bullet.bujo-note svg { color: #888888; }
+.todo-bujo-bullet.bujo-note .bujo-icon-rest { display: block; }
+.todo-bujo-bullet.bujo-note .bujo-icon-hover { display: none; position: absolute; color: #7a7a7a; }
+.todo-bujo-bullet.bujo-note:hover .bujo-icon-rest { display: none; }
+.todo-bujo-bullet.bujo-note:hover .bujo-icon-hover { display: block; }
+/* Note done */
+.todo-bujo-bullet.bujo-note-done svg { color: #7a7a7a; }
+.todo-bujo-bullet.bujo-note-done .bujo-icon-rest { display: block; }
+.todo-bujo-bullet.bujo-note-done .bujo-icon-hover { display: none; position: absolute; color: #888; }
+.todo-bujo-bullet.bujo-note-done:hover .bujo-icon-rest { display: none; }
+.todo-bujo-bullet.bujo-note-done:hover .bujo-icon-hover { display: block; }
+.todo-bujo-bullet.bujo-note-done:hover {
+  border-color: rgba(136, 136, 136, 0.2);
+  background: rgba(136, 136, 136, 0.06);
+}
+/* Migrated / scheduled title treatment */
+.todo-item.migrated .todo-item-title {
+  text-decoration: line-through;
+  color: #8b6e4e;
+}
+.todo-item.scheduled .todo-item-title {
+  color: #5b7a8a;
+}
+/* BuJo state picker popover */
+.todo-state-picker {
+  position: absolute;
+  z-index: 200;
+  background: var(--body-background, #fff);
+  border: 1px solid var(--gray-200, #e5e5e5);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px 0;
+  min-width: 160px;
+}
+.todo-state-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: var(--body-font-color, #333);
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  border-radius: 0;
+}
+.todo-state-picker-item:hover {
+  background: var(--gray-100, #f5f5f5);
+}
+.todo-state-picker-item.active {
+  font-weight: 600;
+  background: var(--gray-50, #fafafa);
+}
+.todo-state-picker-item svg {
+  flex-shrink: 0;
+}
+.todo-state-picker-sep {
+  height: 1px;
+  background: var(--gray-200, #e5e5e5);
+  margin: 4px 0;
+}
+/* BuJo migration date prompt */
+.todo-migrate-prompt {
+  position: absolute;
+  z-index: 210;
+  background: var(--body-background, #fff);
+  border: 1px solid var(--gray-200, #e5e5e5);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 12px;
+  min-width: 200px;
+}
+.todo-migrate-prompt label {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--gray-500, #888);
+  margin-bottom: 4px;
+}
+.todo-migrate-prompt input[type="date"] {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--gray-300, #ccc);
+  border-radius: 6px;
+  font-size: 0.84rem;
+  margin-bottom: 8px;
+}
+.todo-migrate-prompt-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.todo-migrate-prompt-actions button {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  border: 1px solid var(--gray-300, #ccc);
+  background: var(--body-background, #fff);
+}
+.todo-migrate-prompt-actions button.primary {
+  background: var(--color-link, #0070f3);
+  color: #fff;
+  border-color: var(--color-link, #0070f3);
 }
 .todo-item-content {
   flex: 1;
@@ -742,23 +970,23 @@
 .todo-item-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 6px;
+  margin-top: 1px;
   flex-wrap: wrap;
 }
 .todo-item-estimate,
 .todo-item-actual,
 .todo-item-category {
-  font-size: 0.72rem;
-  color: var(--gray-500);
+  font-size: 0.68rem;
+  color: var(--gray-400);
 }
 .todo-item-estimate {
   background: var(--gray-100);
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
 }
 .todo-item-actual {
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
 }
 .todo-item-actual.over {
@@ -772,12 +1000,12 @@
 .todo-item-category {
   background: rgba(0, 105, 255, 0.08);
   color: var(--color-link);
-  padding: 1px 6px;
+  padding: 1px 5px;
   border-radius: 4px;
   font-weight: 500;
 }
 .todo-item-finish-at {
-  font-size: 0.70rem;
+  font-size: 0.66rem;
   color: var(--gray-400);
   padding: 1px 5px;
   border-radius: 4px;
@@ -826,6 +1054,10 @@
   color: var(--color-link);
   background: rgba(66, 133, 244, 0.1);
 }
+.todo-item-action-btn.edit:hover {
+  color: var(--color-link);
+  background: rgba(66, 133, 244, 0.1);
+}
 
 /* Subtask collapse toggle */
 .todo-subtask-toggle {
@@ -866,7 +1098,9 @@
 
 /* Subtasks */
 .todo-subtasks {
-  margin-left: 25px;
+  margin-left: 48px;
+  padding-left: 8px;
+  border-left: 2px solid var(--gray-200);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -875,7 +1109,7 @@
   display: flex;
   gap: 6px;
   align-items: center;
-  margin-left: 25px;
+  margin-left: 48px;
   margin-top: 2px;
   margin-bottom: 4px;
 }
@@ -984,17 +1218,17 @@
 
 /* Toast notifications */
 .todo-toast {
-  position: absolute;
-  bottom: 8px;
+  position: fixed;
+  bottom: 24px;
   left: 50%;
-  transform: translateX(-50%) translateY(10px);
+  transform: translateX(-50%) translateY(20px);
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 0.82rem;
   font-weight: 500;
   opacity: 0;
   transition: opacity 0.3s, transform 0.3s;
-  z-index: 10;
+  z-index: 9999;
   pointer-events: none;
   white-space: nowrap;
 }
@@ -1006,6 +1240,42 @@
   background: var(--color-danger-bg, #fee);
   color: var(--color-danger, #c53030);
   border: 1px solid var(--color-danger, #c53030);
+}
+.todo-toast-undo {
+  background: var(--sidebar-bg, #f7f7f7);
+  color: var(--body-font-color, #333);
+  border: 1px solid var(--border-medium, #ddd);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+  padding: 8px 10px 8px 16px;
+}
+.todo-undo-label {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.todo-undo-btn {
+  background: none;
+  border: none;
+  color: var(--accent-blue, #1976d2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.todo-undo-btn:hover {
+  background: rgba(25, 118, 210, 0.08);
 }
 
 /* Mobile responsiveness */
@@ -1061,7 +1331,7 @@
   color: var(--color-link);
 }
 
-/* Inline pomodoro start/pause/stop in meta row (always visible) */
+/* Inline pomodoro start/pause/stop in meta row */
 .todo-item-pomo-inline {
   display: inline-flex;
   align-items: center;
@@ -1074,7 +1344,7 @@
   background: rgba(0, 105, 255, 0.06);
   color: var(--gray-400);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s, transform 0.1s;
+  transition: color 0.15s, background 0.15s, transform 0.1s, opacity 0.15s;
   line-height: 0;
   flex-shrink: 0;
   vertical-align: middle;
@@ -1096,6 +1366,13 @@
 .todo-item-pomo-inline.pomo-stop:hover {
   background: rgba(234, 67, 53, 0.14);
   color: var(--color-danger, #ea4335);
+}
+/* Hide inactive pomodoro start button until row hover */
+.todo-item-pomo-inline.pomodoro-start:not(.active) {
+  opacity: 0;
+}
+.todo-item:hover .todo-item-pomo-inline.pomodoro-start:not(.active) {
+  opacity: 1;
 }
 @keyframes pomo-btn-pulse {
   0%, 100% { opacity: 1; }
@@ -1366,6 +1643,7 @@
   var _justCompletedIds = {}; // { todoId: true } — for slide-down animation on just-completed tasks
   var _addFormCategory = null; // Selected category string for new task
   var _addFormCategoryPrompted = false; // True when Enter opened category popover (submit on select/skip)
+  var _addFormBujoType = 'task'; // Selected BuJo type for new item (task/event/note)
   var _existingCategories = []; // Cached list of existing categories for autocomplete
   var _catDropdownActiveIdx = -1; // Active index in category dropdown
   var _defaultPomodoroCount = 1;
@@ -1641,7 +1919,9 @@
   // ─── Natural language date/time parsing for speech input ───
   function parseSpeechDateTime(text) {
     // Returns { cleanTitle: string, date: 'YYYY-MM-DD'|null, reminderMs: number|null }
-    // Strips temporal phrases and "remind me (to)" prefix from the title.
+    // Delegates date/time parsing to the shared NLP in window.dmAI._parseDate,
+    // and handles speech-specific logic: "remind me" prefix, "in X minutes/hours",
+    // reminder timestamp computation, and title cleanup.
     var now = new Date();
     var date = null;   // YYYY-MM-DD string
     var time = null;   // { hours: N, minutes: N } in 24h format
@@ -1652,15 +1932,6 @@
       return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     }
 
-    // Helper: get next occurrence of a weekday (0=Sun..6=Sat), always in the future
-    function nextWeekday(target) {
-      var d = new Date(now);
-      var diff = target - d.getDay();
-      if (diff <= 0) diff += 7;
-      d.setDate(d.getDate() + diff);
-      return d;
-    }
-
     // Normalize: lowercase, collapse whitespace
     var lower = cleaned.toLowerCase().replace(/\s+/g, ' ').trim();
 
@@ -1668,7 +1939,7 @@
     lower = lower.replace(/^remind me\s+/, '');
     cleaned = cleaned.replace(/^remind me\s+/i, '');
 
-    // ── 2. Relative durations: "in X minutes/hours" ──
+    // ── 2. Relative durations: "in X minutes/hours" (speech-specific, not in AI parseDate) ──
     var relMatch = lower.match(/\bin\s+(\d+)\s+(minute|minutes|min|hour|hours|hr|hrs)\b/);
     if (relMatch) {
       var amount = parseInt(relMatch[1], 10);
@@ -1681,87 +1952,53 @@
       cleaned = cleaned.replace(relRe, '');
     }
 
-    // ── 3. "at X o'clock" / "at X:XX" / "at X AM/PM" ──
-    if (!time) {
-      // "at 3 o'clock", "at 3", "at 3 PM", "at 15:30", "at 3:30 PM"
-      var timeMatch = lower.match(/\bat\s+(\d{1,2})(?::(\d{2}))?\s*(?:o['']?clock)?\s*(am|pm|a\.m\.|p\.m\.)?\b/);
-      if (timeMatch) {
-        var h = parseInt(timeMatch[1], 10);
-        var m = timeMatch[2] ? parseInt(timeMatch[2], 10) : 0;
-        var ampm = timeMatch[3] ? timeMatch[3].replace(/\./g, '') : null;
-        if (ampm === 'pm' && h < 12) h += 12;
-        if (ampm === 'am' && h === 12) h = 0;
-        // If no AM/PM and hour <= 12, use context: if hour already passed today, it's PM
-        if (!ampm && h <= 12 && h > 0) {
-          var testDate = new Date(now);
-          testDate.setHours(h, m, 0, 0);
-          if (testDate <= now && h < 12) h += 12; // assume PM if morning already passed
+    // ── 3. Delegate date and time-of-day parsing to shared AI NLP ──
+    if (!date && window.dmAI && window.dmAI._parseDate) {
+      var parsed = window.dmAI._parseDate(cleaned);
+      if (parsed) {
+        date = parsed.date;
+        // Strip the matched date phrase from the title
+        if (parsed.matched) {
+          cleaned = cleaned.replace(new RegExp(parsed.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '');
         }
-        time = { hours: h, minutes: m };
-        var timeRe = new RegExp('\\bat\\s+' + timeMatch[1] + '(?::' + (timeMatch[2] || '') + ')?\\s*(?:o[\'\\u2019]?clock)?\\s*(?:' + (timeMatch[3] || '') + ')?', 'i');
-        cleaned = cleaned.replace(timeRe, '');
+        // Extract time info
+        if (parsed.time) {
+          time = { hours: parsed.time.hour, minutes: parsed.time.minute };
+          // Strip the matched time phrase from the title
+          if (parsed.time.matched && parsed.time.matched !== parsed.matched) {
+            cleaned = cleaned.replace(new RegExp(parsed.time.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '');
+          }
+        }
       }
-    }
-
-    // ── 4. Named days / relative dates ──
-    if (!date) {
-      // "today"
+    } else if (!date) {
+      // Fallback: minimal inline parsing if dmAI is not available yet
       if (/\btoday\b/.test(lower)) {
         date = fmtDate(now);
         cleaned = cleaned.replace(/\btoday\b/i, '');
-      }
-      // "tonight"
-      else if (/\btonight\b/.test(lower)) {
+      } else if (/\btonight\b/.test(lower)) {
         date = fmtDate(now);
         if (!time) time = { hours: 21, minutes: 0 };
         cleaned = cleaned.replace(/\btonight\b/i, '');
-      }
-      // "tomorrow"
-      else if (/\btomorrow\b/.test(lower)) {
+      } else if (/\btomorrow\b/.test(lower)) {
         var tmrw = new Date(now); tmrw.setDate(tmrw.getDate() + 1);
         date = fmtDate(tmrw);
         cleaned = cleaned.replace(/\btomorrow\b/i, '');
       }
-      // "this weekend" / "on the weekend" / "the weekend" / "on weekend"
-      else if (/\b(?:this|the|on(?:\s+the)?)\s+weekend\b/.test(lower) || /\bweekend\b/.test(lower)) {
-        date = fmtDate(nextWeekday(6)); // Saturday
-        cleaned = cleaned.replace(/\b(?:(?:this|the|on(?:\s+the)?)\s+)?weekend\b/i, '');
-      }
-      // "next week"
-      else if (/\bnext\s+week\b/.test(lower)) {
-        date = fmtDate(nextWeekday(1)); // Monday
-        cleaned = cleaned.replace(/\bnext\s+week\b/i, '');
-      }
-      // "on Monday", "on Tuesday", ... (with optional "next")
-      else {
-        var dayNames = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-        var dayMatch = lower.match(/\b(?:on\s+)?(?:next\s+)?(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/);
-        if (dayMatch) {
-          var dayIdx = dayNames.indexOf(dayMatch[1]);
-          if (dayIdx !== -1) {
-            date = fmtDate(nextWeekday(dayIdx));
-            var dayRe = new RegExp('\\b(?:on\\s+)?(?:next\\s+)?' + dayMatch[1] + '\\b', 'i');
-            cleaned = cleaned.replace(dayRe, '');
-          }
+    }
+
+    // ── 4. Parse standalone time if not yet found (delegate to AI) ──
+    if (!time && window.dmAI && window.dmAI._parseTimeOfDay) {
+      var timeResult = window.dmAI._parseTimeOfDay(cleaned);
+      if (timeResult) {
+        time = { hours: timeResult.hour, minutes: timeResult.minute };
+        if (timeResult.matched) {
+          cleaned = cleaned.replace(new RegExp(timeResult.matched.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), '');
         }
+        if (!date) date = fmtDate(now); // time-only → assume today
       }
     }
 
-    // ── 5. Time-of-day phrases: "in the morning/afternoon/evening" ──
-    if (!time) {
-      if (/\bin\s+the\s+morning\b/.test(lower)) {
-        time = { hours: 9, minutes: 0 };
-        cleaned = cleaned.replace(/\bin\s+the\s+morning\b/i, '');
-      } else if (/\bin\s+the\s+afternoon\b/.test(lower)) {
-        time = { hours: 14, minutes: 0 };
-        cleaned = cleaned.replace(/\bin\s+the\s+afternoon\b/i, '');
-      } else if (/\bin\s+the\s+evening\b/.test(lower)) {
-        time = { hours: 19, minutes: 0 };
-        cleaned = cleaned.replace(/\bin\s+the\s+evening\b/i, '');
-      }
-    }
-
-    // ── 6. Strip connectors: leading "to", "for", "about", "that" ──
+    // ── 5. Strip connectors: leading "to", "for", "about", "that" ──
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
     cleaned = cleaned.replace(/^(to|for|about|that)\s+/i, '');
     // Also strip trailing connectors
@@ -1773,7 +2010,7 @@
       return { cleanTitle: text, date: null, reminderMs: null };
     }
 
-    // ── 7. Build the reminder timestamp ──
+    // ── 6. Build the reminder timestamp ──
     var reminderDate;
     if (date) {
       var parts = date.split('-');
@@ -1989,6 +2226,38 @@
   }
 
   // ─── Wire up add-form icon buttons and chip clears ───
+
+  // BuJo type toggle in add form
+  var bujoTypeToggle = document.getElementById('todo-add-bujo-type-toggle');
+  var addPomoGroup = document.getElementById('todo-add-pomodoro-group');
+  if (bujoTypeToggle) {
+    bujoTypeToggle.querySelectorAll('.todo-add-bujo-type-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var type = btn.getAttribute('data-bujo-type');
+        _addFormBujoType = type;
+        bujoTypeToggle.querySelectorAll('.todo-add-bujo-type-btn').forEach(function(b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        // Show/hide pomodoro controls (tasks only)
+        if (addPomoGroup) {
+          addPomoGroup.style.display = type === 'task' ? '' : 'none';
+        }
+        if (addCustomMinInput) {
+          addCustomMinInput.style.display = type === 'task' ? '' : 'none';
+        }
+        // Update placeholder
+        if (type === 'event') {
+          addTitleInput.placeholder = 'What event is happening?';
+        } else if (type === 'note') {
+          addTitleInput.placeholder = 'Jot down a note...';
+        } else {
+          addTitleInput.placeholder = 'What needs to be done?';
+        }
+        addTitleInput.focus();
+      });
+    });
+  }
+
   addDateIcon.addEventListener('click', function(e) {
     e.stopPropagation();
     if (_addFormPopover && _addFormPopover.parentNode === addIconRow && _addFormPopover.querySelector('[data-date-offset]')) {
@@ -2290,7 +2559,7 @@
     var toast = document.createElement('div');
     toast.className = 'todo-toast todo-toast-error';
     toast.textContent = msg;
-    container.appendChild(toast);
+    document.body.appendChild(toast);
     setTimeout(function() { toast.classList.add('show'); }, 10);
     setTimeout(function() {
       toast.classList.remove('show');
@@ -2302,11 +2571,13 @@
   function buildTodoItemHtml(todo, isSubtask, hasChildren, finishAtLabel) {
     var doneClass = todo.done ? ' done' : '';
     var justCompletedClass = _justCompletedIds[todo.id] ? ' just-completed' : '';
-    var checked = todo.done ? ' checked' : '';
-    var html = '<div class="todo-item' + doneClass + justCompletedClass + '" data-todo-id="' + todo.id + '">';
+    var bujoState = todo.bujoState || 'open';
+    var bujoType = todo.bujoType || 'task';
+    var stateClass = bujoState === 'migrated' ? ' migrated' : (bujoState === 'scheduled' ? ' scheduled' : '');
+    var html = '<div class="todo-item' + doneClass + justCompletedClass + stateClass + '" data-todo-id="' + todo.id + '">';
 
-    // Drag handle (only on non-done tasks)
-    if (!todo.done) {
+    // Drag handle (only on active tasks — not done, migrated, or scheduled)
+    if (!todo.done && bujoState !== 'migrated' && bujoState !== 'scheduled') {
       html += '<span class="todo-drag-handle" title="Drag to reorder"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/></svg></span>';
     } else {
       html += '<span class="todo-drag-handle-spacer"></span>';
@@ -2324,7 +2595,61 @@
       html += '<div class="todo-subtask-spacer"></div>';
     }
 
-    html += '<input type="checkbox" class="todo-item-checkbox"' + checked + ' data-todo-id="' + todo.id + '" aria-label="Complete: ' + escapeHtml(todo.title) + '">';
+    // BuJo bullet icon
+    var bulletClass = 'todo-bujo-bullet';
+    var bulletSvg = '';
+    var bulletTitle = '';
+    if (bujoType === 'event') {
+      if (bujoState === 'done') {
+        bulletClass += ' bujo-event-done';
+        // Circle with checkmark inside — retains event identity when done
+        bulletSvg = '<svg class="bujo-icon-rest" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="5.5" stroke-width="1.5"/><polyline points="4.5,8 7,10.5 11.5,5.5" stroke-width="2"/></svg>'
+          + '<svg class="bujo-icon-hover" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg>';
+        bulletTitle = 'Done (click to reopen)';
+      } else {
+        bulletClass += ' bujo-event';
+        bulletSvg = '<svg class="bujo-icon-rest" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg>'
+          + '<svg class="bujo-icon-hover" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 7,12 13,4"/></svg>';
+        bulletTitle = 'Event (click to complete)';
+      }
+    } else if (bujoType === 'note') {
+      if (bujoState === 'done') {
+        bulletClass += ' bujo-note-done';
+        // Dash with checkmark overlay — retains note identity when done
+        bulletSvg = '<svg class="bujo-icon-rest" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="10" x2="9" y2="10" stroke-width="2.2"/><polyline points="8,8 10,10.5 14,5" stroke-width="2"/></svg>'
+          + '<svg class="bujo-icon-hover" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>';
+        bulletTitle = 'Done (click to reopen)';
+      } else {
+        bulletClass += ' bujo-note';
+        bulletSvg = '<svg class="bujo-icon-rest" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>'
+          + '<svg class="bujo-icon-hover" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 7,12 13,4"/></svg>';
+        bulletTitle = 'Note (click to complete)';
+      }
+    } else {
+      // Task — varies by bujoState
+      if (bujoState === 'done') {
+        bulletClass += ' bujo-task-done';
+        // Two SVGs: checkmark shown at rest, dot shown on hover (hints "click to reopen")
+        bulletSvg = '<svg class="bujo-icon-rest" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 7,12 13,4"/></svg>'
+          + '<svg class="bujo-icon-hover" width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg>';
+        bulletTitle = 'Done (click to reopen)';
+      } else if (bujoState === 'migrated') {
+        bulletClass += ' bujo-task-migrated';
+        bulletSvg = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>';
+        bulletTitle = 'Migrated';
+      } else if (bujoState === 'scheduled') {
+        bulletClass += ' bujo-task-scheduled';
+        bulletSvg = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10,3 3,8 10,13"/></svg>';
+        bulletTitle = 'Scheduled';
+      } else {
+        bulletClass += ' bujo-task-open';
+        // Two SVGs: dot shown at rest, checkmark shown on hover (CSS handles swap)
+        bulletSvg = '<svg class="bujo-icon-rest" width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg>'
+          + '<svg class="bujo-icon-hover" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 7,12 13,4"/></svg>';
+        bulletTitle = 'Click to complete';
+      }
+    }
+    html += '<button type="button" class="' + bulletClass + '" data-bullet-id="' + todo.id + '" title="' + bulletTitle + '" aria-label="' + bulletTitle + '">' + bulletSvg + '</button>';
     html += '<div class="todo-item-content">';
     html += '<div class="todo-item-title">';
     if (todo.source === 'ai') {
@@ -2360,8 +2685,8 @@
       html += '<span class="todo-item-timer-active' + (timerRunning ? '' : ' paused') + '"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ' + timerLabel + '</span>';
     }
 
-    // Inline pomodoro start/pause/stop buttons (always visible for undone tasks)
-    if (!todo.done) {
+    // Inline pomodoro start/pause/stop buttons (only for undone tasks, not events/notes)
+    if (!todo.done && bujoType === 'task') {
       var isTimerActive = window.dmPomodoro && window.dmPomodoro.isActive(todo.id);
       var isTimerRunning = isTimerActive && window.dmPomodoro.isTimerRunning();
       if (isTimerActive) {
@@ -2407,7 +2732,7 @@
 
     // Action buttons
     html += '<div class="todo-item-actions">';
-    if (!todo.done) {
+    if (!todo.done && bujoType === 'task') {
       var hasReminder = todo.reminderAt && !todo.reminderFired;
       html += '<button type="button" class="todo-item-action-btn reminder-bell' + (hasReminder ? ' has-reminder' : '') + '" data-reminder-id="' + todo.id + '" title="' + (hasReminder ? 'Edit reminder' : 'Set reminder') + '" aria-label="Set reminder">';
       if (hasReminder) {
@@ -2419,7 +2744,7 @@
       }
       html += '</button>';
     }
-    if (!isSubtask && !todo.done) {
+    if (!isSubtask && !todo.done && bujoType === 'task') {
       html += '<button type="button" class="todo-item-action-btn add-subtask" data-parent-id="' + todo.id + '" title="Add subtask" aria-label="Add subtask">';
       html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>';
       html += '</button>';
@@ -2430,6 +2755,10 @@
       html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>';
       html += '</button>';
     }
+    // Edit button (for all tasks, done or not)
+    html += '<button type="button" class="todo-item-action-btn edit" data-edit-id="' + todo.id + '" title="Edit task" aria-label="Edit task">';
+    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
+    html += '</button>';
     html += '<button type="button" class="todo-item-action-btn delete" data-delete-id="' + todo.id + '" title="Delete task" aria-label="Delete task">';
     html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
     html += '</button>';
@@ -2702,6 +3031,265 @@
     return div.innerHTML;
   }
 
+  // ─── BuJo state picker ───
+  var _activeStatePicker = null;
+  var _activeMigratePrompt = null;
+
+  function closeStatePicker() {
+    if (_activeStatePicker) {
+      _activeStatePicker.remove();
+      _activeStatePicker = null;
+    }
+  }
+
+  function closeMigratePrompt() {
+    if (_activeMigratePrompt) {
+      _activeMigratePrompt.remove();
+      _activeMigratePrompt = null;
+    }
+  }
+
+  function changeBujoState(todo, newState, newDate) {
+    var firestoreUpdates = { bujoState: newState, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+    var localUpdates = { bujoState: newState, updatedAt: Date.now() };
+
+    if (newState === 'done') {
+      firestoreUpdates.done = true;
+      firestoreUpdates.status = 'done';
+      localUpdates.done = true;
+      localUpdates.status = 'done';
+    } else if (newState === 'open') {
+      firestoreUpdates.done = false;
+      firestoreUpdates.status = 'active';
+      localUpdates.done = false;
+      localUpdates.status = 'active';
+    } else {
+      // migrated / scheduled — keep status active (still visible)
+      firestoreUpdates.done = false;
+      firestoreUpdates.status = 'active';
+      localUpdates.done = false;
+      localUpdates.status = 'active';
+    }
+
+    if (newDate !== undefined) {
+      firestoreUpdates.scheduledDate = newDate;
+      localUpdates.scheduledDate = newDate;
+    }
+
+    updateTodoField(todo.id, firestoreUpdates, localUpdates);
+    render();
+  }
+
+  function showMigratePrompt(anchorEl, todo, stateType) {
+    closeMigratePrompt();
+    closeStatePicker();
+
+    var prompt = document.createElement('div');
+    prompt.className = 'todo-migrate-prompt';
+
+    var label = stateType === 'migrated' ? 'Migrate to date:' : 'Schedule for date:';
+    var tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    var defaultDate = tomorrow.toISOString().split('T')[0];
+
+    prompt.innerHTML = '<label>' + label + '</label>' +
+      '<input type="date" value="' + defaultDate + '">' +
+      '<div class="todo-migrate-prompt-actions">' +
+      '<button type="button" class="cancel">Cancel</button>' +
+      '<button type="button" class="primary">Confirm</button>' +
+      '</div>';
+
+    var rect = anchorEl.getBoundingClientRect();
+    prompt.style.left = rect.left + 'px';
+    prompt.style.top = (rect.bottom + 4) + 'px';
+    prompt.style.position = 'fixed';
+
+    document.body.appendChild(prompt);
+    _activeMigratePrompt = prompt;
+
+    var dateInput = prompt.querySelector('input[type="date"]');
+    dateInput.focus();
+
+    prompt.querySelector('.cancel').addEventListener('click', function() {
+      closeMigratePrompt();
+    });
+
+    prompt.querySelector('.primary').addEventListener('click', function() {
+      var selectedDate = dateInput.value;
+      if (!selectedDate) return;
+      changeBujoState(todo, stateType, selectedDate);
+      closeMigratePrompt();
+    });
+
+    dateInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        var selectedDate = dateInput.value;
+        if (!selectedDate) return;
+        changeBujoState(todo, stateType, selectedDate);
+        closeMigratePrompt();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeMigratePrompt();
+      }
+    });
+
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('click', function closeOnOutside(e) {
+        if (_activeMigratePrompt && !_activeMigratePrompt.contains(e.target)) {
+          closeMigratePrompt();
+          document.removeEventListener('click', closeOnOutside);
+        }
+      });
+    }, 0);
+  }
+
+  function showStatePicker(anchorEl, todo) {
+    closeStatePicker();
+    closeMigratePrompt();
+
+    var bujoType = todo.bujoType || 'task';
+    var bujoState = todo.bujoState || 'open';
+
+    var picker = document.createElement('div');
+    picker.className = 'todo-state-picker';
+
+    var items = [];
+    if (bujoType === 'task') {
+      items = [
+        { state: 'open', label: 'Open', icon: '<svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="#3d3d3d"/></svg>' },
+        { state: 'done', label: 'Done', icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#7a7a7a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 7,12 13,4"/></svg>' },
+        { state: 'migrated', label: 'Migrate...', icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#8b6e4e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>' },
+        { state: 'scheduled', label: 'Schedule...', icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#5b7a8a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10,3 3,8 10,13"/></svg>' }
+      ];
+    } else {
+      // Events and notes get open/done state options
+      items = [
+        { state: 'open', label: 'Open', icon: bujoType === 'event' ? '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#4a7a9b" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg>' : '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#888" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>' },
+        { state: 'done', label: 'Done', icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#7a7a7a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 7,12 13,4"/></svg>' }
+      ];
+    }
+    // Events/notes get a separator + type change options
+    items.push({ sep: true });
+    items.push({ type: 'task', label: 'Task', icon: '<svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="#3d3d3d"/></svg>' });
+    items.push({ type: 'event', label: 'Event', icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#4a7a9b" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg>' });
+    items.push({ type: 'note', label: 'Note', icon: '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#888" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>' });
+
+    var html = '';
+    items.forEach(function(item) {
+      if (item.sep) {
+        html += '<div class="todo-state-picker-sep"></div>';
+        return;
+      }
+      var isActive = '';
+      if (item.state && item.state === bujoState) isActive = ' active';
+      if (item.type && item.type === bujoType && !item.state) isActive = ' active';
+      var dataAttr = item.state ? 'data-state="' + item.state + '"' : 'data-type="' + item.type + '"';
+      html += '<button type="button" class="todo-state-picker-item' + isActive + '" ' + dataAttr + '>' + item.icon + ' ' + item.label + '</button>';
+    });
+
+    picker.innerHTML = html;
+
+    var rect = anchorEl.getBoundingClientRect();
+    picker.style.left = rect.left + 'px';
+    picker.style.top = (rect.bottom + 4) + 'px';
+    picker.style.position = 'fixed';
+
+    document.body.appendChild(picker);
+    _activeStatePicker = picker;
+
+    // Bind state/type clicks
+    picker.querySelectorAll('.todo-state-picker-item').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var newState = btn.getAttribute('data-state');
+        var newType = btn.getAttribute('data-type');
+
+        if (newState) {
+          if (newState === bujoState) {
+            closeStatePicker();
+            return;
+          }
+          if (newState === 'migrated' || newState === 'scheduled') {
+            closeStatePicker();
+            showMigratePrompt(anchorEl, todo, newState);
+            return;
+          }
+          if (newState === 'done' && bujoType === 'task') {
+            closeStatePicker();
+            // Use completion modal for tasks
+            if (window.dmTodoComplete) {
+              window.dmTodoComplete.open(todo, function(result) {
+                if (!result) { render(); return; }
+                completeTodo(todo, result.actualMin, result.category);
+              });
+            }
+            return;
+          }
+          if (newState === 'done' && bujoType !== 'task') {
+            closeStatePicker();
+            // Events and notes complete directly
+            completeTodo(todo, null, null);
+            return;
+          }
+          changeBujoState(todo, newState);
+        }
+
+        if (newType) {
+          if (newType === bujoType) {
+            closeStatePicker();
+            return;
+          }
+          var firestoreUpdates = { bujoType: newType, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+          var localUpdates = { bujoType: newType, updatedAt: Date.now() };
+          // If switching to event/note from a non-open task state, reset to open
+          if (newType !== 'task' && bujoState !== 'open') {
+            firestoreUpdates.bujoState = 'open';
+            firestoreUpdates.done = false;
+            firestoreUpdates.status = 'active';
+            localUpdates.bujoState = 'open';
+            localUpdates.done = false;
+            localUpdates.status = 'active';
+          }
+          updateTodoField(todo.id, firestoreUpdates, localUpdates);
+          render();
+        }
+
+        closeStatePicker();
+      });
+    });
+
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('click', function closePickerOutside(e) {
+        if (_activeStatePicker && !_activeStatePicker.contains(e.target)) {
+          closeStatePicker();
+          document.removeEventListener('click', closePickerOutside);
+        }
+      });
+    }, 0);
+
+    // Close on Escape
+    function closePickerOnEsc(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeStatePicker();
+        document.removeEventListener('keydown', closePickerOnEsc);
+      }
+    }
+    document.addEventListener('keydown', closePickerOnEsc);
+  }
+
+  // Close pickers on Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      if (_activeMigratePrompt) { closeMigratePrompt(); e.preventDefault(); return; }
+      if (_activeStatePicker) { closeStatePicker(); e.preventDefault(); return; }
+    }
+  });
+
   // ─── Event listeners ───
   function attachEventListeners() {
     // Day group collapse toggle
@@ -2727,61 +3315,77 @@
       });
     });
 
-    // Checkbox toggle
-    itemsEl.querySelectorAll('.todo-item-checkbox').forEach(function(cb) {
-      cb.addEventListener('change', function() {
-        var todoId = cb.getAttribute('data-todo-id');
+    // BuJo bullet click — toggle open/done
+    itemsEl.querySelectorAll('.todo-bujo-bullet[data-bullet-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-bullet-id');
         var todo = allTodos.find(function(t) { return t.id === todoId; });
-        if (!todo) return;
+        if (!todo) { console.warn('[bujo-click] todo not found for id:', todoId); return; }
+        var bujoType = todo.bujoType || 'task';
+        var bujoState = todo.bujoState || 'open';
 
-        if (cb.checked) {
-          // If Pomodoro timer is running for this todo, stop it and capture tracked time
-          var pomodoroMinutes = 0;
-          if (window.dmPomodoro && window.dmPomodoro.isActive(todoId)) {
-            // Stop will fire dm-pomodoro-stopped event, but we capture time preemptively
-            // by reading it before stop() clears state
-            pomodoroMinutes = _pomodoroTrackedMinutes[todoId] || 0;
-            window.dmPomodoro.stop();
-            // The stop event fires synchronously and updates _pomodoroTrackedMinutes
-            if (_pomodoroTrackedMinutes[todoId]) {
+
+        if (bujoState === 'open') {
+          if (bujoType === 'task') {
+            // Tasks use the completion modal (for time tracking)
+            var pomodoroMinutes = 0;
+            if (window.dmPomodoro && window.dmPomodoro.isActive(todoId)) {
+              pomodoroMinutes = _pomodoroTrackedMinutes[todoId] || 0;
+              window.dmPomodoro.stop();
+              if (_pomodoroTrackedMinutes[todoId]) {
+                pomodoroMinutes = _pomodoroTrackedMinutes[todoId];
+              }
+            } else if (_pomodoroTrackedMinutes[todoId]) {
               pomodoroMinutes = _pomodoroTrackedMinutes[todoId];
             }
-          } else if (_pomodoroTrackedMinutes[todoId]) {
-            // Timer was already stopped for this todo — use stored tracked time
-            pomodoroMinutes = _pomodoroTrackedMinutes[todoId];
-          }
 
-          // Opening completion modal
-          if (window.dmTodoComplete) {
-            var modalOpts = {};
-            if (pomodoroMinutes > 0) {
-              modalOpts.trackedMinutes = pomodoroMinutes;
-            }
-            window.dmTodoComplete.open(todo, function(result) {
-              if (!result) {
-                // Cancelled — re-render to reset checkbox state
-                render();
-                return;
+            if (window.dmTodoComplete) {
+              var modalOpts = {};
+              if (pomodoroMinutes > 0) {
+                modalOpts.trackedMinutes = pomodoroMinutes;
               }
-              completeTodo(todo, result.actualMin, result.category);
-              // Clear stored pomodoro time after completion
-              delete _pomodoroTrackedMinutes[todoId];
-              // Clean up localStorage entry
-              try {
-                var _tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
-                delete _tracked[todoId];
-                if (Object.keys(_tracked).length === 0) {
-                  localStorage.removeItem('dm-pomodoro-tracked');
-                } else {
-                  localStorage.setItem('dm-pomodoro-tracked', JSON.stringify(_tracked));
+              window.dmTodoComplete.open(todo, function(result) {
+                if (!result) {
+                  render();
+                  return;
                 }
-              } catch(e) {}
-            }, modalOpts);
+                completeTodo(todo, result.actualMin, result.category);
+                delete _pomodoroTrackedMinutes[todoId];
+                try {
+                  var _tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
+                  delete _tracked[todoId];
+                  if (Object.keys(_tracked).length === 0) {
+                    localStorage.removeItem('dm-pomodoro-tracked');
+                  } else {
+                    localStorage.setItem('dm-pomodoro-tracked', JSON.stringify(_tracked));
+                  }
+                } catch(e) {}
+              }, modalOpts);
+            }
+          } else {
+            // Events and notes complete directly (no time tracking)
+            completeTodo(todo, null, null);
           }
-        } else {
-          // Unchecking — reopen the todo
+        } else if (bujoState === 'done') {
+          // Reopen
+          reopenTodo(todo);
+        } else if (bujoState === 'migrated' || bujoState === 'scheduled') {
+          // Reopen migrated/scheduled tasks back to open
           reopenTodo(todo);
         }
+      });
+    });
+
+    // BuJo bullet right-click — open state picker
+    itemsEl.querySelectorAll('.todo-bujo-bullet[data-bullet-id]').forEach(function(btn) {
+      btn.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-bullet-id');
+        var todo = allTodos.find(function(t) { return t.id === todoId; });
+        if (!todo) return;
+        showStatePicker(btn, todo);
       });
     });
 
@@ -2794,14 +3398,12 @@
       });
     });
 
-    // Delete button
+    // Delete button — instant delete with undo toast (no confirmation modal)
     itemsEl.querySelectorAll('[data-delete-id]').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         var todoId = btn.getAttribute('data-delete-id');
-        showDeleteConfirm('Permanently delete this task? It will not count toward your stats.', function() {
-          deleteTodo(todoId);
-        });
+        deleteTodoWithUndo(todoId);
       });
     });
 
@@ -2811,6 +3413,84 @@
         e.stopPropagation();
         var todoId = btn.getAttribute('data-archive-id');
         archiveTodo(todoId);
+      });
+    });
+
+    // Shared edit handler — opens the edit modal for a given todo ID
+    function openEditForTodo(todoId) {
+      var todo = allTodos.find(function(t) { return t.id === todoId; });
+      if (!todo || !window.dmTodoEdit) return;
+      window.dmTodoEdit.open(todo, function(result) {
+        if (!result) return;
+        var firestoreUpdates = {};
+        var localUpdates = {};
+        if (result.title !== todo.title) {
+          firestoreUpdates.title = result.title;
+          localUpdates.title = result.title;
+        }
+        if (result.scheduledDate !== (todo.scheduledDate || null)) {
+          firestoreUpdates.scheduledDate = result.scheduledDate || null;
+          localUpdates.scheduledDate = result.scheduledDate || null;
+        }
+        if (result.estimatedMin !== (todo.estimatedMin || null)) {
+          firestoreUpdates.estimatedMin = result.estimatedMin || null;
+          localUpdates.estimatedMin = result.estimatedMin || null;
+        }
+        if (result.category !== (todo.category || null)) {
+          firestoreUpdates.category = result.category || null;
+          localUpdates.category = result.category || null;
+        }
+        // BuJo type
+        if (result.bujoType && result.bujoType !== (todo.bujoType || 'task')) {
+          firestoreUpdates.bujoType = result.bujoType;
+          localUpdates.bujoType = result.bujoType;
+        }
+        // BuJo state — sync with done/status
+        if (result.bujoState && result.bujoState !== (todo.bujoState || 'open')) {
+          firestoreUpdates.bujoState = result.bujoState;
+          localUpdates.bujoState = result.bujoState;
+          if (result.bujoState === 'done') {
+            firestoreUpdates.done = true;
+            firestoreUpdates.status = 'done';
+            localUpdates.done = true;
+            localUpdates.status = 'done';
+          } else if (result.bujoState === 'open') {
+            firestoreUpdates.done = false;
+            firestoreUpdates.status = 'active';
+            localUpdates.done = false;
+            localUpdates.status = 'active';
+          } else {
+            // migrated / scheduled — keep active so item stays visible
+            firestoreUpdates.done = false;
+            firestoreUpdates.status = 'active';
+            localUpdates.done = false;
+            localUpdates.status = 'active';
+          }
+        }
+        if (Object.keys(firestoreUpdates).length > 0) {
+          firestoreUpdates.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+          localUpdates.updatedAt = Date.now();
+          updateTodoField(todoId, firestoreUpdates, localUpdates);
+          render();
+        }
+      });
+    }
+
+    // Edit button
+    itemsEl.querySelectorAll('[data-edit-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        openEditForTodo(btn.getAttribute('data-edit-id'));
+      });
+    });
+
+    // Double-click on task item to edit
+    itemsEl.querySelectorAll('.todo-item[data-todo-id]').forEach(function(item) {
+      item.addEventListener('dblclick', function(e) {
+        // Don't trigger if double-clicking on checkbox, buttons, or links
+        if (e.target.closest('input, button, a, .todo-drag-handle')) return;
+        e.preventDefault();
+        openEditForTodo(item.getAttribute('data-todo-id'));
       });
     });
 
@@ -2894,7 +3574,7 @@
         animation: 150,
         fallbackOnBody: true,
         swapThreshold: 0.65,
-        filter: '.done',
+        filter: '.done, .migrated, .scheduled',
         onEnd: function(evt) {
           handleParentDrop(evt);
         }
@@ -2911,7 +3591,7 @@
         chosenClass: 'todo-drag-chosen',
         dragClass: 'todo-drag-active',
         animation: 150,
-        filter: '.done',
+        filter: '.done, .migrated, .scheduled',
         onEnd: function(evt) {
           handleSubtaskDrop(evt);
         }
@@ -3266,7 +3946,7 @@
     return minOrder - 1;
   }
 
-  function createTodo(title, estimatedMin, parentId, scheduledDate, reminderAtMs, category, atTop, pomodoroCount, pomodoroLength, onDone, source, breakLength) {
+  function createTodo(title, estimatedMin, parentId, scheduledDate, reminderAtMs, category, atTop, pomodoroCount, pomodoroLength, onDone, source, breakLength, bujoType) {
     if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
       showTodoError('Not signed in — please sign in to add tasks');
       if (onDone) onDone();
@@ -3301,6 +3981,8 @@
       reminderAt: reminderAtMs ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
       reminderFired: false,
       source: source || null,
+      bujoType: bujoType || 'task',
+      bujoState: 'open',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       completedAt: null
@@ -3326,6 +4008,8 @@
       reminderAt: reminderAtMs || null,
       reminderFired: false,
       source: source || null,
+      bujoType: bujoType || 'task',
+      bujoState: 'open',
       createdAt: Date.now(),
       updatedAt: Date.now(),
       completedAt: null
@@ -3356,6 +4040,7 @@
     var updateData = {
       done: true,
       status: 'done',
+      bujoState: 'done',
       actualMin: actualMin,
       category: category,
       completedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -3365,6 +4050,7 @@
     // Optimistic local update
     todo.done = true;
     todo.status = 'done';
+    todo.bujoState = 'done';
     todo.actualMin = actualMin;
     todo.category = category;
     todo.completedAt = Date.now();
@@ -3391,6 +4077,7 @@
         // Revert local state so UI reflects the failure
         todo.done = false;
         todo.status = 'active';
+        todo.bujoState = 'open';
         todo.actualMin = null;
         todo.category = null;
         todo.completedAt = null;
@@ -3464,6 +4151,7 @@
     var updateData = {
       done: false,
       status: 'active',
+      bujoState: 'open',
       actualMin: null,
       category: null,
       completedAt: null,
@@ -3473,6 +4161,7 @@
     // Optimistic local update
     todo.done = false;
     todo.status = 'active';
+    todo.bujoState = 'open';
     todo.actualMin = null;
     todo.category = null;
     todo.completedAt = null;
@@ -3520,11 +4209,13 @@
         var updateData = {
           done: false,
           status: 'deleted',
+          bujoState: null,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         // Optimistic local update
         todo.done = false;
         todo.status = 'deleted';
+        todo.bujoState = null;
         todo.updatedAt = Date.now();
         return window.dmSync.firestoreWrite({
           collection: 'todos',
@@ -3544,6 +4235,126 @@
       console.error('Error deleting todo:', err);
       showTodoError('Failed to delete task — check console');
     });
+  }
+
+  // ─── Instant delete with undo toast ───
+  var _undoTimer = null;
+  var _undoToast = null;
+
+  function deleteTodoWithUndo(todoId) {
+    // Snapshot the state of all affected todos before deleting (for undo)
+    var affectedIds = [todoId];
+    allTodos.forEach(function(t) {
+      if (t.parentId === todoId) affectedIds.push(t.id);
+    });
+
+    var snapshots = [];
+    affectedIds.forEach(function(id) {
+      var todo = allTodos.find(function(t) { return t.id === id; });
+      if (todo) {
+        snapshots.push({
+          id: id,
+          done: todo.done,
+          status: todo.status,
+          bujoState: todo.bujoState
+        });
+      }
+    });
+
+    var todoTitle = '';
+    var mainTodo = allTodos.find(function(t) { return t.id === todoId; });
+    if (mainTodo) {
+      todoTitle = mainTodo.title || '';
+      if (todoTitle.length > 32) todoTitle = todoTitle.substring(0, 32) + '...';
+    }
+
+    // Perform the delete immediately
+    deleteTodo(todoId);
+
+    // Show undo toast
+    showUndoToast(todoTitle, function() {
+      undoDelete(snapshots);
+    });
+  }
+
+  function undoDelete(snapshots) {
+    if (!window.dmSync || !snapshots || !snapshots.length) return;
+
+    var chain = Promise.resolve();
+    snapshots.forEach(function(snap) {
+      chain = chain.then(function() {
+        var todo = allTodos.find(function(t) { return t.id === snap.id; });
+        if (!todo) return Promise.resolve();
+
+        var updateData = {
+          done: snap.done,
+          status: snap.status,
+          bujoState: snap.bujoState,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        // Restore local state
+        todo.done = snap.done;
+        todo.status = snap.status;
+        todo.bujoState = snap.bujoState;
+        todo.updatedAt = Date.now();
+
+        return window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: snap.id,
+          op: 'update',
+          data: updateData,
+          localOp: function() {
+            return window.dmSync.putTodo(todo);
+          }
+        });
+      });
+    });
+
+    chain.then(function() {
+      render();
+    }).catch(function(err) {
+      console.error('Error undoing delete:', err);
+      showTodoError('Failed to undo delete — check console');
+    });
+  }
+
+  function showUndoToast(taskTitle, onUndo) {
+    // Clear any existing undo toast
+    dismissUndoToast();
+
+    var toast = document.createElement('div');
+    toast.className = 'todo-toast todo-toast-undo';
+    var label = taskTitle ? 'Deleted "' + taskTitle + '"' : 'Task deleted';
+    toast.innerHTML =
+      '<span class="todo-undo-label">' + label + '</span>' +
+      '<button type="button" class="todo-undo-btn">Undo</button>';
+    document.body.appendChild(toast);
+    _undoToast = toast;
+
+    // Wire undo button
+    toast.querySelector('.todo-undo-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      dismissUndoToast();
+      if (onUndo) onUndo();
+    });
+
+    // Slide in
+    setTimeout(function() { toast.classList.add('show'); }, 10);
+
+    // Auto-dismiss after 5 seconds
+    _undoTimer = setTimeout(function() {
+      dismissUndoToast();
+    }, 5000);
+  }
+
+  function dismissUndoToast() {
+    if (_undoTimer) { clearTimeout(_undoTimer); _undoTimer = null; }
+    if (_undoToast) {
+      _undoToast.classList.remove('show');
+      var t = _undoToast;
+      setTimeout(function() { t.remove(); }, 300);
+      _undoToast = null;
+    }
   }
 
   function archiveAllCompleted(ids) {
@@ -3645,7 +4456,7 @@
     addBtn.disabled = true;
     createTodo(title, est, null, scheduledDate, reminderAtMs, category, true, pomCount, pomLen, function() {
       addBtn.disabled = false;
-    }, null, pomBreakLen);
+    }, null, pomBreakLen, _addFormBujoType);
     addTitleInput.value = '';
     addCustomMinInput.value = '';
     // Reset pomodoro count to default but keep date and category sticky for rapid task creation
@@ -3654,6 +4465,16 @@
     // Clear reminder but keep date and category so user can rapidly add tasks
     _addFormReminderMs = null;
     updateReminderChip();
+    // Reset bujo type back to task
+    _addFormBujoType = 'task';
+    if (bujoTypeToggle) {
+      bujoTypeToggle.querySelectorAll('.todo-add-bujo-type-btn').forEach(function(b) { b.classList.remove('active'); });
+      var taskBtn = bujoTypeToggle.querySelector('[data-bujo-type="task"]');
+      if (taskBtn) taskBtn.classList.add('active');
+    }
+    if (addPomoGroup) addPomoGroup.style.display = '';
+    if (addCustomMinInput) addCustomMinInput.style.display = '';
+    addTitleInput.placeholder = 'What needs to be done?';
     closeAddFormPopover();
     hideCatPopover();
     closePomodoroConfigPopover();
@@ -3688,12 +4509,23 @@
       // Migrate legacy todos: backfill status field from done boolean
       var needsMigration = [];
       todos.forEach(function(t) {
+        var migrated = false;
         if (!t.status) {
           // Legacy done=true tasks become 'done' (still visible) so user can review/archive them
           t.status = t.done ? 'done' : 'active';
           t.done = t.status === 'done';
-          needsMigration.push(t);
+          migrated = true;
         }
+        // Backfill bujoType and bujoState for tasks created before BuJo system
+        if (!t.bujoType) {
+          t.bujoType = 'task';
+          migrated = true;
+        }
+        if (!t.bujoState) {
+          t.bujoState = t.done ? 'done' : 'open';
+          migrated = true;
+        }
+        if (migrated) needsMigration.push(t);
       });
       // Persist migrated todos to IDB (fire-and-forget)
       if (needsMigration.length > 0 && window.dmSync) {
@@ -3716,7 +4548,20 @@
     var detail = e.detail || {};
     var title = (detail.title || '').trim();
     if (!title) return;
-    createTodo(title, detail.estimatedMin || null, null, detail.scheduledDate || null, null, detail.category || null, true, null, null, function() {
+    // AI-created tasks default to today if no date specified (proactive scheduling)
+    var scheduledDate = detail.scheduledDate || getTodayStr();
+    createTodo(title, detail.estimatedMin || null, null, scheduledDate, null, detail.category || null, true, null, null, function() {
+      loadTodos();
+    }, detail.source || 'ai', null, detail.bujoType || 'task');
+  });
+
+  // Listen for AI-suggested subtask creation (from edit modal)
+  window.addEventListener('dm-ai-create-subtask', function(e) {
+    var detail = e.detail || {};
+    var title = (detail.title || '').trim();
+    if (!title || !detail.parentId) return;
+    var scheduledDate = detail.scheduledDate || getTodayStr();
+    createTodo(title, detail.estimatedMin || null, detail.parentId, scheduledDate, null, detail.category || null, false, null, null, function() {
       loadTodos();
     }, detail.source || 'ai');
   });
@@ -3728,6 +4573,11 @@
       _pomodoroTrackedMinutes[detail.todoId] = detail.trackedMinutes;
       // Also saved to localStorage by pomodoro-timer.html, but sync in-memory copy
     }
+    render();
+  });
+
+  // Listen for Pomodoro timer state changes (pause/resume/reset/skip) — re-render inline indicators
+  window.addEventListener('dm-pomodoro-state-changed', function() {
     render();
   });
 

@@ -583,7 +583,7 @@
   if (pageSigninBtn) {
     pageSigninBtn.addEventListener('click', function() {
       if (!window.dmAuth || !window.dmGoogleProvider) return;
-      if (window.dmIsLocalhost) {
+      if (window.dmIsLocalhost || window.dmIsMobile) {
         window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
       } else {
         window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
@@ -813,6 +813,46 @@
     // Check for task-creation intent
     var rawTitle = detectPageTaskIntent(text);
     if (rawTitle && window.dmDb && window.dmAuth && window.dmAuth.currentUser && window.dmAI) {
+      // Check for multi-action tasks
+      if (window.dmAI._detectMultipleActions) {
+        var multiActions = window.dmAI._detectMultipleActions(rawTitle);
+        if (multiActions && multiActions.length >= 2) {
+          var sharedDate = window.dmAI._parseDate ? window.dmAI._parseDate(rawTitle) : null;
+          var sharedScheduledDate = sharedDate ? sharedDate.date : null;
+          var confirmParts = [];
+          multiActions.forEach(function(action) {
+            var det = window.dmAI._parseTaskDetails(action);
+            if (!det.scheduledDate && sharedScheduledDate) {
+              det.scheduledDate = sharedScheduledDate;
+            }
+            window.dispatchEvent(new CustomEvent('dm-ai-create-task', {
+              detail: { title: det.title, scheduledDate: det.scheduledDate, estimatedMin: det.estimatedMin, category: det.category, bujoType: det.bujoType || 'task', source: 'ai' }
+            }));
+            confirmParts.push('**' + det.title + '**');
+          });
+          addPageMessage('user', text);
+          var multiConfirm = 'Done — added ' + multiActions.length + ' tasks: ' + confirmParts.join(', ') + '.';
+          if (sharedScheduledDate && window.dmAI._fmtDate) {
+            var today = window.dmAI._fmtDate(new Date());
+            var tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+            var tmrStr = window.dmAI._fmtDate(tmr);
+            var dateLabel = sharedScheduledDate === today ? 'today' : (sharedScheduledDate === tmrStr ? 'tomorrow' : sharedScheduledDate);
+            multiConfirm += ' All scheduled for ' + dateLabel + '.';
+          }
+          addPageMessage('assistant', multiConfirm);
+          var chatHistory = [];
+          try {
+            var saved = sessionStorage.getItem(SS_KEY_MESSAGES);
+            if (saved) chatHistory = JSON.parse(saved);
+          } catch(e) {}
+          chatHistory.push({ role: 'user', content: text });
+          chatHistory.push({ role: 'assistant', content: multiConfirm });
+          try { sessionStorage.setItem(SS_KEY_MESSAGES, JSON.stringify(chatHistory.slice(-20))); } catch(e) {}
+          return;
+        }
+      }
+
+      // Single task creation
       var details = window.dmAI._parseTaskDetails(rawTitle);
 
       var event = new CustomEvent('dm-ai-create-task', {
@@ -821,6 +861,7 @@
           scheduledDate: details.scheduledDate,
           estimatedMin: details.estimatedMin,
           category: details.category,
+          bujoType: details.bujoType || 'task',
           source: 'ai'
         }
       });
@@ -1217,7 +1258,18 @@
       return;
     }
 
-    var event = new CustomEvent('dm-ai-create-task', { detail: { title: title, source: 'ai' } });
+    // Run NLP parsing on suggested task title to extract date/estimate/category
+    var detail = { title: title, source: 'ai', bujoType: 'task' };
+    if (window.dmAI && window.dmAI._parseTaskDetails) {
+      var det = window.dmAI._parseTaskDetails(title);
+      detail.title = det.title;
+      detail.scheduledDate = det.scheduledDate;
+      detail.estimatedMin = det.estimatedMin;
+      detail.category = det.category;
+      detail.bujoType = det.bujoType || 'task';
+    }
+
+    var event = new CustomEvent('dm-ai-create-task', { detail: detail });
     window.dispatchEvent(event);
 
     var addBtn = cardEl.querySelector('.ai-task-card-add');

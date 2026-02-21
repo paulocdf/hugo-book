@@ -282,6 +282,70 @@ $graph-font-stack: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-
     color: var(--text-muted);
     margin-top: 4px;
   }
+
+  .time-stat-delta {
+    font-size: 0.65rem;
+    font-family: $graph-font-stack;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    line-height: 1;
+
+    &.up {
+      color: #4caf50;
+    }
+
+    &.down {
+      color: #ef5350;
+    }
+
+    &.neutral {
+      color: var(--text-muted);
+    }
+
+    .time-stat-delta-arrow {
+      font-size: 0.5rem;
+    }
+
+    .time-stat-delta-prev {
+      opacity: 0.5;
+      font-size: 0.58rem;
+    }
+  }
+}
+
+// Period comparison label
+.time-period-label {
+  text-align: center;
+  font-family: $graph-font-stack;
+  font-size: 0.72rem;
+  margin-bottom: 16px;
+  color: var(--text-muted);
+
+  .time-period-current {
+    font-weight: 600;
+    color: var(--body-font-color);
+  }
+
+  .time-period-vs {
+    opacity: 0.5;
+    margin: 0 6px;
+  }
+
+  .time-period-prev {
+    opacity: 0.5;
+    font-style: italic;
+  }
+}
+
+// Tooltip delta line (for prev period comparisons)
+.graph-tooltip-delta {
+  font-size: 0.7rem;
+  margin-top: 4px;
+  opacity: 0.7;
+  font-style: italic;
 }
 
 // Time view bar chart styles

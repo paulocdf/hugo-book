@@ -32,30 +32,26 @@
     window.dmStorage = firebase.storage();
     window.dmGoogleProvider = new firebase.auth.GoogleAuthProvider();
     window.dmIsLocalhost = isLocalhost;
+    window.dmIsMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
     // dmAuthReady: resolves once Firebase auth state has settled.
     // Prevents the null→user flash on page load (Firebase loads persisted
     // session from IndexedDB asynchronously, causing a brief signed-out state).
-    if (isLocalhost) {
-      // On localhost, wait for redirect result first
-      window.dmAuthReady = window.dmAuth.getRedirectResult().catch(function(err) {
-        console.error('Redirect sign-in error:', err);
-      }).then(function() {
-        return new Promise(function(resolve) {
-          var unsub = window.dmAuth.onAuthStateChanged(function(user) {
-            unsub();
-            resolve(user);
-          });
-        });
-      });
-    } else {
-      // On production, just wait for the first auth state callback
-      window.dmAuthReady = new Promise(function(resolve) {
+    //
+    // Always call getRedirectResult() first — both localhost (which always uses
+    // signInWithRedirect) and mobile (which uses signInWithRedirect because
+    // popups are unreliable on mobile Chrome) need to process the redirect
+    // result after the page reloads.  On desktop production this is a harmless
+    // no-op (resolves immediately with null).
+    window.dmAuthReady = window.dmAuth.getRedirectResult().catch(function(err) {
+      console.error('Redirect sign-in error:', err);
+    }).then(function() {
+      return new Promise(function(resolve) {
         var unsub = window.dmAuth.onAuthStateChanged(function(user) {
           unsub();
           resolve(user);
         });
       });
-    }
+    });
   })();
 </script>

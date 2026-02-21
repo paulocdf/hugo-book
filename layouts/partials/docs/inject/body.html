@@ -117,6 +117,8 @@
 
 {{ partial "todo-complete-modal.html" . }}
 
+{{ partial "todo-edit-modal.html" . }}
+
 {{ partial "pomodoro-timer.html" . }}
 
 {{ partial "keyboard-shortcuts.html" . }}
@@ -198,7 +200,7 @@
   var qcAiModeBtn = document.querySelector('.qc-mode-btn-ai');
 
   // State
-  var currentMode = 'note'; // 'ai', 'note', 'code', or 'todo'
+  var currentMode = 'ai'; // 'ai', 'note', 'code', or 'todo'
   var selectedLang = 'kotlin';
   var inboxMode = 'append'; // 'append' or 'new'
   var selectedDest = {
@@ -246,7 +248,7 @@
   if (signinBtn) {
     signinBtn.addEventListener('click', function() {
       if (!window.dmAuth || !window.dmGoogleProvider) return;
-      if (window.dmIsLocalhost) {
+      if (window.dmIsLocalhost || window.dmIsMobile) {
         window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
       } else {
         window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
@@ -1224,17 +1226,49 @@
     isSaving = true;
     submitBtn.disabled = true;
 
+    // ── NLP auto-parse: extract date, estimate, category, priority from title ──
+    var nlpTitle = title;
+    var nlpScheduledDate = _qcTodoDate || null;
+    var nlpEstimate = todoEstimateInput ? (parseInt(todoEstimateInput.value, 10) || 0) : 0;
+    var nlpCategory = null;
+    var nlpBujoType = 'task';
+    var nlpFeedbackParts = [];
+
+    if (window.dmAI && window.dmAI._parseTaskDetails) {
+      var parsed = window.dmAI._parseTaskDetails(title);
+      // Only apply NLP date if user hasn't manually set one
+      if (!_qcTodoDate && parsed.scheduledDate) {
+        nlpScheduledDate = parsed.scheduledDate;
+        nlpFeedbackParts.push('scheduled');
+      }
+      // Only apply NLP estimate if user hasn't manually entered one
+      if (!nlpEstimate && parsed.estimatedMin) {
+        nlpEstimate = parsed.estimatedMin;
+        nlpFeedbackParts.push(nlpEstimate + 'min');
+      }
+      if (parsed.category) {
+        nlpCategory = parsed.category;
+      }
+      if (parsed.bujoType) {
+        nlpBujoType = parsed.bujoType;
+      }
+      // Use cleaned title (without date/time/estimate phrases)
+      if (parsed.title && parsed.title !== title) {
+        nlpTitle = parsed.title;
+      }
+    }
+
     var user = window.dmAuth.currentUser;
-    var est = todoEstimateInput ? (parseInt(todoEstimateInput.value, 10) || 25) : 25;
-    var scheduledDate = _qcTodoDate || null;
+    var est = nlpEstimate || 25;
+    var scheduledDate = nlpScheduledDate;
     var reminderAtMs = (_qcTodoReminderMs && _qcTodoReminderMs > Date.now()) ? _qcTodoReminderMs : null;
 
     var todoData = {
       userId: user.uid,
-      title: title,
+      title: nlpTitle,
       estimatedMin: est,
       actualMin: null,
-      category: null,
+      category: nlpCategory,
       done: false,
       status: 'active',
       parentId: null,
@@ -1242,6 +1276,8 @@
       scheduledDate: scheduledDate,
       reminderAt: reminderAtMs ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
       reminderFired: false,
+      bujoType: nlpBujoType,
+      bujoState: 'open',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
       completedAt: null
@@ -1266,7 +1302,11 @@
       .then(function() {
         isSaving = false;
         submitBtn.disabled = false;
-        showFeedback('success', 'Task added!');
+        var msg = 'Task added!';
+        if (nlpFeedbackParts.length > 0) {
+          msg = 'Task added (' + nlpFeedbackParts.join(', ') + ')';
+        }
+        showFeedback('success', msg);
         window.dispatchEvent(new CustomEvent('dm-todos-updated'));
       })
       .catch(function(err) {
@@ -1277,7 +1317,7 @@
       });
   }
 
-  btn.addEventListener('click', openModal);
+  btn.addEventListener('click', function() { openModal('ai'); });
   cancelBtn.addEventListener('click', closeModal);
   submitBtn.addEventListener('click', submit);
   backdrop.addEventListener('click', closeModal);
@@ -1300,6 +1340,17 @@
 
     // Modal-specific shortcuts
     if (e.key === 'Escape') {
+      // Only close if the active input for the current mode is empty
+      var activeInput = currentMode === 'todo' ? todoTitleInput
+                      : currentMode === 'ai' ? qcAiInput
+                      : input;
+      if (activeInput && activeInput.value.trim()) {
+        // Clear the input instead of closing
+        e.preventDefault();
+        activeInput.value = '';
+        activeInput.focus();
+        return;
+      }
       e.preventDefault();
       closeModal();
     }
@@ -1469,7 +1520,17 @@
           _qcAiAddMessage('assistant', 'Please sign in to add tasks.');
           return;
         }
-        window.dispatchEvent(new CustomEvent('dm-ai-create-task', { detail: { title: taskTitle, source: 'ai' } }));
+        // Run NLP parsing on suggested task title to extract date/estimate/category
+        var detail = { title: taskTitle, source: 'ai', bujoType: 'task' };
+        if (window.dmAI && window.dmAI._parseTaskDetails) {
+          var det = window.dmAI._parseTaskDetails(taskTitle);
+          detail.title = det.title;
+          detail.scheduledDate = det.scheduledDate;
+          detail.estimatedMin = det.estimatedMin;
+          detail.category = det.category;
+          detail.bujoType = det.bujoType || 'task';
+        }
+        window.dispatchEvent(new CustomEvent('dm-ai-create-task', { detail: detail }));
         addBtn.style.display = 'none';
         var addedSpan = document.createElement('span');
         addedSpan.className = 'qc-ai-task-card-added';
@@ -1674,6 +1735,41 @@
       if (window.dmAI._detectTaskIntent) {
         var rawTitle = window.dmAI._detectTaskIntent(text);
         if (rawTitle && window.dmAI._parseTaskDetails) {
+          // Check for multi-action tasks
+          if (window.dmAI._detectMultipleActions) {
+            var multiActions = window.dmAI._detectMultipleActions(rawTitle);
+            if (multiActions && multiActions.length >= 2 && window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
+              var sharedDate = window.dmAI._parseDate ? window.dmAI._parseDate(rawTitle) : null;
+              var sharedScheduledDate = sharedDate ? sharedDate.date : null;
+              var confirmParts = [];
+              multiActions.forEach(function(action) {
+                var det = window.dmAI._parseTaskDetails(action);
+                if (!det.scheduledDate && sharedScheduledDate) {
+                  det.scheduledDate = sharedScheduledDate;
+                }
+                window.dispatchEvent(new CustomEvent('dm-ai-create-task', {
+                  detail: { title: det.title, scheduledDate: det.scheduledDate, estimatedMin: det.estimatedMin, category: det.category, bujoType: det.bujoType || 'task', source: 'ai' }
+                }));
+                confirmParts.push('**' + det.title + '**');
+              });
+              _qcAiAddMessage('user', text);
+              _qcAiChatHistory.push({ role: 'user', content: text });
+              var multiConfirm = 'Done — added ' + multiActions.length + ' tasks: ' + confirmParts.join(', ') + '.';
+              if (sharedScheduledDate && window.dmAI._fmtDate) {
+                var today = window.dmAI._fmtDate(new Date());
+                var tmr = new Date(); tmr.setDate(tmr.getDate() + 1);
+                var tmrStr = window.dmAI._fmtDate(tmr);
+                var dateLabel = sharedScheduledDate === today ? 'today' : (sharedScheduledDate === tmrStr ? 'tomorrow' : sharedScheduledDate);
+                multiConfirm += ' All scheduled for ' + dateLabel + '.';
+              }
+              _qcAiAddMessage('assistant', multiConfirm);
+              _qcAiChatHistory.push({ role: 'assistant', content: multiConfirm });
+              _qcAiSaveMessages();
+              return;
+            }
+          }
+
+          // Single task creation
           var details = window.dmAI._parseTaskDetails(rawTitle);
           if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
             window.dispatchEvent(new CustomEvent('dm-ai-create-task', {
@@ -1682,6 +1778,7 @@
                 scheduledDate: details.scheduledDate,
                 estimatedMin: details.estimatedMin,
                 category: details.category,
+                bujoType: details.bujoType || 'task',
                 source: 'ai'
               }
             }));
@@ -1900,7 +1997,7 @@
 
   gardenSignin.addEventListener('click', function() {
     if (!window.dmGoogleProvider) return;
-    if (window.dmIsLocalhost) {
+    if (window.dmIsLocalhost || window.dmIsMobile) {
       window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
     } else {
       window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
@@ -2262,6 +2359,62 @@
               '</label>' +
             '</div>' +
           '</div>' +
+          '<div class="sidebar-settings-group-label" style="margin-top:4px;">Sounds</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-sound-work">Work end</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<select id="setting-sound-work" class="sidebar-settings-select">' +
+                '<option value="chime">Chime</option>' +
+                '<option value="bell">Bell</option>' +
+                '<option value="digital">Digital</option>' +
+                '<option value="bowl">Singing bowl</option>' +
+                '<option value="ascending">Ascending</option>' +
+                '<option value="pulse">Soft pulse</option>' +
+                '<option value="none">None</option>' +
+              '</select>' +
+              '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-work" title="Preview">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-sound-break">Break end</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<select id="setting-sound-break" class="sidebar-settings-select">' +
+                '<option value="chime">Chime</option>' +
+                '<option value="bell">Bell</option>' +
+                '<option value="digital">Digital</option>' +
+                '<option value="bowl">Singing bowl</option>' +
+                '<option value="ascending">Ascending</option>' +
+                '<option value="pulse">Soft pulse</option>' +
+                '<option value="none">None</option>' +
+              '</select>' +
+              '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-break" title="Preview">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-sound-tick">Tick</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<select id="setting-sound-tick" class="sidebar-settings-select">' +
+                '<option value="none">None</option>' +
+                '<option value="tick-soft">Soft tick</option>' +
+                '<option value="tick-click">Click</option>' +
+                '<option value="tick-woodblock">Woodblock</option>' +
+              '</select>' +
+              '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-tick" title="Preview">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-sound-volume">Volume</label>' +
+            '<div class="sidebar-settings-control sidebar-settings-volume-control">' +
+              '<input type="range" id="setting-sound-volume" class="sidebar-settings-range" min="0" max="100" value="80" step="5">' +
+              '<span class="sidebar-settings-unit" id="setting-sound-volume-label">80%</span>' +
+            '</div>' +
+          '</div>' +
         '</div>' +
         '<div class="sidebar-settings-trigger" id="sidebar-settings-toggle">' +
           avatarHtml +
@@ -2370,6 +2523,71 @@
         window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-auto-schedule-today', value: val } }));
       });
     }
+
+    // ─── Sound settings ───
+    var soundWorkSelect = document.getElementById('setting-sound-work');
+    var soundBreakSelect = document.getElementById('setting-sound-break');
+    var soundTickSelect = document.getElementById('setting-sound-tick');
+    var soundVolumeRange = document.getElementById('setting-sound-volume');
+    var soundVolumeLabel = document.getElementById('setting-sound-volume-label');
+
+    // Read saved values
+    var savedWorkSound = 'chime';
+    try { var v = localStorage.getItem('dm-pomo-sound-work'); if (v) savedWorkSound = v; } catch(e) {}
+    var savedBreakSound = 'chime';
+    try { var v = localStorage.getItem('dm-pomo-sound-break'); if (v) savedBreakSound = v; } catch(e) {}
+    var savedTickSound = 'none';
+    try { var v = localStorage.getItem('dm-pomo-sound-tick'); if (v) savedTickSound = v; } catch(e) {}
+    var savedVolume = 80;
+    try { var v = parseFloat(localStorage.getItem('dm-pomo-sound-volume')); if (v >= 0 && v <= 1) savedVolume = Math.round(v * 100); } catch(e) {}
+
+    if (soundWorkSelect) soundWorkSelect.value = savedWorkSound;
+    if (soundBreakSelect) soundBreakSelect.value = savedBreakSound;
+    if (soundTickSelect) soundTickSelect.value = savedTickSound;
+    if (soundVolumeRange) soundVolumeRange.value = savedVolume;
+    if (soundVolumeLabel) soundVolumeLabel.textContent = savedVolume + '%';
+
+    // Helper: bind a select sound setting
+    function bindSoundSelect(selectEl, lsKey) {
+      if (!selectEl) return;
+      selectEl.addEventListener('change', function() {
+        var val = selectEl.value;
+        try { localStorage.setItem(lsKey, val); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: lsKey, value: val } }));
+      });
+    }
+
+    bindSoundSelect(soundWorkSelect, 'dm-pomo-sound-work');
+    bindSoundSelect(soundBreakSelect, 'dm-pomo-sound-break');
+    bindSoundSelect(soundTickSelect, 'dm-pomo-sound-tick');
+
+    // Volume slider
+    if (soundVolumeRange) {
+      soundVolumeRange.addEventListener('input', function() {
+        var pct = parseInt(soundVolumeRange.value, 10);
+        if (soundVolumeLabel) soundVolumeLabel.textContent = pct + '%';
+        var vol = pct / 100;
+        try { localStorage.setItem('dm-pomo-sound-volume', vol); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-pomo-sound-volume', value: vol } }));
+      });
+    }
+
+    // Preview buttons
+    var previewBtns = panel.querySelectorAll('.sidebar-settings-preview');
+    previewBtns.forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var selectId = btn.getAttribute('data-sound-select');
+        var selectEl = document.getElementById(selectId);
+        if (!selectEl) return;
+        var soundId = selectEl.value;
+        if (window.dmSounds && soundId && soundId !== 'none') {
+          var vol = soundVolumeRange ? parseInt(soundVolumeRange.value, 10) / 100 : 0.8;
+          window.dmSounds.play(soundId, vol);
+        }
+      });
+    });
   }
 
   function renderAuthPrompt() {

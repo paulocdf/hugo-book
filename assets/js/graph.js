@@ -1086,6 +1086,61 @@
     return { from: null, to: null };
   }
 
+  // Compute the previous period range of equal duration for comparison
+  function getPreviousPeriodRange(currentRange) {
+    if (!currentRange.from || !currentRange.to) return null; // 'all' mode — no comparison
+    var durationMs = currentRange.to.getTime() - currentRange.from.getTime();
+    var prevTo = new Date(currentRange.from.getTime());
+    var prevFrom = new Date(prevTo.getTime() - durationMs);
+    return { from: prevFrom, to: prevTo };
+  }
+
+  // Compute aggregate stats from a set of completed todos
+  function computePeriodStats(completedTodos) {
+    var totalEstimated = 0;
+    var totalActual = 0;
+    completedTodos.forEach(function(t) {
+      totalEstimated += (t.estimatedMin || 25);
+      totalActual += (t.actualMin || 0);
+    });
+    var totalPomodoros = Math.round((totalActual / 25) * 10) / 10;
+
+    var categoryMap = {};
+    completedTodos.forEach(function(t) {
+      var cat = t.category || 'Uncategorized';
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = { estimated: 0, actual: 0, count: 0 };
+      }
+      categoryMap[cat].estimated += (t.estimatedMin || 25);
+      categoryMap[cat].actual += (t.actualMin || 0);
+      categoryMap[cat].count++;
+    });
+
+    var categoryData = Object.keys(categoryMap).map(function(name) {
+      return {
+        name: name,
+        estimated: categoryMap[name].estimated,
+        actual: categoryMap[name].actual,
+        count: categoryMap[name].count
+      };
+    }).sort(function(a, b) { return b.actual - a.actual; });
+
+    return {
+      completed: completedTodos.length,
+      totalEstimated: totalEstimated,
+      totalActual: totalActual,
+      totalPomodoros: totalPomodoros,
+      categoryData: categoryData,
+      categoryMap: categoryMap
+    };
+  }
+
+  // Compute percentage change between two values
+  function pctChange(current, previous) {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return Math.round(((current - previous) / previous) * 100);
+  }
+
   function filterTodosByTimeRange(todos, range) {
     if (!range.from && !range.to) return todos;
 
@@ -1137,35 +1192,19 @@
       return;
     }
 
-    // ---- Compute stats ----
-    var totalEstimated = 0;
-    var totalActual = 0;
-    completedTodos.forEach(function(t) {
-      totalEstimated += (t.estimatedMin || 25);
-      totalActual += (t.actualMin || 0);
-    });
-    var totalPomodoros = Math.round((totalActual / 25) * 10) / 10;
+    // ---- Compute current period stats ----
+    var currentStats = computePeriodStats(completedTodos);
 
-    // ---- Build category data ----
-    var categoryMap = {};
-    completedTodos.forEach(function(t) {
-      var cat = t.category || 'Uncategorized';
-      if (!categoryMap[cat]) {
-        categoryMap[cat] = { estimated: 0, actual: 0, count: 0 };
+    // ---- Compute previous period stats for comparison ----
+    var prevRange = getPreviousPeriodRange(range);
+    var prevStats = null;
+    if (prevRange) {
+      var prevTodosInRange = filterTodosByTimeRange(allTodos, prevRange);
+      var prevCompletedTodos = prevTodosInRange.filter(function(t) { return t.done && t.actualMin != null && !t.parentId; });
+      if (prevCompletedTodos.length > 0) {
+        prevStats = computePeriodStats(prevCompletedTodos);
       }
-      categoryMap[cat].estimated += (t.estimatedMin || 25);
-      categoryMap[cat].actual += (t.actualMin || 0);
-      categoryMap[cat].count++;
-    });
-
-    var categoryData = Object.keys(categoryMap).map(function(name) {
-      return {
-        name: name,
-        estimated: categoryMap[name].estimated,
-        actual: categoryMap[name].actual,
-        count: categoryMap[name].count
-      };
-    }).sort(function(a, b) { return b.actual - a.actual; });
+    }
 
     // ---- Color palette for categories ----
     var palette = [
@@ -1175,14 +1214,36 @@
 
     function catColor(i) { return palette[i % palette.length]; }
 
-    // ---- Summary stat cards ----
+    // ---- Summary stat cards with comparison ----
     var statRow = document.createElement('div');
     statRow.className = 'time-stat-row';
+
+    function buildStatCard(value, label, suffix, prevValue) {
+      var deltaHtml = '';
+      if (prevStats != null && prevValue != null) {
+        var pct = pctChange(typeof value === 'number' ? value : parseFloat(value), prevValue);
+        var isUp = pct > 0;
+        var isDown = pct < 0;
+        var arrow = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9644;');
+        var cls = isUp ? 'up' : (isDown ? 'down' : 'neutral');
+        deltaHtml = '<div class="time-stat-delta ' + cls + '">' +
+          '<span class="time-stat-delta-arrow">' + arrow + '</span> ' +
+          Math.abs(pct) + '%' +
+          '<span class="time-stat-delta-prev"> vs ' + prevValue + (suffix || '') + '</span>' +
+        '</div>';
+      }
+      return '<div class="time-stat-card">' +
+        '<div class="time-stat-value">' + value + (suffix ? '<span style="font-size:0.9rem;font-weight:400;">' + suffix + '</span>' : '') + '</div>' +
+        '<div class="time-stat-label">' + label + '</div>' +
+        deltaHtml +
+      '</div>';
+    }
+
     statRow.innerHTML =
-      '<div class="time-stat-card"><div class="time-stat-value">' + completedTodos.length + '</div><div class="time-stat-label">Completed</div></div>' +
-      '<div class="time-stat-card"><div class="time-stat-value">' + totalActual + '<span style="font-size:0.9rem;font-weight:400;">m</span></div><div class="time-stat-label">Actual Time</div></div>' +
-      '<div class="time-stat-card"><div class="time-stat-value">' + totalEstimated + '<span style="font-size:0.9rem;font-weight:400;">m</span></div><div class="time-stat-label">Estimated</div></div>' +
-      '<div class="time-stat-card"><div class="time-stat-value">' + totalPomodoros + '</div><div class="time-stat-label">Pomodoros</div></div>';
+      buildStatCard(currentStats.completed, 'Completed', '', prevStats ? prevStats.completed : null) +
+      buildStatCard(currentStats.totalActual, 'Actual Time', 'm', prevStats ? prevStats.totalActual : null) +
+      buildStatCard(currentStats.totalEstimated, 'Estimated', 'm', prevStats ? prevStats.totalEstimated : null) +
+      buildStatCard(currentStats.totalPomodoros, 'Pomodoros', '', prevStats ? prevStats.totalPomodoros : null);
     contentArea.appendChild(statRow);
 
     // Animate stat cards
@@ -1196,6 +1257,21 @@
           card.style.transform = 'translateY(0)';
         }, i * 100);
       });
+    }
+
+    // ---- Period label ----
+    if (prevRange) {
+      var periodLabel = document.createElement('div');
+      periodLabel.className = 'time-period-label';
+      var fmtOpts = { month: 'short', day: 'numeric' };
+      var curFromStr = range.from.toLocaleDateString(undefined, fmtOpts);
+      var curToStr = range.to.toLocaleDateString(undefined, fmtOpts);
+      var prevFromStr = prevRange.from.toLocaleDateString(undefined, fmtOpts);
+      var prevToStr = prevRange.to.toLocaleDateString(undefined, fmtOpts);
+      periodLabel.innerHTML =
+        '<span class="time-period-current">' + curFromStr + ' – ' + curToStr + '</span>' +
+        (prevStats ? '<span class="time-period-vs"> vs </span><span class="time-period-prev">' + prevFromStr + ' – ' + prevToStr + '</span>' : '');
+      contentArea.appendChild(periodLabel);
     }
 
     // ---- Two-panel grid ----
@@ -1216,14 +1292,14 @@
     grid.appendChild(barPanel);
 
     // ---- Donut Chart ----
-    renderDonutChart(donutPanel, categoryData, catColor, theme);
+    renderDonutChart(donutPanel, currentStats.categoryData, catColor, theme, prevStats);
 
     // ---- Grouped Bar Chart ----
-    renderComparisonChart(barPanel, categoryData, catColor, theme);
+    renderComparisonChart(barPanel, currentStats.categoryData, catColor, theme, prevStats);
 
     // ---- Update time legend ----
     if (timeLegend) {
-      timeLegend.innerHTML = categoryData.map(function(cat, i) {
+      timeLegend.innerHTML = currentStats.categoryData.map(function(cat, i) {
         return '<div class="legend-item">' +
           '<span class="legend-dot" style="background:' + catColor(i) + ';box-shadow:0 0 6px ' + catColor(i) + '40;"></span>' +
           '<span>' + cat.name + '</span>' +
@@ -1241,11 +1317,17 @@
       '</div>';
   }
 
-  // ---- Donut Chart (time per category) ----
-  function renderDonutChart(container, categoryData, catColor, theme) {
+  // ---- Donut Chart (time per category) with optional previous-period outer ring ----
+  function renderDonutChart(container, categoryData, catColor, theme, prevStats) {
     var size = 260;
     var outerRadius = size / 2 - 10;
     var innerRadius = outerRadius * 0.55;
+
+    // If we have previous data, shrink the main donut to make room for the comparison ring
+    var prevRingOuter = outerRadius;
+    var prevRingInner = outerRadius - 8;
+    var mainOuterRadius = prevStats ? outerRadius - 14 : outerRadius;
+    var mainInnerRadius = mainOuterRadius * 0.55;
 
     var svg = d3.select(container)
       .append('svg')
@@ -1255,20 +1337,91 @@
     var g = svg.append('g')
       .attr('transform', 'translate(' + (size / 2) + ',' + (size / 2) + ')');
 
+    // ---- Previous period outer ring (rendered first, behind main donut) ----
+    if (prevStats && prevStats.categoryData.length > 0) {
+      var prevPie = d3.pie()
+        .value(function(d) { return d.actual; })
+        .sort(null)
+        .padAngle(0.02);
+
+      var prevArc = d3.arc()
+        .innerRadius(prevRingInner)
+        .outerRadius(prevRingOuter)
+        .cornerRadius(2);
+
+      // Build a color map from current categories so previous period uses matching colors
+      var catColorMap = {};
+      categoryData.forEach(function(cat, i) { catColorMap[cat.name] = catColor(i); });
+
+      var prevArcs = g.selectAll('.prev-arc')
+        .data(prevPie(prevStats.categoryData))
+        .enter()
+        .append('path')
+        .attr('class', 'prev-arc')
+        .attr('fill', function(d) { return catColorMap[d.data.name] || theme.textMuted; })
+        .attr('fill-opacity', 0.2)
+        .attr('stroke', theme.background)
+        .attr('stroke-width', 1)
+        .style('cursor', 'pointer');
+
+      // Animate
+      prevArcs
+        .attr('d', d3.arc().innerRadius(prevRingInner).outerRadius(prevRingOuter).cornerRadius(2)
+          .startAngle(function(d) { return d.startAngle; })
+          .endAngle(function(d) { return d.startAngle; })
+        )
+        .transition()
+        .delay(function(d, i) { return 100 + i * 60; })
+        .duration(500)
+        .ease(d3.easeQuadOut)
+        .attrTween('d', function(d) {
+          var interpolate = d3.interpolate(d.startAngle, d.endAngle);
+          return function(t) {
+            return d3.arc()
+              .innerRadius(prevRingInner)
+              .outerRadius(prevRingOuter)
+              .cornerRadius(2)
+              .startAngle(d.startAngle)
+              .endAngle(interpolate(t))();
+          };
+        });
+
+      // Hover on previous ring arcs
+      prevArcs
+        .on('mouseover', function(event, d) {
+          d3.select(this).transition().duration(150).attr('fill-opacity', 0.4);
+          var prevTotal = d3.sum(prevStats.categoryData, function(c) { return c.actual; });
+          var pct = Math.round(d.data.actual / prevTotal * 100);
+          tooltip.innerHTML =
+            '<div class="graph-tooltip-title">' + d.data.name + ' <span style="opacity:0.6">(prev period)</span></div>' +
+            '<div class="graph-tooltip-category">' + d.data.actual + ' min (' + pct + '%)</div>' +
+            '<div class="graph-tooltip-connections">' + d.data.count + ' task' + (d.data.count !== 1 ? 's' : '') + '</div>';
+          tooltip.style.opacity = '1';
+          moveTooltip(event);
+        })
+        .on('mousemove', function(event) { moveTooltip(event); })
+        .on('mouseout', function() {
+          d3.select(this).transition().duration(200).attr('fill-opacity', 0.2);
+          tooltip.style.opacity = '0';
+        });
+    }
+
+    // ---- Main donut (current period) ----
     var pie = d3.pie()
       .value(function(d) { return d.actual; })
       .sort(null)
       .padAngle(0.03);
 
     var arc = d3.arc()
-      .innerRadius(innerRadius)
-      .outerRadius(outerRadius)
+      .innerRadius(mainInnerRadius)
+      .outerRadius(mainOuterRadius)
       .cornerRadius(4);
 
-    var arcs = g.selectAll('path')
+    var arcs = g.selectAll('.main-arc')
       .data(pie(categoryData))
       .enter()
       .append('path')
+      .attr('class', 'main-arc')
       .attr('fill', function(d, i) { return catColor(i); })
       .attr('fill-opacity', 0.85)
       .attr('stroke', theme.background)
@@ -1277,7 +1430,7 @@
 
     // Animate from zero
     arcs
-      .attr('d', d3.arc().innerRadius(innerRadius).outerRadius(outerRadius).cornerRadius(4)
+      .attr('d', d3.arc().innerRadius(mainInnerRadius).outerRadius(mainOuterRadius).cornerRadius(4)
         .startAngle(function(d) { return d.startAngle; })
         .endAngle(function(d) { return d.startAngle; }) // collapsed
       )
@@ -1289,8 +1442,8 @@
         var interpolate = d3.interpolate(d.startAngle, d.endAngle);
         return function(t) {
           return d3.arc()
-            .innerRadius(innerRadius)
-            .outerRadius(outerRadius)
+            .innerRadius(mainInnerRadius)
+            .outerRadius(mainOuterRadius)
             .cornerRadius(4)
             .startAngle(d.startAngle)
             .endAngle(interpolate(t))();
@@ -1309,10 +1462,18 @@
             return 'translate(' + x + ',' + y + ')';
           });
         var pct = Math.round(d.data.actual / d3.sum(categoryData, function(c) { return c.actual; }) * 100);
-        tooltip.innerHTML =
+        var hoverHtml =
           '<div class="graph-tooltip-title">' + d.data.name + '</div>' +
           '<div class="graph-tooltip-category">' + d.data.actual + ' min (' + pct + '%)</div>' +
           '<div class="graph-tooltip-connections">' + d.data.count + ' task' + (d.data.count !== 1 ? 's' : '') + '</div>';
+        // Show comparison in tooltip if previous data exists for this category
+        if (prevStats && prevStats.categoryMap[d.data.name]) {
+          var prevCat = prevStats.categoryMap[d.data.name];
+          var delta = d.data.actual - prevCat.actual;
+          var sign = delta >= 0 ? '+' : '';
+          hoverHtml += '<div class="graph-tooltip-delta">' + sign + delta + ' min vs prev period</div>';
+        }
+        tooltip.innerHTML = hoverHtml;
         tooltip.style.opacity = '1';
         moveTooltip(event);
       })
@@ -1356,8 +1517,8 @@
       .attr('opacity', 1);
   }
 
-  // ---- Grouped Bar Chart (estimated vs actual per category) ----
-  function renderComparisonChart(container, categoryData, catColor, theme) {
+  // ---- Grouped Bar Chart (estimated vs actual per category, with previous-period ghost bars) ----
+  function renderComparisonChart(container, categoryData, catColor, theme, prevStats) {
     var margin = { top: 10, right: 20, bottom: 50, left: 50 };
     var containerWidth = container.clientWidth || 340;
     var width = Math.min(containerWidth - margin.left - margin.right - 40, 360);
@@ -1371,9 +1532,23 @@
     var g = svg.append('g')
       .attr('transform', 'translate(' + margin.left + ',' + margin.top + ')');
 
+    // Merge categories from current and previous period for consistent x-axis
+    var allCatNames = categoryData.map(function(d) { return d.name; });
+    if (prevStats) {
+      prevStats.categoryData.forEach(function(d) {
+        if (allCatNames.indexOf(d.name) === -1) allCatNames.push(d.name);
+      });
+    }
+
+    // Build a lookup for previous period data
+    var prevCatMap = {};
+    if (prevStats) {
+      prevStats.categoryData.forEach(function(d) { prevCatMap[d.name] = d; });
+    }
+
     // X scale: categories
     var x0 = d3.scaleBand()
-      .domain(categoryData.map(function(d) { return d.name; }))
+      .domain(allCatNames)
       .range([0, width])
       .padding(0.35);
 
@@ -1383,8 +1558,12 @@
       .range([0, x0.bandwidth()])
       .padding(0.08);
 
-    // Y scale
+    // Y scale — include previous period values in max calculation
     var maxVal = d3.max(categoryData, function(d) { return Math.max(d.estimated, d.actual); }) || 25;
+    if (prevStats) {
+      var prevMax = d3.max(prevStats.categoryData, function(d) { return Math.max(d.estimated, d.actual); }) || 0;
+      maxVal = Math.max(maxVal, prevMax);
+    }
     var y = d3.scaleLinear()
       .domain([0, maxVal * 1.15])
       .range([height, 0]);
@@ -1406,7 +1585,80 @@
       .attr('class', 'time-axis')
       .call(d3.axisLeft(y).ticks(5).tickFormat(function(d) { return d + 'm'; }));
 
-    // Bars
+    // ---- Previous period ghost bars (rendered first, behind current bars) ----
+    if (prevStats) {
+      var prevGroups = g.selectAll('.time-prev-bar-group')
+        .data(allCatNames)
+        .enter()
+        .append('g')
+        .attr('class', 'time-prev-bar-group')
+        .attr('transform', function(d) { return 'translate(' + x0(d) + ',0)'; });
+
+      // Previous estimated ghost bar
+      prevGroups.append('rect')
+        .attr('class', 'time-bar time-bar-prev')
+        .attr('x', x1('estimated'))
+        .attr('width', x1.bandwidth())
+        .attr('y', function(d) {
+          var prev = prevCatMap[d];
+          return prev ? y(prev.estimated) : height;
+        })
+        .attr('height', function(d) {
+          var prev = prevCatMap[d];
+          return prev ? height - y(prev.estimated) : 0;
+        })
+        .attr('rx', 3)
+        .attr('fill', 'none')
+        .attr('stroke', theme.textMuted)
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3,3')
+        .attr('opacity', 0.35)
+        .on('mouseover', function(event, catName) {
+          var prev = prevCatMap[catName];
+          if (!prev) return;
+          tooltip.innerHTML =
+            '<div class="graph-tooltip-title">' + catName + ' <span style="opacity:0.6">(prev period)</span></div>' +
+            '<div class="graph-tooltip-category">Estimated: ' + prev.estimated + ' min</div>';
+          tooltip.style.opacity = '1';
+          moveTooltip(event);
+        })
+        .on('mousemove', function(event) { moveTooltip(event); })
+        .on('mouseout', function() { tooltip.style.opacity = '0'; });
+
+      // Previous actual ghost bar
+      prevGroups.append('rect')
+        .attr('class', 'time-bar time-bar-prev')
+        .attr('x', x1('actual'))
+        .attr('width', x1.bandwidth())
+        .attr('y', function(d) {
+          var prev = prevCatMap[d];
+          return prev ? y(prev.actual) : height;
+        })
+        .attr('height', function(d) {
+          var prev = prevCatMap[d];
+          return prev ? height - y(prev.actual) : 0;
+        })
+        .attr('rx', 3)
+        .attr('fill', theme.textMuted)
+        .attr('fill-opacity', 0.08)
+        .attr('stroke', theme.textMuted)
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3,3')
+        .attr('opacity', 0.35)
+        .on('mouseover', function(event, catName) {
+          var prev = prevCatMap[catName];
+          if (!prev) return;
+          tooltip.innerHTML =
+            '<div class="graph-tooltip-title">' + catName + ' <span style="opacity:0.6">(prev period)</span></div>' +
+            '<div class="graph-tooltip-category">Actual: ' + prev.actual + ' min</div>';
+          tooltip.style.opacity = '1';
+          moveTooltip(event);
+        })
+        .on('mousemove', function(event) { moveTooltip(event); })
+        .on('mouseout', function() { tooltip.style.opacity = '0'; });
+    }
+
+    // ---- Current period bars ----
     var groups = g.selectAll('.time-bar-group')
       .data(categoryData)
       .enter()
@@ -1455,10 +1707,18 @@
       .on('mouseover', function(event, d) {
         var diff = d.actual - d.estimated;
         var sign = diff >= 0 ? '+' : '';
-        tooltip.innerHTML =
+        var hoverHtml =
           '<div class="graph-tooltip-title">' + d.name + '</div>' +
           '<div class="graph-tooltip-category">Actual: ' + d.actual + ' min</div>' +
           '<div class="graph-tooltip-connections">' + sign + diff + ' min vs estimate</div>';
+        // Show comparison to previous period
+        if (prevStats && prevCatMap[d.name]) {
+          var prevActual = prevCatMap[d.name].actual;
+          var periodDiff = d.actual - prevActual;
+          var periodSign = periodDiff >= 0 ? '+' : '';
+          hoverHtml += '<div class="graph-tooltip-delta">' + periodSign + periodDiff + ' min vs prev period</div>';
+        }
+        tooltip.innerHTML = hoverHtml;
         tooltip.style.opacity = '1';
         moveTooltip(event);
       })
@@ -1472,39 +1732,36 @@
       .attr('height', function(d) { return height - y(d.actual); });
 
     // Bar chart legend (inline, below the chart)
+    var legendItems = [];
+    legendItems.push({ label: 'Estimated', opacity: 0.3, stroke: true, dashed: true });
+    legendItems.push({ label: 'Actual', opacity: 0.85, stroke: false, dashed: false });
+    if (prevStats) {
+      legendItems.push({ label: 'Prev Period', opacity: 0.08, stroke: true, dashed: true, isPrev: true });
+    }
+
+    var legendWidth = prevStats ? 240 : 160;
     var legendG = svg.append('g')
-      .attr('transform', 'translate(' + (margin.left + width / 2 - 80) + ',' + (height + margin.top + margin.bottom - 8) + ')');
+      .attr('transform', 'translate(' + (margin.left + width / 2 - legendWidth / 2) + ',' + (height + margin.top + margin.bottom - 8) + ')');
 
-    // Estimated legend
-    legendG.append('rect')
-      .attr('x', 0).attr('y', 0)
-      .attr('width', 14).attr('height', 10)
-      .attr('rx', 2)
-      .attr('fill', theme.textMuted)
-      .attr('fill-opacity', 0.3)
-      .attr('stroke', theme.textMuted)
-      .attr('stroke-width', 1)
-      .attr('stroke-dasharray', '3,2');
-    legendG.append('text')
-      .attr('x', 18).attr('y', 9)
-      .text('Estimated')
-      .style('fill', theme.textMuted)
-      .style('font-size', '10px')
-      .style('font-family', "'Inter', sans-serif");
-
-    // Actual legend
-    legendG.append('rect')
-      .attr('x', 85).attr('y', 0)
-      .attr('width', 14).attr('height', 10)
-      .attr('rx', 2)
-      .attr('fill', theme.textMuted)
-      .attr('fill-opacity', 0.85);
-    legendG.append('text')
-      .attr('x', 103).attr('y', 9)
-      .text('Actual')
-      .style('fill', theme.textMuted)
-      .style('font-size', '10px')
-      .style('font-family', "'Inter', sans-serif");
+    var lx = 0;
+    legendItems.forEach(function(item) {
+      legendG.append('rect')
+        .attr('x', lx).attr('y', 0)
+        .attr('width', 14).attr('height', 10)
+        .attr('rx', 2)
+        .attr('fill', item.isPrev ? theme.textMuted : theme.textMuted)
+        .attr('fill-opacity', item.opacity)
+        .attr('stroke', (item.stroke) ? theme.textMuted : 'none')
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', item.dashed ? '3,2' : 'none');
+      legendG.append('text')
+        .attr('x', lx + 18).attr('y', 9)
+        .text(item.label)
+        .style('fill', theme.textMuted)
+        .style('font-size', '10px')
+        .style('font-family', "'Inter', sans-serif");
+      lx += item.label.length * 6.5 + 28;
+    });
   }
 
   // =========================================================================
