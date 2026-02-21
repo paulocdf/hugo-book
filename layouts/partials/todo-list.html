@@ -83,6 +83,26 @@
     <!-- Summary -->
     <div class="todo-summary" id="todo-summary" style="display: none;"></div>
   </div>
+
+  <!-- Spotlight task capture overlay -->
+  <div class="todo-spotlight" id="todo-spotlight" style="display: none;">
+    <div class="todo-spotlight-backdrop" id="todo-spotlight-backdrop"></div>
+    <div class="todo-spotlight-dialog">
+      <div class="todo-spotlight-input-wrap">
+        <svg class="todo-spotlight-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        <input type="text" id="todo-spotlight-input" class="todo-spotlight-input" placeholder="What needs to be done?" autocomplete="off" maxlength="280" />
+        <kbd class="todo-spotlight-esc">Esc</kbd>
+      </div>
+      <div class="todo-spotlight-meta" id="todo-spotlight-meta">
+        <div class="todo-spotlight-chips" id="todo-spotlight-chips"></div>
+      </div>
+      <div class="todo-spotlight-footer">
+        <span class="todo-spotlight-hint">
+          <kbd>Enter</kbd> add task &middot; <kbd>Esc</kbd> close
+        </span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Delete modal is created dynamically via JS and appended to document.body -->
@@ -574,6 +594,126 @@
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(1.3); }
 }
+
+/* ─── Spotlight task capture overlay ─── */
+.todo-spotlight {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 18vh;
+}
+.todo-spotlight-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.todo-spotlight-dialog {
+  position: relative;
+  width: 92%;
+  max-width: 560px;
+  background: var(--body-background, #fff);
+  border: 1px solid var(--gray-200, #e5e5e5);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+  animation: todo-spotlight-in 0.18s ease-out;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+@keyframes todo-spotlight-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.todo-spotlight-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--gray-200, #e5e5e5);
+}
+.todo-spotlight-icon {
+  flex-shrink: 0;
+  color: var(--color-link, #0069ff);
+}
+.todo-spotlight-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 1.05rem;
+  font-family: inherit;
+  color: var(--body-font-color);
+}
+.todo-spotlight-input::placeholder {
+  color: var(--gray-400, #aaa);
+}
+.todo-spotlight-esc {
+  flex-shrink: 0;
+  font-size: 0.65rem;
+  font-family: 'Inter', sans-serif;
+  color: var(--gray-400, #aaa);
+  background: var(--gray-100, #f5f5f5);
+  border: 1px solid var(--gray-200, #e5e5e5);
+  border-radius: 4px;
+  padding: 2px 6px;
+  line-height: 1.4;
+}
+.todo-spotlight-meta {
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  min-height: 36px;
+}
+.todo-spotlight-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.todo-spotlight-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: var(--gray-100, #f5f5f5);
+  color: var(--body-font-color);
+  border: 1px solid var(--gray-200, #e5e5e5);
+}
+.todo-spotlight-chip svg {
+  flex-shrink: 0;
+}
+.todo-spotlight-footer {
+  padding: 0.5rem 1rem;
+  border-top: 1px solid var(--gray-200, #e5e5e5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.todo-spotlight-hint {
+  font-size: 0.7rem;
+  color: var(--gray-400, #aaa);
+}
+.todo-spotlight-hint kbd {
+  font-size: 0.62rem;
+  font-family: 'Inter', sans-serif;
+  background: var(--gray-100, #f5f5f5);
+  border: 1px solid var(--gray-200, #e5e5e5);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin: 0 1px;
+  line-height: 1.4;
+}
+
 /* Day group headers */
 .todo-day-group {
   margin-bottom: 4px;
@@ -850,8 +990,53 @@
   background: rgba(136, 136, 136, 0.06);
 }
 /* Migrated / scheduled title treatment */
+/* Migrate to Today button in overdue day group headers */
+.todo-day-migrate-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--gray-300, #ddd);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-danger, #e53e3e);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 8px;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.todo-day-migrate-btn:hover {
+  background: var(--color-danger, #e53e3e);
+  color: #fff;
+}
+.todo-day-migrate-btn svg {
+  flex-shrink: 0;
+}
+
+/* Individual migrate action button on overdue open tasks */
+.todo-item-action-btn.migrate-today {
+  color: #8b6e4e;
+}
+.todo-item-action-btn.migrate-today:hover {
+  color: #6b4e2e;
+  background: rgba(139, 110, 78, 0.1);
+}
+
+/* Highlight flash on newly added tasks */
+@keyframes todo-item-flash {
+  0%   { background: rgba(0, 105, 255, 0.12); }
+  100% { background: transparent; }
+}
+.todo-item.just-added {
+  animation: todo-item-flash 1.5s ease-out;
+}
+
+/* Migration removes line-through — migrated tasks on today show > but normal title */
 .todo-item.migrated .todo-item-title {
-  text-decoration: line-through;
+  text-decoration: none;
   color: #8b6e4e;
 }
 .todo-item.scheduled .todo-item-title {
@@ -1641,6 +1826,7 @@
     if (_savedTracked) _pomodoroTrackedMinutes = JSON.parse(_savedTracked);
   } catch(e) {}
   var _justCompletedIds = {}; // { todoId: true } — for slide-down animation on just-completed tasks
+  var _justAddedIds = {}; // { todoId: true } — for highlight flash animation on just-added tasks
   var _addFormCategory = null; // Selected category string for new task
   var _addFormCategoryPrompted = false; // True when Enter opened category popover (submit on select/skip)
   var _addFormBujoType = 'task'; // Selected BuJo type for new item (task/event/note)
@@ -1808,7 +1994,9 @@
             updateReminderChip();
           }
         }
+        _suppressSpotlight = true;
         addTitleInput.focus();
+        _suppressSpotlight = false;
       }
     };
 
@@ -2253,7 +2441,9 @@
         } else {
           addTitleInput.placeholder = 'What needs to be done?';
         }
+        _suppressSpotlight = true;
         addTitleInput.focus();
+        _suppressSpotlight = false;
       });
     });
   }
@@ -2568,13 +2758,14 @@
   }
 
   // ─── Render ───
-  function buildTodoItemHtml(todo, isSubtask, hasChildren, finishAtLabel) {
+  function buildTodoItemHtml(todo, isSubtask, hasChildren, finishAtLabel, isOverdue) {
     var doneClass = todo.done ? ' done' : '';
     var justCompletedClass = _justCompletedIds[todo.id] ? ' just-completed' : '';
+    var justAddedClass = _justAddedIds[todo.id] ? ' just-added' : '';
     var bujoState = todo.bujoState || 'open';
     var bujoType = todo.bujoType || 'task';
     var stateClass = bujoState === 'migrated' ? ' migrated' : (bujoState === 'scheduled' ? ' scheduled' : '');
-    var html = '<div class="todo-item' + doneClass + justCompletedClass + stateClass + '" data-todo-id="' + todo.id + '">';
+    var html = '<div class="todo-item' + doneClass + justCompletedClass + justAddedClass + stateClass + '" data-todo-id="' + todo.id + '">';
 
     // Drag handle (only on active tasks — not done, migrated, or scheduled)
     if (!todo.done && bujoState !== 'migrated' && bujoState !== 'scheduled') {
@@ -2721,8 +2912,8 @@
 
     // Reminder info
     if (todo.reminderAt && !todo.reminderFired && !todo.done) {
-      var isOverdue = todo.reminderAt < Date.now();
-      html += '<span class="todo-item-reminder' + (isOverdue ? ' overdue' : '') + '">';
+      var reminderOverdue = todo.reminderAt < Date.now();
+      html += '<span class="todo-item-reminder' + (reminderOverdue ? ' overdue' : '') + '">';
       html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>';
       html += formatReminderTime(todo.reminderAt);
       html += '</span>';
@@ -2753,6 +2944,12 @@
     if (todo.done) {
       html += '<button type="button" class="todo-item-action-btn archive" data-archive-id="' + todo.id + '" title="Archive task" aria-label="Archive task">';
       html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>';
+      html += '</button>';
+    }
+    // Migrate to Today button (for open tasks in overdue groups)
+    if (isOverdue && !todo.done && bujoState === 'open') {
+      html += '<button type="button" class="todo-item-action-btn migrate-today" data-migrate-id="' + todo.id + '" title="Migrate to today" aria-label="Migrate to today">';
+      html += '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>';
       html += '</button>';
     }
     // Edit button (for all tasks, done or not)
@@ -2880,6 +3077,13 @@
       }
       g += '<span class="todo-day-label">' + escapeHtml(headerInfo.label) + '</span>';
       g += '<span class="todo-day-progress">' + doneInGroup + '/' + totalInGroup + '</span>';
+      // Migrate to Today button for overdue groups with open tasks
+      if (cssClass === 'overdue' && doneInGroup < totalInGroup) {
+        g += '<button type="button" class="todo-day-migrate-btn" data-migrate-group="' + escapeHtml(groupKey) + '" title="Migrate open tasks to today">';
+        g += '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>';
+        g += ' Migrate to Today';
+        g += '</button>';
+      }
       g += '</div>';
       g += '<div class="todo-day-group-items">';
 
@@ -2943,17 +3147,19 @@
         }
       });
 
+      var _isOverdueGroup = (cssClass === 'overdue');
+
       tasksInGroup.forEach(function(parent) {
         var children = childrenMap[parent.id] || [];
         g += '<div class="todo-item-group" data-group-id="' + parent.id + '">';
-        g += buildTodoItemHtml(parent, false, children.length > 0, finishAtMap[parent.id] || null);
+        g += buildTodoItemHtml(parent, false, children.length > 0, finishAtMap[parent.id] || null, _isOverdueGroup);
         if (children.length > 0) {
           var subCollapsed = false;
           try { subCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + parent.id) === '1'; } catch(e) {}
           g += '<div class="todo-subtasks-wrapper' + (subCollapsed ? ' collapsed' : '') + '" data-subtasks-parent="' + parent.id + '">';
           g += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
           children.forEach(function(child) {
-            g += buildTodoItemHtml(child, true, false, finishAtMap[child.id] || null);
+            g += buildTodoItemHtml(child, true, false, finishAtMap[child.id] || null, _isOverdueGroup);
           });
           g += '</div>';
           g += '</div>';
@@ -3029,6 +3235,40 @@
     var div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+  }
+
+  // ─── Migrate to Today ───
+  function migrateToToday(todoId) {
+    var todo = allTodos.find(function(t) { return t.id === todoId; });
+    if (!todo) return;
+    var today = getTodayStr();
+    changeBujoState(todo, 'migrated', today);
+    // Also migrate children (subtasks)
+    allTodos.forEach(function(t) {
+      if (t.parentId === todoId && !t.done) {
+        changeBujoState(t, 'migrated', today);
+      }
+    });
+  }
+
+  function migrateGroupToToday(groupDateStr) {
+    var today = getTodayStr();
+    // Find all open (not done, not already migrated/scheduled) tasks in this date group
+    var tasksToMigrate = allTodos.filter(function(t) {
+      return t.scheduledDate === groupDateStr && !t.done && (t.bujoState || 'open') === 'open' && !t.parentId;
+    });
+    tasksToMigrate.forEach(function(parent) {
+      changeBujoState(parent, 'migrated', today);
+      // Migrate children too
+      allTodos.forEach(function(t) {
+        if (t.parentId === parent.id && !t.done) {
+          changeBujoState(t, 'migrated', today);
+        }
+      });
+    });
+    // render() is called inside changeBujoState — but it fires for each task.
+    // Call one final render to ensure clean state.
+    render();
   }
 
   // ─── BuJo state picker ───
@@ -3312,6 +3552,24 @@
         var isCollapsed = btn.classList.toggle('collapsed');
         if (wrapper) wrapper.classList.toggle('collapsed', isCollapsed);
         try { localStorage.setItem('dm-todo-subtask-collapsed-' + parentId, isCollapsed ? '1' : '0'); } catch(e) {}
+      });
+    });
+
+    // Migrate group to today (button in overdue day group header)
+    itemsEl.querySelectorAll('.todo-day-migrate-btn[data-migrate-group]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation(); // Don't toggle collapse
+        var groupDate = btn.getAttribute('data-migrate-group');
+        migrateGroupToToday(groupDate);
+      });
+    });
+
+    // Migrate individual task to today
+    itemsEl.querySelectorAll('.todo-item-action-btn.migrate-today[data-migrate-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-migrate-id');
+        migrateToToday(todoId);
       });
     });
 
@@ -4032,8 +4290,11 @@
           return window.dmSync.putTodo(localTodo);
         }
       }).then(function() {
+        _justAddedIds[newDocId] = true;
         if (onDone) onDone();
         render();
+        // Clear flash class after animation completes
+        setTimeout(function() { delete _justAddedIds[newDocId]; }, 1600);
       }).catch(function(err) {
         console.error('Error creating todo:', err);
         showTodoError('Failed to add task — check console');
@@ -4442,7 +4703,7 @@
   // ─── Add form ───
   function addFromForm() {
     var title = addTitleInput.value.trim();
-    if (!title) { addTitleInput.focus(); return; }
+    if (!title) { _suppressSpotlight = true; addTitleInput.focus(); _suppressSpotlight = false; return; }
     var customMin = addCustomMinInput.value ? parseInt(addCustomMinInput.value, 10) : null;
     var pomCount = _addFormPomodoroCount;
     var pomLen = _addFormPomoMode === 'long' ? _globalPomoLongWork : _globalPomoShortWork;
@@ -4487,19 +4748,21 @@
     closeAddFormPopover();
     hideCatPopover();
     closePomodoroConfigPopover();
+    _suppressSpotlight = true;
     addTitleInput.focus();
+    _suppressSpotlight = false;
   }
 
   addBtn.addEventListener('click', addFromForm);
   // Prevent Enter in custom min input from submitting; Tab moves focus to title
   addCustomMinInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') { e.preventDefault(); addTitleInput.focus(); }
+    if (e.key === 'Enter') { e.preventDefault(); _suppressSpotlight = true; addTitleInput.focus(); _suppressSpotlight = false; }
   });
   addTitleInput.addEventListener('keydown', function(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
       var title = addTitleInput.value.trim();
-      if (!title) { addTitleInput.focus(); return; }
+    if (!title) { _suppressSpotlight = true; addTitleInput.focus(); _suppressSpotlight = false; return; }
       // If no category set yet, prompt user to pick one first
       if (!_addFormCategory) {
         _addFormCategoryPrompted = true;
@@ -4509,6 +4772,107 @@
       addFromForm();
     }
   });
+
+  // ─── Spotlight task capture overlay ───
+  var spotlightEl = document.getElementById('todo-spotlight');
+  var spotlightBackdrop = document.getElementById('todo-spotlight-backdrop');
+  var spotlightInput = document.getElementById('todo-spotlight-input');
+  var spotlightChips = document.getElementById('todo-spotlight-chips');
+  var _spotlightOpen = false;
+  var _suppressSpotlight = false; // guard to prevent focus-loop when programmatically focusing addTitleInput
+
+  function openSpotlight() {
+    if (_spotlightOpen) return;
+    _spotlightOpen = true;
+    spotlightEl.style.display = 'flex';
+    updateSpotlightChips();
+    setTimeout(function() {
+      spotlightInput.value = addTitleInput.value || '';
+      spotlightInput.focus();
+    }, 30);
+  }
+
+  function closeSpotlight() {
+    if (!_spotlightOpen) return;
+    _spotlightOpen = false;
+    spotlightEl.style.display = 'none';
+    // Transfer any text back to the inline input
+    if (spotlightInput.value.trim()) {
+      addTitleInput.value = spotlightInput.value;
+    }
+    spotlightInput.value = '';
+  }
+
+  function updateSpotlightChips() {
+    if (!spotlightChips) return;
+    var html = '';
+    // Date chip
+    if (_addFormDate) {
+      var today = getTodayStr();
+      var tomorrow = getDateOffset(1);
+      var dateLabel = _addFormDate === today ? 'Today' : (_addFormDate === tomorrow ? 'Tomorrow' : _addFormDate);
+      html += '<span class="todo-spotlight-chip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg> ' + escapeHtml(dateLabel) + '</span>';
+    }
+    // Category chip
+    if (_addFormCategory) {
+      html += '<span class="todo-spotlight-chip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg> ' + escapeHtml(_addFormCategory) + '</span>';
+    }
+    // BuJo type chip
+    var typeLabel = _addFormBujoType === 'event' ? 'Event' : (_addFormBujoType === 'note' ? 'Note' : 'Task');
+    var typeIcon = _addFormBujoType === 'event'
+      ? '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg>'
+      : (_addFormBujoType === 'note'
+        ? '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>'
+        : '<svg width="10" height="10" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg>');
+    html += '<span class="todo-spotlight-chip">' + typeIcon + ' ' + typeLabel + '</span>';
+    // Pomodoro chip
+    var pomLabel = _addFormPomodoroCount + ' pom';
+    html += '<span class="todo-spotlight-chip"><svg width="10" height="10" viewBox="0 0 24 24" fill="none"><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg> ' + pomLabel + '</span>';
+    spotlightChips.innerHTML = html;
+  }
+
+  function submitFromSpotlight() {
+    var title = spotlightInput.value.trim();
+    if (!title) { spotlightInput.focus(); return; }
+    // Transfer to the inline input and submit via existing addFromForm
+    addTitleInput.value = title;
+    // If no category, prompt category in the spotlight context
+    if (!_addFormCategory) {
+      _addFormCategoryPrompted = true;
+      closeSpotlight();
+      showCatPopover();
+      return;
+    }
+    closeSpotlight();
+    addFromForm();
+  }
+
+  // Open spotlight when clicking on the inline title input
+  addTitleInput.addEventListener('focus', function() {
+    if (_suppressSpotlight) return;
+    openSpotlight();
+  });
+
+  // Spotlight keyboard handlers
+  if (spotlightInput) {
+    spotlightInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        submitFromSpotlight();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSpotlight();
+      }
+    });
+  }
+
+  // Close spotlight on backdrop click
+  if (spotlightBackdrop) {
+    spotlightBackdrop.addEventListener('click', function() {
+      closeSpotlight();
+    });
+  }
 
   // ─── Load todos ───
   function loadTodos() {

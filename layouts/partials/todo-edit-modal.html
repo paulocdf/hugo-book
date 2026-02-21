@@ -10,7 +10,7 @@
 
     <div class="todo-edit-field">
       <label for="todo-edit-title">Title</label>
-      <input type="text" id="todo-edit-title" class="todo-edit-input" placeholder="Task title" autocomplete="off">
+      <textarea id="todo-edit-title" class="todo-edit-input todo-edit-title-area" placeholder="Task title" autocomplete="off" ></textarea>
     </div>
 
     <div class="todo-edit-row todo-edit-bujo-row">
@@ -157,6 +157,16 @@
 .todo-edit-input:focus {
   outline: none;
   border-color: var(--color-link);
+}
+/* Auto-growing textarea for title */
+.todo-edit-title-area {
+  resize: none;
+  overflow: hidden;
+  min-height: 38px;
+  max-height: 200px;
+  line-height: 1.4;
+  font-size: 0.95rem;
+  font-weight: 500;
 }
 .todo-edit-row {
   display: flex;
@@ -454,6 +464,16 @@
   var _dropdownJustClosed = false;
   var _editBujoType = 'task';
   var _editBujoState = 'open';
+
+  // Auto-grow textarea for title
+  function autoGrowTitle() {
+    if (!titleInput) return;
+    titleInput.style.height = 'auto';
+    titleInput.style.height = Math.min(titleInput.scrollHeight, 200) + 'px';
+  }
+  if (titleInput) {
+    titleInput.addEventListener('input', autoGrowTitle);
+  }
 
   // BuJo type/state elements
   var bujoTypeToggle = document.getElementById('todo-edit-bujo-type');
@@ -963,9 +983,11 @@
     // Load existing categories for autocomplete, then show
     loadExistingCategories().then(function() {
       modal.style.display = '';
+      autoGrowTitle();
       setTimeout(function() { titleInput.focus(); titleInput.select(); }, 50);
     }).catch(function() {
       modal.style.display = '';
+      autoGrowTitle();
       setTimeout(function() { titleInput.focus(); titleInput.select(); }, 50);
     });
   }
@@ -1041,6 +1063,14 @@
   });
 
   // ─── NLP auto-parse on title blur ───
+  // Prevent Enter from adding newlines in title textarea — Enter saves
+  titleInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      saveAndClose();
+    }
+  });
+
   titleInput.addEventListener('blur', function() {
     if (!window.dmAI || !window.dmAI._parseTaskDetails) return;
     var text = titleInput.value.trim();
@@ -1062,6 +1092,7 @@
     // Update title to cleaned version
     if (details.title && details.title !== text) {
       titleInput.value = details.title;
+      autoGrowTitle();
     }
   });
 
