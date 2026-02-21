@@ -3435,6 +3435,12 @@
         if (result.estimatedMin !== (todo.estimatedMin || null)) {
           firestoreUpdates.estimatedMin = result.estimatedMin || null;
           localUpdates.estimatedMin = result.estimatedMin || null;
+          // Also update pomodoroLength so the timer uses the new estimate as
+          // the per-session work duration.
+          if (result.estimatedMin && result.estimatedMin > 0) {
+            firestoreUpdates.pomodoroLength = result.estimatedMin;
+            localUpdates.pomodoroLength = result.estimatedMin;
+          }
         }
         if (result.category !== (todo.category || null)) {
           firestoreUpdates.category = result.category || null;
@@ -4443,8 +4449,11 @@
     var pomBreakLen = _addFormPomoMode === 'long' ? _globalPomoLongBreak : _globalPomoShortBreak;
     var est;
     if (customMin != null && customMin >= 0) {
-      est = customMin;
-      // When custom minutes is set, pomCount/pomLen are informational only
+      // Custom minutes override: set pomodoroLength to the custom value so the
+      // timer uses this as the per-session work duration.  Keep pomCount as-is
+      // so multiple sessions of this custom length are supported.
+      pomLen = customMin;
+      est = pomCount > 0 ? pomCount * customMin : customMin;
     } else if (pomCount > 0) {
       est = pomCount * pomLen;
     } else {
