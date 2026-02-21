@@ -1349,9 +1349,10 @@
         e.preventDefault();
         openModal('ai');
       }
-      // E opens note edit modal (clicks the edit button in note-viewer)
+      // E opens note edit modal (clicks the edit button in note-viewer or single-note)
       if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        var editBtn = document.getElementById('note-viewer-edit');
+        var editBtn = document.getElementById('note-viewer-edit')
+          || document.querySelector('.single-note-edit-btn');
         if (editBtn && editBtn.offsetParent !== null) {
           e.preventDefault();
           editBtn.click();
