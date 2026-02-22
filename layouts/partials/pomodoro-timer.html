@@ -1538,11 +1538,25 @@
         playWorkEndSound();
         accumulatedWorkSeconds += totalPhaseSeconds;
 
-        // If all sessions are complete, auto-stop
+        // If all sessions are complete
         if (totalSessions > 1 && sessionCount >= totalSessions) {
           updateDisplay();
-          closeTimer();
+          // If timing a subtask, try to advance to the next one
+          if (activeParentId && activeParentId !== activeTodoId) {
+            advanceToNextSubtask();
+          } else {
+            closeTimer();
+          }
           return;
+        }
+
+        // Single-session task just completed — check for subtask auto-advance
+        if (totalSessions <= 1) {
+          // If timing a subtask, try to advance to the next one
+          if (activeParentId && activeParentId !== activeTodoId) {
+            advanceToNextSubtask();
+            return;
+          }
         }
 
         // Switch to break
@@ -1642,10 +1656,20 @@
       // Accumulate partial work time
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
 
-      // If this was the last session, auto-stop
+      // If this was the last session, auto-stop or auto-advance
       if (totalSessions > 1 && sessionCount >= totalSessions) {
         updateDisplay();
-        closeTimer();
+        if (activeParentId && activeParentId !== activeTodoId) {
+          advanceToNextSubtask();
+        } else {
+          closeTimer();
+        }
+        return;
+      }
+
+      // Single-session subtask: advance to next
+      if (totalSessions <= 1 && activeParentId && activeParentId !== activeTodoId) {
+        advanceToNextSubtask();
         return;
       }
 
@@ -1664,6 +1688,108 @@
     updateDisplay();
     saveStateImmediate();
     notifyStateChanged();
+  }
+
+  // ── Auto-advance: find next undone sibling subtask ──
+  function getNextUndoneSubtask(currentTodoId) {
+    if (!activeParentId || !window.dmSync || !window.dmSync.getAllTodos) {
+      return Promise.resolve(null);
+    }
+    return window.dmSync.getAllTodos().then(function(todos) {
+      var subs = (todos || []).filter(function(t) {
+        return t.parentId === activeParentId && t.status !== 'deleted' && t.status !== 'archived';
+      });
+      // Sort by order
+      subs.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      // Find the index of the current subtask
+      var currentIdx = -1;
+      for (var i = 0; i < subs.length; i++) {
+        if (subs[i].id === currentTodoId) { currentIdx = i; break; }
+      }
+      // Look for the next undone subtask after the current one
+      for (var j = currentIdx + 1; j < subs.length; j++) {
+        if (!subs[j].done && subs[j].id !== currentTodoId) return subs[j];
+      }
+      // Wrap around: check undone subtasks before the current one
+      for (var k = 0; k < currentIdx; k++) {
+        if (!subs[k].done && subs[k].id !== currentTodoId) return subs[k];
+      }
+      return null;
+    });
+  }
+
+  // ── Auto-advance: transition to the next subtask ──
+  // Records tracked time for the completed subtask, marks it done,
+  // then sets up the timer for the next subtask (paused, waiting for user).
+  function advanceToNextSubtask() {
+    var completedTodoId = activeTodoId;
+    var trackedMinutes = Math.round(accumulatedWorkSeconds / 60);
+
+    // Save tracked time for the completed subtask
+    if (completedTodoId && trackedMinutes > 0) {
+      saveTrackedMinutes(completedTodoId, trackedMinutes);
+      window.dispatchEvent(new CustomEvent('dm-pomodoro-stopped', {
+        detail: { todoId: completedTodoId, trackedMinutes: trackedMinutes }
+      }));
+    }
+
+    // Auto-mark the completed subtask as done
+    if (completedTodoId && window.dmSync && window.dmSync.getTodo) {
+      window.dmSync.getTodo(completedTodoId).then(function(todo) {
+        if (todo && !todo.done) {
+          toggleSubtaskDone(todo, true);
+        }
+      });
+    }
+
+    // Find and advance to the next undone subtask
+    getNextUndoneSubtask(completedTodoId).then(function(nextSub) {
+      if (!nextSub) {
+        // No more undone subtasks — close timer
+        // Reset accumulatedWorkSeconds since we already recorded above
+        accumulatedWorkSeconds = 0;
+        closeTimer();
+        return;
+      }
+
+      // Transition to the next subtask
+      activeTodoId = nextSub.id;
+      activeTodoTitle = nextSub.title || 'Task';
+      titleEl.textContent = activeTodoTitle;
+      focusTitleEl.textContent = activeTodoTitle;
+
+      // Load next subtask's pomodoro config (reset to defaults first)
+      WORK_SECONDS = 25 * 60;
+      BREAK_SECONDS = 5 * 60;
+      totalSessions = 1;
+      if (nextSub.pomodoroLength && nextSub.pomodoroLength > 0) {
+        WORK_SECONDS = nextSub.pomodoroLength * 60;
+      }
+      if (nextSub.breakLength && nextSub.breakLength > 0) {
+        BREAK_SECONDS = nextSub.breakLength * 60;
+      } else {
+        // Fall back to global short-break default
+        try { var v = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (v > 0) BREAK_SECONDS = v * 60; } catch(e) {}
+      }
+      if (nextSub.pomodoroCount && nextSub.pomodoroCount > 0) {
+        totalSessions = nextSub.pomodoroCount;
+      }
+
+      // Reset timer state for the new subtask
+      phase = 'work';
+      secondsLeft = WORK_SECONDS;
+      totalPhaseSeconds = WORK_SECONDS;
+      sessionCount = 1;
+      accumulatedWorkSeconds = 0;
+      isRunning = false;
+      showPlayIcon();
+
+      // Refresh subtask list to show updated done states
+      loadSubtasks(activeParentId);
+      updateDisplay();
+      saveStateImmediate();
+      notifyStateChanged();
+    });
   }
 
   function closeTimer() {
@@ -2506,14 +2632,73 @@
     if (wasRunning && elapsedSec > 0) {
       var result = simulateElapsed(rPhase, rSecondsLeft, rTotalPhase, rSessionCount, rAccWork, elapsedSec);
       if (result.finished) {
-        // Timer completed entirely during navigation — auto-close
+        // Timer completed entirely during navigation
+        var completedId = activeTodoId;
+        var completedParentId = activeParentId;
         var trackedMinutes = Math.round(result.accWork / 60);
         clearState();
         if (trackedMinutes > 0) {
-          saveTrackedMinutes(activeTodoId, trackedMinutes);
+          saveTrackedMinutes(completedId, trackedMinutes);
           window.dispatchEvent(new CustomEvent('dm-pomodoro-stopped', {
-            detail: { todoId: activeTodoId, trackedMinutes: trackedMinutes }
+            detail: { todoId: completedId, trackedMinutes: trackedMinutes }
           }));
+        }
+        // If timing a subtask, try to auto-advance to the next one
+        if (completedParentId && completedParentId !== completedId) {
+          // Auto-mark completed subtask as done
+          if (window.dmSync && window.dmSync.getTodo) {
+            window.dmSync.getTodo(completedId).then(function(todo) {
+              if (todo && !todo.done) toggleSubtaskDone(todo, true);
+            });
+          }
+          // Find next subtask and show timer paused on it
+          getNextUndoneSubtask(completedId).then(function(nextSub) {
+            if (!nextSub) {
+              // No more subtasks — stay closed
+              activeTodoId = null;
+              activeTodoTitle = '';
+              activeTodoCategory = '';
+              activeParentId = null;
+              return;
+            }
+            // Set up timer for next subtask (paused, waiting for user)
+            activeTodoId = nextSub.id;
+            activeTodoTitle = nextSub.title || 'Task';
+            activeParentId = completedParentId;
+            activeTodoCategory = nextSub.category || '';
+            titleEl.textContent = activeTodoTitle;
+            focusTitleEl.textContent = activeTodoTitle;
+            if (activeTodoCategory) {
+              categoryEl.textContent = activeTodoCategory;
+              categoryEl.style.display = '';
+              focusCategoryEl.textContent = activeTodoCategory;
+              focusCategoryEl.style.display = '';
+            }
+            // Load config from next subtask
+            WORK_SECONDS = (nextSub.pomodoroLength && nextSub.pomodoroLength > 0) ? nextSub.pomodoroLength * 60 : 25 * 60;
+            if (nextSub.breakLength && nextSub.breakLength > 0) {
+              BREAK_SECONDS = nextSub.breakLength * 60;
+            } else {
+              BREAK_SECONDS = 5 * 60;
+              try { var bv = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (bv > 0) BREAK_SECONDS = bv * 60; } catch(e) {}
+            }
+            totalSessions = (nextSub.pomodoroCount && nextSub.pomodoroCount > 0) ? nextSub.pomodoroCount : 1;
+            phase = 'work';
+            secondsLeft = WORK_SECONDS;
+            totalPhaseSeconds = WORK_SECONDS;
+            sessionCount = 1;
+            accumulatedWorkSeconds = 0;
+            isRunning = false;
+            startedAt = Date.now();
+            showPlayIcon();
+            updateDisplay();
+            resetPosition();
+            timerEl.style.display = '';
+            loadSubtasks(activeParentId);
+            saveStateImmediate();
+            notifyStateChanged();
+          });
+          return;
         }
         activeTodoId = null;
         activeTodoTitle = '';
