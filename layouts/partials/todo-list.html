@@ -4552,6 +4552,7 @@
 
   // ─── Instant completion with celebratory toast + undo ───
   function completeTodoWithToast(todo, actualMin, category) {
+    console.log('[toast] completeTodoWithToast called for:', todo.title, 'actualMin:', actualMin);
     // Snapshot state before completing (for undo)
     var snapshot = {
       done: todo.done,
@@ -4905,6 +4906,7 @@
    *  - duration: number (optional) — auto-dismiss ms, default 3000
    */
   function showActionToast(opts) {
+    console.log('[toast] showActionToast called:', opts.message, 'cssClass:', opts.cssClass);
     dismissActionToast();
 
     var msg      = opts.message || 'Done';
@@ -4929,6 +4931,7 @@
     }
     document.body.appendChild(toast);
     _undoToast = toast;
+    console.log('[toast] toast appended to body, className:', toast.className, 'innerHTML:', toast.innerHTML.substring(0, 100));
 
     if (onUndo) {
       toast.querySelector('.todo-undo-btn').addEventListener('click', function(e) {
