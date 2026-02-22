@@ -3760,8 +3760,10 @@
   var _nestTargetEl = null;   // .todo-item-group currently highlighted for nesting
   var _nestTargetId = null;   // id of the target parent
   var _nestDraggedId = null;  // id of the item being dragged
-  var _lastDragX = 0;         // last cursor X when nest timer started
-  var _lastDragY = 0;         // last cursor Y when nest timer started
+  var _lastDragX = 0;         // cursor X anchor when nest timer started
+  var _lastDragY = 0;         // cursor Y anchor when nest timer started
+  var _cursorX = 0;           // continuously tracked cursor X during drag
+  var _cursorY = 0;           // continuously tracked cursor Y during drag
   var _isDragging = false;    // true while a drag is in progress
   var NEST_HOLD_MS = 500;
   var NEST_MOVE_THRESHOLD = 8; // px — movement beyond this resets the nest timer
@@ -3774,24 +3776,32 @@
   }
 
   // Start a new nest timer, recording the cursor anchor position
-  function startNestTimer(targetId, cx, cy) {
+  function startNestTimer(targetId) {
     clearNestState();
     _nestTargetId = targetId;
-    _lastDragX = cx;
-    _lastDragY = cy;
+    // Snapshot current cursor as the anchor
+    _lastDragX = _cursorX;
+    _lastDragY = _cursorY;
     _nestTimer = setTimeout(function() {
-      var el = itemsEl.querySelector('.todo-item-group[data-group-id="' + _nestTargetId + '"]');
-      if (el) {
-        _nestTargetEl = el;
-        el.classList.add('todo-nest-target');
+      _nestTimer = null;
+      // When the timer fires, check if cursor is STILL close to the anchor
+      var dx = _cursorX - _lastDragX;
+      var dy = _cursorY - _lastDragY;
+      if (Math.sqrt(dx * dx + dy * dy) <= NEST_MOVE_THRESHOLD) {
+        var el = itemsEl.querySelector('.todo-item-group[data-group-id="' + _nestTargetId + '"]');
+        if (el) {
+          _nestTargetEl = el;
+          el.classList.add('todo-nest-target');
+        }
       }
+      // If cursor moved too far, timer simply expires without showing indicator
     }, NEST_HOLD_MS);
   }
 
-  // Global mouse/touch tracking during drag — clears nest when cursor moves
+  // Global mouse/touch tracking during drag — updates cursor position,
+  // clears visible indicator if cursor moves, and restarts timer for current target
   function _onDragCursorMove(e) {
     if (!_isDragging) return;
-    if (!_nestTimer && !_nestTargetEl) return;
     var cx, cy;
     if (e.touches && e.touches[0]) {
       cx = e.touches[0].clientX;
@@ -3800,11 +3810,27 @@
       cx = e.clientX || 0;
       cy = e.clientY || 0;
     }
-    var dx = cx - _lastDragX;
-    var dy = cy - _lastDragY;
-    if (Math.sqrt(dx * dx + dy * dy) > NEST_MOVE_THRESHOLD) {
-      clearNestState();
+    _cursorX = cx;
+    _cursorY = cy;
+
+    // If indicator is already visible and cursor moved away, clear it
+    if (_nestTargetEl) {
+      var dx = cx - _lastDragX;
+      var dy = cy - _lastDragY;
+      if (Math.sqrt(dx * dx + dy * dy) > NEST_MOVE_THRESHOLD) {
+        // Clear visible indicator but keep tracking the target — restart timer
+        _nestTargetEl.classList.remove('todo-nest-target');
+        _nestTargetEl = null;
+        // Restart timer with new anchor so indicator can reappear when user settles again
+        if (_nestTargetId && canNestInto(_nestDraggedId, _nestTargetId)) {
+          if (_nestTimer) { clearTimeout(_nestTimer); _nestTimer = null; }
+          startNestTimer(_nestTargetId);
+        }
+      }
     }
+    // NOTE: We intentionally do NOT clear the pending timer here.
+    // The timer's own callback checks cursor proximity when it fires,
+    // so small jitter during the 500ms window won't prevent the indicator.
   }
 
   function canNestInto(draggedId, targetId) {
@@ -3849,35 +3875,35 @@
         onStart: function(evt) {
           _nestDraggedId = evt.item.getAttribute('data-group-id');
           _isDragging = true;
+          // Initialize cursor tracking from the drag start event
+          var oe = evt.originalEvent || evt;
+          if (oe.touches && oe.touches[0]) {
+            _cursorX = oe.touches[0].clientX;
+            _cursorY = oe.touches[0].clientY;
+          } else {
+            _cursorX = oe.clientX || 0;
+            _cursorY = oe.clientY || 0;
+          }
           document.addEventListener('mousemove', _onDragCursorMove, true);
           document.addEventListener('touchmove', _onDragCursorMove, true);
         },
         onMove: function(evt) {
-          // Get current cursor position
-          var cx = 0, cy = 0;
-          if (evt.originalEvent) {
-            if (evt.originalEvent.touches && evt.originalEvent.touches[0]) {
-              cx = evt.originalEvent.touches[0].clientX;
-              cy = evt.originalEvent.touches[0].clientY;
-            } else {
-              cx = evt.originalEvent.clientX || 0;
-              cy = evt.originalEvent.clientY || 0;
-            }
-          }
-
           // Determine which task group the cursor is over
           var relatedGroup = evt.related ? evt.related.closest('.todo-item-group') : null;
           var relatedId = relatedGroup ? relatedGroup.getAttribute('data-group-id') : null;
 
-          // If hovering over a new valid target, start fresh timer
-          if (relatedId !== _nestTargetId || !relatedId) {
+          // If hovering over a NEW target, clear old state and start fresh timer
+          if (relatedId !== _nestTargetId) {
             clearNestState();
             if (relatedId && canNestInto(_nestDraggedId, relatedId)) {
-              startNestTimer(relatedId, cx, cy);
+              startNestTimer(relatedId);
             }
-          } else if (!_nestTimer && !_nestTargetEl && relatedId && canNestInto(_nestDraggedId, relatedId)) {
-            // Same target but timer was cleared by movement — restart when cursor settles
-            startNestTimer(relatedId, cx, cy);
+          }
+          // If same target and no timer/indicator active (both cleared), restart
+          else if (!_nestTimer && !_nestTargetEl && relatedId && canNestInto(_nestDraggedId, relatedId)) {
+            startNestTimer(relatedId);
+          }
+          // If same target and timer already pending or indicator visible, do nothing — let it run
           }
         },
         onEnd: function(evt) {
