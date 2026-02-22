@@ -215,6 +215,9 @@
       });
     }
 
+    // Debounced render — collapses rapid data-ready calls (e.g. IDB cache load
+    // followed immediately by dm-sync-complete) into a single render
+    var _renderTimer = null;
     function onDataReady(graphData) {
       cachedData = graphData;
       graphRendered = false;
@@ -224,7 +227,11 @@
       _allTodos = null;
       currentNodeId = -1;
       nodesSize = {};
-      switchView(currentView);
+      if (_renderTimer) clearTimeout(_renderTimer);
+      _renderTimer = setTimeout(function() {
+        _renderTimer = null;
+        switchView(currentView);
+      }, 150);
     }
 
     loadFromIndexedDB()
