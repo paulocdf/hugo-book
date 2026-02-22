@@ -1290,6 +1290,7 @@
       scheduledDate: scheduledDate,
       reminderAt: reminderAtMs ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
       reminderFired: false,
+      reminderAcked: false,
       bujoType: nlpBujoType,
       bujoState: 'open',
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -1302,6 +1303,7 @@
       id: newTodoId,
       reminderAt: reminderAtMs || null,
       reminderFired: false,
+      reminderAcked: false,
       createdAt: Date.now(),
       updatedAt: Date.now()
     });

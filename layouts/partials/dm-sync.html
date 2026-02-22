@@ -731,6 +731,7 @@
       scheduledDate: data.scheduledDate || null,
       reminderAt: reminderAt,
       reminderFired: !!data.reminderFired,
+      reminderAcked: !!data.reminderAcked,
       source: data.source || null,
       bujoType: data.bujoType || 'task',
       bujoState: data.bujoState || (status === 'done' ? 'done' : 'open'),
@@ -986,12 +987,16 @@
 
   // ─── Persistent Reminder Banner ───
 
-  function showReminderBanner(title, text) {
+  function showReminderBanner(title, text, todoId) {
     var container = document.getElementById('dm-reminder-banner-container');
     if (!container) return;
 
+    // Prevent duplicate banners for the same todo
+    if (todoId && container.querySelector('[data-reminder-todo="' + todoId + '"]')) return;
+
     var banner = document.createElement('div');
     banner.className = 'dm-reminder-banner';
+    if (todoId) banner.setAttribute('data-reminder-todo', todoId);
     banner.innerHTML =
       '<svg class="dm-reminder-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
         '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>' +
@@ -1016,13 +1021,36 @@
       });
     });
 
-    // Acknowledge = dismiss
+    // Acknowledge = dismiss + persist acknowledgment
     banner.querySelector('.dm-reminder-banner-ack').addEventListener('click', function() {
       banner.classList.remove('dm-banner--in');
       banner.classList.add('dm-banner--out');
       setTimeout(function() {
         if (banner.parentNode) banner.parentNode.removeChild(banner);
       }, 450);
+
+      // Persist acknowledgment so banner doesn't reappear on refresh
+      if (todoId) {
+        idbGet(STORE_TODOS, todoId).then(function(todo) {
+          if (!todo) return;
+          todo.reminderAcked = true;
+          todo.updatedAt = Date.now();
+          return firestoreWrite({
+            collection: 'todos',
+            docId: todoId,
+            op: 'update',
+            data: {
+              reminderAcked: true,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            localOp: function() {
+              return idbPut(STORE_TODOS, todo);
+            }
+          }).then(function() {
+            window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+          });
+        });
+      }
     });
   }
 
@@ -1059,9 +1087,9 @@
 
     // Show persistent banner + play chime
     playReminderChime();
-    showReminderBanner('Reminder:', body);
+    showReminderBanner('Reminder:', body, todo.id);
 
-    // Mark as fired — optimistic local write + queued Firestore write
+    // Mark as fired (but NOT acknowledged — banner persists until user clicks Acknowledge)
     todo.reminderFired = true;
     todo.updatedAt = Date.now();
     firestoreWrite({
@@ -1128,6 +1156,31 @@
   // Re-evaluate timers when todos change
   window.addEventListener('dm-todos-updated', function() {
     scheduleAllReminders();
+  });
+
+  // Restore banners for reminders that fired but were never acknowledged
+  // (e.g. page was refreshed before user clicked Acknowledge)
+  function showPendingReminders() {
+    idbGetAll(STORE_TODOS).then(function(todos) {
+      todos.forEach(function(t) {
+        if (t.reminderFired && !t.reminderAcked && !t.done) {
+          var body = buildReminderBody(t);
+          showReminderBanner('Reminder:', body, t.id);
+        }
+      });
+    }).catch(function(err) {
+      console.warn('[dm-sync] Failed to show pending reminders:', err);
+    });
+  }
+
+  // Show pending reminders once after initial sync completes
+  var _pendingRemindersShown = false;
+  window.addEventListener('dm-todos-updated', function() {
+    if (!_pendingRemindersShown) {
+      _pendingRemindersShown = true;
+      // Small delay to let the page finish rendering
+      setTimeout(showPendingReminders, 500);
+    }
   });
 
   // ─── Note Version History ───
@@ -1892,6 +1945,7 @@
         if (!todo) return;
         todo.reminderAt = reminderAtMs;
         todo.reminderFired = false;
+        todo.reminderAcked = false;
         todo.updatedAt = Date.now();
         return firestoreWrite({
           collection: 'todos',
@@ -1900,6 +1954,7 @@
           data: {
             reminderAt: firebase.firestore.Timestamp.fromMillis(reminderAtMs),
             reminderFired: false,
+            reminderAcked: false,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           },
           localOp: function() {
@@ -1917,6 +1972,7 @@
         if (!todo) return;
         todo.reminderAt = null;
         todo.reminderFired = false;
+        todo.reminderAcked = false;
         todo.updatedAt = Date.now();
         return firestoreWrite({
           collection: 'todos',
@@ -1925,6 +1981,7 @@
           data: {
             reminderAt: null,
             reminderFired: false,
+            reminderAcked: false,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           },
           localOp: function() {
