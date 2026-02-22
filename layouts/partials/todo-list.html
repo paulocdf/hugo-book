@@ -3580,6 +3580,7 @@
         if (!todo) { console.warn('[bujo-click] todo not found for id:', todoId); return; }
         var bujoType = todo.bujoType || 'task';
         var bujoState = todo.bujoState || 'open';
+        console.log('[bujo-click] todoId:', todoId, 'bujoType:', bujoType, 'bujoState:', bujoState);
 
 
         if (bujoState === 'open') {
