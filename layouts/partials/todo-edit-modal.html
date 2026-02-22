@@ -52,9 +52,22 @@
         <label for="todo-edit-date">Scheduled date</label>
         <input type="date" id="todo-edit-date" class="todo-edit-input">
       </div>
-      <div class="todo-edit-field todo-edit-half">
-        <label for="todo-edit-estimate">Estimate (min)</label>
-        <input type="number" id="todo-edit-estimate" class="todo-edit-input" min="1" max="480" placeholder="e.g. 30">
+      <div class="todo-edit-field todo-edit-half" id="todo-edit-estimate-field">
+        <label>Estimate</label>
+        <div class="todo-edit-pomodoro-group" id="todo-edit-pomodoro-group">
+          <button type="button" class="todo-edit-pomo-minus" id="todo-edit-pomo-minus" title="Remove pomodoro" aria-label="Decrease pomodoro count">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+          </button>
+          <button type="button" class="todo-edit-pomodoro-btn" id="todo-edit-pomodoro-btn" title="Short session (click tomato to switch)" aria-label="Pomodoro count">
+            <svg class="todo-edit-pomodoro-icon todo-pomo-icon-short" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
+            <svg class="todo-edit-pomodoro-icon todo-pomo-icon-long" width="16" height="16" viewBox="0 0 24 28" fill="none" style="display:none;"><path d="M10.5 6c-.3-.8 0-1.5.5-1.7.4-.1.8.1 1 .5.2-.4.6-.6 1-.5.5.2.8 1 .5 1.7" fill="#4a7a3e"/><path d="M13.8 5.2c.4-.2.9 0 1.1.3.2.3.1.7-.2.9" stroke="#4a7a3e" stroke-width="0.7" fill="none" stroke-linecap="round"/><path d="M12 10.5 C11 9 9.5 7.8 7.5 7.8 C4.4 7.8 2.8 10.2 2.8 12.8 C2.8 15.5 4.5 18.5 7 21.5 C9 23.8 10.8 25.3 12 27 C13.2 25.3 15 23.8 17 21.5 C19.5 18.5 21.2 15.5 21.2 12.8 C21.2 10.2 19.6 7.8 16.5 7.8 C14.5 7.8 13 9 12 10.5Z" fill="#c4553a" stroke="#a8412e" stroke-width="0.7"/><ellipse cx="7.8" cy="12" rx="2.5" ry="2" fill="#d4776a" opacity="0.25"/></svg>
+            <span class="todo-edit-pomodoro-count" id="todo-edit-pomodoro-count">1</span>
+          </button>
+          <button type="button" class="todo-edit-pomo-plus" id="todo-edit-pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"></line><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+          </button>
+          <input type="number" id="todo-edit-custom-min" class="todo-edit-custom-min" placeholder="min" min="0" max="999" title="Custom time override (minutes)" aria-label="Custom time in minutes">
+        </div>
       </div>
     </div>
 
@@ -424,6 +437,117 @@
   color: var(--gray-500);
 }
 
+/* ─── Pomodoro group in edit modal ─── */
+.todo-edit-pomodoro-group {
+  display: inline-flex;
+  align-items: center;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 8px;
+  height: 38px;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--body-background);
+  transition: border-color 0.15s;
+}
+.todo-edit-pomodoro-group:focus-within {
+  border-color: var(--color-link);
+}
+.todo-edit-pomo-minus,
+.todo-edit-pomo-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 38px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.todo-edit-pomo-minus:hover,
+.todo-edit-pomo-plus:hover {
+  background: var(--gray-100);
+  color: var(--color-link);
+}
+.todo-edit-pomo-minus:disabled {
+  opacity: 0.25;
+  cursor: default;
+  pointer-events: none;
+}
+.todo-edit-pomodoro-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border: none;
+  border-left: 1px solid var(--gray-200);
+  border-right: 1px solid var(--gray-200);
+  border-radius: 0;
+  background: transparent;
+  color: var(--gray-500);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  user-select: none;
+  -webkit-user-select: none;
+  line-height: 1;
+  height: 38px;
+  box-sizing: border-box;
+}
+.todo-edit-pomodoro-btn:hover {
+  background: var(--gray-100);
+  color: var(--color-link);
+}
+.todo-edit-pomodoro-btn.has-count {
+  color: var(--color-link);
+  background: rgba(0, 105, 255, 0.06);
+}
+.todo-edit-pomodoro-icon {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.todo-edit-pomodoro-btn:active .todo-edit-pomodoro-icon {
+  transform: scale(0.85);
+}
+.todo-edit-pomodoro-count {
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-width: 14px;
+  text-align: center;
+}
+.todo-edit-custom-min {
+  width: 46px;
+  padding: 4px 4px;
+  border: none;
+  border-left: 1px solid var(--gray-200);
+  border-radius: 0;
+  background: transparent;
+  color: var(--body-font-color);
+  font-size: 0.82rem;
+  text-align: center;
+  outline: none;
+  height: 38px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.todo-edit-custom-min::-webkit-inner-spin-button,
+.todo-edit-custom-min::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.todo-edit-custom-min::placeholder {
+  color: var(--gray-400);
+  font-size: 0.72rem;
+}
+.todo-edit-custom-min:focus {
+  background: rgba(0, 105, 255, 0.04);
+}
+
 @media screen and (max-width: 600px) {
   .todo-edit-dialog {
     width: 96%;
@@ -453,12 +577,20 @@
   var saveBtn = document.getElementById('todo-edit-save');
   var titleInput = document.getElementById('todo-edit-title');
   var dateInput = document.getElementById('todo-edit-date');
-  var estimateInput = document.getElementById('todo-edit-estimate');
   var categoryChipsEl = document.getElementById('todo-edit-category-chips');
   var categoryInput = document.getElementById('todo-edit-category-input');
   var categoryDropdown = document.getElementById('todo-edit-category-dropdown');
   var aiSection = document.getElementById('todo-edit-ai-section');
   var aiCardsEl = document.getElementById('todo-edit-ai-cards');
+
+  // Pomodoro group elements
+  var editPomoGroup = document.getElementById('todo-edit-pomodoro-group');
+  var editPomoMinusBtn = document.getElementById('todo-edit-pomo-minus');
+  var editPomoPlusBtn = document.getElementById('todo-edit-pomo-plus');
+  var editPomoBtn = document.getElementById('todo-edit-pomodoro-btn');
+  var editPomoCountEl = document.getElementById('todo-edit-pomodoro-count');
+  var editCustomMinInput = document.getElementById('todo-edit-custom-min');
+  var editEstimateField = document.getElementById('todo-edit-estimate-field');
 
   var currentTodo = null;
   var categories = [];
@@ -468,6 +600,10 @@
   var _dropdownJustClosed = false;
   var _editBujoType = 'task';
   var _editBujoState = 'open';
+
+  // Pomodoro state for edit modal
+  var _editPomodoroCount = 1;
+  var _editPomoMode = 'short'; // 'short' | 'long'
 
   // Auto-grow textarea for title
   function autoGrowTitle() {
@@ -483,7 +619,6 @@
   var bujoTypeToggle = document.getElementById('todo-edit-bujo-type');
   var bujoStateToggle = document.getElementById('todo-edit-bujo-state');
   var bujoStateField = document.getElementById('todo-edit-state-field');
-  var estimateField = estimateInput ? estimateInput.closest('.todo-edit-half') : null;
 
   function updateBujoTypeUI() {
     if (!bujoTypeToggle) return;
@@ -494,9 +629,9 @@
     if (bujoStateField) {
       bujoStateField.style.display = _editBujoType === 'task' ? '' : 'none';
     }
-    // Show estimate field only for tasks
-    if (estimateField) {
-      estimateField.style.display = _editBujoType === 'task' ? '' : 'none';
+    // Show pomodoro/estimate field only for tasks
+    if (editEstimateField) {
+      editEstimateField.style.display = _editBujoType === 'task' ? '' : 'none';
     }
   }
 
@@ -531,6 +666,86 @@
         _editBujoState = btn.getAttribute('data-bujo-state');
         updateBujoStateUI();
       });
+    });
+  }
+
+  // ─── Pomodoro controls ───
+
+  // Read global pomodoro settings (same keys as todo-list.html)
+  var _editGlobalPomoShortWork = 25;
+  try { var s = parseInt(localStorage.getItem('dm-pomo-short-work'), 10); if (s > 0) _editGlobalPomoShortWork = s; } catch(e) {}
+  var _editGlobalPomoShortBreak = 5;
+  try { var s = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (s > 0) _editGlobalPomoShortBreak = s; } catch(e) {}
+  var _editGlobalPomoLongWork = 50;
+  try { var s = parseInt(localStorage.getItem('dm-pomo-long-work'), 10); if (s > 0) _editGlobalPomoLongWork = s; } catch(e) {}
+  var _editGlobalPomoLongBreak = 10;
+  try { var s = parseInt(localStorage.getItem('dm-pomo-long-break'), 10); if (s > 0) _editGlobalPomoLongBreak = s; } catch(e) {}
+
+  // Keep in sync if user changes settings while modal is open
+  window.addEventListener('dm-settings-changed', function(e) {
+    var detail = e.detail || {};
+    if (detail.key === 'dm-pomo-short-work' && detail.value > 0) _editGlobalPomoShortWork = detail.value;
+    if (detail.key === 'dm-pomo-short-break' && detail.value > 0) _editGlobalPomoShortBreak = detail.value;
+    if (detail.key === 'dm-pomo-long-work' && detail.value > 0) _editGlobalPomoLongWork = detail.value;
+    if (detail.key === 'dm-pomo-long-break' && detail.value > 0) _editGlobalPomoLongBreak = detail.value;
+  });
+
+  function updateEditPomodoroDisplay() {
+    if (!editPomoCountEl) return;
+    editPomoCountEl.textContent = _editPomodoroCount;
+    if (_editPomodoroCount > 0) {
+      editPomoBtn.classList.add('has-count');
+      editPomoMinusBtn.disabled = false;
+    } else {
+      editPomoBtn.classList.remove('has-count');
+      editPomoMinusBtn.disabled = true;
+    }
+    // Swap tomato icon based on mode
+    var isLong = _editPomoMode === 'long';
+    var shortIcon = editPomoBtn.querySelector('.todo-pomo-icon-short');
+    var longIcon = editPomoBtn.querySelector('.todo-pomo-icon-long');
+    if (shortIcon) shortIcon.style.display = isLong ? 'none' : '';
+    if (longIcon) longIcon.style.display = isLong ? '' : 'none';
+    var workMin = isLong ? _editGlobalPomoLongWork : _editGlobalPomoShortWork;
+    var breakMin = isLong ? _editGlobalPomoLongBreak : _editGlobalPomoShortBreak;
+    editPomoBtn.title = (isLong ? 'Long' : 'Short') + ' session (' + workMin + '/' + breakMin + 'min) \u2014 click tomato to switch';
+  }
+
+  // Plus button
+  if (editPomoPlusBtn) {
+    editPomoPlusBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      _editPomodoroCount++;
+      updateEditPomodoroDisplay();
+    });
+  }
+
+  // Minus button
+  if (editPomoMinusBtn) {
+    editPomoMinusBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+      if (_editPomodoroCount > 0) {
+        _editPomodoroCount--;
+        updateEditPomodoroDisplay();
+      }
+    });
+  }
+
+  // Tomato button: toggle short/long mode
+  if (editPomoBtn) {
+    editPomoBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      _editPomoMode = _editPomoMode === 'long' ? 'short' : 'long';
+      updateEditPomodoroDisplay();
+    });
+  }
+
+  // Prevent Enter in custom min input from saving the form
+  if (editCustomMinInput) {
+    editCustomMinInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); titleInput.focus(); }
     });
   }
 
@@ -742,21 +957,27 @@
         type: 'estimate',
         text: 'Quick task (15 min)',
         action: function() {
-          estimateInput.value = '15';
+          editCustomMinInput.value = '15';
+          _editPomodoroCount = 1;
+          updateEditPomodoroDisplay();
         }
       });
       suggestions.push({
         type: 'estimate',
         text: 'Medium task (30 min)',
         action: function() {
-          estimateInput.value = '30';
+          editCustomMinInput.value = '30';
+          _editPomodoroCount = 1;
+          updateEditPomodoroDisplay();
         }
       });
       suggestions.push({
         type: 'estimate',
         text: 'Deep work (60 min)',
         action: function() {
-          estimateInput.value = '60';
+          editCustomMinInput.value = '60';
+          _editPomodoroCount = 1;
+          updateEditPomodoroDisplay();
         }
       });
     }
@@ -958,7 +1179,26 @@
     // Populate fields
     titleInput.value = todo.title || '';
     dateInput.value = todo.scheduledDate || '';
-    estimateInput.value = todo.estimatedMin || '';
+
+    // Populate pomodoro state from task data
+    _editPomodoroCount = todo.pomodoroCount || 0;
+    var pomLen = todo.pomodoroLength || 0;
+    // Detect mode: if pomodoroLength matches global long-work, use long; otherwise short
+    if (pomLen > 0 && pomLen === _editGlobalPomoLongWork) {
+      _editPomoMode = 'long';
+    } else {
+      _editPomoMode = 'short';
+    }
+    // If the task has a custom pomodoroLength that doesn't match either preset,
+    // put it in the custom min override field
+    var isShortPreset = pomLen === _editGlobalPomoShortWork || pomLen === 0;
+    var isLongPreset = pomLen === _editGlobalPomoLongWork;
+    if (pomLen > 0 && !isShortPreset && !isLongPreset) {
+      editCustomMinInput.value = pomLen;
+    } else {
+      editCustomMinInput.value = '';
+    }
+    updateEditPomodoroDisplay();
 
     // BuJo type/state
     _editBujoType = todo.bujoType || 'task';
@@ -1019,13 +1259,30 @@
     saveBtn.textContent = 'Saving...';
 
     var newDate = dateInput.value || null;
-    var newEstimate = parseInt(estimateInput.value, 10) || null;
     var newCategory = categories.length > 0 ? categories.join(', ') : null;
+
+    // Compute pomodoro fields (mirrors addFromForm logic in todo-list.html)
+    var customMin = editCustomMinInput.value ? parseInt(editCustomMinInput.value, 10) : null;
+    var pomCount = _editPomodoroCount;
+    var pomLen = _editPomoMode === 'long' ? _editGlobalPomoLongWork : _editGlobalPomoShortWork;
+    var pomBreakLen = _editPomoMode === 'long' ? _editGlobalPomoLongBreak : _editGlobalPomoShortBreak;
+    var est;
+    if (customMin != null && customMin >= 0) {
+      pomLen = customMin;
+      est = pomCount > 0 ? pomCount * customMin : customMin;
+    } else if (pomCount > 0) {
+      est = pomCount * pomLen;
+    } else {
+      est = 0;
+    }
 
     var result = {
       title: newTitle,
       scheduledDate: newDate,
-      estimatedMin: newEstimate,
+      estimatedMin: est || null,
+      pomodoroCount: pomCount,
+      pomodoroLength: pomLen,
+      breakLength: pomBreakLen,
       category: newCategory,
       bujoType: _editBujoType,
       bujoState: _editBujoState
@@ -1086,8 +1343,10 @@
     if (details.scheduledDate && !dateInput.value) {
       dateInput.value = details.scheduledDate;
     }
-    if (details.estimatedMin && !estimateInput.value) {
-      estimateInput.value = details.estimatedMin;
+    if (details.estimatedMin && !editCustomMinInput.value && _editPomodoroCount === 0) {
+      editCustomMinInput.value = details.estimatedMin;
+      _editPomodoroCount = 1;
+      updateEditPomodoroDisplay();
     }
     if (details.category && categories.length === 0) {
       categories.push(details.category.toLowerCase());

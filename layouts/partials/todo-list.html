@@ -3679,12 +3679,19 @@
         if (result.estimatedMin !== (todo.estimatedMin || null)) {
           firestoreUpdates.estimatedMin = result.estimatedMin || null;
           localUpdates.estimatedMin = result.estimatedMin || null;
-          // Also update pomodoroLength so the timer uses the new estimate as
-          // the per-session work duration.
-          if (result.estimatedMin && result.estimatedMin > 0) {
-            firestoreUpdates.pomodoroLength = result.estimatedMin;
-            localUpdates.pomodoroLength = result.estimatedMin;
-          }
+        }
+        // Update pomodoro fields from the edit modal
+        if (result.pomodoroCount != null && result.pomodoroCount !== (todo.pomodoroCount || 0)) {
+          firestoreUpdates.pomodoroCount = result.pomodoroCount;
+          localUpdates.pomodoroCount = result.pomodoroCount;
+        }
+        if (result.pomodoroLength != null && result.pomodoroLength !== (todo.pomodoroLength || 0)) {
+          firestoreUpdates.pomodoroLength = result.pomodoroLength;
+          localUpdates.pomodoroLength = result.pomodoroLength;
+        }
+        if (result.breakLength != null && result.breakLength !== (todo.breakLength || 0)) {
+          firestoreUpdates.breakLength = result.breakLength;
+          localUpdates.breakLength = result.breakLength;
         }
         if (result.category !== (todo.category || null)) {
           firestoreUpdates.category = result.category || null;

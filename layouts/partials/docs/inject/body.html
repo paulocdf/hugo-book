@@ -652,6 +652,287 @@
     if (currentMode === 'note') scheduleNotePreview();
   });
 
+  // =========================================================================
+  // Quick Capture — Image/File Attachments (paste, drag-drop, file picker)
+  // =========================================================================
+  var qcAttachBtn = document.getElementById('qc-attach-btn');
+  var qcFileInput = document.getElementById('qc-file-input');
+  var qcDropzone = document.getElementById('qc-dropzone');
+  var qcUploadBar = document.getElementById('qc-upload-bar');
+  var qcUploadProgress = document.getElementById('qc-upload-progress');
+  var qcUploadText = document.getElementById('qc-upload-text');
+  var qcAttachments = document.getElementById('qc-attachments');
+  var qcAttachmentsList = document.getElementById('qc-attachments-list');
+  var qcEditorBox = document.getElementById('qc-editor-box');
+  var qcDragCounter = 0;
+
+  // Pre-generated note ID for uploads before note is saved
+  var _qcPendingNoteId = null;
+  // Track uploaded attachments so we can clean up on cancel
+  var _qcPendingAttachments = [];
+
+  function qcGetOrCreateNoteId() {
+    if (_qcPendingNoteId) return _qcPendingNoteId;
+    if (window.dmDb) {
+      _qcPendingNoteId = window.dmDb.collection('notes').doc().id;
+    } else {
+      _qcPendingNoteId = 'local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    }
+    return _qcPendingNoteId;
+  }
+
+  function qcIsImageType(fileType) {
+    return fileType && fileType.startsWith('image/');
+  }
+
+  function qcFormatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  function qcInsertAtCursor(text) {
+    var start = input.selectionStart;
+    var end = input.selectionEnd;
+    var val = input.value;
+    var prefix = '';
+    if (start > 0 && val[start - 1] !== '\n') prefix = '\n';
+    var suffix = '\n';
+    input.value = val.slice(0, start) + prefix + text + suffix + val.slice(end);
+    var newPos = start + prefix.length + text.length + suffix.length;
+    input.selectionStart = input.selectionEnd = newPos;
+    input.focus();
+    if (currentMode === 'note') scheduleNotePreview();
+  }
+
+  function qcInsertAttachmentMarkdown(attachment) {
+    if (qcIsImageType(attachment.fileType)) {
+      qcInsertAtCursor('![' + attachment.fileName + '](' + attachment.downloadUrl + ')');
+    } else {
+      qcInsertAtCursor('[' + attachment.fileName + '](' + attachment.downloadUrl + ')');
+    }
+  }
+
+  function qcRenderAttachmentGallery() {
+    if (!qcAttachments || !qcAttachmentsList) return;
+    if (!_qcPendingAttachments.length) {
+      qcAttachments.style.display = 'none';
+      return;
+    }
+
+    qcAttachments.style.display = '';
+    qcAttachmentsList.innerHTML = '';
+
+    _qcPendingAttachments.forEach(function(att, idx) {
+      var item = document.createElement('div');
+      item.className = 'qc-attach-item';
+
+      if (qcIsImageType(att.fileType)) {
+        var thumb = document.createElement('img');
+        thumb.className = 'qc-attach-thumb';
+        thumb.src = att.downloadUrl;
+        thumb.alt = att.fileName;
+        thumb.loading = 'lazy';
+        item.appendChild(thumb);
+      } else {
+        var icon = document.createElement('span');
+        icon.className = 'qc-attach-icon';
+        icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>';
+        item.appendChild(icon);
+      }
+
+      var info = document.createElement('div');
+      info.className = 'qc-attach-info';
+      var nameEl = document.createElement('span');
+      nameEl.className = 'qc-attach-name';
+      nameEl.textContent = att.fileName;
+      nameEl.title = att.fileName;
+      var sizeEl = document.createElement('span');
+      sizeEl.className = 'qc-attach-size';
+      sizeEl.textContent = qcFormatFileSize(att.fileSize);
+      info.appendChild(nameEl);
+      info.appendChild(sizeEl);
+      item.appendChild(info);
+
+      var removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'qc-attach-remove';
+      removeBtn.title = 'Remove';
+      removeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+      removeBtn.addEventListener('click', function() {
+        // Delete from storage
+        if (window.dmSync && window.dmSync.deleteAttachment) {
+          window.dmSync.deleteAttachment(att).catch(function(err) {
+            console.error('[qc-attachments] Delete error:', err);
+          });
+        }
+        _qcPendingAttachments.splice(idx, 1);
+        qcRenderAttachmentGallery();
+      });
+      item.appendChild(removeBtn);
+
+      qcAttachmentsList.appendChild(item);
+    });
+  }
+
+  function qcHandleFiles(files) {
+    if (!files || !files.length) return;
+    if (!window.dmSync || !window.dmSync.uploadAttachment) return;
+    if (!window.dmAuth || !window.dmAuth.currentUser) {
+      showFeedback('error', 'Please sign in to attach files.');
+      return;
+    }
+
+    var noteId = qcGetOrCreateNoteId();
+    var fileArr = Array.from(files);
+    var total = fileArr.length;
+    var completed = 0;
+
+    if (qcUploadBar) {
+      qcUploadBar.style.display = '';
+      qcUploadProgress.style.width = '0%';
+      qcUploadText.textContent = 'Uploading ' + total + ' file' + (total > 1 ? 's' : '') + '...';
+    }
+
+    var chain = Promise.resolve();
+    fileArr.forEach(function(file) {
+      chain = chain.then(function() {
+        return window.dmSync.uploadAttachment(noteId, file, function(pct) {
+          var overallPct = Math.round(((completed + pct / 100) / total) * 100);
+          if (qcUploadProgress) qcUploadProgress.style.width = overallPct + '%';
+          if (qcUploadText) qcUploadText.textContent = 'Uploading ' + (completed + 1) + '/' + total + ' (' + pct + '%)';
+        }).then(function(attachment) {
+          completed++;
+          _qcPendingAttachments.push(attachment);
+          qcInsertAttachmentMarkdown(attachment);
+          qcRenderAttachmentGallery();
+        }).catch(function(err) {
+          completed++;
+          console.error('[qc-attachments] Upload error:', err);
+          if (qcUploadText) qcUploadText.textContent = 'Failed: ' + (err.message || 'Upload error');
+        });
+      });
+    });
+
+    chain.then(function() {
+      setTimeout(function() {
+        if (qcUploadBar) qcUploadBar.style.display = 'none';
+      }, 1500);
+    });
+  }
+
+  function qcCleanupPendingAttachments() {
+    if (_qcPendingAttachments.length > 0 && window.dmSync) {
+      _qcPendingAttachments.forEach(function(att) {
+        if (window.dmSync.deleteAttachment) {
+          window.dmSync.deleteAttachment(att).catch(function(err) {
+            console.error('[qc-attachments] Cleanup error:', err);
+          });
+        }
+      });
+    }
+    _qcPendingAttachments = [];
+    _qcPendingNoteId = null;
+    if (qcAttachments) qcAttachments.style.display = 'none';
+    if (qcAttachmentsList) qcAttachmentsList.innerHTML = '';
+  }
+
+  // File picker button
+  if (qcAttachBtn && qcFileInput) {
+    qcAttachBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (currentMode === 'note' || currentMode === 'code') qcFileInput.click();
+    });
+
+    qcFileInput.addEventListener('change', function() {
+      if (qcFileInput.files.length > 0) {
+        qcHandleFiles(qcFileInput.files);
+        qcFileInput.value = '';
+      }
+    });
+  }
+
+  // Drag and drop on editor box
+  if (qcEditorBox) {
+    qcEditorBox.addEventListener('dragenter', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      qcDragCounter++;
+      if (currentMode === 'note' || currentMode === 'code') {
+        if (qcDropzone) qcDropzone.style.display = '';
+      }
+    });
+
+    qcEditorBox.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      qcDragCounter--;
+      if (qcDragCounter <= 0) {
+        qcDragCounter = 0;
+        if (qcDropzone) qcDropzone.style.display = 'none';
+      }
+    });
+
+    qcEditorBox.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    qcEditorBox.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      qcDragCounter = 0;
+      if (qcDropzone) qcDropzone.style.display = 'none';
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        qcHandleFiles(e.dataTransfer.files);
+      }
+    });
+  }
+
+  // Paste handler — intercept image/file paste
+  input.addEventListener('paste', function(e) {
+    if (currentMode !== 'note' && currentMode !== 'code') return;
+    var items = (e.clipboardData || e.originalEvent.clipboardData || {}).items;
+    if (!items) return;
+
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        var f = items[i].getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      qcHandleFiles(files);
+    }
+  });
+
+  // Dialog-level paste handler — auto-switch to Note mode when pasting
+  // files while in AI or Todo mode (where the main textarea is hidden)
+  dialog.addEventListener('paste', function(e) {
+    // Only intercept in AI/Todo modes; note/code are handled by the input handler above
+    if (currentMode !== 'ai' && currentMode !== 'todo') return;
+    var items = (e.clipboardData || e.originalEvent.clipboardData || {}).items;
+    if (!items) return;
+
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        var f = items[i].getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
+      // Switch to Note mode so the textarea and toolbar become visible
+      setMode('note');
+      // Allow the DOM to update before uploading (textarea needs to be visible for cursor insertion)
+      setTimeout(function() { qcHandleFiles(files); }, 50);
+    }
+  });
+
   // Mode switching logic
   var modes = ['ai', 'note', 'code', 'todo'];
 
@@ -674,8 +955,13 @@
 
     // Hide/show common elements based on AI vs other modes
     var isAiMode = mode === 'ai';
+    var isEditorMode = mode === 'note' || mode === 'code';
     titleInput.style.display = isAiMode ? 'none' : '';
     document.getElementById('qc-editor-box').style.display = isAiMode ? 'none' : '';
+    // Show attachments gallery only in note/code modes if there are pending attachments
+    if (qcAttachments) {
+      qcAttachments.style.display = (isEditorMode && _qcPendingAttachments.length > 0) ? '' : 'none';
+    }
     // Hide Save/Cancel for AI mode, show for others
     var actionsEl = modal.querySelector('.quick-capture-actions');
     if (actionsEl) actionsEl.style.display = isAiMode ? 'none' : '';
@@ -981,6 +1267,12 @@
     // Reset state
     currentMode = mode;
     selectedLang = 'kotlin';
+    // Reset attachment state (clean up any leftover uploads)
+    _qcPendingAttachments = [];
+    _qcPendingNoteId = null;
+    if (qcAttachments) qcAttachments.style.display = 'none';
+    if (qcAttachmentsList) qcAttachmentsList.innerHTML = '';
+    if (qcUploadBar) qcUploadBar.style.display = 'none';
     modeButtons.forEach(function(b) { b.classList.remove('active'); });
     modeButtons.forEach(function(b) {
       if (b.getAttribute('data-mode') === mode) b.classList.add('active');
@@ -1053,6 +1345,16 @@
   function closeModal() {
     modal.classList.remove('active');
     modal.setAttribute('aria-hidden', 'true');
+    // Clean up pending attachments if note was NOT saved
+    if (!isSaving && _qcPendingAttachments.length > 0) {
+      qcCleanupPendingAttachments();
+    } else {
+      // Note was saved — just reset state without deleting attachments
+      _qcPendingAttachments = [];
+      _qcPendingNoteId = null;
+      if (qcAttachments) qcAttachments.style.display = 'none';
+      if (qcAttachmentsList) qcAttachmentsList.innerHTML = '';
+    }
     titleInput.value = '';
     input.value = '';
     if (bookTitleInput) bookTitleInput.value = '';
@@ -1191,7 +1493,8 @@
   }
 
   function createNewNote(noteData) {
-    var newDocId = window.dmDb ? window.dmDb.collection('notes').doc().id : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+    // Reuse pre-generated ID if attachments were uploaded, otherwise generate a new one
+    var newDocId = _qcPendingNoteId || (window.dmDb ? window.dmDb.collection('notes').doc().id : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9)));
     var localNote = Object.assign({}, noteData, {
       id: newDocId,
       createdAt: Date.now(),
