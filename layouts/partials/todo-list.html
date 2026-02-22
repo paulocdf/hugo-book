@@ -1352,10 +1352,13 @@
   border-color: var(--color-danger, #e53e3e);
 }
 
-/* Toast notifications — use absolute positioning + JS scroll tracking
-   to bypass ancestors with will-change/transform that break position:fixed */
+/* Toast notifications — position:fixed works because toasts are appended
+   directly to document.body, outside .book-page (which has will-change). */
 .todo-toast {
-  position: absolute;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 0.82rem;
@@ -1439,7 +1442,6 @@
   background: var(--color-success, #2e7d32);
 }
 .todo-toast-undo, .todo-toast-done {
-  position: relative;
   overflow: hidden;
 }
 @keyframes toast-progress-shrink {
@@ -2716,21 +2718,13 @@
   updateCategoryChip();
 
   // ─── Toast notifications ───
-  function positionToastElement(el) {
-    var vw = window.innerWidth;
-    var vh = window.innerHeight;
-    var tw = el.offsetWidth;
-    el.style.left = Math.round((vw - tw) / 2) + 'px';
-    el.style.top = (window.scrollY + vh - el.offsetHeight - 24) + 'px';
-  }
-
   function showTodoError(msg) {
     var toast = document.createElement('div');
     toast.className = 'todo-toast todo-toast-error';
     toast.textContent = msg;
     document.body.appendChild(toast);
+    // CSS handles positioning (position:fixed, bottom:24px, centered)
     setTimeout(function() {
-      positionToastElement(toast);
       toast.style.opacity = '1';
     }, 10);
     setTimeout(function() {
@@ -4820,7 +4814,6 @@
   // ─── Instant delete with undo toast ───
   var _undoTimer = null;
   var _undoToast = null;
-  var _toastPositionHandler = null;
 
   function deleteTodoWithUndo(todoId) {
     // Snapshot the state of all affected todos before deleting (for undo)
@@ -4934,11 +4927,6 @@
     document.body.appendChild(toast);
     _undoToast = toast;
 
-    // Position toast at bottom-center of viewport using shared utility
-    function positionToast() {
-      if (_undoToast) positionToastElement(_undoToast);
-    }
-
     if (onUndo) {
       toast.querySelector('.todo-undo-btn').addEventListener('click', function(e) {
         e.stopPropagation();
@@ -4947,16 +4935,11 @@
       });
     }
 
-    // Initial position + slide in
+    // CSS handles positioning (position:fixed, bottom:24px, centered).
+    // Fade in after a tick so the transition triggers.
     setTimeout(function() {
-      positionToast();
       toast.style.opacity = '1';
     }, 10);
-
-    // Keep pinned to viewport on scroll/resize
-    _toastPositionHandler = function() { positionToast(); };
-    window.addEventListener('scroll', _toastPositionHandler, { passive: true });
-    window.addEventListener('resize', _toastPositionHandler, { passive: true });
 
     // Auto-dismiss
     _undoTimer = setTimeout(function() {
@@ -4975,11 +4958,6 @@
 
   function dismissActionToast() {
     if (_undoTimer) { clearTimeout(_undoTimer); _undoTimer = null; }
-    if (_toastPositionHandler) {
-      window.removeEventListener('scroll', _toastPositionHandler);
-      window.removeEventListener('resize', _toastPositionHandler);
-      _toastPositionHandler = null;
-    }
     if (_undoToast) {
       _undoToast.style.opacity = '0';
       var t = _undoToast;
