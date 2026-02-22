@@ -3033,10 +3033,11 @@
         showPlayIcon();
         updateDisplay();
         resetPosition();
-        timerEl.style.display = '';
         // Request notification permission on first timer start (needs user gesture)
         requestNotificationPermission();
         startTimer();
+        // Open in focus (maximized) mode by default
+        enterFocusMode();
       }
 
       // Clear subtasks from previous run
