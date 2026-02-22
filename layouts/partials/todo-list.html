@@ -3760,8 +3760,10 @@
   var _nestTargetEl = null;   // .todo-item-group currently highlighted for nesting
   var _nestTargetId = null;   // id of the target parent
   var _nestDraggedId = null;  // id of the item being dragged
-  var _lastDragY = 0;         // last known cursor Y during drag (for nest zone check)
+  var _lastDragX = 0;         // last cursor X when nest timer started
+  var _lastDragY = 0;         // last cursor Y when nest timer started
   var NEST_HOLD_MS = 500;
+  var NEST_MOVE_THRESHOLD = 8; // px — movement beyond this resets the nest timer
 
   function clearNestState() {
     if (_nestTimer) { clearTimeout(_nestTimer); _nestTimer = null; }
@@ -3770,12 +3772,19 @@
     _nestTargetId = null;
   }
 
-  // Check if cursor is in the nest zone (top 50%) of the target element
-  function isInNestZone(targetEl) {
-    if (!targetEl) return false;
-    var rect = targetEl.getBoundingClientRect();
-    var threshold = rect.top + rect.height * 0.5;
-    return _lastDragY <= threshold;
+  // Start a new nest timer, recording the cursor anchor position
+  function startNestTimer(targetId, cx, cy) {
+    clearNestState();
+    _nestTargetId = targetId;
+    _lastDragX = cx;
+    _lastDragY = cy;
+    _nestTimer = setTimeout(function() {
+      var el = itemsEl.querySelector('.todo-item-group[data-group-id="' + _nestTargetId + '"]');
+      if (el) {
+        _nestTargetEl = el;
+        el.classList.add('todo-nest-target');
+      }
+    }, NEST_HOLD_MS);
   }
 
   function canNestInto(draggedId, targetId) {
@@ -3821,34 +3830,41 @@
           _nestDraggedId = evt.item.getAttribute('data-group-id');
         },
         onMove: function(evt) {
-          // Track cursor Y for nest-zone detection
+          // Get current cursor position
+          var cx = 0, cy = 0;
           if (evt.originalEvent) {
-            _lastDragY = evt.originalEvent.clientY || (evt.originalEvent.touches && evt.originalEvent.touches[0] ? evt.originalEvent.touches[0].clientY : _lastDragY);
+            if (evt.originalEvent.touches && evt.originalEvent.touches[0]) {
+              cx = evt.originalEvent.touches[0].clientX;
+              cy = evt.originalEvent.touches[0].clientY;
+            } else {
+              cx = evt.originalEvent.clientX || 0;
+              cy = evt.originalEvent.clientY || 0;
+            }
           }
 
-          // evt.related is the element being hovered over
+          // Check if cursor moved beyond the stillness threshold
+          var dx = cx - _lastDragX;
+          var dy = cy - _lastDragY;
+          var moved = Math.sqrt(dx * dx + dy * dy) > NEST_MOVE_THRESHOLD;
+
+          // If cursor moved significantly, clear nest state (indicator + timer)
+          if (moved && (_nestTimer || _nestTargetEl)) {
+            clearNestState();
+          }
+
+          // Determine which task group the cursor is over
           var relatedGroup = evt.related ? evt.related.closest('.todo-item-group') : null;
           var relatedId = relatedGroup ? relatedGroup.getAttribute('data-group-id') : null;
 
-          // If hovering over a different target than before, reset timer
+          // If hovering over a new valid target, start fresh timer
           if (relatedId !== _nestTargetId || !relatedId) {
             clearNestState();
             if (relatedId && canNestInto(_nestDraggedId, relatedId)) {
-              _nestTargetId = relatedId;
-              _nestTimer = setTimeout(function() {
-                // Find the element fresh (it may have moved in DOM)
-                var el = itemsEl.querySelector('.todo-item-group[data-group-id="' + _nestTargetId + '"]');
-                if (el && isInNestZone(el)) {
-                  _nestTargetEl = el;
-                  el.classList.add('todo-nest-target');
-                }
-              }, NEST_HOLD_MS);
+              startNestTimer(relatedId, cx, cy);
             }
-          } else if (_nestTargetEl) {
-            // Same target — check if cursor moved out of the nest zone
-            if (!isInNestZone(_nestTargetEl)) {
-              clearNestState();
-            }
+          } else if (!_nestTimer && !_nestTargetEl && relatedId && canNestInto(_nestDraggedId, relatedId)) {
+            // Same target but timer was cleared by movement — restart if cursor settles
+            startNestTimer(relatedId, cx, cy);
           }
         },
         onEnd: function(evt) {
