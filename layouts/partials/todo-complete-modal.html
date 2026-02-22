@@ -575,7 +575,7 @@
   closeBtn.addEventListener('click', function() { closeModal(true); });
   cancelBtn.addEventListener('click', function() { closeModal(true); });
 
-  // Escape key
+  // Escape key + Enter to save
   modal.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       // Don't close modal if dropdown was just dismissed by Escape
@@ -587,7 +587,13 @@
       e.preventDefault();
       closeModal(true);
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    if (e.key === 'Enter') {
+      // If category input is focused with text or active dropdown, let it handle Enter
+      if (document.activeElement === categoryInput) {
+        var hasText = categoryInput.value.trim().length > 0;
+        var isDropdownVisible = categoryDropdown.classList.contains('show');
+        if (hasText || (isDropdownVisible && dropdownActiveIdx >= 0)) return;
+      }
       e.preventDefault();
       saveBtn.click();
     }
