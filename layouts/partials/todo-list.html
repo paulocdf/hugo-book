@@ -3760,6 +3760,7 @@
   var _nestTargetEl = null;   // .todo-item-group currently highlighted for nesting
   var _nestTargetId = null;   // id of the target parent
   var _nestDraggedId = null;  // id of the item being dragged
+  var _lastDragY = 0;         // last known cursor Y during drag (for nest zone check)
   var NEST_HOLD_MS = 500;
 
   function clearNestState() {
@@ -3767,6 +3768,14 @@
     if (_nestTargetEl) { _nestTargetEl.classList.remove('todo-nest-target'); }
     _nestTargetEl = null;
     _nestTargetId = null;
+  }
+
+  // Check if cursor is in the nest zone (top 50%) of the target element
+  function isInNestZone(targetEl) {
+    if (!targetEl) return false;
+    var rect = targetEl.getBoundingClientRect();
+    var threshold = rect.top + rect.height * 0.5;
+    return _lastDragY <= threshold;
   }
 
   function canNestInto(draggedId, targetId) {
@@ -3812,6 +3821,11 @@
           _nestDraggedId = evt.item.getAttribute('data-group-id');
         },
         onMove: function(evt) {
+          // Track cursor Y for nest-zone detection
+          if (evt.originalEvent) {
+            _lastDragY = evt.originalEvent.clientY || (evt.originalEvent.touches && evt.originalEvent.touches[0] ? evt.originalEvent.touches[0].clientY : _lastDragY);
+          }
+
           // evt.related is the element being hovered over
           var relatedGroup = evt.related ? evt.related.closest('.todo-item-group') : null;
           var relatedId = relatedGroup ? relatedGroup.getAttribute('data-group-id') : null;
@@ -3824,11 +3838,16 @@
               _nestTimer = setTimeout(function() {
                 // Find the element fresh (it may have moved in DOM)
                 var el = itemsEl.querySelector('.todo-item-group[data-group-id="' + _nestTargetId + '"]');
-                if (el) {
+                if (el && isInNestZone(el)) {
                   _nestTargetEl = el;
                   el.classList.add('todo-nest-target');
                 }
               }, NEST_HOLD_MS);
+            }
+          } else if (_nestTargetEl) {
+            // Same target — check if cursor moved out of the nest zone
+            if (!isInNestZone(_nestTargetEl)) {
+              clearNestState();
             }
           }
         },
