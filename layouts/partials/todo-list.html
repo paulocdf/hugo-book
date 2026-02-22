@@ -3762,6 +3762,7 @@
   var _nestDraggedId = null;  // id of the item being dragged
   var _lastDragX = 0;         // last cursor X when nest timer started
   var _lastDragY = 0;         // last cursor Y when nest timer started
+  var _isDragging = false;    // true while a drag is in progress
   var NEST_HOLD_MS = 500;
   var NEST_MOVE_THRESHOLD = 8; // px — movement beyond this resets the nest timer
 
@@ -3785,6 +3786,25 @@
         el.classList.add('todo-nest-target');
       }
     }, NEST_HOLD_MS);
+  }
+
+  // Global mouse/touch tracking during drag — clears nest when cursor moves
+  function _onDragCursorMove(e) {
+    if (!_isDragging) return;
+    if (!_nestTimer && !_nestTargetEl) return;
+    var cx, cy;
+    if (e.touches && e.touches[0]) {
+      cx = e.touches[0].clientX;
+      cy = e.touches[0].clientY;
+    } else {
+      cx = e.clientX || 0;
+      cy = e.clientY || 0;
+    }
+    var dx = cx - _lastDragX;
+    var dy = cy - _lastDragY;
+    if (Math.sqrt(dx * dx + dy * dy) > NEST_MOVE_THRESHOLD) {
+      clearNestState();
+    }
   }
 
   function canNestInto(draggedId, targetId) {
@@ -3828,6 +3848,9 @@
         filter: '.done, .migrated, .scheduled',
         onStart: function(evt) {
           _nestDraggedId = evt.item.getAttribute('data-group-id');
+          _isDragging = true;
+          document.addEventListener('mousemove', _onDragCursorMove, true);
+          document.addEventListener('touchmove', _onDragCursorMove, true);
         },
         onMove: function(evt) {
           // Get current cursor position
@@ -3842,16 +3865,6 @@
             }
           }
 
-          // Check if cursor moved beyond the stillness threshold
-          var dx = cx - _lastDragX;
-          var dy = cy - _lastDragY;
-          var moved = Math.sqrt(dx * dx + dy * dy) > NEST_MOVE_THRESHOLD;
-
-          // If cursor moved significantly, clear nest state (indicator + timer)
-          if (moved && (_nestTimer || _nestTargetEl)) {
-            clearNestState();
-          }
-
           // Determine which task group the cursor is over
           var relatedGroup = evt.related ? evt.related.closest('.todo-item-group') : null;
           var relatedId = relatedGroup ? relatedGroup.getAttribute('data-group-id') : null;
@@ -3863,11 +3876,15 @@
               startNestTimer(relatedId, cx, cy);
             }
           } else if (!_nestTimer && !_nestTargetEl && relatedId && canNestInto(_nestDraggedId, relatedId)) {
-            // Same target but timer was cleared by movement — restart if cursor settles
+            // Same target but timer was cleared by movement — restart when cursor settles
             startNestTimer(relatedId, cx, cy);
           }
         },
         onEnd: function(evt) {
+          _isDragging = false;
+          document.removeEventListener('mousemove', _onDragCursorMove, true);
+          document.removeEventListener('touchmove', _onDragCursorMove, true);
+
           var nestTargetId = _nestTargetEl ? _nestTargetId : null;
           clearNestState();
           _nestDraggedId = null;
