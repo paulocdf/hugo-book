@@ -1413,6 +1413,45 @@
 .todo-undo-btn:hover {
   background: rgba(25, 118, 210, 0.08);
 }
+/* Celebratory done toast variant */
+.todo-toast-done {
+  background: var(--sidebar-bg, #f7f7f7);
+  color: var(--body-font-color, #333);
+  border: 1px solid var(--color-success, #2e7d32);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+  padding: 8px 10px 8px 14px;
+}
+.todo-toast-done .todo-toast-icon {
+  color: var(--color-success, #2e7d32);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+/* Toast progress bar (shared across all action toasts) */
+.todo-toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--accent-blue, #1976d2);
+  border-radius: 0 0 8px 8px;
+  width: 100%;
+  transform-origin: left;
+}
+.todo-toast-done .todo-toast-progress {
+  background: var(--color-success, #2e7d32);
+}
+.todo-toast-undo, .todo-toast-done {
+  position: relative;
+  overflow: hidden;
+}
+@keyframes toast-progress-shrink {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
 
 /* Mobile responsiveness */
 @media screen and (max-width: 500px) {
@@ -3180,11 +3219,36 @@
     var todo = allTodos.find(function(t) { return t.id === todoId; });
     if (!todo) return;
     var today = getTodayStr();
+
+    // Snapshot state before migrating (for undo)
+    var snapshots = [{ id: todo.id, bujoState: todo.bujoState || 'open', scheduledDate: todo.scheduledDate }];
+    allTodos.forEach(function(t) {
+      if (t.parentId === todoId && !t.done) {
+        snapshots.push({ id: t.id, bujoState: t.bujoState || 'open', scheduledDate: t.scheduledDate });
+      }
+    });
+
     changeBujoState(todo, 'migrated', today);
     // Also migrate children (subtasks)
     allTodos.forEach(function(t) {
       if (t.parentId === todoId && !t.done) {
         changeBujoState(t, 'migrated', today);
+      }
+    });
+
+    var taskTitle = todo.title || '';
+    if (taskTitle.length > 30) taskTitle = taskTitle.substring(0, 30) + '...';
+
+    showActionToast({
+      message: 'Migrated \u201c' + taskTitle + '\u201d to today',
+      duration: 3000,
+      onUndo: function() {
+        // Restore pre-migration state
+        snapshots.forEach(function(snap) {
+          var t = allTodos.find(function(x) { return x.id === snap.id; });
+          if (!t) return;
+          changeBujoState(t, snap.bujoState, snap.scheduledDate);
+        });
       }
     });
   }
@@ -3397,13 +3461,9 @@
           }
           if (newState === 'done' && bujoType === 'task') {
             closeStatePicker();
-            // Use completion modal for tasks
-            if (window.dmTodoComplete) {
-              window.dmTodoComplete.open(todo, function(result) {
-                if (!result) { render(); return; }
-                completeTodo(todo, result.actualMin, result.category);
-              });
-            }
+            // Instant completion with celebratory toast
+            var prefillMin = todo.estimatedMin || null;
+            completeTodoWithToast(todo, prefillMin, todo.category || null);
             return;
           }
           if (newState === 'done' && bujoType !== 'task') {
@@ -3524,7 +3584,7 @@
 
         if (bujoState === 'open') {
           if (bujoType === 'task') {
-            // Tasks use the completion modal (for time tracking)
+            // Instant completion — skip modal, use tracked/estimated time
             var pomodoroMinutes = 0;
             if (window.dmPomodoro && window.dmPomodoro.isActive(todoId)) {
               pomodoroMinutes = _pomodoroTrackedMinutes[todoId] || 0;
@@ -3536,29 +3596,20 @@
               pomodoroMinutes = _pomodoroTrackedMinutes[todoId];
             }
 
-            if (window.dmTodoComplete) {
-              var modalOpts = {};
-              if (pomodoroMinutes > 0) {
-                modalOpts.trackedMinutes = pomodoroMinutes;
+            var prefillMin = pomodoroMinutes > 0 ? pomodoroMinutes : (todo.estimatedMin || null);
+            completeTodoWithToast(todo, prefillMin, todo.category || null);
+
+            // Clean up tracked minutes
+            delete _pomodoroTrackedMinutes[todoId];
+            try {
+              var _tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
+              delete _tracked[todoId];
+              if (Object.keys(_tracked).length === 0) {
+                localStorage.removeItem('dm-pomodoro-tracked');
+              } else {
+                localStorage.setItem('dm-pomodoro-tracked', JSON.stringify(_tracked));
               }
-              window.dmTodoComplete.open(todo, function(result) {
-                if (!result) {
-                  render();
-                  return;
-                }
-                completeTodo(todo, result.actualMin, result.category);
-                delete _pomodoroTrackedMinutes[todoId];
-                try {
-                  var _tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
-                  delete _tracked[todoId];
-                  if (Object.keys(_tracked).length === 0) {
-                    localStorage.removeItem('dm-pomodoro-tracked');
-                  } else {
-                    localStorage.setItem('dm-pomodoro-tracked', JSON.stringify(_tracked));
-                  }
-                } catch(e) {}
-              }, modalOpts);
-            }
+            } catch(e) {}
           } else {
             // Events and notes complete directly (no time tracking)
             completeTodo(todo, null, null);
@@ -4500,6 +4551,69 @@
     }); // end userIdPromise.then
   }
 
+  // ─── Instant completion with celebratory toast + undo ───
+  function completeTodoWithToast(todo, actualMin, category) {
+    // Snapshot state before completing (for undo)
+    var snapshot = {
+      done: todo.done,
+      status: todo.status,
+      bujoState: todo.bujoState,
+      actualMin: todo.actualMin,
+      category: todo.category,
+      completedAt: todo.completedAt,
+      updatedAt: todo.updatedAt
+    };
+
+    completeTodo(todo, actualMin, category);
+
+    var taskTitle = todo.title || 'Task';
+    if (taskTitle.length > 30) taskTitle = taskTitle.substring(0, 30) + '...';
+
+    showActionToast({
+      message: 'Completed \u201c' + taskTitle + '\u201d',
+      icon: '\u2714',
+      cssClass: 'todo-toast-done',
+      duration: 3000,
+      onUndo: function() {
+        // Restore pre-completion state
+        var updateData = {
+          done: snapshot.done,
+          status: snapshot.status,
+          bujoState: snapshot.bujoState,
+          actualMin: snapshot.actualMin,
+          category: snapshot.category,
+          completedAt: snapshot.completedAt,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        todo.done = snapshot.done;
+        todo.status = snapshot.status;
+        todo.bujoState = snapshot.bujoState;
+        todo.actualMin = snapshot.actualMin;
+        todo.category = snapshot.category;
+        todo.completedAt = snapshot.completedAt;
+        todo.updatedAt = Date.now();
+
+        if (window.dmSync) {
+          window.dmSync.firestoreWrite({
+            collection: 'todos',
+            docId: todo.id,
+            op: 'update',
+            data: updateData,
+            localOp: function() {
+              return window.dmSync.putTodo(todo);
+            }
+          }).then(function() {
+            render();
+          }).catch(function(err) {
+            console.error('Error undoing completion:', err);
+            showTodoError('Failed to undo — check console');
+          });
+        }
+      }
+    });
+  }
+
   function completeTodo(todo, actualMin, category) {
     var updateData = {
       done: true,
@@ -4782,36 +4896,68 @@
     });
   }
 
-  function showUndoToast(taskTitle, onUndo) {
-    // Clear any existing undo toast
-    dismissUndoToast();
+  /**
+   * showActionToast({ message, icon, cssClass, onUndo, duration })
+   *  - message:  string (required) — label text
+   *  - icon:     string (optional) — HTML icon to show before label
+   *  - cssClass: string (optional) — extra class on the toast (e.g. 'todo-toast-done')
+   *                                   defaults to 'todo-toast-undo'
+   *  - onUndo:   function (optional) — if provided an Undo button is shown
+   *  - duration: number (optional) — auto-dismiss ms, default 3000
+   */
+  function showActionToast(opts) {
+    dismissActionToast();
+
+    var msg      = opts.message || 'Done';
+    var icon     = opts.icon || '';
+    var cls      = opts.cssClass || 'todo-toast-undo';
+    var onUndo   = opts.onUndo || null;
+    var duration = opts.duration != null ? opts.duration : 3000;
 
     var toast = document.createElement('div');
-    toast.className = 'todo-toast todo-toast-undo';
-    var label = taskTitle ? 'Deleted "' + taskTitle + '"' : 'Task deleted';
-    toast.innerHTML =
-      '<span class="todo-undo-label">' + label + '</span>' +
-      '<button type="button" class="todo-undo-btn">Undo</button>';
+    toast.className = 'todo-toast ' + cls;
+
+    var html = '';
+    if (icon) html += '<span class="todo-toast-icon">' + icon + '</span>';
+    html += '<span class="todo-undo-label">' + msg + '</span>';
+    if (onUndo) html += '<button type="button" class="todo-undo-btn">Undo</button>';
+    html += '<span class="todo-toast-progress"></span>';
+    toast.innerHTML = html;
+    // Apply animation via JS to avoid Hugo template parser issues with inline style colons
+    var progressBar = toast.querySelector('.todo-toast-progress');
+    if (progressBar) {
+      progressBar.style.animation = 'toast-progress-shrink ' + duration + 'ms linear forwards';
+    }
     document.body.appendChild(toast);
     _undoToast = toast;
 
-    // Wire undo button
-    toast.querySelector('.todo-undo-btn').addEventListener('click', function(e) {
-      e.stopPropagation();
-      dismissUndoToast();
-      if (onUndo) onUndo();
-    });
+    if (onUndo) {
+      toast.querySelector('.todo-undo-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        dismissActionToast();
+        onUndo();
+      });
+    }
 
     // Slide in
     setTimeout(function() { toast.classList.add('show'); }, 10);
 
-    // Auto-dismiss after 5 seconds
+    // Auto-dismiss
     _undoTimer = setTimeout(function() {
-      dismissUndoToast();
-    }, 5000);
+      dismissActionToast();
+    }, duration);
   }
 
-  function dismissUndoToast() {
+  // Legacy wrapper so any remaining callers still work
+  function showUndoToast(taskTitle, onUndo) {
+    showActionToast({
+      message: taskTitle ? 'Deleted \u201c' + taskTitle + '\u201d' : 'Task deleted',
+      onUndo: onUndo,
+      duration: 3000
+    });
+  }
+
+  function dismissActionToast() {
     if (_undoTimer) { clearTimeout(_undoTimer); _undoTimer = null; }
     if (_undoToast) {
       _undoToast.classList.remove('show');
@@ -4820,6 +4966,9 @@
       _undoToast = null;
     }
   }
+
+  // Legacy alias
+  function dismissUndoToast() { dismissActionToast(); }
 
   function archiveAllCompleted(ids) {
     if (!window.dmSync || ids.length === 0) return;
@@ -4865,6 +5014,17 @@
 
     if (!window.dmSync) return;
 
+    // Snapshot status before archiving (for undo)
+    var snapshots = [];
+    toArchive.forEach(function(id) {
+      var todo = allTodos.find(function(t) { return t.id === id; });
+      if (todo) snapshots.push({ id: id, status: todo.status });
+    });
+
+    var mainTodo = allTodos.find(function(t) { return t.id === todoId; });
+    var taskTitle = mainTodo ? (mainTodo.title || '') : '';
+    if (taskTitle.length > 30) taskTitle = taskTitle.substring(0, 30) + '...';
+
     var chain = Promise.resolve();
     toArchive.forEach(function(id) {
       chain = chain.then(function() {
@@ -4891,6 +5051,41 @@
 
     chain.then(function() {
       render();
+      showActionToast({
+        message: 'Archived \u201c' + taskTitle + '\u201d',
+        duration: 3000,
+        onUndo: function() {
+          // Restore pre-archive status
+          var undoChain = Promise.resolve();
+          snapshots.forEach(function(snap) {
+            undoChain = undoChain.then(function() {
+              var todo = allTodos.find(function(t) { return t.id === snap.id; });
+              if (!todo) return Promise.resolve();
+              var updateData = {
+                status: snap.status,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              };
+              todo.status = snap.status;
+              todo.updatedAt = Date.now();
+              return window.dmSync.firestoreWrite({
+                collection: 'todos',
+                docId: snap.id,
+                op: 'update',
+                data: updateData,
+                localOp: function() {
+                  return window.dmSync.putTodo(todo);
+                }
+              });
+            });
+          });
+          undoChain.then(function() {
+            render();
+          }).catch(function(err) {
+            console.error('Error undoing archive:', err);
+            showTodoError('Failed to undo archive — check console');
+          });
+        }
+      });
     }).catch(function(err) {
       console.error('Error archiving todo:', err);
       showTodoError('Failed to archive task — check console');
