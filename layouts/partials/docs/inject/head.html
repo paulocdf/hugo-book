@@ -36,36 +36,27 @@
 
     // Global sign-in helper.
     //
-    // Localhost: always use signInWithRedirect (Chrome blocks third-party
-    // cookies from the signInWithPopup cross-origin popup).
+    // Always use signInWithPopup first.  Chrome's third-party cookie
+    // deprecation now breaks signInWithRedirect on localhost (and
+    // increasingly on production too): getRedirectResult() resolves null
+    // because the firebaseapp.com auth handler can no longer write
+    // cross-origin cookies/storage.  signInWithPopup communicates
+    // credentials back via postMessage, bypassing the cookie issue.
     //
-    // Mobile (iPhone/Android): try signInWithPopup first.  On iOS all browsers
-    // use WebKit and Safari ITP blocks cross-origin storage from the
-    // firebaseapp.com auth handler, making signInWithRedirect silently fail
-    // (getRedirectResult resolves null).  signInWithPopup opens a same-tab
-    // popup/sheet that avoids ITP.  If the popup is blocked (rare), fall back
-    // to signInWithRedirect as a last resort.
-    //
-    // Desktop production: signInWithPopup (standard behaviour).
+    // If the popup is blocked (e.g. iOS Safari, strict browser settings),
+    // fall back to signInWithRedirect as a last resort.
     window.dmSignIn = function() {
       if (!window.dmAuth || !window.dmGoogleProvider) return;
-      if (isLocalhost) {
-        // Redirect is the only reliable option for localhost
-        window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
-      } else {
-        // Popup-first for both mobile and desktop
-        window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
-          // auth/popup-blocked or auth/popup-closed-by-user — fall back to redirect
-          if (err.code === 'auth/popup-blocked' ||
-              err.code === 'auth/popup-closed-by-user' ||
-              err.code === 'auth/cancelled-popup-request') {
-            console.warn('Popup blocked/closed, falling back to redirect:', err.code);
-            window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
-          } else {
-            console.error('Sign-in error:', err);
-          }
-        });
-      }
+      window.dmAuth.signInWithPopup(window.dmGoogleProvider).catch(function(err) {
+        if (err.code === 'auth/popup-blocked' ||
+            err.code === 'auth/popup-closed-by-user' ||
+            err.code === 'auth/cancelled-popup-request') {
+          console.warn('Popup blocked/closed, falling back to redirect:', err.code);
+          window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
+        } else {
+          console.error('Sign-in error:', err);
+        }
+      });
     };
 
     // dmAuthReady: resolves once Firebase auth state has settled.

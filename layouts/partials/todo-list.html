@@ -1352,25 +1352,19 @@
   border-color: var(--color-danger, #e53e3e);
 }
 
-/* Toast notifications */
+/* Toast notifications — use absolute positioning + JS scroll tracking
+   to bypass ancestors with will-change/transform that break position:fixed */
 .todo-toast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%) translateY(20px);
+  position: absolute;
   padding: 8px 16px;
   border-radius: 8px;
   font-size: 0.82rem;
   font-weight: 500;
   opacity: 0;
-  transition: opacity 0.3s, transform 0.3s;
+  transition: opacity 0.3s;
   z-index: 9999;
   pointer-events: none;
   white-space: nowrap;
-}
-.todo-toast.show {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
 .todo-toast-error {
   background: var(--color-danger-bg, #fee);
@@ -2722,14 +2716,25 @@
   updateCategoryChip();
 
   // ─── Toast notifications ───
+  function positionToastElement(el) {
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var tw = el.offsetWidth;
+    el.style.left = Math.round((vw - tw) / 2) + 'px';
+    el.style.top = (window.scrollY + vh - el.offsetHeight - 24) + 'px';
+  }
+
   function showTodoError(msg) {
     var toast = document.createElement('div');
     toast.className = 'todo-toast todo-toast-error';
     toast.textContent = msg;
     document.body.appendChild(toast);
-    setTimeout(function() { toast.classList.add('show'); }, 10);
     setTimeout(function() {
-      toast.classList.remove('show');
+      positionToastElement(toast);
+      toast.style.opacity = '1';
+    }, 10);
+    setTimeout(function() {
+      toast.style.opacity = '0';
       setTimeout(function() { toast.remove(); }, 300);
     }, 4000);
   }
@@ -3580,9 +3585,6 @@
         if (!todo) { console.warn('[bujo-click] todo not found for id:', todoId); return; }
         var bujoType = todo.bujoType || 'task';
         var bujoState = todo.bujoState || 'open';
-        console.log('[bujo-click] todoId:', todoId, 'bujoType:', bujoType, 'bujoState:', bujoState);
-
-
         if (bujoState === 'open') {
           if (bujoType === 'task') {
             // Instant completion — skip modal, use tracked/estimated time
@@ -4553,7 +4555,6 @@
 
   // ─── Instant completion with celebratory toast + undo ───
   function completeTodoWithToast(todo, actualMin, category) {
-    console.log('[toast] completeTodoWithToast called for:', todo.title, 'actualMin:', actualMin);
     // Snapshot state before completing (for undo)
     var snapshot = {
       done: todo.done,
@@ -4819,6 +4820,7 @@
   // ─── Instant delete with undo toast ───
   var _undoTimer = null;
   var _undoToast = null;
+  var _toastPositionHandler = null;
 
   function deleteTodoWithUndo(todoId) {
     // Snapshot the state of all affected todos before deleting (for undo)
@@ -4907,7 +4909,6 @@
    *  - duration: number (optional) — auto-dismiss ms, default 3000
    */
   function showActionToast(opts) {
-    console.log('[toast] showActionToast called:', opts.message, 'cssClass:', opts.cssClass);
     dismissActionToast();
 
     var msg      = opts.message || 'Done';
@@ -4932,7 +4933,11 @@
     }
     document.body.appendChild(toast);
     _undoToast = toast;
-    console.log('[toast] toast appended to body, className:', toast.className, 'innerHTML:', toast.innerHTML.substring(0, 100));
+
+    // Position toast at bottom-center of viewport using shared utility
+    function positionToast() {
+      if (_undoToast) positionToastElement(_undoToast);
+    }
 
     if (onUndo) {
       toast.querySelector('.todo-undo-btn').addEventListener('click', function(e) {
@@ -4942,8 +4947,16 @@
       });
     }
 
-    // Slide in
-    setTimeout(function() { toast.classList.add('show'); }, 10);
+    // Initial position + slide in
+    setTimeout(function() {
+      positionToast();
+      toast.style.opacity = '1';
+    }, 10);
+
+    // Keep pinned to viewport on scroll/resize
+    _toastPositionHandler = function() { positionToast(); };
+    window.addEventListener('scroll', _toastPositionHandler, { passive: true });
+    window.addEventListener('resize', _toastPositionHandler, { passive: true });
 
     // Auto-dismiss
     _undoTimer = setTimeout(function() {
@@ -4962,8 +4975,13 @@
 
   function dismissActionToast() {
     if (_undoTimer) { clearTimeout(_undoTimer); _undoTimer = null; }
+    if (_toastPositionHandler) {
+      window.removeEventListener('scroll', _toastPositionHandler);
+      window.removeEventListener('resize', _toastPositionHandler);
+      _toastPositionHandler = null;
+    }
     if (_undoToast) {
-      _undoToast.classList.remove('show');
+      _undoToast.style.opacity = '0';
       var t = _undoToast;
       setTimeout(function() { t.remove(); }, 300);
       _undoToast = null;
