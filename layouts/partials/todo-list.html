@@ -967,11 +967,11 @@
   flex-shrink: 0;
 }
 
-/* Individual migrate action button on overdue open tasks */
-.todo-item-action-btn.migrate-today {
+/* Migrate action button on open tasks */
+.todo-item-action-btn.migrate-forward {
   color: #8b6e4e;
 }
-.todo-item-action-btn.migrate-today:hover {
+.todo-item-action-btn.migrate-forward:hover {
   color: #6b4e2e;
   background: rgba(139, 110, 78, 0.1);
 }
@@ -3098,15 +3098,9 @@
       html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8v13H3V8"></path><path d="M1 3h22v5H1z"></path><path d="M10 12h4"></path></svg>';
       html += '</button>';
     }
-    // Migrate to Today button (for open tasks in overdue groups)
-    if (isOverdue && !todo.done && bujoState === 'open') {
-      html += '<button type="button" class="todo-item-action-btn migrate-today" data-migrate-id="' + todo.id + '" title="Migrate to today" aria-label="Migrate to today">';
-      html += '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>';
-      html += '</button>';
-    }
-    // Push to Tomorrow button (for open tasks in today's group)
-    if (isToday && !todo.done && bujoState === 'open') {
-      html += '<button type="button" class="todo-item-action-btn migrate-tomorrow" data-migrate-tomorrow-id="' + todo.id + '" title="Push to tomorrow" aria-label="Push to tomorrow">';
+    // Migrate forward button (move task +1 day — BuJo migration)
+    if (!todo.done) {
+      html += '<button type="button" class="todo-item-action-btn migrate-forward" data-migrate-forward-id="' + todo.id + '" title="Migrate forward one day" aria-label="Migrate forward one day">';
       html += '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>';
       html += '</button>';
     }
@@ -3463,11 +3457,20 @@
     return div.innerHTML;
   }
 
-  // ─── Migrate to Today ───
-  function migrateToToday(todoId) {
+  function migrateForward(todoId) {
     var todo = allTodos.find(function(t) { return t.id === todoId; });
     if (!todo) return;
-    var today = getTodayStr();
+
+    // Compute target: scheduledDate + 1 day (or tomorrow if unscheduled)
+    var baseDate;
+    if (todo.scheduledDate) {
+      var parts = todo.scheduledDate.split('-');
+      baseDate = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    } else {
+      baseDate = new Date();
+    }
+    baseDate.setDate(baseDate.getDate() + 1);
+    var targetDate = baseDate.getFullYear() + '-' + String(baseDate.getMonth() + 1).padStart(2, '0') + '-' + String(baseDate.getDate()).padStart(2, '0');
 
     // Snapshot state before migrating (for undo)
     var snapshots = [{ id: todo.id, bujoState: todo.bujoState || 'open', scheduledDate: todo.scheduledDate }];
@@ -3477,57 +3480,23 @@
       }
     });
 
-    changeBujoState(todo, 'migrated', today);
+    changeBujoState(todo, 'migrated', targetDate);
     // Also migrate children (subtasks)
     allTodos.forEach(function(t) {
       if (t.parentId === todoId && !t.done) {
-        changeBujoState(t, 'migrated', today);
+        changeBujoState(t, 'migrated', targetDate);
       }
     });
 
+    // Format target date for toast message
+    var targetD = new Date(parseInt(targetDate.split('-')[0], 10), parseInt(targetDate.split('-')[1], 10) - 1, parseInt(targetDate.split('-')[2], 10));
+    var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var targetLabel = dayNames[targetD.getDay()] + ' ' + targetD.getDate();
     var taskTitle = todo.title || '';
     if (taskTitle.length > 30) taskTitle = taskTitle.substring(0, 30) + '...';
 
     showActionToast({
-      message: 'Migrated \u201c' + taskTitle + '\u201d to today',
-      duration: 3000,
-      onUndo: function() {
-        // Restore pre-migration state
-        snapshots.forEach(function(snap) {
-          var t = allTodos.find(function(x) { return x.id === snap.id; });
-          if (!t) return;
-          changeBujoState(t, snap.bujoState, snap.scheduledDate);
-        });
-      }
-    });
-  }
-
-  function migrateToTomorrow(todoId) {
-    var todo = allTodos.find(function(t) { return t.id === todoId; });
-    if (!todo) return;
-    var tomorrow = getDateOffset(1);
-
-    // Snapshot state before migrating (for undo)
-    var snapshots = [{ id: todo.id, bujoState: todo.bujoState || 'open', scheduledDate: todo.scheduledDate }];
-    allTodos.forEach(function(t) {
-      if (t.parentId === todoId && !t.done) {
-        snapshots.push({ id: t.id, bujoState: t.bujoState || 'open', scheduledDate: t.scheduledDate });
-      }
-    });
-
-    changeBujoState(todo, 'migrated', tomorrow);
-    // Also migrate children (subtasks)
-    allTodos.forEach(function(t) {
-      if (t.parentId === todoId && !t.done) {
-        changeBujoState(t, 'migrated', tomorrow);
-      }
-    });
-
-    var taskTitle = todo.title || '';
-    if (taskTitle.length > 30) taskTitle = taskTitle.substring(0, 30) + '...';
-
-    showActionToast({
-      message: 'Pushed \u201c' + taskTitle + '\u201d to tomorrow',
+      message: 'Migrated \u201c' + taskTitle + '\u201d to ' + targetLabel,
       duration: 3000,
       onUndo: function() {
         snapshots.forEach(function(snap) {
@@ -3865,20 +3834,12 @@
     });
 
     // Migrate individual task to today
-    itemsEl.querySelectorAll('.todo-item-action-btn.migrate-today[data-migrate-id]').forEach(function(btn) {
+    // Migrate forward (BuJo migration — move task +1 day)
+    itemsEl.querySelectorAll('.todo-item-action-btn.migrate-forward[data-migrate-forward-id]').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
-        var todoId = btn.getAttribute('data-migrate-id');
-        migrateToToday(todoId);
-      });
-    });
-
-    // Push individual task to tomorrow
-    itemsEl.querySelectorAll('.todo-item-action-btn.migrate-tomorrow[data-migrate-tomorrow-id]').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        var todoId = btn.getAttribute('data-migrate-tomorrow-id');
-        migrateToTomorrow(todoId);
+        var todoId = btn.getAttribute('data-migrate-forward-id');
+        migrateForward(todoId);
       });
     });
 
