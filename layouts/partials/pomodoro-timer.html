@@ -1334,6 +1334,71 @@
       });
       return 900;
     }},
+    plang: { label: 'Plang', type: 'notification', play: function(ctx, vol) {
+      // Soothing vibraphone-like plang with fade-in swell + metallic strike + long decay
+      var now = ctx.currentTime;
+      var strikeTime = 0.5; // swell duration before the strike
+
+      // 1. Fade-in pad swell — warm sine that builds anticipation
+      var padOsc = ctx.createOscillator();
+      var padGain = ctx.createGain();
+      padOsc.type = 'sine';
+      padOsc.frequency.value = 523.25; // C5
+      padGain.gain.setValueAtTime(0.0001, now);
+      padGain.gain.linearRampToValueAtTime(vol * 0.06, now + strikeTime);
+      // Merge into the strike decay
+      padGain.gain.setValueAtTime(vol * 0.06, now + strikeTime);
+      padGain.gain.exponentialRampToValueAtTime(0.0001, now + 2.8);
+      padOsc.connect(padGain);
+      padGain.connect(ctx.destination);
+      padOsc.start(now);
+      padOsc.stop(now + 2.9);
+
+      // 2. Strike transient — filtered noise burst for mallet attack character
+      var noiseLen = Math.floor(ctx.sampleRate * 0.04);
+      var noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
+      var noiseData = noiseBuf.getChannelData(0);
+      for (var i = 0; i < noiseLen; i++) noiseData[i] = Math.random() * 2 - 1;
+      var noiseSrc = ctx.createBufferSource();
+      noiseSrc.buffer = noiseBuf;
+      // Bandpass filter to shape the noise into a mallet-like click
+      var noiseBP = ctx.createBiquadFilter();
+      noiseBP.type = 'bandpass';
+      noiseBP.frequency.value = 3000;
+      noiseBP.Q.value = 1.5;
+      var noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(vol * 0.18, now + strikeTime);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + strikeTime + 0.04);
+      noiseSrc.connect(noiseBP);
+      noiseBP.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+      noiseSrc.start(now + strikeTime);
+
+      // 3. Resonant body — layered partials with inharmonic ratios (metal bar acoustics)
+      var partials = [
+        { freq: 523.25, amp: 1.0,  decay: 2.2, detune: 0   },  // fundamental C5
+        { freq: 1318,   amp: 0.35, decay: 1.4, detune: 3   },  // ~2.52x (inharmonic)
+        { freq: 2093,   amp: 0.15, decay: 0.9, detune: -5  },  // ~4x (shimmer)
+        { freq: 3136,   amp: 0.06, decay: 0.5, detune: 7   }   // ~6x (sparkle, subtle)
+      ];
+      partials.forEach(function(p) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = p.freq;
+        osc.detune.value = p.detune;
+        // Sharp attack at strike time, then exponential decay
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.setValueAtTime(vol * 0.12 * p.amp, now + strikeTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + strikeTime + p.decay);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + strikeTime - 0.01);
+        osc.stop(now + strikeTime + p.decay + 0.1);
+      });
+
+      return 2900;
+    }},
 
     // ── Tick sounds (during countdown) ──
     'tick-soft': { label: 'Soft tick', type: 'tick', play: function(ctx, vol) {
@@ -1441,10 +1506,10 @@
 
   // Convenience methods
   function playWorkEndSound() {
-    playSound(getSoundPref('dm-pomo-sound-work', 'chime'));
+    playSound(getSoundPref('dm-pomo-sound-work', 'plang'));
   }
   function playBreakEndSound() {
-    playSound(getSoundPref('dm-pomo-sound-break', 'chime'));
+    playSound(getSoundPref('dm-pomo-sound-break', 'ascending'));
   }
   function playTickSound() {
     var tickId = getSoundPref('dm-pomo-sound-tick', 'none');

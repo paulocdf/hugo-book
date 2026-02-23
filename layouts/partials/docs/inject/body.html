@@ -2681,13 +2681,14 @@
           '<div class="sidebar-settings-row">' +
             '<label class="sidebar-settings-label" for="setting-sound-work">Work end</label>' +
             '<div class="sidebar-settings-control">' +
-              '<select id="setting-sound-work" class="sidebar-settings-select">' +
+               '<select id="setting-sound-work" class="sidebar-settings-select">' +
                 '<option value="chime">Chime</option>' +
                 '<option value="bell">Bell</option>' +
                 '<option value="digital">Digital</option>' +
                 '<option value="bowl">Singing bowl</option>' +
                 '<option value="ascending">Ascending</option>' +
                 '<option value="pulse">Soft pulse</option>' +
+                '<option value="plang">Plang</option>' +
                 '<option value="none">None</option>' +
               '</select>' +
               '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-work" title="Preview">' +
@@ -2698,13 +2699,14 @@
           '<div class="sidebar-settings-row">' +
             '<label class="sidebar-settings-label" for="setting-sound-break">Break end</label>' +
             '<div class="sidebar-settings-control">' +
-              '<select id="setting-sound-break" class="sidebar-settings-select">' +
+               '<select id="setting-sound-break" class="sidebar-settings-select">' +
                 '<option value="chime">Chime</option>' +
                 '<option value="bell">Bell</option>' +
                 '<option value="digital">Digital</option>' +
                 '<option value="bowl">Singing bowl</option>' +
                 '<option value="ascending">Ascending</option>' +
                 '<option value="pulse">Soft pulse</option>' +
+                '<option value="plang">Plang</option>' +
                 '<option value="none">None</option>' +
               '</select>' +
               '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-break" title="Preview">' +
@@ -2850,9 +2852,9 @@
     var soundVolumeLabel = document.getElementById('setting-sound-volume-label');
 
     // Read saved values
-    var savedWorkSound = 'chime';
+    var savedWorkSound = 'plang';
     try { var v = localStorage.getItem('dm-pomo-sound-work'); if (v) savedWorkSound = v; } catch(e) {}
-    var savedBreakSound = 'chime';
+    var savedBreakSound = 'ascending';
     try { var v = localStorage.getItem('dm-pomo-sound-break'); if (v) savedBreakSound = v; } catch(e) {}
     var savedTickSound = 'none';
     try { var v = localStorage.getItem('dm-pomo-sound-tick'); if (v) savedTickSound = v; } catch(e) {}
