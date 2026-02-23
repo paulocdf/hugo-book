@@ -1962,7 +1962,16 @@
       var trackedSoFar = accumulatedWorkSeconds;
       if (phase === 'work') trackedSoFar += (totalPhaseSeconds - secondsLeft);
       var mins = Math.round(trackedSoFar / 60);
-      if (mins > 0 && !confirm('Stop timer? ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ' of work will be recorded.')) {
+      if (mins > 0) {
+        window.dmConfirm({
+          title: 'Stop timer?',
+          message: mins + ' minute' + (mins !== 1 ? 's' : '') + ' of work will be recorded.',
+          confirmLabel: 'Stop',
+          cancelLabel: 'Keep going',
+          danger: false
+        }).then(function(confirmed) {
+          if (confirmed) closeTimer();
+        });
         return;
       }
     }
@@ -1972,9 +1981,16 @@
   // Close (x) button: cancel without recording time
   closeBtn.addEventListener('click', function() {
     if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
-      if (!confirm('Cancel timer? Tracked time will be discarded.')) {
-        return;
-      }
+      window.dmConfirm({
+        title: 'Cancel timer?',
+        message: 'Tracked time will be discarded.',
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep going',
+        danger: true
+      }).then(function(confirmed) {
+        if (confirmed) cancelTimer();
+      });
+      return;
     }
     cancelTimer();
   });
@@ -2438,7 +2454,16 @@
       var trackedSoFar = accumulatedWorkSeconds;
       if (phase === 'work') trackedSoFar += (totalPhaseSeconds - secondsLeft);
       var mins = Math.round(trackedSoFar / 60);
-      if (mins > 0 && !confirm('Stop timer? ' + mins + ' minute' + (mins !== 1 ? 's' : '') + ' of work will be recorded.')) {
+      if (mins > 0) {
+        window.dmConfirm({
+          title: 'Stop timer?',
+          message: mins + ' minute' + (mins !== 1 ? 's' : '') + ' of work will be recorded.',
+          confirmLabel: 'Stop',
+          cancelLabel: 'Keep going',
+          danger: false
+        }).then(function(confirmed) {
+          if (confirmed) closeTimer();
+        });
         return;
       }
     }
@@ -2447,9 +2472,16 @@
 
   focusCloseBtn.addEventListener('click', function() {
     if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
-      if (!confirm('Cancel timer? Tracked time will be discarded.')) {
-        return;
-      }
+      window.dmConfirm({
+        title: 'Cancel timer?',
+        message: 'Tracked time will be discarded.',
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep going',
+        danger: true
+      }).then(function(confirmed) {
+        if (confirmed) cancelTimer();
+      });
+      return;
     }
     cancelTimer();
   });

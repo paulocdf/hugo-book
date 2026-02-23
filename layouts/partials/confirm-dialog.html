@@ -1,0 +1,288 @@
+{{/* Global confirm/alert dialog — replaces native confirm() and alert() with a styled modal.
+     API:
+       window.dmConfirm({ title, message, confirmLabel, cancelLabel, danger })  → Promise<boolean>
+       window.dmAlert({ title, message, buttonLabel })                          → Promise<void>
+*/}}
+
+<style>
+/* ─── Global confirm/alert dialog ─── */
+.dm-confirm-overlay {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+  pointer-events: none;
+}
+.dm-confirm-overlay.dm-confirm-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.dm-confirm-backdrop {
+  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+.dm-confirm-dialog {
+  position: relative;
+  background: var(--body-background);
+  border-radius: 14px;
+  padding: 1.5rem;
+  width: 94%;
+  max-width: 380px;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+  transform: translateY(12px) scale(0.97);
+  transition: transform 0.2s ease-out;
+}
+.dm-confirm-visible .dm-confirm-dialog {
+  transform: translateY(0) scale(1);
+}
+.dm-confirm-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  margin-bottom: 0.75rem;
+}
+.dm-confirm-icon-danger {
+  background: rgba(229,62,62,0.1);
+  color: var(--color-danger, #e53e3e);
+}
+.dm-confirm-icon-info {
+  background: rgba(49,130,206,0.1);
+  color: var(--color-link, #3182ce);
+}
+.dm-confirm-title {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.dm-confirm-message {
+  font-size: 0.9rem;
+  color: var(--gray-500);
+  margin: 0 0 1.25rem 0;
+  line-height: 1.55;
+}
+.dm-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.dm-confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--gray-300);
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dm-confirm-btn:hover { background: var(--gray-100); }
+.dm-confirm-btn:focus-visible {
+  outline: 2px solid var(--color-link);
+  outline-offset: 2px;
+}
+.dm-confirm-btn-primary {
+  border-color: var(--color-link, #3182ce);
+  color: var(--color-link, #3182ce);
+}
+.dm-confirm-btn-primary:hover {
+  background: var(--color-link, #3182ce);
+  color: #fff;
+}
+.dm-confirm-btn-danger {
+  border-color: var(--color-danger, #e53e3e);
+  color: var(--color-danger, #e53e3e);
+}
+.dm-confirm-btn-danger:hover {
+  background: var(--color-danger, #e53e3e);
+  color: #fff;
+}
+.dm-confirm-hints {
+  margin-top: 0.75rem;
+  text-align: center;
+  font-size: 0.7rem;
+  color: var(--gray-400);
+}
+.dm-confirm-hints kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: var(--gray-100);
+  font-size: 0.65rem;
+  font-family: inherit;
+  color: var(--gray-500);
+}
+@media screen and (max-width: 500px) {
+  .dm-confirm-dialog {
+    width: 96%;
+    padding: 1.25rem;
+  }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  var overlay = null;
+  var _resolve = null;
+  var _isConfirm = true;
+
+  function ensureOverlay() {
+    if (overlay) return;
+    overlay = document.createElement('div');
+    overlay.className = 'dm-confirm-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.innerHTML =
+        '<div class="dm-confirm-backdrop"></div>'
+      + '<div class="dm-confirm-dialog">'
+      +   '<div class="dm-confirm-icon dm-confirm-icon-danger">'
+      +     '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      +       '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>'
+      +       '<line x1="12" y1="9" x2="12" y2="13"></line>'
+      +       '<line x1="12" y1="17" x2="12.01" y2="17"></line>'
+      +     '</svg>'
+      +   '</div>'
+      +   '<h3 class="dm-confirm-title"></h3>'
+      +   '<p class="dm-confirm-message"></p>'
+      +   '<div class="dm-confirm-actions">'
+      +     '<button type="button" class="dm-confirm-btn dm-confirm-cancel">Cancel</button>'
+      +     '<button type="button" class="dm-confirm-btn dm-confirm-ok dm-confirm-btn-danger">Delete</button>'
+      +   '</div>'
+      +   '<div class="dm-confirm-hints">'
+      +     '<kbd>Esc</kbd> cancel &middot; <kbd>Enter</kbd> confirm'
+      +   '</div>'
+      + '</div>';
+    document.body.appendChild(overlay);
+
+    var backdrop = overlay.querySelector('.dm-confirm-backdrop');
+    var cancelBtn = overlay.querySelector('.dm-confirm-cancel');
+    var okBtn = overlay.querySelector('.dm-confirm-ok');
+
+    backdrop.addEventListener('click', function() { close(false); });
+    cancelBtn.addEventListener('click', function() { close(false); });
+    okBtn.addEventListener('click', function() { close(true); });
+    overlay.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') { e.preventDefault(); close(false); }
+      if (e.key === 'Enter') { e.preventDefault(); close(true); }
+    });
+  }
+
+  function close(result) {
+    if (!overlay) return;
+    overlay.classList.remove('dm-confirm-visible');
+    if (_resolve) {
+      var r = _resolve;
+      _resolve = null;
+      r(_isConfirm ? result : undefined);
+    }
+  }
+
+  /**
+   * window.dmConfirm(opts) → Promise<boolean>
+   *   opts.title        — dialog title (default: 'Are you sure?')
+   *   opts.message      — body text
+   *   opts.confirmLabel — text for confirm button (default: 'Delete')
+   *   opts.cancelLabel  — text for cancel button (default: 'Cancel')
+   *   opts.danger       — if true, confirm button is red (default: true)
+   */
+  window.dmConfirm = function(opts) {
+    opts = opts || {};
+    ensureOverlay();
+    _isConfirm = true;
+
+    var titleEl = overlay.querySelector('.dm-confirm-title');
+    var messageEl = overlay.querySelector('.dm-confirm-message');
+    var okBtn = overlay.querySelector('.dm-confirm-ok');
+    var cancelBtn = overlay.querySelector('.dm-confirm-cancel');
+    var iconEl = overlay.querySelector('.dm-confirm-icon');
+    var hintsEl = overlay.querySelector('.dm-confirm-hints');
+
+    titleEl.textContent = opts.title || 'Are you sure?';
+    messageEl.textContent = opts.message || '';
+    okBtn.textContent = opts.confirmLabel || 'Delete';
+    cancelBtn.textContent = opts.cancelLabel || 'Cancel';
+    cancelBtn.style.display = '';
+    hintsEl.innerHTML = '<kbd>Esc</kbd> cancel &middot; <kbd>Enter</kbd> confirm';
+
+    // Danger vs primary style
+    okBtn.classList.remove('dm-confirm-btn-danger', 'dm-confirm-btn-primary');
+    iconEl.classList.remove('dm-confirm-icon-danger', 'dm-confirm-icon-info');
+    if (opts.danger === false) {
+      okBtn.classList.add('dm-confirm-btn-primary');
+      iconEl.classList.add('dm-confirm-icon-info');
+      iconEl.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + '<circle cx="12" cy="12" r="10"></circle>'
+        + '<line x1="12" y1="8" x2="12" y2="12"></line>'
+        + '<line x1="12" y1="16" x2="12.01" y2="16"></line>'
+        + '</svg>';
+    } else {
+      okBtn.classList.add('dm-confirm-btn-danger');
+      iconEl.classList.add('dm-confirm-icon-danger');
+      iconEl.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        + '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>'
+        + '<line x1="12" y1="9" x2="12" y2="13"></line>'
+        + '<line x1="12" y1="17" x2="12.01" y2="17"></line>'
+        + '</svg>';
+    }
+
+    overlay.classList.add('dm-confirm-visible');
+    setTimeout(function() { okBtn.focus({ preventScroll: true }); }, 50);
+
+    return new Promise(function(resolve) { _resolve = resolve; });
+  };
+
+  /**
+   * window.dmAlert(opts) → Promise<void>
+   *   opts.title       — dialog title (default: 'Notice')
+   *   opts.message     — body text
+   *   opts.buttonLabel — text for OK button (default: 'OK')
+   */
+  window.dmAlert = function(opts) {
+    opts = opts || {};
+    ensureOverlay();
+    _isConfirm = false;
+
+    var titleEl = overlay.querySelector('.dm-confirm-title');
+    var messageEl = overlay.querySelector('.dm-confirm-message');
+    var okBtn = overlay.querySelector('.dm-confirm-ok');
+    var cancelBtn = overlay.querySelector('.dm-confirm-cancel');
+    var iconEl = overlay.querySelector('.dm-confirm-icon');
+    var hintsEl = overlay.querySelector('.dm-confirm-hints');
+
+    titleEl.textContent = opts.title || 'Notice';
+    messageEl.textContent = opts.message || '';
+    okBtn.textContent = opts.buttonLabel || 'OK';
+    cancelBtn.style.display = 'none';
+    hintsEl.innerHTML = '<kbd>Enter</kbd> dismiss';
+
+    okBtn.classList.remove('dm-confirm-btn-danger', 'dm-confirm-btn-primary');
+    okBtn.classList.add('dm-confirm-btn-primary');
+    iconEl.classList.remove('dm-confirm-icon-danger', 'dm-confirm-icon-info');
+    iconEl.classList.add('dm-confirm-icon-info');
+    iconEl.innerHTML = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<circle cx="12" cy="12" r="10"></circle>'
+      + '<line x1="12" y1="8" x2="12" y2="12"></line>'
+      + '<line x1="12" y1="16" x2="12.01" y2="16"></line>'
+      + '</svg>';
+
+    overlay.classList.add('dm-confirm-visible');
+    setTimeout(function() { okBtn.focus({ preventScroll: true }); }, 50);
+
+    return new Promise(function(resolve) { _resolve = resolve; });
+  };
+})();
+</script>

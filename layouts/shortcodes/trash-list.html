@@ -457,21 +457,28 @@
       btn.addEventListener('click', function() {
         var noteId = btn.getAttribute('data-delete-note');
         if (!noteId || !window.dmSync) return;
-        if (!confirm('Permanently delete this note? This cannot be undone.')) return;
-        btn.disabled = true;
+        window.dmConfirm({
+          title: 'Delete permanently?',
+          message: 'This note will be permanently deleted. This cannot be undone.',
+          confirmLabel: 'Delete',
+          danger: true
+        }).then(function(confirmed) {
+          if (!confirmed) return;
+          btn.disabled = true;
 
-        window.dmSync.firestoreWrite({
-          collection: 'notes',
-          docId: noteId,
-          op: 'delete',
-          data: null,
-          localOp: function() { return window.dmSync.permanentlyDeleteNote(noteId); }
-        }).then(function() {
-          loadFromCache();
-          window.dispatchEvent(new CustomEvent('dm-sync-complete'));
-        }).catch(function(err) {
-          console.error('Permanent delete note error:', err);
-          btn.disabled = false;
+          window.dmSync.firestoreWrite({
+            collection: 'notes',
+            docId: noteId,
+            op: 'delete',
+            data: null,
+            localOp: function() { return window.dmSync.permanentlyDeleteNote(noteId); }
+          }).then(function() {
+            loadFromCache();
+            window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+          }).catch(function(err) {
+            console.error('Permanent delete note error:', err);
+            btn.disabled = false;
+          });
         });
       });
     });
@@ -509,21 +516,28 @@
       btn.addEventListener('click', function() {
         var todoId = btn.getAttribute('data-delete-todo');
         if (!todoId || !window.dmSync) return;
-        if (!confirm('Permanently delete this task? This cannot be undone.')) return;
-        btn.disabled = true;
+        window.dmConfirm({
+          title: 'Delete permanently?',
+          message: 'This task will be permanently deleted. This cannot be undone.',
+          confirmLabel: 'Delete',
+          danger: true
+        }).then(function(confirmed) {
+          if (!confirmed) return;
+          btn.disabled = true;
 
-        window.dmSync.firestoreWrite({
-          collection: 'todos',
-          docId: todoId,
-          op: 'delete',
-          data: null,
-          localOp: function() { return window.dmSync.permanentlyDeleteTodo(todoId); }
-        }).then(function() {
-          loadFromCache();
-          window.dispatchEvent(new CustomEvent('dm-todos-updated'));
-        }).catch(function(err) {
-          console.error('Permanent delete todo error:', err);
-          btn.disabled = false;
+          window.dmSync.firestoreWrite({
+            collection: 'todos',
+            docId: todoId,
+            op: 'delete',
+            data: null,
+            localOp: function() { return window.dmSync.permanentlyDeleteTodo(todoId); }
+          }).then(function() {
+            loadFromCache();
+            window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+          }).catch(function(err) {
+            console.error('Permanent delete todo error:', err);
+            btn.disabled = false;
+          });
         });
       });
     });
@@ -543,49 +557,56 @@
   if (emptyBtn) {
     emptyBtn.addEventListener('click', function() {
       var scope = activeTab === 'notes' ? 'notes' : activeTab === 'todos' ? 'tasks' : 'items';
-      if (!confirm('Permanently delete all ' + scope + ' in trash? This cannot be undone.')) return;
-      emptyBtn.disabled = true;
+      window.dmConfirm({
+        title: 'Empty trash?',
+        message: 'Permanently delete all ' + scope + ' in trash? This cannot be undone.',
+        confirmLabel: 'Empty Trash',
+        danger: true
+      }).then(function(confirmed) {
+        if (!confirmed) return;
+        emptyBtn.disabled = true;
 
-      var chain = Promise.resolve();
+        var chain = Promise.resolve();
 
-      // Delete notes if applicable
-      if (activeTab === 'all' || activeTab === 'notes') {
-        cachedNotes.forEach(function(note) {
-          chain = chain.then(function() {
-            return window.dmSync.firestoreWrite({
-              collection: 'notes',
-              docId: note.id,
-              op: 'delete',
-              data: null,
-              localOp: function() { return window.dmSync.permanentlyDeleteNote(note.id); }
+        // Delete notes if applicable
+        if (activeTab === 'all' || activeTab === 'notes') {
+          cachedNotes.forEach(function(note) {
+            chain = chain.then(function() {
+              return window.dmSync.firestoreWrite({
+                collection: 'notes',
+                docId: note.id,
+                op: 'delete',
+                data: null,
+                localOp: function() { return window.dmSync.permanentlyDeleteNote(note.id); }
+              });
             });
           });
-        });
-      }
+        }
 
-      // Delete todos if applicable
-      if (activeTab === 'all' || activeTab === 'todos') {
-        cachedTodos.forEach(function(todo) {
-          chain = chain.then(function() {
-            return window.dmSync.firestoreWrite({
-              collection: 'todos',
-              docId: todo.id,
-              op: 'delete',
-              data: null,
-              localOp: function() { return window.dmSync.permanentlyDeleteTodo(todo.id); }
+        // Delete todos if applicable
+        if (activeTab === 'all' || activeTab === 'todos') {
+          cachedTodos.forEach(function(todo) {
+            chain = chain.then(function() {
+              return window.dmSync.firestoreWrite({
+                collection: 'todos',
+                docId: todo.id,
+                op: 'delete',
+                data: null,
+                localOp: function() { return window.dmSync.permanentlyDeleteTodo(todo.id); }
+              });
             });
           });
-        });
-      }
+        }
 
-      chain.then(function() {
-        loadFromCache();
-        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
-        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
-        emptyBtn.disabled = false;
-      }).catch(function(err) {
-        console.error('Empty trash error:', err);
-        emptyBtn.disabled = false;
+        chain.then(function() {
+          loadFromCache();
+          window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+          window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+          emptyBtn.disabled = false;
+        }).catch(function(err) {
+          console.error('Empty trash error:', err);
+          emptyBtn.disabled = false;
+        });
       });
     });
   }
