@@ -61,8 +61,8 @@
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"></line></svg>
           </button>
           <button type="button" class="todo-edit-pomodoro-btn" id="todo-edit-pomodoro-btn" title="Short session (click tomato to switch)" aria-label="Pomodoro count">
-            <svg class="todo-edit-pomodoro-icon todo-pomo-icon-short" width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 6c-.4-.9 0-1.8.6-2 .5-.2 1 .1 1.4.5.4-.4.9-.7 1.4-.5.6.2 1 1.1.6 2" fill="#b5c4ad"/><ellipse cx="12" cy="14" rx="7.5" ry="7" fill="#d9a080" stroke="#cc9474" stroke-width="0.8"/></svg>
-            <svg class="todo-edit-pomodoro-icon todo-pomo-icon-long" width="16" height="16" viewBox="0 0 24 28" fill="none" style="display:none;"><path d="M10.5 6c-.3-.8 0-1.5.5-1.7.4-.1.8.1 1 .5.2-.4.6-.6 1-.5.5.2.8 1 .5 1.7" fill="#4a7a3e"/><path d="M13.8 5.2c.4-.2.9 0 1.1.3.2.3.1.7-.2.9" stroke="#4a7a3e" stroke-width="0.7" fill="none" stroke-linecap="round"/><path d="M12 10.5 C11 9 9.5 7.8 7.5 7.8 C4.4 7.8 2.8 10.2 2.8 12.8 C2.8 15.5 4.5 18.5 7 21.5 C9 23.8 10.8 25.3 12 27 C13.2 25.3 15 23.8 17 21.5 C19.5 18.5 21.2 15.5 21.2 12.8 C21.2 10.2 19.6 7.8 16.5 7.8 C14.5 7.8 13 9 12 10.5Z" fill="#c4553a" stroke="#a8412e" stroke-width="0.7"/><ellipse cx="7.8" cy="12" rx="2.5" ry="2" fill="#d4776a" opacity="0.25"/></svg>
+            <span class="todo-edit-pomodoro-icon todo-pomo-icon-short" style="font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;position:relative;top:3px;">&#x1F345;</span>
+            <img class="todo-edit-pomodoro-icon todo-pomo-icon-long" src="{{ "oxheart_tomato.png" | relURL }}" width="22" height="22" alt="Long pomodoro" style="display:none;">
             <span class="todo-edit-pomodoro-count" id="todo-edit-pomodoro-count">1</span>
           </button>
           <button type="button" class="todo-edit-pomo-plus" id="todo-edit-pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
@@ -702,6 +702,8 @@
 }
 .todo-edit-pomodoro-icon {
   flex-shrink: 0;
+  position: relative;
+  top: 1px;
   transition: transform 0.2s ease;
 }
 .todo-edit-pomodoro-btn:active .todo-edit-pomodoro-icon {
