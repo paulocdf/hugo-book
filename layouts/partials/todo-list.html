@@ -2745,7 +2745,7 @@
   }
 
   // ─── Render ───
-  function buildTodoItemHtml(todo, isSubtask, hasChildren, finishAtLabel, isOverdue) {
+  function buildTodoItemHtml(todo, isSubtask, hasChildren, finishAtLabel, isOverdue, isToday) {
     var doneClass = todo.done ? ' done' : '';
     var justCompletedClass = _justCompletedIds[todo.id] ? ' just-completed' : '';
     var justAddedClass = _justAddedIds[todo.id] ? ' just-added' : '';
@@ -2941,6 +2941,12 @@
     // Migrate to Today button (for open tasks in overdue groups)
     if (isOverdue && !todo.done && bujoState === 'open') {
       html += '<button type="button" class="todo-item-action-btn migrate-today" data-migrate-id="' + todo.id + '" title="Migrate to today" aria-label="Migrate to today">';
+      html += '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>';
+      html += '</button>';
+    }
+    // Push to Tomorrow button (for open tasks in today's group)
+    if (isToday && !todo.done && bujoState === 'open') {
+      html += '<button type="button" class="todo-item-action-btn migrate-tomorrow" data-migrate-tomorrow-id="' + todo.id + '" title="Push to tomorrow" aria-label="Push to tomorrow">';
       html += '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>';
       html += '</button>';
     }
@@ -3141,18 +3147,19 @@
       });
 
       var _isOverdueGroup = (cssClass === 'overdue');
+      var _isTodayGroup = (cssClass === 'today');
 
       tasksInGroup.forEach(function(parent) {
         var children = childrenMap[parent.id] || [];
         g += '<div class="todo-item-group" data-group-id="' + parent.id + '">';
-        g += buildTodoItemHtml(parent, false, children.length > 0, finishAtMap[parent.id] || null, _isOverdueGroup);
+        g += buildTodoItemHtml(parent, false, children.length > 0, finishAtMap[parent.id] || null, _isOverdueGroup, _isTodayGroup);
         if (children.length > 0) {
           var subCollapsed = false;
           try { subCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + parent.id) === '1'; } catch(e) {}
           g += '<div class="todo-subtasks-wrapper' + (subCollapsed ? ' collapsed' : '') + '" data-subtasks-parent="' + parent.id + '">';
           g += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
           children.forEach(function(child) {
-            g += buildTodoItemHtml(child, true, false, finishAtMap[child.id] || null, _isOverdueGroup);
+            g += buildTodoItemHtml(child, true, false, finishAtMap[child.id] || null, _isOverdueGroup, _isTodayGroup);
           });
           g += '</div>';
           g += '</div>';
@@ -3260,6 +3267,43 @@
       duration: 3000,
       onUndo: function() {
         // Restore pre-migration state
+        snapshots.forEach(function(snap) {
+          var t = allTodos.find(function(x) { return x.id === snap.id; });
+          if (!t) return;
+          changeBujoState(t, snap.bujoState, snap.scheduledDate);
+        });
+      }
+    });
+  }
+
+  function migrateToTomorrow(todoId) {
+    var todo = allTodos.find(function(t) { return t.id === todoId; });
+    if (!todo) return;
+    var tomorrow = getDateOffset(1);
+
+    // Snapshot state before migrating (for undo)
+    var snapshots = [{ id: todo.id, bujoState: todo.bujoState || 'open', scheduledDate: todo.scheduledDate }];
+    allTodos.forEach(function(t) {
+      if (t.parentId === todoId && !t.done) {
+        snapshots.push({ id: t.id, bujoState: t.bujoState || 'open', scheduledDate: t.scheduledDate });
+      }
+    });
+
+    changeBujoState(todo, 'migrated', tomorrow);
+    // Also migrate children (subtasks)
+    allTodos.forEach(function(t) {
+      if (t.parentId === todoId && !t.done) {
+        changeBujoState(t, 'migrated', tomorrow);
+      }
+    });
+
+    var taskTitle = todo.title || '';
+    if (taskTitle.length > 30) taskTitle = taskTitle.substring(0, 30) + '...';
+
+    showActionToast({
+      message: 'Pushed \u201c' + taskTitle + '\u201d to tomorrow',
+      duration: 3000,
+      onUndo: function() {
         snapshots.forEach(function(snap) {
           var t = allTodos.find(function(x) { return x.id === snap.id; });
           if (!t) return;
@@ -3584,6 +3628,15 @@
         e.stopPropagation();
         var todoId = btn.getAttribute('data-migrate-id');
         migrateToToday(todoId);
+      });
+    });
+
+    // Push individual task to tomorrow
+    itemsEl.querySelectorAll('.todo-item-action-btn.migrate-tomorrow[data-migrate-tomorrow-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-migrate-tomorrow-id');
+        migrateToTomorrow(todoId);
       });
     });
 
