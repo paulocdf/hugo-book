@@ -1,4 +1,4 @@
-{{/* Trash List: displays soft-deleted notes with restore and permanent delete options */}}
+{{/* Trash List: displays soft-deleted notes and todos with restore and permanent delete options */}}
 
 <div class="trash-list" id="trash-list">
   <div class="trash-list-auth" style="display: none;">
@@ -8,7 +8,7 @@
         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
       </svg>
       <h3>Sign in to view trash</h3>
-      <p>Your notes are stored securely and require authentication.</p>
+      <p>Your deleted items are stored securely and require authentication.</p>
       <button type="button" class="section-notes-signin-btn" id="trash-signin-btn">
         <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
         Sign in with Google
@@ -21,30 +21,38 @@
     <span>Loading trash...</span>
   </div>
 
+  <div class="trash-list-content" style="display: none;">
+    <div class="trash-list-tabs">
+      <button type="button" class="trash-tab active" data-tab="all">All</button>
+      <button type="button" class="trash-tab" data-tab="notes">Notes</button>
+      <button type="button" class="trash-tab" data-tab="todos">Tasks</button>
+    </div>
+
+    <div class="trash-list-toolbar">
+      <div class="trash-list-info">
+        <span class="trash-list-count"></span>
+        <span class="trash-list-purge-info">Items are permanently deleted after 30 days</span>
+      </div>
+      <button type="button" class="trash-list-empty-btn" id="trash-empty-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+        Empty Trash
+      </button>
+    </div>
+
+    <div class="trash-list-items"></div>
+  </div>
+
   <div class="trash-list-empty" style="display: none;">
     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--gray-300); margin-bottom: 1rem;">
       <polyline points="3 6 5 6 21 6"></polyline>
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
     </svg>
     <p>Trash is empty</p>
-    <p style="font-size: 0.85rem; color: var(--gray-400);">Deleted notes will appear here for 30 days before being permanently removed.</p>
+    <p style="font-size: 0.85rem; color: var(--gray-400);">Deleted notes and tasks will appear here for 30 days before being permanently removed.</p>
   </div>
-
-  <div class="trash-list-toolbar" style="display: none;">
-    <div class="trash-list-info">
-      <span class="trash-list-count"></span>
-      <span class="trash-list-purge-info">Items are permanently deleted after 30 days</span>
-    </div>
-    <button type="button" class="trash-list-empty-btn" id="trash-empty-btn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <polyline points="3 6 5 6 21 6"></polyline>
-        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-      </svg>
-      Empty Trash
-    </button>
-  </div>
-
-  <div class="trash-list-items"></div>
 </div>
 
 <style>
@@ -69,6 +77,36 @@
   padding: 3rem 0;
   color: var(--gray-500);
 }
+
+/* Tabs */
+.trash-list-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid var(--gray-200);
+  padding-bottom: 0;
+}
+.trash-tab {
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  font-size: 0.85rem;
+  color: var(--gray-500);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.trash-tab:hover {
+  color: var(--body-font-color);
+}
+.trash-tab.active {
+  color: var(--color-link);
+  border-bottom-color: var(--color-link);
+  font-weight: 600;
+}
+
+/* Toolbar */
 .trash-list-toolbar {
   display: flex;
   justify-content: space-between;
@@ -139,6 +177,27 @@
   color: var(--gray-500);
   flex-wrap: wrap;
 }
+.trash-item-type {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+.trash-item-type-note {
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+.trash-item-type-task {
+  background: #ebf5ff;
+  color: #2b6cb0;
+}
+@media (prefers-color-scheme: dark) {
+  .trash-item-type-task {
+    background: #1a365d;
+    color: #90cdf4;
+  }
+}
 .trash-item-dest {
   display: inline-block;
   padding: 1px 8px;
@@ -208,11 +267,17 @@
   var authEl = container.querySelector('.trash-list-auth');
   var loadingEl = container.querySelector('.trash-list-loading');
   var emptyEl = container.querySelector('.trash-list-empty');
+  var contentEl = container.querySelector('.trash-list-content');
   var toolbarEl = container.querySelector('.trash-list-toolbar');
   var itemsEl = container.querySelector('.trash-list-items');
   var countEl = container.querySelector('.trash-list-count');
   var signinBtn = document.getElementById('trash-signin-btn');
   var emptyBtn = document.getElementById('trash-empty-btn');
+  var tabBtns = container.querySelectorAll('.trash-tab');
+
+  var activeTab = 'all'; // 'all', 'notes', 'todos'
+  var cachedNotes = [];
+  var cachedTodos = [];
 
   var restoreIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     + '<polyline points="1 4 1 10 7 10"></polyline>'
@@ -228,8 +293,7 @@
     authEl.style.display = state === 'auth' ? '' : 'none';
     loadingEl.style.display = state === 'loading' ? '' : 'none';
     emptyEl.style.display = state === 'empty' ? '' : 'none';
-    toolbarEl.style.display = (state === 'content') ? '' : 'none';
-    itemsEl.style.display = (state === 'content') ? '' : 'none';
+    contentEl.style.display = (state === 'content') ? '' : 'none';
   }
 
   function escapeHtml(str) {
@@ -257,16 +321,24 @@
     return dest || 'Note';
   }
 
-  function renderTrashItem(note) {
+  function bujoLabel(bujoType) {
+    if (bujoType === 'event') return 'Event';
+    if (bujoType === 'note') return 'Note';
+    return 'Task';
+  }
+
+  // ─── Render a note trash item ───
+  function renderNoteItem(note) {
     var preview = note.content || '';
     var textPreview = preview.length > 200 ? preview.substring(0, 200) + '...' : preview;
     var days = daysUntilPurge(note.deletedAt);
     var expiryText = days <= 0 ? 'Expiring soon' : days + ' day' + (days !== 1 ? 's' : '') + ' left';
 
-    return '<div class="trash-item" data-id="' + note.id + '">'
+    return '<div class="trash-item" data-id="' + note.id + '" data-kind="note">'
       + '<div class="trash-item-content">'
       + '<h4 class="trash-item-title">' + escapeHtml(note.title || 'Untitled') + '</h4>'
       + '<div class="trash-item-meta">'
+      + '<span class="trash-item-type trash-item-type-note">Note</span>'
       + '<span class="trash-item-dest">' + destLabel(note.destination) + '</span>'
       + '<span>Deleted ' + formatDate(note.deletedAt) + '</span>'
       + '<span class="trash-item-expiry">' + expiryText + '</span>'
@@ -274,35 +346,93 @@
       + '<div class="trash-item-preview">' + escapeHtml(textPreview) + '</div>'
       + '</div>'
       + '<div class="trash-item-actions">'
-      + '<button type="button" class="trash-item-restore" data-restore-id="' + note.id + '" title="Restore note">' + restoreIcon + ' Restore</button>'
-      + '<button type="button" class="trash-item-delete" data-delete-id="' + note.id + '" title="Delete permanently">' + deleteIcon + ' Delete</button>'
+      + '<button type="button" class="trash-item-restore" data-restore-note="' + note.id + '" title="Restore note">' + restoreIcon + ' Restore</button>'
+      + '<button type="button" class="trash-item-delete" data-delete-note="' + note.id + '" title="Delete permanently">' + deleteIcon + ' Delete</button>'
       + '</div>'
       + '</div>';
   }
 
-  function renderTrash(notes) {
-    if (!notes.length) {
+  // ─── Render a todo trash item ───
+  function renderTodoItem(todo) {
+    var days = daysUntilPurge(todo.deletedAt);
+    var expiryText = days <= 0 ? 'Expiring soon' : days + ' day' + (days !== 1 ? 's' : '') + ' left';
+    var catHtml = todo.category ? '<span class="trash-item-dest">' + escapeHtml(todo.category) + '</span>' : '';
+    var notesPreview = todo.notes || '';
+    if (notesPreview.length > 200) notesPreview = notesPreview.substring(0, 200) + '...';
+
+    return '<div class="trash-item" data-id="' + todo.id + '" data-kind="todo">'
+      + '<div class="trash-item-content">'
+      + '<h4 class="trash-item-title">' + escapeHtml(todo.title || 'Untitled task') + '</h4>'
+      + '<div class="trash-item-meta">'
+      + '<span class="trash-item-type trash-item-type-task">' + bujoLabel(todo.bujoType) + '</span>'
+      + catHtml
+      + '<span>Deleted ' + formatDate(todo.deletedAt) + '</span>'
+      + '<span class="trash-item-expiry">' + expiryText + '</span>'
+      + '</div>'
+      + (notesPreview ? '<div class="trash-item-preview">' + escapeHtml(notesPreview) + '</div>' : '')
+      + '</div>'
+      + '<div class="trash-item-actions">'
+      + '<button type="button" class="trash-item-restore" data-restore-todo="' + todo.id + '" title="Restore task">' + restoreIcon + ' Restore</button>'
+      + '<button type="button" class="trash-item-delete" data-delete-todo="' + todo.id + '" title="Delete permanently">' + deleteIcon + ' Delete</button>'
+      + '</div>'
+      + '</div>';
+  }
+
+  function getFilteredItems() {
+    var items = [];
+    if (activeTab === 'all' || activeTab === 'notes') {
+      cachedNotes.forEach(function(n) { items.push({ kind: 'note', data: n, deletedAt: n.deletedAt || 0 }); });
+    }
+    if (activeTab === 'all' || activeTab === 'todos') {
+      cachedTodos.forEach(function(t) { items.push({ kind: 'todo', data: t, deletedAt: t.deletedAt || 0 }); });
+    }
+    // Sort by most recently deleted first
+    items.sort(function(a, b) { return b.deletedAt - a.deletedAt; });
+    return items;
+  }
+
+  function renderTrash() {
+    var items = getFilteredItems();
+    var totalCount = cachedNotes.length + cachedTodos.length;
+
+    if (totalCount === 0) {
       showState('empty');
       return;
     }
 
-    // Sort by most recently deleted first
-    notes.sort(function(a, b) { return (b.deletedAt || 0) - (a.deletedAt || 0); });
+    // Update tab labels with counts
+    tabBtns.forEach(function(btn) {
+      var tab = btn.getAttribute('data-tab');
+      if (tab === 'all') btn.textContent = 'All (' + totalCount + ')';
+      else if (tab === 'notes') btn.textContent = 'Notes (' + cachedNotes.length + ')';
+      else if (tab === 'todos') btn.textContent = 'Tasks (' + cachedTodos.length + ')';
+    });
 
-    countEl.textContent = notes.length + ' item' + (notes.length !== 1 ? 's' : '') + ' in trash';
+    if (items.length === 0) {
+      // Tab is active but has no items for this filter
+      countEl.textContent = '0 items';
+      itemsEl.innerHTML = '<p style="text-align: center; color: var(--gray-400); padding: 2rem 0;">No ' + (activeTab === 'notes' ? 'notes' : 'tasks') + ' in trash.</p>';
+      showState('content');
+      return;
+    }
+
+    countEl.textContent = items.length + ' item' + (items.length !== 1 ? 's' : '') + ' in trash';
 
     var html = '';
-    notes.forEach(function(n) { html += renderTrashItem(n); });
+    items.forEach(function(item) {
+      if (item.kind === 'note') html += renderNoteItem(item.data);
+      else html += renderTodoItem(item.data);
+    });
     itemsEl.innerHTML = html;
     showState('content');
     bindButtons();
   }
 
   function bindButtons() {
-    // Restore buttons
-    itemsEl.querySelectorAll('.trash-item-restore[data-restore-id]').forEach(function(btn) {
+    // Restore note buttons
+    itemsEl.querySelectorAll('[data-restore-note]').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var noteId = btn.getAttribute('data-restore-id');
+        var noteId = btn.getAttribute('data-restore-note');
         if (!noteId || !window.dmSync) return;
         btn.disabled = true;
 
@@ -316,16 +446,16 @@
           loadFromCache();
           window.dispatchEvent(new CustomEvent('dm-sync-complete'));
         }).catch(function(err) {
-          console.error('Restore error:', err);
+          console.error('Restore note error:', err);
           btn.disabled = false;
         });
       });
     });
 
-    // Permanent delete buttons
-    itemsEl.querySelectorAll('.trash-item-delete[data-delete-id]').forEach(function(btn) {
+    // Permanently delete note buttons
+    itemsEl.querySelectorAll('[data-delete-note]').forEach(function(btn) {
       btn.addEventListener('click', function() {
-        var noteId = btn.getAttribute('data-delete-id');
+        var noteId = btn.getAttribute('data-delete-note');
         if (!noteId || !window.dmSync) return;
         if (!confirm('Permanently delete this note? This cannot be undone.')) return;
         btn.disabled = true;
@@ -340,22 +470,87 @@
           loadFromCache();
           window.dispatchEvent(new CustomEvent('dm-sync-complete'));
         }).catch(function(err) {
-          console.error('Permanent delete error:', err);
+          console.error('Permanent delete note error:', err);
+          btn.disabled = false;
+        });
+      });
+    });
+
+    // Restore todo buttons
+    itemsEl.querySelectorAll('[data-restore-todo]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var todoId = btn.getAttribute('data-restore-todo');
+        if (!todoId || !window.dmSync) return;
+        btn.disabled = true;
+
+        window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: todoId,
+          op: 'update',
+          data: {
+            status: 'active',
+            bujoState: 'open',
+            deletedAt: firebase.firestore.FieldValue.delete(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          },
+          localOp: function() { return window.dmSync.restoreTodo(todoId); }
+        }).then(function() {
+          loadFromCache();
+          window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+        }).catch(function(err) {
+          console.error('Restore todo error:', err);
+          btn.disabled = false;
+        });
+      });
+    });
+
+    // Permanently delete todo buttons
+    itemsEl.querySelectorAll('[data-delete-todo]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var todoId = btn.getAttribute('data-delete-todo');
+        if (!todoId || !window.dmSync) return;
+        if (!confirm('Permanently delete this task? This cannot be undone.')) return;
+        btn.disabled = true;
+
+        window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: todoId,
+          op: 'delete',
+          data: null,
+          localOp: function() { return window.dmSync.permanentlyDeleteTodo(todoId); }
+        }).then(function() {
+          loadFromCache();
+          window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+        }).catch(function(err) {
+          console.error('Permanent delete todo error:', err);
           btn.disabled = false;
         });
       });
     });
   }
 
-  // Empty Trash button
+  // Tab switching
+  tabBtns.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      activeTab = btn.getAttribute('data-tab');
+      tabBtns.forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      renderTrash();
+    });
+  });
+
+  // Empty Trash button — empties both notes AND todos for the active tab
   if (emptyBtn) {
     emptyBtn.addEventListener('click', function() {
-      if (!confirm('Permanently delete all items in trash? This cannot be undone.')) return;
+      var scope = activeTab === 'notes' ? 'notes' : activeTab === 'todos' ? 'tasks' : 'items';
+      if (!confirm('Permanently delete all ' + scope + ' in trash? This cannot be undone.')) return;
       emptyBtn.disabled = true;
 
-      window.dmSync.getTrashedNotes().then(function(trashed) {
-        var chain = Promise.resolve();
-        trashed.forEach(function(note) {
+      var chain = Promise.resolve();
+
+      // Delete notes if applicable
+      if (activeTab === 'all' || activeTab === 'notes') {
+        cachedNotes.forEach(function(note) {
           chain = chain.then(function() {
             return window.dmSync.firestoreWrite({
               collection: 'notes',
@@ -366,10 +561,27 @@
             });
           });
         });
-        return chain;
-      }).then(function() {
+      }
+
+      // Delete todos if applicable
+      if (activeTab === 'all' || activeTab === 'todos') {
+        cachedTodos.forEach(function(todo) {
+          chain = chain.then(function() {
+            return window.dmSync.firestoreWrite({
+              collection: 'todos',
+              docId: todo.id,
+              op: 'delete',
+              data: null,
+              localOp: function() { return window.dmSync.permanentlyDeleteTodo(todo.id); }
+            });
+          });
+        });
+      }
+
+      chain.then(function() {
         loadFromCache();
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
         emptyBtn.disabled = false;
       }).catch(function(err) {
         console.error('Empty trash error:', err);
@@ -381,8 +593,13 @@
   function loadFromCache() {
     if (!window.dmSync) return;
     showState('loading');
-    window.dmSync.getTrashedNotes().then(function(notes) {
-      renderTrash(notes);
+    Promise.all([
+      window.dmSync.getTrashedNotes(),
+      window.dmSync.getTrashedTodos()
+    ]).then(function(results) {
+      cachedNotes = results[0] || [];
+      cachedTodos = results[1] || [];
+      renderTrash();
     }).catch(function(err) {
       console.error('Error loading trash:', err);
       showState('empty');
@@ -398,6 +615,11 @@
 
   // Listen for sync events
   window.addEventListener('dm-sync-complete', function() {
+    if (window.dmAuth && window.dmAuth.currentUser) {
+      loadFromCache();
+    }
+  });
+  window.addEventListener('dm-todos-updated', function() {
     if (window.dmAuth && window.dmAuth.currentUser) {
       loadFromCache();
     }

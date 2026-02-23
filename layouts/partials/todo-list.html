@@ -2959,8 +2959,9 @@
   function render() {
     container.style.display = '';
 
-    // Filter to only active and done tasks (exclude archived and deleted)
+    // Filter to only active and done tasks (exclude archived, deleted, and trashed)
     var visibleTodos = allTodos.filter(function(t) {
+      if (t.deletedAt) return false;
       var s = t.status || 'active';
       return s === 'active' || s === 'done';
     });
@@ -4809,15 +4810,13 @@
         var todo = allTodos.find(function(t) { return t.id === id; });
         if (!todo) return Promise.resolve();
         var updateData = {
-          done: false,
           status: 'deleted',
-          bujoState: null,
+          deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         // Optimistic local update
-        todo.done = false;
         todo.status = 'deleted';
-        todo.bujoState = null;
+        todo.deletedAt = Date.now();
         todo.updatedAt = Date.now();
         return window.dmSync.firestoreWrite({
           collection: 'todos',
@@ -4858,7 +4857,8 @@
           id: id,
           done: todo.done,
           status: todo.status,
-          bujoState: todo.bujoState
+          bujoState: todo.bujoState,
+          deletedAt: todo.deletedAt || null
         });
       }
     });
@@ -4892,12 +4892,14 @@
           done: snap.done,
           status: snap.status,
           bujoState: snap.bujoState,
+          deletedAt: firebase.firestore.FieldValue.delete(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         // Restore local state
         todo.done = snap.done;
         todo.status = snap.status;
         todo.bujoState = snap.bujoState;
+        delete todo.deletedAt;
         todo.updatedAt = Date.now();
 
         return window.dmSync.firestoreWrite({

@@ -736,6 +736,7 @@
       bujoType: data.bujoType || 'task',
       bujoState: data.bujoState || (status === 'done' ? 'done' : 'open'),
       notes: data.notes || '',
+      deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
       createdAt: createdAt,
       updatedAt: updatedAt,
       completedAt: completedAt
@@ -880,10 +881,11 @@
   function purgeExpiredTrash() {
     var thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
     var cutoff = Date.now() - thirtyDaysMs;
-    return idbGetAll(STORE_NOTES).then(function(notes) {
+    // Purge expired notes
+    var purgeNotes = idbGetAll(STORE_NOTES).then(function(notes) {
       var expired = notes.filter(function(n) { return n.deletedAt && n.deletedAt < cutoff; });
       if (!expired.length) return Promise.resolve();
-      console.log('[dm-sync] Purging ' + expired.length + ' expired trash items');
+      console.log('[dm-sync] Purging ' + expired.length + ' expired trash notes');
       return Promise.all(expired.map(function(n) {
         return firestoreWrite({
           collection: 'notes',
@@ -894,6 +896,22 @@
         });
       }));
     });
+    // Purge expired todos
+    var purgeTodos = idbGetAll(STORE_TODOS).then(function(todos) {
+      var expired = todos.filter(function(t) { return t.deletedAt && t.deletedAt < cutoff; });
+      if (!expired.length) return Promise.resolve();
+      console.log('[dm-sync] Purging ' + expired.length + ' expired trash todos');
+      return Promise.all(expired.map(function(t) {
+        return firestoreWrite({
+          collection: 'todos',
+          docId: t.id,
+          op: 'delete',
+          data: null,
+          localOp: function() { return idbDelete(STORE_TODOS, t.id); }
+        });
+      }));
+    });
+    return Promise.all([purgeNotes, purgeTodos]);
   }
 
   function syncAll(userId) {
@@ -1950,8 +1968,18 @@
     },
 
     // IndexedDB operations — Todos
-    getTodo: function(id) { return idbGet(STORE_TODOS, id); },
-    getAllTodos: function() { return idbGetAll(STORE_TODOS); },
+    getTodo: function(id) {
+      return idbGet(STORE_TODOS, id).then(function(todo) {
+        if (todo && todo.deletedAt) return null;
+        return todo;
+      });
+    },
+    getTodoIncludingTrashed: function(id) { return idbGet(STORE_TODOS, id); },
+    getAllTodos: function() {
+      return idbGetAll(STORE_TODOS).then(function(todos) {
+        return todos.filter(function(t) { return !t.deletedAt; });
+      });
+    },
     putTodo: function(todo) {
       return idbPut(STORE_TODOS, todo).then(function() {
         window.dispatchEvent(new CustomEvent('dm-todos-updated'));
@@ -1964,12 +1992,53 @@
     },
     getTodosByParent: function(parentId) {
       return idbGetAll(STORE_TODOS).then(function(todos) {
-        return todos.filter(function(t) { return t.parentId === parentId; });
+        return todos.filter(function(t) { return t.parentId === parentId && !t.deletedAt; });
       });
     },
     getTopLevelTodos: function() {
       return idbGetAll(STORE_TODOS).then(function(todos) {
-        return todos.filter(function(t) { return !t.parentId; });
+        return todos.filter(function(t) { return !t.parentId && !t.deletedAt; });
+      });
+    },
+    // Trash operations — Todos
+    trashTodo: function(id) {
+      return idbGet(STORE_TODOS, id).then(function(todo) {
+        if (!todo) return;
+        todo.deletedAt = Date.now();
+        todo.updatedAt = Date.now();
+        return idbPut(STORE_TODOS, todo).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+        });
+      });
+    },
+    restoreTodo: function(id) {
+      return idbGet(STORE_TODOS, id).then(function(todo) {
+        if (!todo) return;
+        delete todo.deletedAt;
+        todo.status = todo.done ? 'done' : 'active';
+        todo.bujoState = todo.done ? 'done' : 'open';
+        todo.updatedAt = Date.now();
+        return idbPut(STORE_TODOS, todo).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+        });
+      });
+    },
+    getTrashedTodos: function() {
+      return idbGetAll(STORE_TODOS).then(function(todos) {
+        return todos.filter(function(t) { return !!t.deletedAt; });
+      });
+    },
+    permanentlyDeleteTodo: function(id) {
+      return idbDelete(STORE_TODOS, id).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+      });
+    },
+    emptyTodoTrash: function() {
+      return idbGetAll(STORE_TODOS).then(function(todos) {
+        var trashed = todos.filter(function(t) { return !!t.deletedAt; });
+        return Promise.all(trashed.map(function(t) { return idbDelete(STORE_TODOS, t.id); }));
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
       });
     },
     setReminder: function(todoId, reminderAtMs) {
