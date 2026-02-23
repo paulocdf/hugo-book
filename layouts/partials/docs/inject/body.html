@@ -2679,6 +2679,24 @@
               '</label>' +
             '</div>' +
           '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-auto-break">Auto-start break</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<label class="sidebar-settings-toggle-switch">' +
+                '<input type="checkbox" id="setting-auto-break" checked>' +
+                '<span class="sidebar-settings-toggle-slider"></span>' +
+              '</label>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-auto-work">Auto-start work</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<label class="sidebar-settings-toggle-switch">' +
+                '<input type="checkbox" id="setting-auto-work">' +
+                '<span class="sidebar-settings-toggle-slider"></span>' +
+              '</label>' +
+            '</div>' +
+          '</div>' +
           '<div class="sidebar-settings-group-label" style="margin-top:4px;">Sounds</div>' +
           '<div class="sidebar-settings-row">' +
             '<label class="sidebar-settings-label" for="setting-sound-work">Work end</label>' +
@@ -2784,12 +2802,19 @@
     var autoSchedule = true;
     try { var v = localStorage.getItem('dm-auto-schedule-today'); if (v === 'false') autoSchedule = false; } catch(e) {}
 
+    var autoBreak = true;
+    try { var v = localStorage.getItem('dm-pomo-auto-break'); if (v === 'false') autoBreak = false; } catch(e) {}
+    var autoWork = false;
+    try { var v = localStorage.getItem('dm-pomo-auto-work'); if (v === 'true') autoWork = true; } catch(e) {}
+
     var shortWorkInput = document.getElementById('setting-pomo-short-work');
     var shortBreakInput = document.getElementById('setting-pomo-short-break');
     var longWorkInput = document.getElementById('setting-pomo-long-work');
     var longBreakInput = document.getElementById('setting-pomo-long-break');
     var countInput = document.getElementById('setting-pomo-count');
     var scheduleToggle = document.getElementById('setting-auto-schedule');
+    var autoBreakToggle = document.getElementById('setting-auto-break');
+    var autoWorkToggle = document.getElementById('setting-auto-work');
 
     if (shortWorkInput) shortWorkInput.value = shortWork;
     if (shortBreakInput) shortBreakInput.value = shortBreak;
@@ -2797,6 +2822,8 @@
     if (longBreakInput) longBreakInput.value = longBreak;
     if (countInput) countInput.value = defaultPomoCount;
     if (scheduleToggle) scheduleToggle.checked = autoSchedule;
+    if (autoBreakToggle) autoBreakToggle.checked = autoBreak;
+    if (autoWorkToggle) autoWorkToggle.checked = autoWork;
 
     // Toggle panel visibility
     toggle.addEventListener('click', function(e) {
@@ -2843,6 +2870,24 @@
         var val = scheduleToggle.checked;
         try { localStorage.setItem('dm-auto-schedule-today', val ? 'true' : 'false'); } catch(e) {}
         window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-auto-schedule-today', value: val } }));
+      });
+    }
+
+    // Save on change — Auto-start break
+    if (autoBreakToggle) {
+      autoBreakToggle.addEventListener('change', function() {
+        var val = autoBreakToggle.checked;
+        try { localStorage.setItem('dm-pomo-auto-break', val ? 'true' : 'false'); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-pomo-auto-break', value: val } }));
+      });
+    }
+
+    // Save on change — Auto-start work
+    if (autoWorkToggle) {
+      autoWorkToggle.addEventListener('change', function() {
+        var val = autoWorkToggle.checked;
+        try { localStorage.setItem('dm-pomo-auto-work', val ? 'true' : 'false'); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-pomo-auto-work', value: val } }));
       });
     }
 

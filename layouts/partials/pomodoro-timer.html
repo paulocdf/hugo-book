@@ -1633,8 +1633,12 @@
         totalPhaseSeconds = BREAK_SECONDS;
         updateDisplay();
         saveStateImmediate();
-        // Auto-start break
-        startTimer();
+        // Auto-start break (if enabled in settings)
+        var _autoBreak = true;
+        try { var v = localStorage.getItem('dm-pomo-auto-break'); if (v === 'false') _autoBreak = false; } catch(e) {}
+        if (_autoBreak) {
+          startTimer();
+        }
       } else {
         playBreakEndSound();
         // Break finished, start next work session
@@ -1644,7 +1648,12 @@
         totalPhaseSeconds = WORK_SECONDS;
         updateDisplay();
         saveStateImmediate();
-        // Don't auto-start — wait for user
+        // Auto-start work (if enabled in settings)
+        var _autoWork = false;
+        try { var v = localStorage.getItem('dm-pomo-auto-work'); if (v === 'true') _autoWork = true; } catch(e) {}
+        if (_autoWork) {
+          startTimer();
+        }
       }
       return;
     }
@@ -2857,6 +2866,12 @@
   function simulateElapsed(curPhase, curSecondsLeft, curTotalPhase, curSession, curAccWork, elapsed) {
     var remaining = elapsed;
 
+    // Read auto-start preferences
+    var _simAutoBreak = true;
+    try { var v = localStorage.getItem('dm-pomo-auto-break'); if (v === 'false') _simAutoBreak = false; } catch(e) {}
+    var _simAutoWork = false;
+    try { var v = localStorage.getItem('dm-pomo-auto-work'); if (v === 'true') _simAutoWork = true; } catch(e) {}
+
     while (remaining > 0) {
       if (remaining >= curSecondsLeft) {
         // Phase completed during navigation
@@ -2870,27 +2885,43 @@
             return { finished: true, accWork: curAccWork };
           }
 
-          // Switch to break (auto-started)
+          // Switch to break
           curPhase = 'break';
           curSecondsLeft = BREAK_SECONDS;
           curTotalPhase = BREAK_SECONDS;
+
+          if (!_simAutoBreak) {
+            // Auto-break disabled — pause at break start
+            return {
+              finished: false,
+              paused: true,
+              phase: curPhase,
+              secondsLeft: curSecondsLeft,
+              totalPhase: curTotalPhase,
+              sessionCount: curSession,
+              accWork: curAccWork
+            };
+          }
         } else {
-          // Break finished — next work session does NOT auto-start
+          // Break finished — next work session
           curSession++;
           curPhase = 'work';
           curSecondsLeft = WORK_SECONDS;
           curTotalPhase = WORK_SECONDS;
-          // Break -> work transition doesn't auto-start, so stop consuming time
-          // and signal that the timer should be paused on restore
-          return {
-            finished: false,
-            paused: true,
-            phase: curPhase,
-            secondsLeft: curSecondsLeft,
-            totalPhase: curTotalPhase,
-            sessionCount: curSession,
-            accWork: curAccWork
-          };
+
+          if (!_simAutoWork) {
+            // Auto-work disabled — pause at work start
+            return {
+              finished: false,
+              paused: true,
+              phase: curPhase,
+              secondsLeft: curSecondsLeft,
+              totalPhase: curTotalPhase,
+              sessionCount: curSession,
+              accWork: curAccWork
+            };
+          }
+          // Auto-work enabled — continue consuming elapsed time
         }
       } else {
         // Elapsed time consumed within current phase
