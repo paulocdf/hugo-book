@@ -1,0 +1,853 @@
+<!-- History: Calendar grid view of past task activity -->
+<!-- Reads from IndexedDB todos store + closedDays via window.dmSync -->
+
+<div class="history" id="history">
+  <div class="history-auth" id="history-auth" style="display: none;">
+    <div class="history-auth-card">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <h3>Sign in to view your history</h3>
+      <p>Your task history requires authentication.</p>
+      <button type="button" class="history-signin-btn" id="history-signin-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <div class="history-loading" id="history-loading" style="display: none;">
+    <div class="history-spinner"></div>
+    <span>Loading history...</span>
+  </div>
+
+  <div class="history-empty" id="history-empty" style="display: none;">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    <p>No task history yet.</p>
+    <p class="history-empty-hint">Complete and close days in your <a href="{{ "docs/inbox/" | relURL }}">Inbox</a> to see your history here.</p>
+  </div>
+
+  <div class="history-content" id="history-content" style="display: none;">
+    <!-- Month navigation -->
+    <div class="history-month-nav">
+      <button type="button" class="history-nav-btn" id="history-prev-month" title="Previous month">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <span class="history-month-label" id="history-month-label"></span>
+      <button type="button" class="history-nav-btn" id="history-next-month" title="Next month">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+    </div>
+
+    <!-- Month summary stats -->
+    <div class="history-month-stats" id="history-month-stats"></div>
+
+    <!-- Calendar grid -->
+    <div class="history-calendar" id="history-calendar"></div>
+
+    <!-- Day detail (expanded task list) -->
+    <div class="history-day-detail" id="history-day-detail" style="display: none;"></div>
+  </div>
+</div>
+
+<style>
+.history {
+  max-width: 800px;
+}
+
+/* Auth */
+.history-auth {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+.history-auth-card {
+  text-align: center;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  max-width: 380px;
+}
+.history-auth-card h3 { margin: 1rem 0 0.5rem; }
+.history-auth-card p { color: var(--gray-500); margin-bottom: 1.5rem; font-size: 0.9rem; }
+.history-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--body-font-color);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: box-shadow 0.15s, background 0.15s;
+}
+.history-signin-btn:hover {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  background: var(--gray-100);
+}
+
+/* Loading */
+.history-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2rem;
+  justify-content: center;
+  color: var(--gray-500);
+  font-size: 0.9rem;
+}
+.history-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--color-link);
+  border-radius: 50%;
+  animation: history-spin 0.8s linear infinite;
+}
+@keyframes history-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Empty */
+.history-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--gray-500);
+}
+.history-empty p { margin: 0.5rem 0; }
+.history-empty-hint { font-size: 0.85rem; }
+.history-empty-hint a { color: var(--color-link); }
+
+/* Month navigation */
+.history-month-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.history-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--body-font-color);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.history-nav-btn:hover {
+  background: var(--gray-100);
+}
+.history-month-label {
+  font-size: 1.1rem;
+  font-weight: 600;
+  min-width: 180px;
+  text-align: center;
+}
+
+/* Month summary stats */
+.history-month-stats {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+}
+.history-month-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.history-month-stat strong {
+  color: var(--body-font-color);
+}
+
+/* Calendar grid */
+.history-calendar {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 16px;
+}
+.history-cal-header {
+  text-align: center;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--gray-400);
+  padding: 4px 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.history-cal-cell {
+  position: relative;
+  min-height: 64px;
+  border-radius: 8px;
+  border: 1px solid var(--gray-100);
+  padding: 4px 6px;
+  font-size: 0.72rem;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+  cursor: default;
+}
+.history-cal-cell.is-empty {
+  background: transparent;
+  border-color: transparent;
+}
+.history-cal-cell.has-tasks {
+  cursor: pointer;
+}
+.history-cal-cell.has-tasks:hover {
+  border-color: var(--color-link);
+  box-shadow: 0 1px 4px rgba(0, 105, 255, 0.10);
+}
+.history-cal-cell.is-today {
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 1px var(--color-link);
+}
+.history-cal-cell.is-closed {
+  background: var(--color-success-bg, rgba(56, 161, 105, 0.06));
+  border-color: rgba(56, 161, 105, 0.2);
+}
+.history-cal-cell.is-closed:hover {
+  border-color: var(--color-success, #38a169);
+}
+.history-cal-cell.is-selected {
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 2px rgba(0, 105, 255, 0.15);
+  background: rgba(0, 105, 255, 0.03);
+}
+.history-cal-day {
+  font-weight: 600;
+  color: var(--body-font-color);
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.history-cal-cell.is-future .history-cal-day {
+  color: var(--gray-300);
+}
+.history-cal-cell.is-today .history-cal-day {
+  color: var(--color-link);
+}
+.history-cal-cell.is-closed .history-cal-day {
+  color: var(--color-success, #38a169);
+}
+.history-cal-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.62rem;
+  color: var(--gray-400);
+  line-height: 1.2;
+}
+.history-cal-stat-done {
+  color: var(--color-success, #38a169);
+  font-weight: 500;
+}
+.history-cal-progress {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--gray-200, rgba(0,0,0,0.06));
+  overflow: hidden;
+  margin-top: 3px;
+}
+.history-cal-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--color-link);
+  transition: width 0.3s ease;
+}
+.history-cal-cell.is-closed .history-cal-progress-fill,
+.history-cal-cell.is-all-done .history-cal-progress-fill {
+  background: var(--color-success, #38a169);
+}
+.history-cal-closed-icon {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  color: var(--color-success, #38a169);
+  font-size: 0.6rem;
+  line-height: 1;
+}
+
+/* Day detail panel */
+.history-day-detail {
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 16px;
+  margin-top: 8px;
+}
+.history-day-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.history-day-detail-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.history-day-detail-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.history-day-detail-close:hover {
+  background: var(--gray-100);
+  color: var(--body-font-color);
+}
+.history-day-detail-stats {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--gray-100);
+}
+.history-day-detail-stats strong {
+  color: var(--body-font-color);
+}
+.history-day-task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.history-day-task {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--gray-100);
+  font-size: 0.82rem;
+}
+.history-day-task:last-child {
+  border-bottom: none;
+}
+.history-day-task-bullet {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--gray-400);
+}
+.history-day-task-bullet.is-done {
+  color: var(--color-success, #38a169);
+}
+.history-day-task-title {
+  flex: 1;
+  color: var(--body-font-color);
+}
+.history-day-task-title.is-done {
+  text-decoration: line-through;
+  color: var(--gray-400);
+}
+.history-day-task-meta {
+  flex-shrink: 0;
+  font-size: 0.7rem;
+  color: var(--gray-400);
+  text-align: right;
+}
+.history-day-task-subtask {
+  padding-left: 24px;
+}
+.history-day-task-category {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+  font-size: 0.65rem;
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .history-auth-card {
+    border-color: var(--gray-400);
+  }
+  .history-signin-btn {
+    background: var(--body-background);
+    border-color: var(--gray-400);
+  }
+  .history-signin-btn:hover {
+    background: rgba(255,255,255,0.05);
+  }
+  .history-nav-btn {
+    border-color: var(--gray-400);
+  }
+  .history-nav-btn:hover {
+    background: rgba(255,255,255,0.05);
+  }
+  .history-cal-cell {
+    border-color: rgba(255,255,255,0.06);
+  }
+  .history-cal-cell.is-closed {
+    background: rgba(104, 211, 145, 0.08);
+    border-color: rgba(104, 211, 145, 0.2);
+  }
+  .history-day-detail {
+    border-color: var(--gray-400);
+  }
+  .history-day-task-category {
+    background: rgba(255,255,255,0.06);
+  }
+}
+[data-theme="dark"] .history-auth-card {
+  border-color: var(--gray-400);
+}
+[data-theme="dark"] .history-signin-btn {
+  background: var(--body-background);
+  border-color: var(--gray-400);
+}
+[data-theme="dark"] .history-signin-btn:hover {
+  background: rgba(255,255,255,0.05);
+}
+[data-theme="dark"] .history-nav-btn {
+  border-color: var(--gray-400);
+}
+[data-theme="dark"] .history-nav-btn:hover {
+  background: rgba(255,255,255,0.05);
+}
+[data-theme="dark"] .history-cal-cell {
+  border-color: rgba(255,255,255,0.06);
+}
+[data-theme="dark"] .history-cal-cell.is-closed {
+  background: rgba(104, 211, 145, 0.08);
+  border-color: rgba(104, 211, 145, 0.2);
+}
+[data-theme="dark"] .history-day-detail {
+  border-color: var(--gray-400);
+}
+[data-theme="dark"] .history-day-task-category {
+  background: rgba(255,255,255,0.06);
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  // ─── DOM refs ───
+  var authEl = document.getElementById('history-auth');
+  var loadingEl = document.getElementById('history-loading');
+  var emptyEl = document.getElementById('history-empty');
+  var contentEl = document.getElementById('history-content');
+  var calendarEl = document.getElementById('history-calendar');
+  var monthLabelEl = document.getElementById('history-month-label');
+  var monthStatsEl = document.getElementById('history-month-stats');
+  var dayDetailEl = document.getElementById('history-day-detail');
+  var prevBtn = document.getElementById('history-prev-month');
+  var nextBtn = document.getElementById('history-next-month');
+  var signinBtn = document.getElementById('history-signin-btn');
+
+  // ─── State ───
+  var allTodos = [];
+  var closedDays = {}; // { 'YYYY-MM-DD': true }
+  var currentYear = new Date().getFullYear();
+  var currentMonth = new Date().getMonth(); // 0-indexed
+  var selectedDay = null; // 'YYYY-MM-DD' or null
+
+  var monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  var dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  // ─── Helpers ───
+  function showState(state) {
+    authEl.style.display = state === 'auth' ? '' : 'none';
+    loadingEl.style.display = state === 'loading' ? '' : 'none';
+    emptyEl.style.display = state === 'empty' ? '' : 'none';
+    contentEl.style.display = state === 'content' ? '' : 'none';
+  }
+
+  function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function pad2(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function todayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  }
+
+  // ─── Data helpers ───
+  // Get tasks scheduled on a given date (both parents and subtasks)
+  function getTasksForDate(dateStr) {
+    var parents = [];
+    var childrenMap = {};
+    allTodos.forEach(function(t) {
+      if (t.status === 'archived' || t.status === 'deleted') return;
+      if (t.scheduledDate !== dateStr) return;
+      if (t.parentId) {
+        if (!childrenMap[t.parentId]) childrenMap[t.parentId] = [];
+        childrenMap[t.parentId].push(t);
+      } else {
+        parents.push(t);
+      }
+    });
+    return { parents: parents, childrenMap: childrenMap };
+  }
+
+  // Compute stats for a date
+  function computeDayStats(dateStr) {
+    var data = getTasksForDate(dateStr);
+    var total = 0, done = 0, estMin = 0, actualMin = 0, pomos = 0;
+    data.parents.forEach(function(p) {
+      var ch = data.childrenMap[p.id] || [];
+      if (ch.length > 0) {
+        ch.forEach(function(c) {
+          total++;
+          if (c.done) done++;
+          if (c.estimatedMin) estMin += c.estimatedMin;
+          if (c.actualMin) actualMin += c.actualMin;
+          if (c.pomodoroCount) pomos += c.pomodoroCount;
+        });
+      } else {
+        total++;
+        if (p.done) done++;
+        if (p.estimatedMin) estMin += p.estimatedMin;
+        if (p.actualMin) actualMin += p.actualMin;
+        if (p.pomodoroCount) pomos += p.pomodoroCount;
+      }
+    });
+    return { total: total, done: done, estMin: estMin, actualMin: actualMin, pomos: pomos };
+  }
+
+  // ─── Render Calendar ───
+  function renderCalendar() {
+    var today = todayStr();
+    monthLabelEl.textContent = monthNames[currentMonth] + ' ' + currentYear;
+
+    // First day of month (0=Sun, adjust to Mon=0)
+    var firstDay = new Date(currentYear, currentMonth, 1);
+    var startDow = firstDay.getDay(); // 0=Sun
+    var offset = startDow === 0 ? 6 : startDow - 1; // Mon=0
+
+    // Days in month
+    var daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+    // Month-level stats
+    var monthTotal = 0, monthDone = 0, monthEstMin = 0, monthActualMin = 0, monthPomos = 0;
+    var monthClosedDays = 0;
+
+    // Pre-compute day stats for the month
+    var dayStatsMap = {};
+    for (var d = 1; d <= daysInMonth; d++) {
+      var ds = currentYear + '-' + pad2(currentMonth + 1) + '-' + pad2(d);
+      var stats = computeDayStats(ds);
+      dayStatsMap[ds] = stats;
+      monthTotal += stats.total;
+      monthDone += stats.done;
+      monthEstMin += stats.estMin;
+      monthActualMin += stats.actualMin;
+      monthPomos += stats.pomos;
+      if (closedDays[ds]) monthClosedDays++;
+    }
+
+    // Month stats bar
+    var statsHtml = '';
+    statsHtml += '<span class="history-month-stat"><strong>' + monthDone + '</strong>/' + monthTotal + ' tasks done</span>';
+    if (monthEstMin > 0) {
+      statsHtml += '<span class="history-month-stat">Est: <strong>' + (monthEstMin / 60).toFixed(1) + 'h</strong></span>';
+    }
+    if (monthActualMin > 0) {
+      statsHtml += '<span class="history-month-stat">Actual: <strong>' + (monthActualMin / 60).toFixed(1) + 'h</strong></span>';
+    }
+    if (monthPomos > 0) {
+      statsHtml += '<span class="history-month-stat"><strong>' + monthPomos + '</strong> pomo' + (monthPomos !== 1 ? 's' : '') + '</span>';
+    }
+    if (monthClosedDays > 0) {
+      statsHtml += '<span class="history-month-stat"><strong>' + monthClosedDays + '</strong> day' + (monthClosedDays !== 1 ? 's' : '') + ' closed</span>';
+    }
+    monthStatsEl.innerHTML = statsHtml;
+
+    // Calendar grid
+    var html = '';
+    // Day-of-week headers
+    for (var h = 0; h < 7; h++) {
+      html += '<div class="history-cal-header">' + dayHeaders[h] + '</div>';
+    }
+
+    // Empty cells before first day
+    for (var e = 0; e < offset; e++) {
+      html += '<div class="history-cal-cell is-empty"></div>';
+    }
+
+    // Day cells
+    for (var day = 1; day <= daysInMonth; day++) {
+      var dateStr = currentYear + '-' + pad2(currentMonth + 1) + '-' + pad2(day);
+      var st = dayStatsMap[dateStr];
+      var isClosed = !!closedDays[dateStr];
+      var isToday = dateStr === today;
+      var isFuture = dateStr > today;
+      var hasTasks = st.total > 0;
+      var isAllDone = hasTasks && st.done === st.total;
+
+      var classes = 'history-cal-cell';
+      if (!hasTasks) classes += ' is-empty';
+      if (hasTasks) classes += ' has-tasks';
+      if (isToday) classes += ' is-today';
+      if (isFuture) classes += ' is-future';
+      if (isClosed) classes += ' is-closed';
+      if (isAllDone && !isClosed) classes += ' is-all-done';
+      if (selectedDay === dateStr) classes += ' is-selected';
+
+      html += '<div class="' + classes + '" data-history-day="' + dateStr + '">';
+      html += '<div class="history-cal-day">' + day + '</div>';
+
+      if (isClosed) {
+        html += '<span class="history-cal-closed-icon">\u2713</span>';
+      }
+
+      if (hasTasks && !isFuture) {
+        html += '<div class="history-cal-stats">';
+        html += '<span class="history-cal-stat-done">' + st.done + '/' + st.total + '</span>';
+        if (st.estMin > 0) {
+          html += '<span>' + (st.estMin / 60).toFixed(1) + 'h</span>';
+        }
+        html += '</div>';
+        // Progress bar
+        var pct = Math.round((st.done / st.total) * 100);
+        html += '<div class="history-cal-progress"><div class="history-cal-progress-fill" style="width:' + pct + '%"></div></div>';
+      }
+
+      html += '</div>';
+    }
+
+    calendarEl.innerHTML = html;
+
+    // Attach click handlers to day cells
+    calendarEl.querySelectorAll('.history-cal-cell.has-tasks').forEach(function(cell) {
+      cell.addEventListener('click', function() {
+        var dateStr = cell.getAttribute('data-history-day');
+        if (selectedDay === dateStr) {
+          // Toggle off
+          selectedDay = null;
+          dayDetailEl.style.display = 'none';
+          cell.classList.remove('is-selected');
+        } else {
+          // Deselect previous
+          var prev = calendarEl.querySelector('.history-cal-cell.is-selected');
+          if (prev) prev.classList.remove('is-selected');
+          selectedDay = dateStr;
+          cell.classList.add('is-selected');
+          renderDayDetail(dateStr);
+        }
+      });
+    });
+
+    // If a day was selected, re-render detail (in case data changed)
+    if (selectedDay) {
+      var selDateParts = selectedDay.split('-');
+      var selMonth = parseInt(selDateParts[1], 10) - 1;
+      var selYear = parseInt(selDateParts[0], 10);
+      if (selMonth === currentMonth && selYear === currentYear) {
+        renderDayDetail(selectedDay);
+      } else {
+        selectedDay = null;
+        dayDetailEl.style.display = 'none';
+      }
+    }
+  }
+
+  // ─── Render Day Detail ───
+  function renderDayDetail(dateStr) {
+    var data = getTasksForDate(dateStr);
+    var stats = computeDayStats(dateStr);
+    var isClosed = !!closedDays[dateStr];
+
+    // Parse date for header
+    var parts = dateStr.split('-');
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    var dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    var headerLabel = dayNames[d.getDay()] + ', ' + monthNames[d.getMonth()] + ' ' + d.getDate();
+    if (isClosed) headerLabel += ' (Closed)';
+
+    var html = '';
+    html += '<div class="history-day-detail-header">';
+    html += '<span class="history-day-detail-title">' + escapeHtml(headerLabel) + '</span>';
+    html += '<button type="button" class="history-day-detail-close" id="history-detail-close" title="Close">';
+    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+    html += '</button>';
+    html += '</div>';
+
+    // Stats row
+    html += '<div class="history-day-detail-stats">';
+    html += '<span><strong>' + stats.done + '</strong>/' + stats.total + ' tasks</span>';
+    if (stats.estMin > 0) {
+      html += '<span>Est: <strong>' + stats.estMin + 'min</strong> (' + (stats.estMin / 60).toFixed(1) + 'h)</span>';
+    }
+    if (stats.actualMin > 0) {
+      html += '<span>Actual: <strong>' + stats.actualMin + 'min</strong> (' + (stats.actualMin / 60).toFixed(1) + 'h)</span>';
+    }
+    if (stats.pomos > 0) {
+      html += '<span><strong>' + stats.pomos + '</strong> pomo' + (stats.pomos !== 1 ? 's' : '') + '</span>';
+    }
+    html += '</div>';
+
+    // Task list
+    html += '<ul class="history-day-task-list">';
+    data.parents.forEach(function(p) {
+      html += buildTaskItem(p, false);
+      var children = data.childrenMap[p.id] || [];
+      children.forEach(function(c) {
+        html += buildTaskItem(c, true);
+      });
+    });
+    html += '</ul>';
+
+    dayDetailEl.innerHTML = html;
+    dayDetailEl.style.display = '';
+
+    // Close button
+    document.getElementById('history-detail-close').addEventListener('click', function() {
+      selectedDay = null;
+      dayDetailEl.style.display = 'none';
+      var sel = calendarEl.querySelector('.history-cal-cell.is-selected');
+      if (sel) sel.classList.remove('is-selected');
+    });
+
+    // Scroll into view
+    dayDetailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function buildTaskItem(task, isSubtask) {
+    var isDone = !!task.done;
+    var bulletClass = 'history-day-task-bullet' + (isDone ? ' is-done' : '');
+    var titleClass = 'history-day-task-title' + (isDone ? ' is-done' : '');
+    var classes = 'history-day-task' + (isSubtask ? ' history-day-task-subtask' : '');
+
+    var html = '<li class="' + classes + '">';
+
+    // Bullet
+    if (isDone) {
+      html += '<span class="' + bulletClass + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>';
+    } else {
+      html += '<span class="' + bulletClass + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg></span>';
+    }
+
+    // Title + category
+    html += '<span class="' + titleClass + '">' + escapeHtml(task.title || 'Untitled');
+    if (task.category && !isSubtask) {
+      html += '<span class="history-day-task-category">' + escapeHtml(task.category) + '</span>';
+    }
+    html += '</span>';
+
+    // Meta (time)
+    var meta = [];
+    if (task.estimatedMin) meta.push(task.estimatedMin + 'min est');
+    if (task.actualMin) meta.push(task.actualMin + 'min actual');
+    if (task.pomodoroCount) meta.push(task.pomodoroCount + ' pomo');
+    if (meta.length > 0) {
+      html += '<span class="history-day-task-meta">' + meta.join(' / ') + '</span>';
+    }
+
+    html += '</li>';
+    return html;
+  }
+
+  // ─── Navigation ───
+  prevBtn.addEventListener('click', function() {
+    currentMonth--;
+    if (currentMonth < 0) {
+      currentMonth = 11;
+      currentYear--;
+    }
+    selectedDay = null;
+    dayDetailEl.style.display = 'none';
+    renderCalendar();
+  });
+
+  nextBtn.addEventListener('click', function() {
+    currentMonth++;
+    if (currentMonth > 11) {
+      currentMonth = 0;
+      currentYear++;
+    }
+    selectedDay = null;
+    dayDetailEl.style.display = 'none';
+    renderCalendar();
+  });
+
+  // ─── Data loading ───
+  function loadHistory() {
+    if (!window.dmSync) {
+      showState('auth');
+      return;
+    }
+
+    showState('loading');
+
+    var closedPromise = window.dmSync.getClosedDays().then(function(days) {
+      closedDays = {};
+      days.forEach(function(d) { closedDays[d] = true; });
+    }).catch(function() {});
+
+    var todosPromise = window.dmSync.getAllTodos();
+
+    Promise.all([closedPromise, todosPromise]).then(function(results) {
+      allTodos = results[1] || [];
+      // Filter to only active/done (not archived/deleted)
+      allTodos = allTodos.filter(function(t) {
+        return t.status === 'active' || t.status === 'done';
+      });
+
+      if (allTodos.length === 0 && Object.keys(closedDays).length === 0) {
+        showState('empty');
+      } else {
+        showState('content');
+        renderCalendar();
+      }
+    }).catch(function(err) {
+      console.error('[history] load error:', err);
+      showState('empty');
+    });
+  }
+
+  // ─── Auth ───
+  if (signinBtn) {
+    signinBtn.addEventListener('click', function() {
+      if (window.dmSignIn) window.dmSignIn();
+    });
+  }
+
+  window.addEventListener('dm-todos-updated', loadHistory);
+  window.addEventListener('dm-sync-complete', loadHistory);
+
+  if (window.dmAuth) {
+    function subscribeHistoryAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          loadHistory();
+        } else {
+          showState('auth');
+        }
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeHistoryAuth);
+    } else {
+      subscribeHistoryAuth();
+    }
+  }
+})();
+</script>
