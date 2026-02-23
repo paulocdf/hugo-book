@@ -775,6 +775,279 @@
 })();
 </script>
 
+<!-- Image controls: floating toolbar + drag-to-resize on rendered images -->
+<script>
+(function() {
+  'use strict';
+
+  // SVG icon helpers (Feather-style, stroke="currentColor")
+  var ICON_TRASH = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+  var ICON_GRIP = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="14" y1="2" x2="2" y2="14"/><line x1="14" y1="7" x2="7" y2="14"/><line x1="14" y1="12" x2="12" y2="14"/></svg>';
+
+  /**
+   * Enable image controls on rendered markdown images.
+   * - Floating toolbar above image (with delete button + inline confirm)
+   * - Drag-to-resize handle at bottom-right corner
+   *
+   * @param {Element}  bodyEl   - container with rendered HTML
+   * @param {Object}   note     - note object with .id and .content
+   * @param {Function} onUpdate - called after successful save
+   */
+  window.dmEnableImageResize = function(bodyEl, note, onUpdate) {
+    if (!bodyEl || !note) return;
+    var images = bodyEl.querySelectorAll('img');
+    if (!images.length) return;
+
+    images.forEach(function(img, idx) {
+      // Skip if already wrapped
+      if (img.parentElement && img.parentElement.classList.contains('dm-img-resizable')) return;
+
+      // Create wrapper
+      var wrapper = document.createElement('span');
+      wrapper.className = 'dm-img-resizable';
+      img.parentNode.insertBefore(wrapper, img);
+      wrapper.appendChild(img);
+
+      // ---- Floating toolbar (centered above image) ----
+      var toolbar = document.createElement('span');
+      toolbar.className = 'dm-img-toolbar';
+      wrapper.appendChild(toolbar);
+
+      // Delete button
+      var deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'dm-img-toolbar-btn dm-img-toolbar-btn--delete';
+      deleteBtn.title = 'Delete image';
+      deleteBtn.innerHTML = ICON_TRASH;
+      toolbar.appendChild(deleteBtn);
+
+      // Inline confirmation (hidden by default)
+      var confirmEl = document.createElement('span');
+      confirmEl.className = 'dm-img-delete-confirm';
+      confirmEl.style.display = 'none';
+      confirmEl.innerHTML =
+        '<span>Delete?</span>' +
+        '<button type="button" class="dm-img-delete-confirm-btn dm-img-delete-confirm-btn--yes">Yes</button>' +
+        '<button type="button" class="dm-img-delete-confirm-btn dm-img-delete-confirm-btn--no">No</button>';
+      toolbar.appendChild(confirmEl);
+
+      deleteBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteBtn.style.display = 'none';
+        confirmEl.style.display = 'flex';
+      });
+
+      confirmEl.querySelector('.dm-img-delete-confirm-btn--no').addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        confirmEl.style.display = 'none';
+        deleteBtn.style.display = '';
+      });
+
+      confirmEl.querySelector('.dm-img-delete-confirm-btn--yes').addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        deleteImage(note, idx, wrapper, bodyEl, onUpdate);
+      });
+
+      // Reset confirm state when mouse leaves the wrapper
+      wrapper.addEventListener('mouseleave', function() {
+        if (confirmEl.style.display !== 'none') {
+          confirmEl.style.display = 'none';
+          deleteBtn.style.display = '';
+        }
+      });
+
+      // ---- Resize handle (bottom-right corner) ----
+      var handle = document.createElement('span');
+      handle.className = 'dm-img-resize-handle';
+      handle.title = 'Drag to resize';
+      handle.innerHTML = ICON_GRIP;
+      wrapper.appendChild(handle);
+
+      // Tooltip
+      var tooltip = document.createElement('span');
+      tooltip.className = 'dm-img-resize-tooltip';
+      wrapper.appendChild(tooltip);
+
+      // Drag state
+      var startX, startWidth;
+
+      function onPointerDown(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        handle.classList.add('dm-dragging');
+        document.body.classList.add('dm-img-resizing');
+
+        startX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+        startWidth = img.offsetWidth;
+
+        tooltip.textContent = startWidth + 'px';
+        tooltip.style.display = 'block';
+
+        document.addEventListener('mousemove', onPointerMove);
+        document.addEventListener('mouseup', onPointerUp);
+        document.addEventListener('touchmove', onPointerMove, { passive: false });
+        document.addEventListener('touchend', onPointerUp);
+      }
+
+      function onPointerMove(e) {
+        e.preventDefault();
+        var clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+        var dx = clientX - startX;
+        var containerWidth = wrapper.parentElement ? wrapper.parentElement.offsetWidth : 800;
+        var newWidth = Math.max(50, Math.min(containerWidth, startWidth + dx));
+        newWidth = Math.round(newWidth);
+
+        img.style.width = newWidth + 'px';
+        img.style.height = 'auto';
+        tooltip.textContent = newWidth + 'px';
+      }
+
+      function onPointerUp() {
+        document.removeEventListener('mousemove', onPointerMove);
+        document.removeEventListener('mouseup', onPointerUp);
+        document.removeEventListener('touchmove', onPointerMove);
+        document.removeEventListener('touchend', onPointerUp);
+
+        handle.classList.remove('dm-dragging');
+        document.body.classList.remove('dm-img-resizing');
+        tooltip.style.display = 'none';
+
+        var finalWidth = Math.round(img.offsetWidth);
+        if (finalWidth === startWidth) return;
+
+        persistImageResize(note, idx, finalWidth, onUpdate);
+      }
+
+      handle.addEventListener('mousedown', onPointerDown);
+      handle.addEventListener('touchstart', onPointerDown, { passive: false });
+    });
+  };
+
+  // ---- Persist helpers ----
+
+  /**
+   * Combined regex: matches markdown images OR HTML img tags.
+   * Group 1 = md alt, Group 2 = md src (both undefined for HTML img matches).
+   */
+  var IMG_REGEX = /!\[([^\]]*)\]\(([^)]+)\)|<img\s[^>]*>/g;
+
+  /**
+   * Delete the Nth image from note.content and remove from DOM.
+   */
+  function deleteImage(note, imgIndex, wrapperEl, bodyEl, onUpdate) {
+    var raw = note.content || '';
+    var count = 0;
+
+    var newContent = raw.replace(IMG_REGEX, function(match) {
+      if (count !== imgIndex) {
+        count++;
+        return match;
+      }
+      count++;
+      return ''; // remove the image
+    });
+
+    // Clean up leftover blank lines from removal
+    newContent = newContent.replace(/\n{3,}/g, '\n\n');
+
+    if (newContent === raw) return;
+
+    // Remove from DOM immediately
+    if (wrapperEl && wrapperEl.parentNode) {
+      wrapperEl.parentNode.removeChild(wrapperEl);
+    }
+
+    // Re-index remaining images: re-run dmEnableImageResize so indices are correct
+    // First strip all existing wrappers to avoid "already wrapped" guard
+    if (bodyEl) {
+      var existingWrappers = bodyEl.querySelectorAll('.dm-img-resizable');
+      existingWrappers.forEach(function(w) {
+        var innerImg = w.querySelector('img');
+        if (innerImg && w.parentNode) {
+          w.parentNode.insertBefore(innerImg, w);
+          w.parentNode.removeChild(w);
+        }
+      });
+    }
+
+    note.content = newContent;
+    note.updatedAt = Date.now();
+
+    persistToFirestore(note, newContent, onUpdate);
+
+    // Re-wire remaining images with correct indices
+    if (bodyEl && window.dmEnableImageResize) {
+      window.dmEnableImageResize(bodyEl, note, onUpdate);
+    }
+  }
+
+  /**
+   * Persist resized image width back to note.content markdown.
+   */
+  function persistImageResize(note, imgIndex, newWidth, onUpdate) {
+    var raw = note.content || '';
+    var count = 0;
+
+    var newContent = raw.replace(IMG_REGEX, function(match, mdAlt, mdSrc) {
+      if (count !== imgIndex) {
+        count++;
+        return match;
+      }
+      count++;
+
+      if (mdSrc !== undefined) {
+        // Markdown syntax -> HTML img with width
+        return '<img src="' + mdSrc + '" alt="' + (mdAlt || '') + '" width="' + newWidth + '">';
+      } else {
+        // HTML <img> tag: update or add width attribute
+        if (/width\s*=\s*["']?\d+["']?/.test(match)) {
+          return match.replace(/width\s*=\s*["']?\d+["']?/, 'width="' + newWidth + '"');
+        } else {
+          return match.replace(/<img\s/, '<img width="' + newWidth + '" ');
+        }
+      }
+    });
+
+    if (newContent === raw) return;
+
+    note.content = newContent;
+    note.updatedAt = Date.now();
+
+    persistToFirestore(note, newContent, onUpdate);
+  }
+
+  /**
+   * Save updated content to Firestore + IndexedDB.
+   */
+  function persistToFirestore(note, newContent, onUpdate) {
+    if (window.dmDb && window.dmSync) {
+      window._dmImageResizing = true;
+      window.dmSync.firestoreWrite({
+        collection: 'notes',
+        docId: note.id,
+        op: 'update',
+        data: {
+          content: newContent,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        },
+        localOp: function() {
+          return window.dmSync.putNote(note);
+        }
+      }).then(function() {
+        window._dmImageResizing = false;
+        if (onUpdate) onUpdate(note);
+      }).catch(function(err) {
+        window._dmImageResizing = false;
+        console.error('Image control save error:', err);
+      });
+    }
+  }
+})();
+</script>
+
 <!-- RSS -->
 {{- with .OutputFormats.Get "rss" -}}
   {{ printf `<link rel="%s" type="%s" href="%s" title="%s" />` .Rel .MediaType.Type .Permalink $.Site.Title | safeHTML }}

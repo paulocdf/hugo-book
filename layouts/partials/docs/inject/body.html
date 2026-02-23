@@ -777,13 +777,8 @@
 
   function qcHandleFiles(files) {
     if (!files || !files.length) return;
-    if (!window.dmSync || !window.dmSync.uploadAttachment) return;
-    if (!window.dmAuth || !window.dmAuth.currentUser) {
-      showFeedback('error', 'Please sign in to attach files.');
-      return;
-    }
+    if (!window.dmFileToBase64Markdown) { console.warn('[qc-attach] dmFileToBase64Markdown not available'); return; }
 
-    var noteId = qcGetOrCreateNoteId();
     var fileArr = Array.from(files);
     var total = fileArr.length;
     var completed = 0;
@@ -791,30 +786,28 @@
     if (qcUploadBar) {
       qcUploadBar.style.display = '';
       qcUploadProgress.style.width = '0%';
-      qcUploadText.textContent = 'Uploading ' + total + ' file' + (total > 1 ? 's' : '') + '...';
+      qcUploadText.textContent = 'Embedding ' + total + ' file' + (total > 1 ? 's' : '') + '...';
     }
 
     var chain = Promise.resolve();
     fileArr.forEach(function(file) {
       chain = chain.then(function() {
-        return window.dmSync.uploadAttachment(noteId, file, function(pct) {
-          var overallPct = Math.round(((completed + pct / 100) / total) * 100);
-          if (qcUploadProgress) qcUploadProgress.style.width = overallPct + '%';
-          if (qcUploadText) qcUploadText.textContent = 'Uploading ' + (completed + 1) + '/' + total + ' (' + pct + '%)';
-        }).then(function(attachment) {
+        return window.dmFileToBase64Markdown(file).then(function(md) {
           completed++;
-          _qcPendingAttachments.push(attachment);
-          qcInsertAttachmentMarkdown(attachment);
-          qcRenderAttachmentGallery();
+          var pct = Math.round((completed / total) * 100);
+          if (qcUploadProgress) qcUploadProgress.style.width = pct + '%';
+          if (qcUploadText) qcUploadText.textContent = 'Embedding ' + completed + '/' + total;
+          qcInsertAtCursor(md);
         }).catch(function(err) {
           completed++;
-          console.error('[qc-attachments] Upload error:', err);
-          if (qcUploadText) qcUploadText.textContent = 'Failed: ' + (err.message || 'Upload error');
+          console.error('[qc-attach] Embed error:', err);
+          if (qcUploadText) qcUploadText.textContent = 'Failed: ' + (err.message || 'Embed error');
         });
       });
     });
 
     chain.then(function() {
+      if (qcUploadText) qcUploadText.textContent = 'Done!';
       setTimeout(function() {
         if (qcUploadBar) qcUploadBar.style.display = 'none';
       }, 1500);
@@ -889,7 +882,7 @@
     });
   }
 
-  // Paste handler — intercept image/file paste
+  // Paste handler — intercept image/file paste on the content textarea
   input.addEventListener('paste', function(e) {
     if (currentMode !== 'note' && currentMode !== 'code') return;
     var items = (e.clipboardData || e.originalEvent.clipboardData || {}).items;
@@ -904,15 +897,15 @@
     }
     if (files.length > 0) {
       e.preventDefault();
+      e.stopPropagation(); // prevent dialog-level handler from also firing
       qcHandleFiles(files);
     }
   });
 
-  // Dialog-level paste handler — auto-switch to Note mode when pasting
-  // files while in AI or Todo mode (where the main textarea is hidden)
+  // Dialog-level paste handler — catches paste from ANY element inside the
+  // dialog (title input, AI chat textarea, etc.).  The textarea handler above
+  // calls stopPropagation when it handles files so we won't double-process.
   dialog.addEventListener('paste', function(e) {
-    // Only intercept in AI/Todo modes; note/code are handled by the input handler above
-    if (currentMode !== 'ai' && currentMode !== 'todo') return;
     var items = (e.clipboardData || e.originalEvent.clipboardData || {}).items;
     if (!items) return;
 
@@ -926,10 +919,14 @@
     if (files.length > 0) {
       e.preventDefault();
       e.stopPropagation();
-      // Switch to Note mode so the textarea and toolbar become visible
-      setMode('note');
-      // Allow the DOM to update before uploading (textarea needs to be visible for cursor insertion)
-      setTimeout(function() { qcHandleFiles(files); }, 50);
+      // If not already in note/code mode, switch to note mode first
+      if (currentMode !== 'note' && currentMode !== 'code') {
+        setMode('note');
+        // Allow the DOM to update before uploading (textarea needs to be visible for cursor insertion)
+        setTimeout(function() { qcHandleFiles(files); }, 50);
+      } else {
+        qcHandleFiles(files);
+      }
     }
   });
 

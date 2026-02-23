@@ -61,6 +61,11 @@
       <div class="note-viewer-attachments-list" id="sn-attachments-list"></div>
     </div>
   </div>
+  <!-- Paste/drop upload toast -->
+  <div class="sn-upload-toast" style="display: none;">
+    <div class="sn-upload-toast-progress"></div>
+    <span class="sn-upload-toast-text">Uploading...</span>
+  </div>
 </div>
 
 <style>
@@ -218,6 +223,42 @@
 .single-note-merge-btn {
   /* inherits .note-action-btn */
 }
+/* Paste/drop upload toast */
+.sn-upload-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 2000;
+  min-width: 180px;
+  overflow: hidden;
+}
+.sn-upload-toast-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--color-link);
+  transition: width 0.2s ease;
+  width: 0%;
+}
+.sn-upload-toast-text {
+  font-size: 0.85rem;
+  color: var(--body-font-color);
+}
+/* Drop zone highlight */
+.single-note.sn-drag-over {
+  outline: 2px dashed var(--color-link);
+  outline-offset: -4px;
+  background: rgba(0, 105, 255, 0.03);
+}
 </style>
 
 <script>
@@ -312,6 +353,13 @@
       if (window.dmEnableCheckboxes) {
         window.dmEnableCheckboxes(bodyEl, note, function(updated) {
           // Checkbox already toggled visually; no re-render needed
+        });
+      }
+
+      // Enable drag-to-resize on images
+      if (window.dmEnableImageResize) {
+        window.dmEnableImageResize(bodyEl, note, function(updated) {
+          // Width already applied visually; no re-render needed
         });
       }
 
@@ -729,6 +777,163 @@
       });
     }
 
+    // ============================
+    // Paste-to-upload & Drag-and-drop
+    // ============================
+    var snUploadToast = container.querySelector('.sn-upload-toast');
+    var snUploadProgress = container.querySelector('.sn-upload-toast-progress');
+    var snUploadText = container.querySelector('.sn-upload-toast-text');
+
+    function snShowUploadToast(text) {
+      if (!snUploadToast) return;
+      snUploadToast.style.display = '';
+      snUploadText.textContent = text || 'Uploading...';
+      snUploadProgress.style.width = '0%';
+    }
+
+    function snHideUploadToast() {
+      if (!snUploadToast) return;
+      setTimeout(function() { snUploadToast.style.display = 'none'; }, 1500);
+    }
+
+    function snHandleFiles(files) {
+      if (!currentNote) return;
+      if (!files || !files.length) return;
+      if (!window.dmFileToBase64Markdown) {
+        console.warn('[sn-attach] dmFileToBase64Markdown not available');
+        return;
+      }
+
+      var fileArr = Array.from(files);
+      var total = fileArr.length;
+      var completed = 0;
+
+      snShowUploadToast('Embedding ' + total + ' file' + (total > 1 ? 's' : '') + '...');
+
+      var chain = Promise.resolve();
+      var embeddedMarkdown = [];
+
+      fileArr.forEach(function(file) {
+        chain = chain.then(function() {
+          return window.dmFileToBase64Markdown(file).then(function(md) {
+            completed++;
+            var pct = Math.round((completed / total) * 100);
+            if (snUploadProgress) snUploadProgress.style.width = pct + '%';
+            if (snUploadText) snUploadText.textContent = 'Embedding ' + completed + '/' + total;
+            embeddedMarkdown.push(md);
+          }).catch(function(err) {
+            completed++;
+            console.error('[sn-attach] Embed error:', err);
+            if (snUploadText) snUploadText.textContent = 'Failed: ' + (err.message || 'Embed error');
+          });
+        });
+      });
+
+      chain.then(function() {
+        if (!embeddedMarkdown.length) {
+          snHideUploadToast();
+          return;
+        }
+
+        // Append markdown to the note content and save
+        var newContent = (currentNote.content || '') + '\n\n' + embeddedMarkdown.join('\n');
+
+        var updateData = {
+          content: newContent,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        return window.dmSync.firestoreWrite({
+          collection: 'notes',
+          docId: currentNote.id,
+          op: 'update',
+          data: updateData,
+          localOp: function() {
+            currentNote.content = newContent;
+            currentNote.updatedAt = Date.now();
+            return window.dmSync.putNote(currentNote);
+          }
+        }).then(function() {
+          if (snUploadText) snUploadText.textContent = 'Done!';
+          snHideUploadToast();
+          selfTriggeredSync = true;
+          renderNote(currentNote);
+          setTimeout(function() { selfTriggeredSync = false; }, 200);
+        });
+      }).catch(function(err) {
+        console.error('[sn-attach] Save error:', err);
+        if (snUploadText) snUploadText.textContent = 'Save failed';
+        snHideUploadToast();
+      });
+    }
+
+    // Document-level paste handler.
+    // We listen on `document` because the container is a plain <div> (not focusable).
+    // When multiple single-note instances exist on a page, each registers its own
+    // handler but only the one whose content is visible will act.
+    document.addEventListener('paste', function(e) {
+      if (!currentNote) return;
+      // Another handler already processed this paste (e.g. another single-note instance)
+      if (e.defaultPrevented) return;
+      // Don't intercept paste inside inputs, textareas, or contenteditable
+      var tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+      // Only act when this container's content is visible
+      if (contentEl.style.display === 'none') return;
+      // Skip if the note-viewer is visible (let its handler take priority)
+      var noteViewer = document.getElementById('note-viewer-content');
+      if (noteViewer && noteViewer.style.display !== 'none') return;
+
+      var items = (e.clipboardData || e.originalEvent.clipboardData || {}).items;
+      if (!items) return;
+
+      var files = [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].kind === 'file') {
+          var f = items[i].getAsFile();
+          if (f) files.push(f);
+        }
+      }
+      if (files.length > 0) {
+        e.preventDefault();
+        snHandleFiles(files);
+      }
+    });
+
+    // Drag-and-drop support
+    var snDragCounter = 0;
+    container.addEventListener('dragenter', function(e) {
+      if (!currentNote) return;
+      e.preventDefault();
+      e.stopPropagation();
+      snDragCounter++;
+      container.classList.add('sn-drag-over');
+    });
+    container.addEventListener('dragleave', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      snDragCounter--;
+      if (snDragCounter <= 0) {
+        snDragCounter = 0;
+        container.classList.remove('sn-drag-over');
+      }
+    });
+    container.addEventListener('dragover', function(e) {
+      if (!currentNote) return;
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    container.addEventListener('drop', function(e) {
+      if (!currentNote) return;
+      e.preventDefault();
+      e.stopPropagation();
+      snDragCounter = 0;
+      container.classList.remove('sn-drag-over');
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        snHandleFiles(e.dataTransfer.files);
+      }
+    });
+
     // Auth handling
     if (signinBtn) {
       signinBtn.addEventListener('click', function() {
@@ -740,6 +945,7 @@
     window.addEventListener('dm-sync-complete', function(e) {
       if (selfTriggeredSync) return;
       if (window._dmCheckboxSyncing) return;
+      if (window._dmImageResizing) return;
       if (e.detail && e.detail.source === 'edit-modal') return;
       if (window.dmAuth && window.dmAuth.currentUser) {
         loadFromCache();

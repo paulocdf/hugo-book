@@ -1041,7 +1041,7 @@
 
   function handleFiles(files, noteId) {
     if (!files || !files.length || !noteId) return;
-    if (!window.dmSync || !window.dmSync.uploadAttachment) return;
+    if (!window.dmFileToBase64Markdown) { console.warn('[edit-attach] dmFileToBase64Markdown not available'); return; }
 
     var fileArr = Array.from(files);
     var total = fileArr.length;
@@ -1049,28 +1049,27 @@
 
     attachUploadBar.style.display = '';
     attachUploadProgress.style.width = '0%';
-    attachUploadText.textContent = 'Uploading ' + total + ' file' + (total > 1 ? 's' : '') + '...';
+    attachUploadText.textContent = 'Embedding ' + total + ' file' + (total > 1 ? 's' : '') + '...';
 
     var chain = Promise.resolve();
     fileArr.forEach(function(file) {
       chain = chain.then(function() {
-        return window.dmSync.uploadAttachment(noteId, file, function(pct) {
-          var overallPct = Math.round(((completed + pct / 100) / total) * 100);
-          attachUploadProgress.style.width = overallPct + '%';
-          attachUploadText.textContent = 'Uploading ' + (completed + 1) + '/' + total + ' (' + pct + '%)';
-        }).then(function(attachment) {
+        return window.dmFileToBase64Markdown(file).then(function(md) {
           completed++;
-          insertAttachmentMarkdown(attachment);
-          return renderAttachmentGallery(noteId);
+          var pct = Math.round((completed / total) * 100);
+          attachUploadProgress.style.width = pct + '%';
+          attachUploadText.textContent = 'Embedding ' + completed + '/' + total;
+          insertAtCursor(md);
         }).catch(function(err) {
           completed++;
-          console.error('[attachments] Upload error:', err);
-          attachUploadText.textContent = 'Failed: ' + (err.message || 'Upload error');
+          console.error('[edit-attach] Embed error:', err);
+          attachUploadText.textContent = 'Failed: ' + (err.message || 'Embed error');
         });
       });
     });
 
     chain.then(function() {
+      attachUploadText.textContent = 'Done!';
       setTimeout(function() {
         attachUploadBar.style.display = 'none';
       }, 1500);
@@ -1128,7 +1127,7 @@
     });
   }
 
-  // Paste handler — intercept image paste
+  // Paste handler — intercept image paste on the content textarea
   editContentInput.addEventListener('paste', function(e) {
     if (!currentNote) return;
     var items = (e.clipboardData || e.originalEvent.clipboardData || {}).items;
@@ -1143,6 +1142,29 @@
     }
     if (files.length > 0) {
       e.preventDefault();
+      e.stopPropagation();
+      handleFiles(files, currentNote.id);
+    }
+  });
+
+  // Modal-level paste handler — catches paste from the title input or any
+  // other element inside the edit modal.  The textarea handler above calls
+  // stopPropagation when it handles files so we won't double-process.
+  editModal.addEventListener('paste', function(e) {
+    if (!currentNote) return;
+    var items = (e.clipboardData || e.originalEvent.clipboardData || {}).items;
+    if (!items) return;
+
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        var f = items[i].getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      e.stopPropagation();
       handleFiles(files, currentNote.id);
     }
   });

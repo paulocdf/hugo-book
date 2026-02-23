@@ -1360,10 +1360,11 @@
    */
   function uploadAttachment(noteId, file, onProgress) {
     var user = window.dmAuth && window.dmAuth.currentUser;
-    if (!user) return Promise.reject(new Error('Not authenticated'));
-    if (!window.dmStorage) return Promise.reject(new Error('Storage not available'));
+    if (!user) { console.error('[dm-sync] Not authenticated'); return Promise.reject(new Error('Not authenticated')); }
+    if (!window.dmStorage) { console.error('[dm-sync] Storage not available'); return Promise.reject(new Error('Storage not available')); }
 
     if (file.size > MAX_FILE_SIZE) {
+      console.error('[dm-sync] File too large:', file.size);
       return Promise.reject(new Error('File too large (max 10 MB)'));
     }
 
@@ -1846,6 +1847,36 @@
       return notes.filter(function(n) { return !n.deletedAt; });
     });
   }
+
+  /**
+   * Convert a File to a base64 data URL markdown string.
+   * Returns a Promise that resolves to a markdown image/link string.
+   * Images become ![name](data:...), other files become [name](data:...).
+   * Max size: 500 KB (base64 inflates ~33%, Firestore doc limit is 1 MB).
+   */
+  var BASE64_MAX_SIZE = 500 * 1024; // 500 KB
+  window.dmFileToBase64Markdown = function(file) {
+    return new Promise(function(resolve, reject) {
+      if (!file) return reject(new Error('No file provided'));
+      if (file.size > BASE64_MAX_SIZE) {
+        return reject(new Error('File too large (max 500 KB). Try a smaller image or compress it first.'));
+      }
+      var reader = new FileReader();
+      reader.onload = function() {
+        var dataUrl = reader.result;
+        var isImage = file.type && file.type.startsWith('image/');
+        var name = file.name || ('pasted-' + Date.now());
+        var md = isImage
+          ? '![' + name + '](' + dataUrl + ')'
+          : '[' + name + '](' + dataUrl + ')';
+        resolve(md);
+      };
+      reader.onerror = function() {
+        reject(new Error('Failed to read file'));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
 
   window.dmSync = {
     // IndexedDB operations — Notes

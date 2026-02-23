@@ -73,6 +73,11 @@
       <h3 class="backlinks-title">Linked from</h3>
       <div class="backlinks-list" id="backlinks-list"></div>
     </div>
+    <!-- Paste upload toast (shown when pasting images on the viewer) -->
+    <div class="nv-upload-toast" id="nv-upload-toast" style="display: none;">
+      <div class="nv-upload-toast-progress" id="nv-upload-toast-progress"></div>
+      <span class="nv-upload-toast-text" id="nv-upload-toast-text">Uploading...</span>
+    </div>
   </div>
 </div>
 
@@ -346,6 +351,36 @@
     padding: 1rem;
   }
 }
+/* Paste-upload toast */
+.nv-upload-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 2000;
+  min-width: 180px;
+  overflow: hidden;
+}
+.nv-upload-toast-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--color-link);
+  transition: width 0.2s ease;
+  width: 0%;
+}
+.nv-upload-toast-text {
+  font-size: 0.85rem;
+  color: var(--body-font-color);
+}
 </style>
 
 <script>
@@ -527,6 +562,13 @@
       if (window.dmEnableCheckboxes) {
         window.dmEnableCheckboxes(bodyEl, note, function(updated) {
           // Checkbox already toggled visually; no re-render needed
+        });
+      }
+
+      // Enable drag-to-resize on images
+      if (window.dmEnableImageResize) {
+        window.dmEnableImageResize(bodyEl, note, function(updated) {
+          // Width already applied visually; no re-render needed
         });
       }
 
@@ -876,6 +918,7 @@
   window.addEventListener('dm-sync-complete', function(e) {
     if (selfTriggeredSync) return;
     if (window._dmCheckboxSyncing) return;
+    if (window._dmImageResizing) return;
     if (e.detail && e.detail.source === 'edit-modal') return;
     if (noteId && window.dmAuth && window.dmAuth.currentUser) {
       loadNote();
@@ -901,5 +944,155 @@
   } else {
     showState('auth');
   }
+
+  // ============================
+  // Paste-to-upload on the viewer page
+  // ============================
+  var nvUploadToast = document.getElementById('nv-upload-toast');
+  var nvUploadProgress = document.getElementById('nv-upload-toast-progress');
+  var nvUploadText = document.getElementById('nv-upload-toast-text');
+
+  function nvShowUploadToast(text) {
+    if (!nvUploadToast) return;
+    nvUploadToast.style.display = '';
+    nvUploadText.textContent = text || 'Uploading...';
+    nvUploadProgress.style.width = '0%';
+  }
+
+  function nvHideUploadToast() {
+    if (!nvUploadToast) return;
+    setTimeout(function() { nvUploadToast.style.display = 'none'; }, 1500);
+  }
+
+  function nvHandleFiles(files) {
+    if (!currentNote) return;
+    if (!files || !files.length) return;
+    if (!window.dmFileToBase64Markdown) {
+      console.warn('[nv-attach] dmFileToBase64Markdown not available');
+      return;
+    }
+
+    var fileArr = Array.from(files);
+    var total = fileArr.length;
+    var completed = 0;
+
+    nvShowUploadToast('Embedding ' + total + ' file' + (total > 1 ? 's' : '') + '...');
+
+    var chain = Promise.resolve();
+    var embeddedMarkdown = [];
+
+    fileArr.forEach(function(file) {
+      chain = chain.then(function() {
+        return window.dmFileToBase64Markdown(file).then(function(md) {
+          completed++;
+          var pct = Math.round((completed / total) * 100);
+          if (nvUploadProgress) nvUploadProgress.style.width = pct + '%';
+          if (nvUploadText) nvUploadText.textContent = 'Embedding ' + completed + '/' + total;
+          embeddedMarkdown.push(md);
+        }).catch(function(err) {
+          completed++;
+          console.error('[nv-attach] Embed error:', err);
+          if (nvUploadText) nvUploadText.textContent = 'Failed: ' + (err.message || 'Embed error');
+        });
+      });
+    });
+
+    chain.then(function() {
+      if (!embeddedMarkdown.length) {
+        nvHideUploadToast();
+        return;
+      }
+
+      // Append markdown to the note content and save
+      var newContent = (currentNote.content || '') + '\n\n' + embeddedMarkdown.join('\n');
+
+      var updateData = {
+        content: newContent,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      return window.dmSync.firestoreWrite({
+        collection: 'notes',
+        docId: currentNote.id,
+        op: 'update',
+        data: updateData,
+        localOp: function() {
+          currentNote.content = newContent;
+          currentNote.updatedAt = Date.now();
+          return window.dmSync.putNote(currentNote);
+        }
+      }).then(function() {
+        if (nvUploadText) nvUploadText.textContent = 'Done!';
+        nvHideUploadToast();
+        selfTriggeredSync = true;
+        renderNote(currentNote);
+        setTimeout(function() { selfTriggeredSync = false; }, 200);
+      });
+    }).catch(function(err) {
+      console.error('[nv-attach] Save error:', err);
+      if (nvUploadText) nvUploadText.textContent = 'Save failed';
+      nvHideUploadToast();
+    });
+  }
+
+  // Document-level paste handler for the note viewer.
+  // We listen on `document` because the viewer is a plain <div> (not focusable).
+  // Paste events fire on the focused element; if no input/textarea is focused
+  // the event targets document.body, so a handler on a non-focusable div would
+  // never fire.  We skip when the paste target is an input/textarea/contenteditable
+  // so we don't steal paste from the edit modal or other form fields.
+  document.addEventListener('paste', function(e) {
+    if (!currentNote) return;
+    // Don't intercept paste inside inputs, textareas, or contenteditable
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+    // Only act when the viewer content is visible
+    if (contentEl.style.display === 'none') return;
+
+    var items = (e.clipboardData || e.originalEvent.clipboardData || {}).items;
+    if (!items) return;
+
+    var files = [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        var f = items[i].getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length > 0) {
+      e.preventDefault();
+      nvHandleFiles(files);
+    }
+  });
+
+  // Drag-and-drop support for the note viewer
+  var nvDragCounter = 0;
+  viewerEl.addEventListener('dragenter', function(e) {
+    if (!currentNote) return;
+    e.preventDefault();
+    e.stopPropagation();
+    nvDragCounter++;
+  });
+  viewerEl.addEventListener('dragleave', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    nvDragCounter--;
+    if (nvDragCounter <= 0) nvDragCounter = 0;
+  });
+  viewerEl.addEventListener('dragover', function(e) {
+    if (!currentNote) return;
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  viewerEl.addEventListener('drop', function(e) {
+    if (!currentNote) return;
+    e.preventDefault();
+    e.stopPropagation();
+    nvDragCounter = 0;
+    if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+      nvHandleFiles(e.dataTransfer.files);
+    }
+  });
+
 })();
 </script>
