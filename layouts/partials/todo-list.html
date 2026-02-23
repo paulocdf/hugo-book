@@ -2905,7 +2905,7 @@
   }
 
   // ─── Render ───
-  function buildTodoItemHtml(todo, isSubtask, hasChildren, finishAtLabel, isOverdue, isToday) {
+  function buildTodoItemHtml(todo, isSubtask, hasChildren, finishAtLabel) {
     var doneClass = todo.done ? ' done' : '';
     var justCompletedClass = _justCompletedIds[todo.id] ? ' just-completed' : '';
     var justAddedClass = _justAddedIds[todo.id] ? ' just-added' : '';
@@ -3302,20 +3302,17 @@
         }
       });
 
-      var _isOverdueGroup = (cssClass === 'overdue');
-      var _isTodayGroup = (cssClass === 'today');
-
       tasksInGroup.forEach(function(parent) {
         var children = childrenMap[parent.id] || [];
         g += '<div class="todo-item-group" data-group-id="' + parent.id + '">';
-        g += buildTodoItemHtml(parent, false, children.length > 0, finishAtMap[parent.id] || null, _isOverdueGroup, _isTodayGroup);
+        g += buildTodoItemHtml(parent, false, children.length > 0, finishAtMap[parent.id] || null);
         if (children.length > 0) {
           var subCollapsed = false;
           try { subCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + parent.id) === '1'; } catch(e) {}
           g += '<div class="todo-subtasks-wrapper' + (subCollapsed ? ' collapsed' : '') + '" data-subtasks-parent="' + parent.id + '">';
           g += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
           children.forEach(function(child) {
-            g += buildTodoItemHtml(child, true, false, finishAtMap[child.id] || null, _isOverdueGroup, _isTodayGroup);
+            g += buildTodoItemHtml(child, true, false, finishAtMap[child.id] || null);
           });
           g += '</div>';
           g += '</div>';
