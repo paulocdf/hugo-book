@@ -1481,6 +1481,8 @@
   }
 
   function scheduleNotification(delaySec, phaseLabel) {
+    // Cancel any previously scheduled notification to avoid orphaned timeouts
+    cancelScheduledNotification();
     if (notifPermission !== 'granted') return;
     var title = phaseLabel === 'work' ? 'Work Session Complete' : 'Break Over';
     var body = activeTodoTitle || 'Pomodoro timer finished';
@@ -1533,6 +1535,7 @@
       intervalId = null;
       isRunning = false;
       showPlayIcon();
+      cancelScheduledNotification();
 
       if (phase === 'work') {
         playWorkEndSound();
@@ -1746,8 +1749,11 @@
     getNextUndoneSubtask(completedTodoId).then(function(nextSub) {
       if (!nextSub) {
         // No more undone subtasks — close timer
-        // Reset accumulatedWorkSeconds since we already recorded above
+        // Reset accumulatedWorkSeconds since we already recorded above,
+        // and set phase to 'break' so closeTimer() doesn't re-accumulate
+        // work time (its guard checks phase === 'work').
         accumulatedWorkSeconds = 0;
+        phase = 'break';
         closeTimer();
         return;
       }
