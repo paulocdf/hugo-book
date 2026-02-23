@@ -489,7 +489,8 @@
           collection: opts.collection,
           docId: opts.docId,
           op: opts.op,
-          data: opts.data || null
+          data: opts.data || null,
+          merge: opts.merge || false
         }).then(function() {
           updateOfflineIndicator();
         });
@@ -499,7 +500,7 @@
       var ref = window.dmDb.collection(opts.collection).doc(opts.docId);
       var fsPromise;
       if (opts.op === 'set') {
-        fsPromise = ref.set(opts.data);
+        fsPromise = opts.merge ? ref.set(opts.data, { merge: true }) : ref.set(opts.data);
       } else if (opts.op === 'update') {
         fsPromise = ref.update(opts.data);
       } else if (opts.op === 'delete') {
@@ -519,7 +520,8 @@
           collection: opts.collection,
           docId: opts.docId,
           op: opts.op,
-          data: opts.data || null
+          data: opts.data || null,
+          merge: opts.merge || false
         }).then(function() {
           updateOfflineIndicator();
         });
@@ -562,7 +564,7 @@
           var fsData = entry.data ? deserializeQueueData(entry.data) : null;
           var fsPromise;
           if (entry.op === 'set') {
-            fsPromise = ref.set(fsData);
+            fsPromise = entry.merge ? ref.set(fsData, { merge: true }) : ref.set(fsData);
           } else if (entry.op === 'update') {
             fsPromise = ref.update(fsData);
           } else if (entry.op === 'delete') {
@@ -928,6 +930,7 @@
       .then(function() { return syncVersions(userId); })
       .then(function() { return syncAttachments(userId); })
       .then(function() { return syncReviewCards(userId); })
+      .then(function() { return syncClosedDays(userId); })
       .then(function() {
         _syncing = false;
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -1897,6 +1900,23 @@
     });
   };
 
+  // ─── Closed Days Sync ───
+  function syncClosedDays(userId) {
+    if (!window.dmDb) return Promise.resolve([]);
+    return window.dmDb.collection('userSettings').doc(userId).get().then(function(doc) {
+      var remoteDays = (doc.exists && doc.data().closedDays) ? doc.data().closedDays : [];
+      // Firestore is authoritative — overwrite local cache
+      return idbPut(STORE_META, { key: 'closedDays', value: remoteDays }).then(function() {
+        return remoteDays;
+      });
+    }).catch(function(err) {
+      console.warn('[dm-sync] Failed to sync closed days:', err);
+      return idbGet(STORE_META, 'closedDays').then(function(meta) {
+        return (meta && meta.value) ? meta.value : [];
+      });
+    });
+  }
+
   window.dmSync = {
     // IndexedDB operations — Notes
     getNote: function(id) {
@@ -2267,6 +2287,34 @@
     deleteReviewCard: deleteReviewCard,
     getReviewCards: getReviewCards,
     getDueCount: getDueCount,
+
+    // Closed days (day-level finalization for todo list)
+    getClosedDays: function() {
+      return idbGet(STORE_META, 'closedDays').then(function(meta) {
+        return (meta && meta.value) ? meta.value : [];
+      });
+    },
+    setClosedDays: function(days) {
+      var sorted = days.slice().sort();
+      // Write to IDB
+      var idbPromise = idbPut(STORE_META, { key: 'closedDays', value: sorted });
+      // Write to Firestore (if authenticated)
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      if (user && window.dmDb) {
+        return idbPromise.then(function() {
+          return firestoreWrite({
+            collection: 'userSettings',
+            docId: user.uid,
+            op: 'set',
+            data: { closedDays: sorted, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+            merge: true,
+            localOp: function() { return Promise.resolve(); }
+          });
+        });
+      }
+      return idbPromise;
+    },
+    syncClosedDays: syncClosedDays,
 
     // Search index cache
     getSearchIndexCache: function() { return idbGet(STORE_META, 'searchIndex'); },

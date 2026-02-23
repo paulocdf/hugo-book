@@ -967,6 +967,126 @@
   flex-shrink: 0;
 }
 
+/* Close Day button on day group headers */
+.todo-day-close-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--gray-300, #ddd);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-success, #38a169);
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 8px;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.todo-day-close-btn:hover {
+  background: var(--color-success, #38a169);
+  color: #fff;
+}
+.todo-day-close-btn svg {
+  flex-shrink: 0;
+}
+
+/* Closed day — ultra-compact summary line */
+.todo-day-closed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  color: var(--gray-400);
+  border-left: 3px solid var(--color-success, #38a169);
+  margin-bottom: 4px;
+  transition: background 0.15s;
+}
+.todo-day-closed:not(:first-child) {
+  margin-top: 12px;
+}
+.todo-day-closed:hover {
+  background: var(--gray-100);
+}
+.todo-day-closed-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-success, #38a169);
+  flex-shrink: 0;
+}
+.todo-day-closed-label {
+  font-weight: 500;
+  color: var(--gray-500);
+}
+.todo-day-closed-stats {
+  font-size: 0.68rem;
+  color: var(--gray-400);
+  font-weight: 400;
+}
+.todo-day-closed-spacer {
+  flex: 1;
+}
+.todo-day-reopen-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gray-400);
+  font-size: 0.65rem;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
+}
+.todo-day-closed:hover .todo-day-reopen-btn {
+  opacity: 1;
+}
+.todo-day-reopen-btn:hover {
+  color: var(--color-link, #4285f4);
+  background: rgba(66, 133, 244, 0.08);
+  border-color: var(--color-link, #4285f4);
+}
+
+@media (prefers-color-scheme: dark) {
+  .todo-day-closed {
+    border-left-color: #68d391;
+  }
+  .todo-day-closed-icon {
+    color: #68d391;
+  }
+  .todo-day-close-btn {
+    color: #68d391;
+    border-color: var(--gray-400);
+  }
+  .todo-day-close-btn:hover {
+    background: #68d391;
+    color: #1a202c;
+  }
+}
+[data-theme="dark"] .todo-day-closed {
+  border-left-color: #68d391;
+}
+[data-theme="dark"] .todo-day-closed-icon {
+  color: #68d391;
+}
+[data-theme="dark"] .todo-day-close-btn {
+  color: #68d391;
+  border-color: var(--gray-400);
+}
+[data-theme="dark"] .todo-day-close-btn:hover {
+  background: #68d391;
+  color: #1a202c;
+}
+
 /* Migrate action button on open tasks */
 .todo-item-action-btn.migrate-forward {
   color: #8b6e4e;
@@ -1976,6 +2096,7 @@
 
   // State
   var allTodos = [];
+  var _closedDays = {}; // { 'YYYY-MM-DD': true } — set of closed (finalized) days
   var _pomodoroTrackedMinutes = {}; // { todoId: minutes } — stores tracked time from Pomodoro timer
   // Restore tracked minutes from localStorage (persisted across page navigations)
   try {
@@ -3239,6 +3360,13 @@
         g += ' Migrate to Today';
         g += '</button>';
       }
+      // Close Day button for past days where all tasks are done
+      if (groupKey !== '_unscheduled' && groupKey < today && doneInGroup === totalInGroup && totalInGroup > 0) {
+        g += '<button type="button" class="todo-day-close-btn" data-close-day="' + escapeHtml(groupKey) + '" title="Close this day">';
+        g += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+        g += ' Close Day';
+        g += '</button>';
+      }
       g += '</div>';
       g += '<div class="todo-day-group-items">';
 
@@ -3324,6 +3452,50 @@
       return g;
     }
 
+    // ─── Closed Day (compact summary line) ───
+    function buildClosedDayHtml(groupKey, headerInfo, tasksInGroup) {
+      // Count leaf tasks and compute stats
+      var totalInGroup = 0;
+      var totalEstMin = 0;
+      var totalPomos = 0;
+      tasksInGroup.forEach(function(p) {
+        var ch = childrenMap[p.id] || [];
+        if (ch.length > 0) {
+          ch.forEach(function(c) {
+            totalInGroup++;
+            if (c.estimatedMin) totalEstMin += c.estimatedMin;
+            if (c.pomodoroCount) totalPomos += c.pomodoroCount;
+          });
+        } else {
+          totalInGroup++;
+          if (p.estimatedMin) totalEstMin += p.estimatedMin;
+          if (p.pomodoroCount) totalPomos += p.pomodoroCount;
+        }
+      });
+
+      var statsText = totalInGroup + ' task' + (totalInGroup !== 1 ? 's' : '');
+      if (totalEstMin > 0) {
+        var hrs = (totalEstMin / 60).toFixed(1);
+        statsText += ', ' + hrs + 'h';
+      }
+      if (totalPomos > 0) {
+        statsText += ', ' + totalPomos + ' pomo' + (totalPomos !== 1 ? 's' : '');
+      }
+
+      var h = '<div class="todo-day-closed" data-closed-day="' + escapeHtml(groupKey) + '">';
+      // Checkmark icon
+      h += '<span class="todo-day-closed-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>';
+      h += '<span class="todo-day-closed-label">' + escapeHtml(headerInfo.label) + '</span>';
+      h += '<span class="todo-day-closed-stats">\u2014 ' + escapeHtml(statsText) + '</span>';
+      h += '<span class="todo-day-closed-spacer"></span>';
+      h += '<button type="button" class="todo-day-reopen-btn" data-reopen-day="' + escapeHtml(groupKey) + '" title="Reopen this day">';
+      h += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>';
+      h += ' Reopen';
+      h += '</button>';
+      h += '</div>';
+      return h;
+    }
+
     // ─── Week Summary Bar ───
     // Compute Mon–Sun of the current week
     var todayDate = new Date();
@@ -3389,10 +3561,37 @@
     }
 
     // Render date groups
+    var _closedDaysToReopen = []; // auto-reopen closed days that have undone tasks
     sortedDates.forEach(function(dateStr) {
       var info = formatDayHeader(dateStr);
-      html += buildDayGroup(dateStr, info, dateGroups[dateStr]);
+      var tasksInGroup = dateGroups[dateStr];
+
+      // Check if this day is closed
+      if (_closedDays[dateStr]) {
+        // Auto-reopen: if closed day has any undone tasks, it shouldn't be closed
+        var hasUndone = false;
+        tasksInGroup.forEach(function(p) {
+          if (!p.done) { hasUndone = true; return; }
+          var ch = childrenMap[p.id] || [];
+          ch.forEach(function(c) { if (!c.done) hasUndone = true; });
+        });
+        if (hasUndone) {
+          _closedDaysToReopen.push(dateStr);
+          html += buildDayGroup(dateStr, info, tasksInGroup);
+        } else {
+          html += buildClosedDayHtml(dateStr, info, tasksInGroup);
+        }
+      } else {
+        html += buildDayGroup(dateStr, info, tasksInGroup);
+      }
     });
+
+    // Auto-reopen closed days that have undone tasks (fire-and-forget)
+    if (_closedDaysToReopen.length > 0 && window.dmSync) {
+      _closedDaysToReopen.forEach(function(d) { delete _closedDays[d]; });
+      var updatedDays = Object.keys(_closedDays).sort();
+      window.dmSync.setClosedDays(updatedDays);
+    }
 
     // Render unscheduled
     if (unscheduled.length > 0) {
@@ -3522,6 +3721,40 @@
     });
     // render() is called inside changeBujoState — but it fires for each task.
     // Call one final render to ensure clean state.
+    render();
+  }
+
+  // ─── Close / Reopen Day ───
+  function closeDayGroup(dateStr) {
+    _closedDays[dateStr] = true;
+    var days = Object.keys(_closedDays).sort();
+    if (window.dmSync) {
+      window.dmSync.setClosedDays(days);
+    }
+
+    // Format label for toast
+    var parts = dateStr.split('-');
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var dayLabel = dayNames[d.getDay()] + ' ' + d.getDate();
+
+    render();
+
+    showActionToast({
+      message: 'Closed ' + dayLabel,
+      duration: 3000,
+      onUndo: function() {
+        reopenDayGroup(dateStr);
+      }
+    });
+  }
+
+  function reopenDayGroup(dateStr) {
+    delete _closedDays[dateStr];
+    var days = Object.keys(_closedDays).sort();
+    if (window.dmSync) {
+      window.dmSync.setClosedDays(days);
+    }
     render();
   }
 
@@ -3809,15 +4042,22 @@
     itemsEl.querySelectorAll('.todo-week-day[data-week-day]').forEach(function(col) {
       col.addEventListener('click', function() {
         var dateKey = col.getAttribute('data-week-day');
+        // Try normal day group first, then closed day line
         var group = itemsEl.querySelector('.todo-day-group[data-day-group="' + dateKey + '"]');
-        if (!group) return; // No tasks for this day
-        // Expand if collapsed
-        if (group.classList.contains('collapsed')) {
-          group.classList.remove('collapsed');
-          try { localStorage.setItem('dm-todo-daygroup-' + dateKey, '0'); } catch(e) {}
+        if (group) {
+          // Expand if collapsed
+          if (group.classList.contains('collapsed')) {
+            group.classList.remove('collapsed');
+            try { localStorage.setItem('dm-todo-daygroup-' + dateKey, '0'); } catch(e) {}
+          }
+          group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          return;
         }
-        // Smooth-scroll to the group
-        group.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // Closed day line
+        var closedEl = itemsEl.querySelector('.todo-day-closed[data-closed-day="' + dateKey + '"]');
+        if (closedEl) {
+          closedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       });
     });
 
@@ -3827,6 +4067,24 @@
         e.stopPropagation(); // Don't toggle collapse
         var groupDate = btn.getAttribute('data-migrate-group');
         migrateGroupToToday(groupDate);
+      });
+    });
+
+    // Close Day button in day group header
+    itemsEl.querySelectorAll('.todo-day-close-btn[data-close-day]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation(); // Don't toggle collapse
+        var dateStr = btn.getAttribute('data-close-day');
+        closeDayGroup(dateStr);
+      });
+    });
+
+    // Reopen Day button on closed day summary lines
+    itemsEl.querySelectorAll('.todo-day-reopen-btn[data-reopen-day]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var dateStr = btn.getAttribute('data-reopen-day');
+        reopenDayGroup(dateStr);
       });
     });
 
@@ -5544,7 +5802,16 @@
   function loadTodos() {
     if (!window.dmSync) return;
 
-    window.dmSync.getAllTodos().then(function(todos) {
+    // Load closed days and todos in parallel
+    var closedDaysPromise = window.dmSync.getClosedDays().then(function(days) {
+      _closedDays = {};
+      days.forEach(function(d) { _closedDays[d] = true; });
+    }).catch(function() { /* keep existing _closedDays */ });
+
+    var todosPromise = window.dmSync.getAllTodos();
+
+    Promise.all([closedDaysPromise, todosPromise]).then(function(results) {
+      var todos = results[1];
       // Migrate legacy todos: backfill status field from done boolean
       var needsMigration = [];
       todos.forEach(function(t) {
