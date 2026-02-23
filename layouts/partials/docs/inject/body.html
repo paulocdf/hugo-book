@@ -3317,3 +3317,253 @@
 })();
 </script>
 
+<!-- SPA-like navigation: intercept sidebar link clicks to avoid full page reloads -->
+<script>
+(function() {
+  'use strict';
+
+  // ---- Feature detection & guards ----
+  if (!window.history || !window.history.pushState) return;
+  if (!window.fetch) return;
+
+  var mainContent = document.querySelector('.book-page');
+  if (!mainContent) return;
+
+  var sidebarNav = document.querySelector('.book-menu-content nav');
+  if (!sidebarNav) return;
+
+  // Track in-flight navigation so we can abort superseded requests
+  var currentNavController = null;
+
+  // ---- Loading indicator ----
+  var progressEl = null;
+  function showProgress() {
+    if (!progressEl) {
+      progressEl = document.createElement('div');
+      progressEl.className = 'spa-nav-progress';
+      document.body.appendChild(progressEl);
+    }
+    progressEl.classList.remove('spa-nav-progress--done');
+    // Force reflow so the animation restarts
+    void progressEl.offsetWidth;
+    progressEl.classList.add('spa-nav-progress--active');
+  }
+
+  function hideProgress() {
+    if (progressEl) {
+      progressEl.classList.remove('spa-nav-progress--active');
+      progressEl.classList.add('spa-nav-progress--done');
+    }
+  }
+
+  // ---- Sidebar active-state update ----
+  function updateSidebarActive(url) {
+    var parsed = new URL(url, window.location.origin);
+    var pathname = parsed.pathname;
+    var viewId = parsed.searchParams.get('id');
+
+    var links = sidebarNav.querySelectorAll('a[href]');
+    links.forEach(function(a) {
+      a.classList.remove('active');
+      var href = a.getAttribute('href');
+      if (!href) return;
+
+      if (viewId && href.indexOf('id=' + viewId) !== -1) {
+        a.classList.add('active');
+      } else if (!viewId) {
+        var hrefPath = href.split('?')[0].split('#')[0];
+        if (pathname === hrefPath || pathname === hrefPath.replace(/\/$/, '')) {
+          a.classList.add('active');
+        }
+      }
+    });
+
+    // Inbox accent
+    var inboxItem = sidebarNav.querySelector('.sidebar-inbox');
+    if (inboxItem) {
+      var inboxLink = inboxItem.querySelector('a');
+      if (inboxLink) {
+        if (pathname.indexOf('/docs/inbox') !== -1) {
+          inboxLink.classList.add('active');
+        } else {
+          inboxLink.classList.remove('active');
+        }
+      }
+    }
+  }
+
+  // ---- Execute inline scripts from parsed HTML ----
+  // When we set innerHTML, <script> tags are inert. We must clone them
+  // into fresh <script> elements so the browser evaluates them.
+  function executeScripts(container) {
+    var scripts = Array.from(container.querySelectorAll('script'));
+    var chain = Promise.resolve();
+    scripts.forEach(function(oldScript) {
+      chain = chain.then(function() {
+        return new Promise(function(resolve) {
+          var newScript = document.createElement('script');
+          // Copy all attributes
+          Array.from(oldScript.attributes).forEach(function(attr) {
+            newScript.setAttribute(attr.name, attr.value);
+          });
+          if (oldScript.src) {
+            newScript.onload = resolve;
+            newScript.onerror = resolve; // continue even if one fails
+          } else {
+            newScript.textContent = oldScript.textContent;
+          }
+          oldScript.parentNode.replaceChild(newScript, oldScript);
+          // Inline scripts execute synchronously
+          if (!oldScript.src) resolve();
+        });
+      });
+    });
+    return chain;
+  }
+
+  // ---- Core navigation function ----
+  function navigateTo(url, pushHistory) {
+    // Abort any in-flight navigation
+    if (currentNavController) {
+      currentNavController.abort();
+    }
+    currentNavController = new AbortController();
+    var signal = currentNavController.signal;
+
+    showProgress();
+
+    fetch(url, { signal: signal })
+      .then(function(response) {
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        return response.text();
+      })
+      .then(function(html) {
+        // Parse the fetched page
+        var parser = new DOMParser();
+        var doc = parser.parseFromString(html, 'text/html');
+
+        var newBookPage = doc.querySelector('.book-page');
+        if (!newBookPage) {
+          // Fallback: full navigation if structure doesn't match
+          window.location.href = url;
+          return;
+        }
+
+        // Update document title
+        var newTitle = doc.querySelector('title');
+        if (newTitle) {
+          document.title = newTitle.textContent;
+        }
+
+        // Swap main content
+        mainContent.innerHTML = newBookPage.innerHTML;
+
+        // Swap right sidebar (ToC)
+        var newToc = doc.querySelector('.book-toc-content');
+        var currentToc = document.querySelector('.book-toc-content');
+        if (currentToc && newToc) {
+          currentToc.innerHTML = newToc.innerHTML;
+        }
+        // Show ToC container again (it may have been hidden)
+        var tocAside = document.querySelector('.book-toc');
+        if (tocAside) {
+          tocAside.style.display = '';
+        }
+
+        // Push browser history
+        if (pushHistory) {
+          history.pushState({ spaNav: true }, '', url);
+        }
+
+        // Update sidebar active states
+        updateSidebarActive(url);
+
+        // Scroll to top (or to hash target)
+        var hash = url.indexOf('#') !== -1 ? url.substring(url.indexOf('#') + 1) : '';
+        if (hash) {
+          var target = document.getElementById(decodeURIComponent(hash));
+          if (target) {
+            target.scrollIntoView({ behavior: 'auto' });
+          }
+        } else {
+          window.scrollTo(0, 0);
+        }
+
+        // Execute scripts inside the swapped content so page-specific
+        // shortcode logic (note-viewer, dashboard, review-queue, etc.) runs.
+        executeScripts(mainContent).then(function() {
+          // Dispatch content-rendered event so ToC rebuilds, etc.
+          window.dispatchEvent(new CustomEvent('dm-content-rendered'));
+        });
+
+        hideProgress();
+        currentNavController = null;
+      })
+      .catch(function(err) {
+        if (err.name === 'AbortError') return; // superseded, ignore
+        hideProgress();
+        currentNavController = null;
+        // On any error, fall back to normal navigation
+        window.location.href = url;
+      });
+  }
+
+  // ---- Should we intercept this click? ----
+  function shouldIntercept(anchor, event) {
+    // Skip if modifier keys are held (open in new tab)
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return false;
+    // Skip if not left click
+    if (event.button !== 0) return false;
+    // Skip if target is _blank
+    if (anchor.target === '_blank') return false;
+    // Skip if it's a download link
+    if (anchor.hasAttribute('download')) return false;
+
+    var href = anchor.getAttribute('href');
+    if (!href) return false;
+    // Skip hash-only links
+    if (href.charAt(0) === '#') return false;
+    // Skip external links
+    if (href.indexOf('://') !== -1 && href.indexOf(window.location.origin) !== 0) return false;
+    // Skip javascript: links
+    if (href.indexOf('javascript:') === 0) return false;
+    // Skip mailto/tel
+    if (href.indexOf('mailto:') === 0 || href.indexOf('tel:') === 0) return false;
+    // Skip role="button" links (section expand toggles)
+    if (anchor.getAttribute('role') === 'button') return false;
+
+    return true;
+  }
+
+  // ---- Click handler on sidebar ----
+  // Use event delegation on the sidebar nav
+  sidebarNav.addEventListener('click', function(event) {
+    // Walk up from target to find the <a> element
+    var anchor = event.target.closest('a');
+    if (!anchor) return;
+    // Ensure the anchor is inside the sidebar
+    if (!sidebarNav.contains(anchor)) return;
+
+    if (!shouldIntercept(anchor, event)) return;
+
+    event.preventDefault();
+    var url = anchor.href;
+
+    // Don't navigate if we're already on this page
+    if (url === window.location.href) return;
+
+    navigateTo(url, true);
+  });
+
+  // ---- Handle browser back/forward ----
+  window.addEventListener('popstate', function() {
+    navigateTo(window.location.href, false);
+  });
+
+  // Set initial state so popstate works for the first page too
+  if (!history.state || !history.state.spaNav) {
+    history.replaceState({ spaNav: true }, '', window.location.href);
+  }
+})();
+</script>
+
