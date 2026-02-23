@@ -233,7 +233,13 @@
         e.preventDefault();
         e.stopPropagation();
         var noteId = this.getAttribute('data-id');
-        if (confirm('Move this note to trash?')) {
+        window.dmConfirm({
+          title: 'Delete Note',
+          message: 'Move this note to trash?',
+          confirmLabel: 'Move to Trash',
+          danger: true
+        }).then(function(ok) {
+          if (!ok) return;
           window.dmSync.firestoreWrite({
             collection: 'notes',
             docId: noteId,
@@ -246,7 +252,7 @@
           }).catch(function(err) {
             console.warn('[tag-cloud] Delete failed:', err);
           });
-        }
+        });
       });
     });
   }

@@ -513,7 +513,7 @@
             console.error('Error creating note:', err);
             createBtn.disabled = false;
             createBtn.textContent = 'Create Page';
-            alert('Failed to create page. Please try again.');
+            window.dmAlert({ title: 'Error', message: 'Failed to create page. Please try again.' });
           });
       });
     }
@@ -697,7 +697,13 @@
       mergeBtn.addEventListener('click', function() {
         if (allDestNotes.length < 2) return;
         if (!window.dmDb || !window.dmSync || !window.dmAuth || !window.dmAuth.currentUser) return;
-        if (!confirm('Merge ' + allDestNotes.length + ' notes into one? Extra notes will be deleted. This cannot be undone.')) return;
+        window.dmConfirm({
+          title: 'Merge Notes',
+          message: 'Merge ' + allDestNotes.length + ' notes into one? Extra notes will be deleted. This cannot be undone.',
+          confirmLabel: 'Merge',
+          danger: true
+        }).then(function(ok) {
+          if (!ok) return;
 
         mergeBtn.disabled = true;
         mergeBtn.title = 'Merging...';
@@ -772,8 +778,9 @@
             console.error('Merge error:', err);
             mergeBtn.disabled = false;
             mergeBtn.title = 'Merge Notes';
-            alert('Failed to merge. Please try again.');
+            window.dmAlert({ title: 'Error', message: 'Failed to merge. Please try again.' });
           });
+        }); // close dmConfirm .then
       });
     }
 

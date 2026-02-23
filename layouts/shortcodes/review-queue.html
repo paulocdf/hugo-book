@@ -1092,20 +1092,27 @@
         e.stopPropagation();
         var item = btn.closest('.review-schedule-item');
         var cardId = item.getAttribute('data-card-id');
-        if (!confirm('Delete this flashcard?')) return;
+        window.dmConfirm({
+          title: 'Delete Flashcard',
+          message: 'Delete this flashcard?',
+          confirmLabel: 'Delete',
+          danger: true
+        }).then(function(ok) {
+          if (!ok) return;
 
-        btn.disabled = true;
-        window.dmSync.deleteReviewCard(cardId).then(function() {
-          item.style.opacity = '0';
-          item.style.transform = 'translateX(20px)';
-          item.style.transition = 'opacity 0.2s, transform 0.2s';
-          setTimeout(function() {
-            if (item.parentNode) item.parentNode.removeChild(item);
-          }, 200);
-          loadQueue();
-        }).catch(function(err) {
-          console.error('Error deleting card:', err);
-          btn.disabled = false;
+          btn.disabled = true;
+          window.dmSync.deleteReviewCard(cardId).then(function() {
+            item.style.opacity = '0';
+            item.style.transform = 'translateX(20px)';
+            item.style.transition = 'opacity 0.2s, transform 0.2s';
+            setTimeout(function() {
+              if (item.parentNode) item.parentNode.removeChild(item);
+            }, 200);
+            loadQueue();
+          }).catch(function(err) {
+            console.error('Error deleting card:', err);
+            btn.disabled = false;
+          });
         });
       });
     });

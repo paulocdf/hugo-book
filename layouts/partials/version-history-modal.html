@@ -422,28 +422,41 @@
       btn.addEventListener('click', function() {
         var action = btn.getAttribute('data-action');
         if (action === 'restore') {
-          if (!confirm('Restore this version? Your current content will be replaced in the editor.')) return;
-          if (onRestoreCallback) {
-            onRestoreCallback(version);
-          }
-          close();
-        } else if (action === 'delete') {
-          if (!confirm('Delete this version permanently?')) return;
-          btn.disabled = true;
-          window.dmSync.deleteVersion(version.id).then(function() {
-            versions.splice(index, 1);
-            selectedIndex = -1;
-            if (versions.length === 0) {
-              listEl.innerHTML = '';
-              emptyEl.style.display = '';
-              contentEl.innerHTML = '<div class="vh-content-placeholder">No versions remaining</div>';
-            } else {
-              renderList();
-              contentEl.innerHTML = '<div class="vh-content-placeholder">Select a version to view changes</div>';
+          window.dmConfirm({
+            title: 'Restore Version',
+            message: 'Restore this version? Your current content will be replaced in the editor.',
+            confirmLabel: 'Restore'
+          }).then(function(ok) {
+            if (!ok) return;
+            if (onRestoreCallback) {
+              onRestoreCallback(version);
             }
-          }).catch(function(err) {
-            console.error('Error deleting version:', err);
-            btn.disabled = false;
+            close();
+          });
+        } else if (action === 'delete') {
+          window.dmConfirm({
+            title: 'Delete Version',
+            message: 'Delete this version permanently?',
+            confirmLabel: 'Delete',
+            danger: true
+          }).then(function(ok) {
+            if (!ok) return;
+            btn.disabled = true;
+            window.dmSync.deleteVersion(version.id).then(function() {
+              versions.splice(index, 1);
+              selectedIndex = -1;
+              if (versions.length === 0) {
+                listEl.innerHTML = '';
+                emptyEl.style.display = '';
+                contentEl.innerHTML = '<div class="vh-content-placeholder">No versions remaining</div>';
+              } else {
+                renderList();
+                contentEl.innerHTML = '<div class="vh-content-placeholder">Select a version to view changes</div>';
+              }
+            }).catch(function(err) {
+              console.error('Error deleting version:', err);
+              btn.disabled = false;
+            });
           });
         }
       });

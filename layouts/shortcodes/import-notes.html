@@ -110,12 +110,18 @@
 
   deleteAllBtn.addEventListener('click', function() {
     var user = window.dmAuth.currentUser;
-    if (!user) { alert('Please sign in first.'); return; }
-    if (!confirm('Delete ALL notes from Firestore? This cannot be undone.')) return;
+    if (!user) { window.dmAlert({ title: 'Sign In Required', message: 'Please sign in first.' }); return; }
+    window.dmConfirm({
+      title: 'Delete All Notes',
+      message: 'Delete ALL notes from Firestore? This cannot be undone.',
+      confirmLabel: 'Delete All',
+      danger: true
+    }).then(function(ok) {
+      if (!ok) return;
 
-    deleteAllBtn.disabled = true;
-    deleteAllBtn.textContent = 'Deleting...';
-    logEl.innerHTML = '';
+      deleteAllBtn.disabled = true;
+      deleteAllBtn.textContent = 'Deleting...';
+      logEl.innerHTML = '';
 
     window.dmDb.collection('notes')
       .where('userId', '==', user.uid)
@@ -157,6 +163,7 @@
         deleteAllBtn.disabled = false;
         deleteAllBtn.textContent = 'Delete All Notes';
       });
+    }); // close dmConfirm .then
   });
 })();
 </script>

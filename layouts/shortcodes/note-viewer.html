@@ -909,7 +909,7 @@
         .catch(function(err) {
           console.error('Error deleting note:', err);
           deleteBtn.disabled = false;
-          alert('Failed to delete note. Please try again.');
+          window.dmAlert({ title: 'Error', message: 'Failed to delete note. Please try again.' });
         });
     });
   });
