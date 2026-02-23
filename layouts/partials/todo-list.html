@@ -1140,6 +1140,17 @@
   border-radius: 4px;
   font-weight: 500;
 }
+.todo-item-has-notes {
+  display: inline-flex;
+  align-items: center;
+  color: #b8860b;
+  opacity: 0.55;
+}
+@media (prefers-color-scheme: dark) {
+  .todo-item-has-notes {
+    color: #e0b44a;
+  }
+}
 .todo-item-finish-at {
   font-size: 0.66rem;
   color: var(--gray-400);
@@ -2881,6 +2892,11 @@
       html += '<span class="todo-item-category">' + escapeHtml(todo.category) + '</span>';
     }
 
+    // Notes indicator icon
+    if (todo.notes) {
+      html += '<span class="todo-item-has-notes" title="Has notes"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></span>';
+    }
+
     // Estimated finish time (computed per day group for undone tasks)
     if (finishAtLabel && !todo.done) {
       html += '<span class="todo-item-finish-at"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + finishAtLabel + '</span>';
@@ -3701,6 +3717,11 @@
         if (result.bujoType && result.bujoType !== (todo.bujoType || 'task')) {
           firestoreUpdates.bujoType = result.bujoType;
           localUpdates.bujoType = result.bujoType;
+        }
+        // Notes
+        if (result.notes !== (todo.notes || '')) {
+          firestoreUpdates.notes = result.notes || '';
+          localUpdates.notes = result.notes || '';
         }
         // BuJo state — sync with done/status
         if (result.bujoState && result.bujoState !== (todo.bujoState || 'open')) {
