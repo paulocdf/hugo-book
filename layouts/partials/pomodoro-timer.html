@@ -2711,6 +2711,8 @@
       rTotalPhase = result.totalPhase;
       rSessionCount = result.sessionCount;
       rAccWork = result.accWork;
+      // Break->work transition pauses the timer (don't auto-start work)
+      if (result.paused) wasRunning = false;
     }
 
     // Apply restored state
@@ -2775,8 +2777,17 @@
           curPhase = 'work';
           curSecondsLeft = WORK_SECONDS;
           curTotalPhase = WORK_SECONDS;
-          // Break → work transition doesn't auto-start, so stop consuming time
-          break;
+          // Break -> work transition doesn't auto-start, so stop consuming time
+          // and signal that the timer should be paused on restore
+          return {
+            finished: false,
+            paused: true,
+            phase: curPhase,
+            secondsLeft: curSecondsLeft,
+            totalPhase: curTotalPhase,
+            sessionCount: curSession,
+            accWork: curAccWork
+          };
         }
       } else {
         // Elapsed time consumed within current phase
@@ -2856,6 +2867,8 @@
       rTotalPhase = result.totalPhase;
       rSessionCount = result.sessionCount;
       rAccWork = result.accWork;
+      // Break->work transition pauses the timer (don't auto-start work)
+      if (result.paused) wasRunning = false;
     }
 
     // Apply state
