@@ -1155,7 +1155,7 @@
     pop.innerHTML =
       '<button type="button" class="qc-todo-popover-shortcut" data-val="' + todayStr + '">Today</button>' +
       '<button type="button" class="qc-todo-popover-shortcut" data-val="' + tmrwStr + '">Tomorrow</button>' +
-      '<input type="date" class="qc-todo-popover-date" min="' + todayStr + '" />';
+      '<input type="date" class="qc-todo-popover-date" />';
 
     pop.querySelectorAll('.qc-todo-popover-shortcut').forEach(function(btn) {
       btn.addEventListener('click', function() {

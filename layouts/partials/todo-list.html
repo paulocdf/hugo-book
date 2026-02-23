@@ -3155,6 +3155,12 @@
         timerLabel = (timerRunning ? '' : 'paused ') + sessionInfo.current + '/' + sessionInfo.total;
       }
       html += '<span class="todo-item-timer-active' + (timerRunning ? '' : ' paused') + '"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ' + timerLabel + '</span>';
+    } else if (!todo.done && window.dmPomodoro && window.dmPomodoro.getTaskProgress) {
+      // Show prior session progress for tasks that have been partially completed
+      var priorProgress = window.dmPomodoro.getTaskProgress(todo.id);
+      if (priorProgress && priorProgress.sessionsCompleted > 0 && priorProgress.totalSessions > 1) {
+        html += '<span class="todo-item-timer-progress">' + priorProgress.sessionsCompleted + '/' + priorProgress.totalSessions + ' done</span>';
+      }
     }
 
     // Inline pomodoro start/pause/stop buttons (only for undone tasks, not events/notes)
@@ -4173,6 +4179,10 @@
                 localStorage.setItem('dm-pomodoro-tracked', JSON.stringify(_tracked));
               }
             } catch(e) {}
+            // Clean up per-task session progress
+            if (window.dmPomodoro && window.dmPomodoro.clearTaskProgress) {
+              window.dmPomodoro.clearTaskProgress(todoId);
+            }
           } else {
             // Events and notes complete directly (no time tracking)
             completeTodo(todo, null, null);

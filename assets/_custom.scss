@@ -184,6 +184,16 @@ body {
   }
 }
 
+// ======================================
+// History page: full-width layout
+// ======================================
+.book-page:has(.history) {
+  .markdown {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 // TOC sidebar — padding handled in main ToC section below
 
 // ======================================

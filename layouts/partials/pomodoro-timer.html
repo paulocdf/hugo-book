@@ -299,6 +299,16 @@
   animation: none;
   opacity: 0.65;
 }
+/* Prior session progress indicator (task not currently active) */
+.todo-item-timer-progress {
+  font-size: 0.65rem;
+  color: var(--accent-green, #388e3c);
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  opacity: 0.85;
+}
 @keyframes pomo-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -1009,6 +1019,7 @@
   // ── State persistence (survives page navigation) ──
   var STATE_KEY = 'dm-pomodoro-state';
   var TRACKED_KEY = 'dm-pomodoro-tracked';
+  var PROGRESS_KEY = 'dm-pomodoro-progress'; // per-task session progress
 
   // ── Cross-device sync via Firestore ──
   // Each tab gets a unique deviceId to avoid re-applying its own writes.
@@ -1128,6 +1139,65 @@
       if (raw) tracked = JSON.parse(raw);
       tracked[todoId] = minutes;
       localStorage.setItem(TRACKED_KEY, JSON.stringify(tracked));
+    } catch(e) {}
+  }
+
+  // ── Per-task session progress persistence ──
+  // Stores { todoId: { sessionsCompleted, accWorkSeconds, totalSessions, workSeconds, breakSeconds, savedAt } }
+  // Survives task switches so users can resume where they left off.
+
+  function saveTaskProgress(todoId, sessionsCompleted, accWorkSec, totalSess, workSec, breakSec) {
+    try {
+      var all = {};
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      if (raw) all = JSON.parse(raw);
+      all[todoId] = {
+        sessionsCompleted: sessionsCompleted,
+        accWorkSeconds: accWorkSec,
+        totalSessions: totalSess,
+        workSeconds: workSec,
+        breakSeconds: breakSec,
+        savedAt: Date.now()
+      };
+      localStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
+    } catch(e) {}
+    // Sync progress to Firestore
+    saveProgressToFirestore(todoId);
+  }
+
+  function loadTaskProgress(todoId) {
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      if (!raw) return null;
+      var all = JSON.parse(raw);
+      return all[todoId] || null;
+    } catch(e) { return null; }
+  }
+
+  function clearTaskProgress(todoId) {
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      if (!raw) return;
+      var all = JSON.parse(raw);
+      delete all[todoId];
+      if (Object.keys(all).length === 0) {
+        localStorage.removeItem(PROGRESS_KEY);
+      } else {
+        localStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
+      }
+    } catch(e) {}
+    // Sync deletion to Firestore
+    saveProgressToFirestore(todoId, true);
+  }
+
+  function saveProgressToFirestore(todoId, deleted) {
+    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) return;
+    var ref = window.dmDb.collection('pomodoroProgress').doc(window.dmAuth.currentUser.uid);
+    try {
+      var raw = localStorage.getItem(PROGRESS_KEY);
+      var all = raw ? JSON.parse(raw) : {};
+      ref.set({ progress: all, updatedAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true })
+        .catch(function(err) { console.warn('[pomo-progress] Firestore write failed:', err.message); });
     } catch(e) {}
   }
 
@@ -1801,12 +1871,21 @@
   function advanceToNextSubtask() {
     var completedTodoId = activeTodoId;
     var trackedMinutes = Math.round(accumulatedWorkSeconds / 60);
+    var completedSessions = totalSessions; // all sessions done when auto-advancing
+
+    // Clear per-task progress for completed subtask (all sessions done)
+    if (completedTodoId) clearTaskProgress(completedTodoId);
 
     // Save tracked time for the completed subtask
     if (completedTodoId && trackedMinutes > 0) {
       saveTrackedMinutes(completedTodoId, trackedMinutes);
       window.dispatchEvent(new CustomEvent('dm-pomodoro-stopped', {
-        detail: { todoId: completedTodoId, trackedMinutes: trackedMinutes }
+        detail: {
+          todoId: completedTodoId,
+          trackedMinutes: trackedMinutes,
+          sessionsCompleted: completedSessions,
+          totalSessions: completedSessions
+        }
       }));
     }
 
@@ -1855,12 +1934,23 @@
         totalSessions = nextSub.pomodoroCount;
       }
 
-      // Reset timer state for the new subtask
+      // Check for prior progress on the next subtask
+      var priorProgress = loadTaskProgress(nextSub.id);
+      if (priorProgress && priorProgress.sessionsCompleted > 0) {
+        sessionCount = priorProgress.sessionsCompleted + 1;
+        accumulatedWorkSeconds = priorProgress.accWorkSeconds || 0;
+        if (priorProgress.totalSessions) totalSessions = priorProgress.totalSessions;
+        if (priorProgress.workSeconds) WORK_SECONDS = priorProgress.workSeconds;
+        if (priorProgress.breakSeconds) BREAK_SECONDS = priorProgress.breakSeconds;
+      } else {
+        sessionCount = 1;
+        accumulatedWorkSeconds = 0;
+      }
+
+      // Set up timer for the new subtask (paused)
       phase = 'work';
       secondsLeft = WORK_SECONDS;
       totalPhaseSeconds = WORK_SECONDS;
-      sessionCount = 1;
-      accumulatedWorkSeconds = 0;
       isRunning = false;
       showPlayIcon();
 
@@ -1901,20 +1991,53 @@
 
     var trackedMinutes = Math.round(accumulatedWorkSeconds / 60);
     var closedTodoId = activeTodoId;
+    var closedSessionCount = sessionCount;
+    var closedTotalSessions = totalSessions;
+    var closedAccWork = accumulatedWorkSeconds;
+    var closedWorkSec = WORK_SECONDS;
+    var closedBreakSec = BREAK_SECONDS;
+    var closedPhase = phase;
     activeTodoId = null;
     activeTodoTitle = '';
     activeTodoCategory = '';
     activeParentId = null;
 
-    // Clear persisted timer state
+    // Clear persisted timer state (the active timer slot)
     clearState();
+
+    // Determine how many sessions were fully completed
+    // sessionCount is 1-indexed: session 1 means working on session 1 (0 completed)
+    // A session is "completed" when its work phase finishes and break completes (incrementing sessionCount)
+    // So sessionsCompleted = sessionCount - 1, unless we were in a break (meaning the work for that session is done)
+    var sessionsCompleted = closedSessionCount - 1;
+    if (closedPhase === 'break') {
+      // Work for current session finished, we're in break — count that session too
+      sessionsCompleted = closedSessionCount;
+    }
+
+    // Determine if ALL sessions were completed (timer ran to natural end)
+    var allDone = (closedTotalSessions > 1 && sessionsCompleted >= closedTotalSessions) ||
+                  (closedTotalSessions <= 1 && sessionsCompleted >= 1);
+
+    // Save per-task progress if there are remaining sessions
+    if (closedTodoId && !allDone && sessionsCompleted > 0) {
+      saveTaskProgress(closedTodoId, sessionsCompleted, closedAccWork, closedTotalSessions, closedWorkSec, closedBreakSec);
+    } else if (closedTodoId && allDone) {
+      // All sessions complete — clear any prior progress
+      clearTaskProgress(closedTodoId);
+    }
 
     // Notify the todo list about tracked time
     if (closedTodoId && trackedMinutes > 0) {
       // Persist tracked minutes to localStorage so they survive navigation
       saveTrackedMinutes(closedTodoId, trackedMinutes);
       window.dispatchEvent(new CustomEvent('dm-pomodoro-stopped', {
-        detail: { todoId: closedTodoId, trackedMinutes: trackedMinutes }
+        detail: {
+          todoId: closedTodoId,
+          trackedMinutes: trackedMinutes,
+          sessionsCompleted: sessionsCompleted,
+          totalSessions: closedTotalSessions
+        }
       }));
     } else {
       // Even if no time tracked, notify so inline indicators update
@@ -1942,6 +2065,9 @@
     // Restore page title
     var cleanTitle = document.title.replace(/^\d{2}:\d{2} \u2014 (Work|Break) \| /, '');
     document.title = cleanTitle;
+
+    // Clear per-task progress — user explicitly cancelled, discard everything
+    if (activeTodoId) clearTaskProgress(activeTodoId);
 
     activeTodoId = null;
     activeTodoTitle = '';
@@ -2749,10 +2875,17 @@
         var completedParentId = activeParentId;
         var trackedMinutes = Math.round(result.accWork / 60);
         clearState();
+        // All sessions completed — clear per-task progress
+        if (completedId) clearTaskProgress(completedId);
         if (trackedMinutes > 0) {
           saveTrackedMinutes(completedId, trackedMinutes);
           window.dispatchEvent(new CustomEvent('dm-pomodoro-stopped', {
-            detail: { todoId: completedId, trackedMinutes: trackedMinutes }
+            detail: {
+              todoId: completedId,
+              trackedMinutes: trackedMinutes,
+              sessionsCompleted: totalSessions,
+              totalSessions: totalSessions
+            }
           }));
         }
         // If timing a subtask, try to auto-advance to the next one
@@ -3117,6 +3250,38 @@
       if (!user) return;
       tryRemoteRestore();
       startFirestoreListener();
+      restoreProgressFromFirestore();
+    });
+  }
+
+  // Restore per-task session progress from Firestore (merges with local)
+  function restoreProgressFromFirestore() {
+    if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) return;
+    var ref = window.dmDb.collection('pomodoroProgress').doc(window.dmAuth.currentUser.uid);
+    ref.get().then(function(doc) {
+      if (!doc.exists) return;
+      var data = doc.data();
+      if (!data || !data.progress) return;
+      var remote = data.progress;
+      try {
+        var local = {};
+        var raw = localStorage.getItem(PROGRESS_KEY);
+        if (raw) local = JSON.parse(raw);
+        // Merge: remote wins for tasks not in local, or where remote is newer
+        var merged = Object.assign({}, local);
+        Object.keys(remote).forEach(function(tid) {
+          if (!merged[tid] || (remote[tid].savedAt && (!merged[tid].savedAt || remote[tid].savedAt > merged[tid].savedAt))) {
+            merged[tid] = remote[tid];
+          }
+        });
+        if (Object.keys(merged).length > 0) {
+          localStorage.setItem(PROGRESS_KEY, JSON.stringify(merged));
+        }
+        // Notify todo list to re-render (so inline progress indicators update)
+        notifyStateChanged();
+      } catch(e) {}
+    }).catch(function(err) {
+      console.warn('[pomo-progress] Firestore restore failed:', err.message);
     });
   }
 
@@ -3170,11 +3335,23 @@
       totalSessions = 1;
 
       function initAndStart() {
+        // Check for prior session progress on this task
+        var prior = loadTaskProgress(todoId);
+        if (prior && prior.sessionsCompleted > 0 && prior.totalSessions === totalSessions) {
+          // Restore: resume from the next uncompleted session
+          sessionCount = prior.sessionsCompleted + 1;
+          accumulatedWorkSeconds = prior.accWorkSeconds || 0;
+          // Use stored durations if they match (user may have changed settings)
+          if (prior.workSeconds > 0) WORK_SECONDS = prior.workSeconds;
+          if (prior.breakSeconds > 0) BREAK_SECONDS = prior.breakSeconds;
+          console.log('[pomo] Resuming task with ' + prior.sessionsCompleted + '/' + prior.totalSessions + ' sessions completed');
+        } else {
+          sessionCount = 1;
+          accumulatedWorkSeconds = 0;
+        }
         phase = 'work';
         secondsLeft = WORK_SECONDS;
         totalPhaseSeconds = WORK_SECONDS;
-        sessionCount = 1;
-        accumulatedWorkSeconds = 0;
         startedAt = Date.now();
         isRunning = false;
         showPlayIcon();
@@ -3265,6 +3442,12 @@
     },
     getSessionInfo: function() {
       return { current: sessionCount, total: totalSessions };
+    },
+    getTaskProgress: function(todoId) {
+      return loadTaskProgress(todoId);
+    },
+    clearTaskProgress: function(todoId) {
+      clearTaskProgress(todoId);
     },
     getStartedAt: function() {
       return startedAt;
