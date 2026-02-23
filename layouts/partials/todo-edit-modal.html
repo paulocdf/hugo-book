@@ -12,52 +12,50 @@
       <textarea id="todo-edit-title" class="todo-edit-input todo-edit-title-area" placeholder="What needs to be done?" autocomplete="off" ></textarea>
     </div>
 
-    <details class="todo-edit-bujo-details" id="todo-edit-bujo-details">
-      <summary class="todo-edit-bujo-summary" id="todo-edit-bujo-summary">
-        <span class="todo-edit-bujo-summary-text" id="todo-edit-bujo-summary-text">Task &middot; Open</span>
-      </summary>
-      <div class="todo-edit-bujo-body">
-        <div class="todo-edit-field todo-edit-half">
-          <label>Type</label>
-          <div class="todo-edit-bujo-toggle" id="todo-edit-bujo-type">
-            <button type="button" class="todo-edit-bujo-btn active" data-bujo-type="task" title="Task">
-              <svg width="12" height="12" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg> Task
-            </button>
-            <button type="button" class="todo-edit-bujo-btn" data-bujo-type="event" title="Event">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg> Event
-            </button>
-            <button type="button" class="todo-edit-bujo-btn" data-bujo-type="note" title="Note">
-              <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg> Note
-            </button>
+    <div class="todo-edit-metadata-row">
+      <div class="todo-edit-bujo-wrapper" id="todo-edit-bujo-wrapper">
+        <button type="button" class="todo-edit-bujo-pill" id="todo-edit-bujo-pill" title="Change type &amp; state">
+          <span class="todo-edit-bujo-pill-arrow"></span>
+          <span class="todo-edit-bujo-summary-text" id="todo-edit-bujo-summary-text">Task &middot; Open</span>
+        </button>
+        <div class="todo-edit-bujo-popover" id="todo-edit-bujo-popover">
+          <div class="todo-edit-field todo-edit-half">
+            <label>Type</label>
+            <div class="todo-edit-bujo-toggle" id="todo-edit-bujo-type">
+              <button type="button" class="todo-edit-bujo-btn active" data-bujo-type="task" title="Task">
+                <svg width="12" height="12" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg> Task
+              </button>
+              <button type="button" class="todo-edit-bujo-btn" data-bujo-type="event" title="Event">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg> Event
+              </button>
+              <button type="button" class="todo-edit-bujo-btn" data-bujo-type="note" title="Note">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg> Note
+              </button>
+            </div>
           </div>
-        </div>
-        <div class="todo-edit-field todo-edit-half" id="todo-edit-state-field">
-          <label>State</label>
-          <div class="todo-edit-bujo-toggle" id="todo-edit-bujo-state">
-            <button type="button" class="todo-edit-bujo-btn active" data-bujo-state="open" title="Open">
-              <svg width="10" height="10" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg> Open
-            </button>
-            <button type="button" class="todo-edit-bujo-btn" data-bujo-state="done" title="Done">
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 7,12 13,4"/></svg> Done
-            </button>
-            <button type="button" class="todo-edit-bujo-btn" data-bujo-state="migrated" title="Migrated">
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg> Migrated
-            </button>
-            <button type="button" class="todo-edit-bujo-btn" data-bujo-state="scheduled" title="Scheduled">
-              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10,3 3,8 10,13"/></svg> Sched.
-            </button>
+          <div class="todo-edit-field todo-edit-half" id="todo-edit-state-field">
+            <label>State</label>
+            <div class="todo-edit-bujo-toggle" id="todo-edit-bujo-state">
+              <button type="button" class="todo-edit-bujo-btn active" data-bujo-state="open" title="Open">
+                <svg width="10" height="10" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg> Open
+              </button>
+              <button type="button" class="todo-edit-bujo-btn" data-bujo-state="done" title="Done">
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 7,12 13,4"/></svg> Done
+              </button>
+              <button type="button" class="todo-edit-bujo-btn" data-bujo-state="migrated" title="Migrated">
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg> Migrated
+              </button>
+              <button type="button" class="todo-edit-bujo-btn" data-bujo-state="scheduled" title="Scheduled">
+                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10,3 3,8 10,13"/></svg> Sched.
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </details>
 
-    <div class="todo-edit-row">
-      <div class="todo-edit-field todo-edit-half">
-        <label for="todo-edit-date">Scheduled date</label>
-        <input type="date" id="todo-edit-date" class="todo-edit-input">
-      </div>
-      <div class="todo-edit-field todo-edit-half" id="todo-edit-estimate-field">
-        <label>Estimate</label>
+      <input type="date" id="todo-edit-date" class="todo-edit-meta-date" title="Scheduled date" aria-label="Scheduled date">
+
+      <div class="todo-edit-meta-estimate" id="todo-edit-estimate-field">
         <div class="todo-edit-pomodoro-group" id="todo-edit-pomodoro-group">
           <button type="button" class="todo-edit-pomo-minus" id="todo-edit-pomo-minus" title="Remove pomodoro" aria-label="Decrease pomodoro count">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"></line></svg>
@@ -207,10 +205,6 @@
 .todo-edit-title-area::placeholder {
   color: var(--gray-400);
   font-weight: 400;
-}
-.todo-edit-row {
-  display: flex;
-  gap: 12px;
 }
 .todo-edit-half {
   flex: 1;
@@ -375,60 +369,109 @@
   }
 }
 
-/* Details/summary for BuJo type/state — collapsed by default */
-.todo-edit-bujo-details {
+/* ─── Compact metadata row: Type/State + Date + Estimate ─── */
+.todo-edit-metadata-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   margin-bottom: 0.85rem;
+}
+
+/* BuJo type/state — pill button with dropdown popover */
+.todo-edit-bujo-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+.todo-edit-bujo-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 10px;
+  height: 36px;
   border: 1px solid var(--gray-200);
   border-radius: 8px;
-  overflow: hidden;
-}
-.todo-edit-bujo-summary {
-  display: flex;
-  align-items: center;
-  padding: 6px 12px;
+  background: var(--body-background);
   font-size: 0.78rem;
   font-weight: 500;
   color: var(--gray-400);
   cursor: pointer;
-  user-select: none;
-  -webkit-user-select: none;
-  list-style: none;
-  transition: color 0.15s, background 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  box-sizing: border-box;
 }
-.todo-edit-bujo-summary::-webkit-details-marker { display: none; }
-.todo-edit-bujo-summary::before {
-  content: '';
+.todo-edit-bujo-pill:hover {
+  color: var(--body-font-color);
+  background: var(--gray-100);
+}
+.todo-edit-bujo-pill.active {
+  border-color: var(--color-link);
+  color: var(--body-font-color);
+}
+.todo-edit-bujo-pill-arrow {
   display: inline-block;
   width: 0;
   height: 0;
   border-left: 4px solid currentColor;
   border-top: 3px solid transparent;
   border-bottom: 3px solid transparent;
-  margin-right: 8px;
+  margin-right: 6px;
   transition: transform 0.15s;
   flex-shrink: 0;
 }
-.todo-edit-bujo-details[open] > .todo-edit-bujo-summary::before {
+.todo-edit-bujo-pill.active .todo-edit-bujo-pill-arrow {
   transform: rotate(90deg);
 }
-.todo-edit-bujo-summary:hover {
-  color: var(--body-font-color);
-  background: var(--gray-100);
+.todo-edit-bujo-popover {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 10px 12px;
+  min-width: 200px;
 }
-.todo-edit-bujo-summary-text {
-  letter-spacing: 0.3px;
-}
-.todo-edit-bujo-body {
+.todo-edit-bujo-popover.show {
   display: flex;
   gap: 12px;
-  padding: 8px 12px 10px;
-  border-top: 1px solid var(--gray-200);
 }
-.todo-edit-bujo-body .todo-edit-field label {
+.todo-edit-bujo-popover .todo-edit-field {
+  margin-bottom: 0;
+}
+.todo-edit-bujo-popover .todo-edit-field label {
   font-size: 0.7rem;
   color: var(--gray-400);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Compact date input — no label, matches row height */
+.todo-edit-meta-date {
+  height: 36px;
+  padding: 4px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: var(--body-font-color);
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+  flex-shrink: 0;
+  min-width: 0;
+}
+.todo-edit-meta-date:focus {
+  outline: none;
+  border-color: var(--color-link);
+}
+
+/* Compact estimate wrapper — no label, inline in row */
+.todo-edit-meta-estimate {
+  flex-shrink: 0;
 }
 .todo-edit-bujo-toggle {
   display: inline-flex;
@@ -593,9 +636,9 @@
 .todo-edit-pomodoro-group {
   display: inline-flex;
   align-items: center;
-  border: 1.5px solid var(--gray-200);
+  border: 1px solid var(--gray-200);
   border-radius: 8px;
-  height: 38px;
+  height: 36px;
   box-sizing: border-box;
   overflow: hidden;
   background: var(--body-background);
@@ -609,8 +652,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 38px;
+  width: 28px;
+  height: 36px;
   padding: 0;
   border: none;
   background: transparent;
@@ -646,7 +689,7 @@
   user-select: none;
   -webkit-user-select: none;
   line-height: 1;
-  height: 38px;
+  height: 36px;
   box-sizing: border-box;
 }
 .todo-edit-pomodoro-btn:hover {
@@ -681,7 +724,7 @@
   font-size: 0.82rem;
   text-align: center;
   outline: none;
-  height: 38px;
+  height: 36px;
   box-sizing: border-box;
   flex-shrink: 0;
   -moz-appearance: textfield;
@@ -706,13 +749,12 @@
     padding: 1.25rem;
     border-radius: 12px;
   }
-  .todo-edit-row {
-    flex-direction: column;
-    gap: 0;
+  .todo-edit-metadata-row {
+    flex-wrap: wrap;
   }
-  .todo-edit-bujo-body {
+  .todo-edit-bujo-popover.show {
     flex-direction: column;
-    gap: 0;
+    gap: 6px;
   }
   .todo-edit-bujo-toggle {
     flex-wrap: wrap;
@@ -740,6 +782,8 @@
   var aiCardsEl = document.getElementById('todo-edit-ai-cards');
   var notesInput = document.getElementById('todo-edit-notes');
   var bujoSummaryText = document.getElementById('todo-edit-bujo-summary-text');
+  var bujoPill = document.getElementById('todo-edit-bujo-pill');
+  var bujoPopover = document.getElementById('todo-edit-bujo-popover');
 
   // Pomodoro group elements
   var editPomoGroup = document.getElementById('todo-edit-pomodoro-group');
@@ -844,6 +888,37 @@
       });
     });
   }
+
+  // ─── BuJo pill popover toggle ───
+  function closeBujoPopover() {
+    if (bujoPopover) bujoPopover.classList.remove('show');
+    if (bujoPill) bujoPill.classList.remove('active');
+  }
+  function toggleBujoPopover() {
+    if (!bujoPopover) return;
+    var isOpen = bujoPopover.classList.contains('show');
+    if (isOpen) {
+      closeBujoPopover();
+    } else {
+      bujoPopover.classList.add('show');
+      if (bujoPill) bujoPill.classList.add('active');
+    }
+  }
+  if (bujoPill) {
+    bujoPill.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleBujoPopover();
+    });
+  }
+  // Close popover on outside click
+  document.addEventListener('click', function(e) {
+    if (bujoPopover && bujoPopover.classList.contains('show')) {
+      var wrapper = document.getElementById('todo-edit-bujo-wrapper');
+      if (wrapper && !wrapper.contains(e.target)) {
+        closeBujoPopover();
+      }
+    }
+  });
 
   // ─── Pomodoro controls ───
 
@@ -1382,9 +1457,8 @@
     _editBujoState = todo.bujoState || 'open';
     updateBujoTypeUI();
     updateBujoStateUI();
-    // Collapse the type/state details on each open
-    var bujoDetails = document.getElementById('todo-edit-bujo-details');
-    if (bujoDetails) bujoDetails.removeAttribute('open');
+    // Close the type/state popover on each open
+    closeBujoPopover();
 
     // Parse category
     categories = [];
