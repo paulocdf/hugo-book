@@ -993,8 +993,17 @@
   flex-shrink: 0;
 }
 
-/* Closed day — ultra-compact summary line */
-.todo-day-closed {
+/* Close Day — animated compact line (shows briefly, then disappears) */
+@keyframes closeday-fill {
+  from { width: 0; }
+  to { width: 100%; }
+}
+@keyframes closeday-fadeout {
+  from { opacity: 1; max-height: 50px; margin-top: 12px; margin-bottom: 4px; padding: 5px 10px; }
+  to { opacity: 0; max-height: 0; margin-top: 0; margin-bottom: 0; padding: 0 10px; }
+}
+.todo-day-closing {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1004,64 +1013,51 @@
   color: var(--gray-400);
   border-left: 3px solid var(--color-success, #38a169);
   margin-bottom: 4px;
-  transition: background 0.15s;
+  overflow: hidden;
 }
-.todo-day-closed:not(:first-child) {
+.todo-day-closing:not(:first-child) {
   margin-top: 12px;
 }
-.todo-day-closed:hover {
-  background: var(--gray-100);
-}
-.todo-day-closed-icon {
+.todo-day-closing-icon {
   display: inline-flex;
   align-items: center;
   color: var(--color-success, #38a169);
   flex-shrink: 0;
+  z-index: 1;
 }
-.todo-day-closed-label {
+.todo-day-closing-label {
   font-weight: 500;
   color: var(--gray-500);
+  z-index: 1;
 }
-.todo-day-closed-stats {
+.todo-day-closing-stats {
   font-size: 0.68rem;
   color: var(--gray-400);
   font-weight: 400;
+  z-index: 1;
 }
-.todo-day-closed-spacer {
-  flex: 1;
+.todo-day-closing-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--color-success-bg, rgba(56, 161, 105, 0.08));
+  border-radius: 8px;
+  animation: closeday-fill 2.5s ease-out forwards;
 }
-.todo-day-reopen-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 8px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--gray-400);
-  font-size: 0.65rem;
-  font-weight: 500;
-  cursor: pointer;
-  flex-shrink: 0;
-  white-space: nowrap;
-  opacity: 0;
-  transition: opacity 0.15s, background 0.15s, color 0.15s, border-color 0.15s;
-}
-.todo-day-closed:hover .todo-day-reopen-btn {
-  opacity: 1;
-}
-.todo-day-reopen-btn:hover {
-  color: var(--color-link, #4285f4);
-  background: rgba(66, 133, 244, 0.08);
-  border-color: var(--color-link, #4285f4);
+.todo-day-closing.is-fading {
+  animation: closeday-fadeout 0.4s ease forwards;
 }
 
 @media (prefers-color-scheme: dark) {
-  .todo-day-closed {
+  .todo-day-closing {
     border-left-color: #68d391;
   }
-  .todo-day-closed-icon {
+  .todo-day-closing-icon {
     color: #68d391;
+  }
+  .todo-day-closing-bar {
+    background: rgba(104, 211, 145, 0.12);
   }
   .todo-day-close-btn {
     color: #68d391;
@@ -1072,11 +1068,14 @@
     color: #1a202c;
   }
 }
-[data-theme="dark"] .todo-day-closed {
+[data-theme="dark"] .todo-day-closing {
   border-left-color: #68d391;
 }
-[data-theme="dark"] .todo-day-closed-icon {
+[data-theme="dark"] .todo-day-closing-icon {
   color: #68d391;
+}
+[data-theme="dark"] .todo-day-closing-bar {
+  background: rgba(104, 211, 145, 0.12);
 }
 [data-theme="dark"] .todo-day-close-btn {
   color: #68d391;
@@ -1997,6 +1996,20 @@
   font-size: 0.6rem;
   color: var(--gray-300);
   line-height: 1;
+}
+/* Closed day in week bar — subtle checkmark, muted, clickable to reopen */
+.todo-week-day.is-closed {
+  opacity: 0.40;
+  cursor: pointer;
+  position: relative;
+}
+.todo-week-day.is-closed:hover {
+  opacity: 0.70;
+}
+.todo-week-day.is-closed .todo-week-day-label::after {
+  content: ' \2713';
+  color: var(--color-success, #2e7d32);
+  font-size: 0.6rem;
 }
 @media (prefers-color-scheme: dark) {
   .todo-week-bar {
@@ -3452,50 +3465,6 @@
       return g;
     }
 
-    // ─── Closed Day (compact summary line) ───
-    function buildClosedDayHtml(groupKey, headerInfo, tasksInGroup) {
-      // Count leaf tasks and compute stats
-      var totalInGroup = 0;
-      var totalEstMin = 0;
-      var totalPomos = 0;
-      tasksInGroup.forEach(function(p) {
-        var ch = childrenMap[p.id] || [];
-        if (ch.length > 0) {
-          ch.forEach(function(c) {
-            totalInGroup++;
-            if (c.estimatedMin) totalEstMin += c.estimatedMin;
-            if (c.pomodoroCount) totalPomos += c.pomodoroCount;
-          });
-        } else {
-          totalInGroup++;
-          if (p.estimatedMin) totalEstMin += p.estimatedMin;
-          if (p.pomodoroCount) totalPomos += p.pomodoroCount;
-        }
-      });
-
-      var statsText = totalInGroup + ' task' + (totalInGroup !== 1 ? 's' : '');
-      if (totalEstMin > 0) {
-        var hrs = (totalEstMin / 60).toFixed(1);
-        statsText += ', ' + hrs + 'h';
-      }
-      if (totalPomos > 0) {
-        statsText += ', ' + totalPomos + ' pomo' + (totalPomos !== 1 ? 's' : '');
-      }
-
-      var h = '<div class="todo-day-closed" data-closed-day="' + escapeHtml(groupKey) + '">';
-      // Checkmark icon
-      h += '<span class="todo-day-closed-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>';
-      h += '<span class="todo-day-closed-label">' + escapeHtml(headerInfo.label) + '</span>';
-      h += '<span class="todo-day-closed-stats">\u2014 ' + escapeHtml(statsText) + '</span>';
-      h += '<span class="todo-day-closed-spacer"></span>';
-      h += '<button type="button" class="todo-day-reopen-btn" data-reopen-day="' + escapeHtml(groupKey) + '" title="Reopen this day">';
-      h += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 4v6h6"></path><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>';
-      h += ' Reopen';
-      h += '</button>';
-      h += '</div>';
-      return h;
-    }
-
     // ─── Week Summary Bar ───
     // Compute Mon–Sun of the current week
     var todayDate = new Date();
@@ -3539,6 +3508,7 @@
         });
 
         var wClasses = 'todo-week-day';
+        var wIsClosed = !!_closedDays[wDateStr];
         if (wDateStr === today) {
           wClasses += ' is-today';
           if (wTotal > 0 && wDone === wTotal) wClasses += ' is-all-done';
@@ -3548,6 +3518,7 @@
         } else {
           wClasses += ' is-future';
         }
+        if (wIsClosed) wClasses += ' is-closed';
 
         html += '<div class="' + wClasses + '" data-week-day="' + wDateStr + '">';
         html += '<span class="todo-week-day-label">' + dayLabels[wi] + ' ' + wDate.getDate() + '</span>';
@@ -3578,9 +3549,8 @@
         if (hasUndone) {
           _closedDaysToReopen.push(dateStr);
           html += buildDayGroup(dateStr, info, tasksInGroup);
-        } else {
-          html += buildClosedDayHtml(dateStr, info, tasksInGroup);
         }
+        // else: closed day — skip entirely, no HTML output
       } else {
         html += buildDayGroup(dateStr, info, tasksInGroup);
       }
@@ -3724,6 +3694,19 @@
     render();
   }
 
+  // ─── Closing Day Animation (compact line with progress bar, then auto-hide) ───
+  // This is only used during the close animation; closed days are fully hidden on render.
+  function buildClosingDayHtml(headerLabel, statsText) {
+    var h = '<div class="todo-day-closing">';
+    h += '<div class="todo-day-closing-bar"></div>';
+    // Checkmark icon
+    h += '<span class="todo-day-closing-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>';
+    h += '<span class="todo-day-closing-label">' + escapeHtml(headerLabel) + '</span>';
+    h += '<span class="todo-day-closing-stats">\u2014 ' + escapeHtml(statsText) + '</span>';
+    h += '</div>';
+    return h;
+  }
+
   // ─── Close / Reopen Day ───
   function closeDayGroup(dateStr) {
     _closedDays[dateStr] = true;
@@ -3738,11 +3721,76 @@
     var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     var dayLabel = dayNames[d.getDay()] + ' ' + d.getDate();
 
-    render();
+    // Find the day group DOM element and animate it out
+    var itemsEl = document.getElementById('todo-items');
+    var groupEl = itemsEl ? itemsEl.querySelector('.todo-day-group[data-day-group="' + dateStr + '"]') : null;
+
+    if (groupEl) {
+      // Compute stats from allTodos for the closing line
+      var tasksInGroup = allTodos.filter(function(t) {
+        return t.scheduledDate === dateStr && !t.parentId &&
+               (t.status === 'active' || t.status === 'done');
+      });
+      // Build children map for stat counting
+      var groupChildren = {};
+      allTodos.forEach(function(t) {
+        if (t.parentId && (t.status === 'active' || t.status === 'done')) {
+          if (!groupChildren[t.parentId]) groupChildren[t.parentId] = [];
+          groupChildren[t.parentId].push(t);
+        }
+      });
+      var totalInGroup = 0, totalEstMin = 0, totalPomos = 0;
+      tasksInGroup.forEach(function(p) {
+        var ch = groupChildren[p.id] || [];
+        if (ch.length > 0) {
+          ch.forEach(function(c) {
+            totalInGroup++;
+            if (c.estimatedMin) totalEstMin += c.estimatedMin;
+            if (c.pomodoroCount) totalPomos += c.pomodoroCount;
+          });
+        } else {
+          totalInGroup++;
+          if (p.estimatedMin) totalEstMin += p.estimatedMin;
+          if (p.pomodoroCount) totalPomos += p.pomodoroCount;
+        }
+      });
+      var statsText = totalInGroup + ' task' + (totalInGroup !== 1 ? 's' : '');
+      if (totalEstMin > 0) {
+        statsText += ', ' + (totalEstMin / 60).toFixed(1) + 'h';
+      }
+      if (totalPomos > 0) {
+        statsText += ', ' + totalPomos + ' pomo' + (totalPomos !== 1 ? 's' : '');
+      }
+
+      // Build the closing animation line
+      var closingHtml = buildClosingDayHtml(dayLabel, statsText);
+      var temp = document.createElement('div');
+      temp.innerHTML = closingHtml;
+      var closingEl = temp.firstChild;
+
+      // Replace day group with closing line
+      groupEl.parentNode.replaceChild(closingEl, groupEl);
+
+      // Update week bar: add .is-closed to the day column
+      var weekDayEl = itemsEl.querySelector('.todo-week-day[data-week-day="' + dateStr + '"]');
+      if (weekDayEl) weekDayEl.classList.add('is-closed');
+
+      // After progress bar fill (2.5s), fade out and collapse
+      setTimeout(function() {
+        closingEl.classList.add('is-fading');
+        // After fade (0.4s), remove from DOM
+        setTimeout(function() {
+          if (closingEl.parentNode) closingEl.parentNode.removeChild(closingEl);
+        }, 450);
+      }, 2500);
+    } else {
+      // Fallback: no DOM element found, just re-render
+      render();
+    }
 
     showActionToast({
       message: 'Closed ' + dayLabel,
-      duration: 3000,
+      duration: 5000,
       onUndo: function() {
         reopenDayGroup(dateStr);
       }
@@ -4038,11 +4086,16 @@
       });
     });
 
-    // Week summary bar: click a day to expand + scroll to its group
+    // Week summary bar: click a day to expand + scroll to its group, or reopen if closed
     itemsEl.querySelectorAll('.todo-week-day[data-week-day]').forEach(function(col) {
       col.addEventListener('click', function() {
         var dateKey = col.getAttribute('data-week-day');
-        // Try normal day group first, then closed day line
+        // If this day is closed, reopen it
+        if (_closedDays[dateKey]) {
+          reopenDayGroup(dateKey);
+          return;
+        }
+        // Try normal day group — expand if collapsed + scroll
         var group = itemsEl.querySelector('.todo-day-group[data-day-group="' + dateKey + '"]');
         if (group) {
           // Expand if collapsed
@@ -4051,12 +4104,6 @@
             try { localStorage.setItem('dm-todo-daygroup-' + dateKey, '0'); } catch(e) {}
           }
           group.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          return;
-        }
-        // Closed day line
-        var closedEl = itemsEl.querySelector('.todo-day-closed[data-closed-day="' + dateKey + '"]');
-        if (closedEl) {
-          closedEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       });
     });
@@ -4076,15 +4123,6 @@
         e.stopPropagation(); // Don't toggle collapse
         var dateStr = btn.getAttribute('data-close-day');
         closeDayGroup(dateStr);
-      });
-    });
-
-    // Reopen Day button on closed day summary lines
-    itemsEl.querySelectorAll('.todo-day-reopen-btn[data-reopen-day]').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        var dateStr = btn.getAttribute('data-reopen-day');
-        reopenDayGroup(dateStr);
       });
     });
 
