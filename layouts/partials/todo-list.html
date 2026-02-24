@@ -4455,7 +4455,7 @@
       // When the timer fires, check if cursor is STILL close to the anchor
       var dx = _cursorX - _lastDragX;
       var dy = _cursorY - _lastDragY;
-      if (Math.sqrt(dx * dx + dy * dy) <= NEST_MOVE_THRESHOLD) {
+      if (Math.sqrt(dx * dx + dy * dy) <= NEST_MOVE_THRESHOLD && isCursorOverTarget()) {
         var el = itemsEl.querySelector('.todo-item-group[data-group-id="' + _nestTargetId + '"]');
         if (el) {
           _nestTargetEl = el;
@@ -4481,11 +4481,11 @@
     _cursorX = cx;
     _cursorY = cy;
 
-    // If indicator is already visible and cursor moved away, clear it
+    // If indicator is already visible and cursor moved away or left target bounds, clear it
     if (_nestTargetEl) {
       var dx = cx - _lastDragX;
       var dy = cy - _lastDragY;
-      if (Math.sqrt(dx * dx + dy * dy) > NEST_MOVE_THRESHOLD) {
+      if (Math.sqrt(dx * dx + dy * dy) > NEST_MOVE_THRESHOLD || !isCursorOverTarget()) {
         // Clear visible indicator but keep tracking the target — restart timer
         _nestTargetEl.classList.remove('todo-nest-target');
         _nestTargetEl = null;
@@ -4514,6 +4514,16 @@
     // Don't nest into a subtask (target must be a top-level parent)
     if (target.parentId) return false;
     return true;
+  }
+
+  // Check if the cursor is geometrically within the nest target's bounding box
+  function isCursorOverTarget() {
+    if (!_nestTargetId) return false;
+    var el = itemsEl.querySelector('.todo-item-group[data-group-id="' + _nestTargetId + '"]');
+    if (!el) return false;
+    var rect = el.getBoundingClientRect();
+    return _cursorX >= rect.left && _cursorX <= rect.right &&
+           _cursorY >= rect.top && _cursorY <= rect.bottom;
   }
 
   function initSortable() {
