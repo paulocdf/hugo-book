@@ -116,6 +116,16 @@
           <div class="pomodoro-focus-panel-label">Today</div>
           <div class="pomodoro-focus-stats-grid" id="focus-stats-grid"></div>
         </div>
+
+        <!-- Notes panel -->
+        <div class="pomodoro-focus-panel pomodoro-focus-notes-panel" id="focus-panel-notes">
+          <div class="pomodoro-focus-panel-label">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            Notes
+          </div>
+          <textarea id="focus-notes-textarea" class="pomodoro-focus-notes-textarea" placeholder="Jot down thoughts while you work..."></textarea>
+          <div class="pomodoro-focus-notes-status" id="focus-notes-status"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -892,6 +902,14 @@
     flex: 1;
     min-width: 140px;
   }
+  .pomodoro-focus-notes-panel {
+    width: 100%;
+    flex: none;
+    min-height: 100px;
+  }
+  .pomodoro-focus-notes-textarea {
+    min-height: 80px;
+  }
   .pomodoro-focus-header-strip {
     height: 48px;
   }
@@ -937,6 +955,78 @@
   }
   .pomodoro-focus-stats-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  .pomodoro-focus-notes-panel {
+    flex: none;
+    min-height: 80px;
+  }
+  .pomodoro-focus-notes-textarea {
+    min-height: 60px;
+  }
+}
+/* Focus mode notes panel */
+.pomodoro-focus-notes-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 80px;
+}
+.pomodoro-focus-notes-panel .pomodoro-focus-panel-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pomodoro-focus-notes-panel .pomodoro-focus-panel-label svg {
+  opacity: 0.6;
+}
+.pomodoro-focus-notes-textarea {
+  flex: 1;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(249, 168, 37, 0.25);
+  border-radius: 6px;
+  background: rgba(255, 253, 231, 0.5);
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: var(--body-font-color);
+  resize: none;
+  min-height: 60px;
+  box-sizing: border-box;
+  line-height: 1.5;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pomodoro-focus-notes-textarea:focus {
+  outline: none;
+  border-color: #f9a825;
+  background: rgba(255, 253, 231, 0.8);
+}
+.pomodoro-focus-notes-textarea::placeholder {
+  color: #c4a035;
+  opacity: 0.5;
+}
+.pomodoro-focus-notes-status {
+  font-size: 0.62rem;
+  color: var(--color-success, #34a853);
+  height: 14px;
+  line-height: 14px;
+  margin-top: 3px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.pomodoro-focus-notes-status.visible {
+  opacity: 1;
+}
+@media (prefers-color-scheme: dark) {
+  .pomodoro-focus-notes-textarea {
+    background: rgba(255, 193, 7, 0.04);
+    border-color: rgba(255, 193, 7, 0.15);
+  }
+  .pomodoro-focus-notes-textarea:focus {
+    border-color: rgba(255, 193, 7, 0.4);
+    background: rgba(255, 193, 7, 0.08);
+  }
+  .pomodoro-focus-notes-textarea::placeholder {
+    color: #a08930;
   }
 }
 </style>
@@ -996,6 +1086,10 @@
   var focusTimelineBlocksEl = document.getElementById('focus-timeline-blocks');
   var focusDetailsGridEl = document.getElementById('focus-details-grid');
   var focusStatsGridEl = document.getElementById('focus-stats-grid');
+  var focusNotesTextarea = document.getElementById('focus-notes-textarea');
+  var focusNotesStatus = document.getElementById('focus-notes-status');
+  var _focusNotesTimer = null;
+  var _focusNotesOriginal = '';
   var focusVizCanvas = document.getElementById('focus-viz-canvas');
   var focusVizToggle = document.getElementById('focus-viz-toggle');
   var focusVizContainer = focusVizCanvas ? focusVizCanvas.parentElement : null;
@@ -1980,6 +2074,14 @@
     categoryEl.textContent = '';
     showPlayIcon();
     clearInfoAndSubtasks();
+    // Flush pending notes save before closing
+    if (_focusNotesTimer) {
+      clearTimeout(_focusNotesTimer);
+      _focusNotesTimer = null;
+    }
+    saveFocusNotes();
+    focusNotesTextarea.value = '';
+    _focusNotesOriginal = '';
     // Hide focus overlay if open
     focusOverlay.style.display = 'none';
     isFocusMode = false;
@@ -2057,6 +2159,14 @@
     categoryEl.textContent = '';
     clearInfoAndSubtasks();
     showPlayIcon();
+    // Flush pending notes save before closing
+    if (_focusNotesTimer) {
+      clearTimeout(_focusNotesTimer);
+      _focusNotesTimer = null;
+    }
+    saveFocusNotes();
+    focusNotesTextarea.value = '';
+    _focusNotesOriginal = '';
     // Hide focus overlay if open
     focusOverlay.style.display = 'none';
     isFocusMode = false;
@@ -2542,13 +2652,22 @@
     // Start visualizer
     vizStart();
 
-    // Load task details from IDB
+    // Load task details and notes from IDB
     if (window.dmSync && window.dmSync.getTodo && activeTodoId) {
       window.dmSync.getTodo(activeTodoId).then(function(todo) {
         renderTaskDetails(todo);
-      }).catch(function() { renderTaskDetails(null); });
+        // Populate notes
+        _focusNotesOriginal = (todo && todo.notes) || '';
+        focusNotesTextarea.value = _focusNotesOriginal;
+      }).catch(function() {
+        renderTaskDetails(null);
+        _focusNotesOriginal = '';
+        focusNotesTextarea.value = '';
+      });
     } else {
       renderTaskDetails(null);
+      _focusNotesOriginal = '';
+      focusNotesTextarea.value = '';
     }
 
     // Load today's stats
@@ -2559,6 +2678,12 @@
 
   function exitFocusMode() {
     isFocusMode = false;
+    // Flush any pending notes save
+    if (_focusNotesTimer) {
+      clearTimeout(_focusNotesTimer);
+      _focusNotesTimer = null;
+    }
+    saveFocusNotes();
     focusOverlay.style.display = 'none';
     timerEl.style.display = '';
     vizStop();
@@ -2624,6 +2749,32 @@
   // Backdrop click → collapse back to compact
   focusOverlay.querySelector('.pomodoro-focus-backdrop').addEventListener('click', function() {
     exitFocusMode();
+  });
+
+  // ── Focus notes auto-save with debounce ──
+  function saveFocusNotes() {
+    var newVal = focusNotesTextarea.value.trim();
+    if (newVal === _focusNotesOriginal) return;
+    if (!activeTodoId) return;
+    _focusNotesOriginal = newVal;
+    window.dmSync.firestoreWrite({
+      collection: 'todos',
+      docId: activeTodoId,
+      data: { notes: newVal, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+      localData: { notes: newVal, updatedAt: Date.now() }
+    });
+    // Flash "Saved" indicator
+    focusNotesStatus.textContent = 'Saved';
+    focusNotesStatus.classList.add('visible');
+    setTimeout(function() { focusNotesStatus.classList.remove('visible'); }, 1500);
+  }
+
+  focusNotesTextarea.addEventListener('input', function() {
+    if (_focusNotesTimer) clearTimeout(_focusNotesTimer);
+    _focusNotesTimer = setTimeout(function() {
+      _focusNotesTimer = null;
+      saveFocusNotes();
+    }, 1500);
   });
 
   // Escape key → collapse focus mode
@@ -3374,6 +3525,8 @@
       focusTimelineBlocksEl.innerHTML = '';
       focusDetailsGridEl.innerHTML = '';
       focusStatsGridEl.innerHTML = '';
+      focusNotesTextarea.value = '';
+      _focusNotesOriginal = '';
 
       if (window.dmSync && window.dmSync.getTodo) {
         window.dmSync.getTodo(todoId).then(function(todo) {
