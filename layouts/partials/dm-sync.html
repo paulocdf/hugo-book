@@ -1958,7 +1958,9 @@
 
   /**
    * Share a task with another user by email.
-   * Creates a taskShares doc and adds the invitee's uid to the todo's collaborators array.
+   * Creates a taskShares doc with a deterministic ID (todoId_inviteeUid) so
+   * Firestore security rules can verify the share exists when the invitee
+   * adds themselves to the todo's collaborators array.
    * @param {string} todoId — the task to share
    * @param {string} email — invitee's email address
    * @returns {Promise<Object>} — the created share doc
@@ -1969,47 +1971,46 @@
     if (!window.dmDb) return Promise.reject(new Error('Firestore not available'));
     if (email === user.email) return Promise.reject(new Error('Cannot share with yourself'));
 
-    // Check if already shared with this email
-    return idbGetAll(STORE_TASK_SHARES).then(function(shares) {
-      var existing = shares.find(function(s) {
-        return s.todoId === todoId && s.inviteeEmail === email && s.status !== 'declined';
-      });
-      if (existing) return Promise.reject(new Error('Already shared with ' + email));
+    // Look up invitee first — they must have an account for deterministic ID
+    return lookupUserByEmail(email).then(function(invitee) {
+      if (!invitee) return Promise.reject(new Error('No account found for ' + email + '. They must sign in at least once before you can share with them.'));
 
-      var shareId = window.dmDb.collection('taskShares').doc().id;
-      var now = Date.now();
+      // Deterministic share ID: todoId_inviteeUid
+      var shareId = todoId + '_' + invitee.uid;
 
-      var shareData = {
-        todoId: todoId,
-        ownerId: user.uid,
-        ownerEmail: user.email || '',
-        ownerName: user.displayName || '',
-        inviteeEmail: email,
-        inviteeUid: null,
-        status: 'pending',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
+      // Check if already shared with this user
+      return idbGetAll(STORE_TASK_SHARES).then(function(shares) {
+        var existing = shares.find(function(s) {
+          return s.id === shareId && s.status !== 'declined';
+        });
+        if (existing) return Promise.reject(new Error('Already shared with ' + email));
 
-      var localShare = {
-        id: shareId,
-        todoId: todoId,
-        ownerId: user.uid,
-        ownerEmail: user.email || '',
-        ownerName: user.displayName || '',
-        inviteeEmail: email,
-        inviteeUid: null,
-        status: 'pending',
-        createdAt: now,
-        updatedAt: now
-      };
+        var now = Date.now();
 
-      // Look up invitee to pre-populate uid if they already have an account
-      return lookupUserByEmail(email).then(function(invitee) {
-        if (invitee) {
-          shareData.inviteeUid = invitee.uid;
-          localShare.inviteeUid = invitee.uid;
-        }
+        var shareData = {
+          todoId: todoId,
+          ownerId: user.uid,
+          ownerEmail: user.email || '',
+          ownerName: user.displayName || '',
+          inviteeEmail: email,
+          inviteeUid: invitee.uid,
+          status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        var localShare = {
+          id: shareId,
+          todoId: todoId,
+          ownerId: user.uid,
+          ownerEmail: user.email || '',
+          ownerName: user.displayName || '',
+          inviteeEmail: email,
+          inviteeUid: invitee.uid,
+          status: 'pending',
+          createdAt: now,
+          updatedAt: now
+        };
 
         return firestoreWrite({
           collection: 'taskShares',
@@ -2027,8 +2028,10 @@
 
   /**
    * Accept a pending share invitation.
-   * Updates status to 'accepted', sets inviteeUid, and adds current user to todo's collaborators.
-   * @param {string} shareId — the taskShares document ID
+   * Updates status to 'accepted', sets inviteeUid, adds current user to todo's
+   * collaborators array (allowed by security rules via deterministic share ID
+   * verification), and fetches the shared todo into local IDB.
+   * @param {string} shareId — the taskShares document ID (format: todoId_inviteeUid)
    */
   function acceptShare(shareId) {
     var user = window.dmAuth && window.dmAuth.currentUser;
@@ -2042,7 +2045,7 @@
       share.inviteeUid = user.uid;
       share.updatedAt = Date.now();
 
-      // Update the share document
+      // Step 1: Update the share document status to 'accepted'
       return firestoreWrite({
         collection: 'taskShares',
         docId: shareId,
@@ -2054,25 +2057,23 @@
         },
         localOp: function() { return idbPut(STORE_TASK_SHARES, share); }
       }).then(function() {
-        // Add current user to the todo's collaborators array in Firestore
+        // Step 2: Add current user to the todo's collaborators array.
+        // Security rules allow this because the deterministic taskShares doc
+        // (todoId_inviteeUid) exists with status 'accepted'.
         if (window.dmDb) {
           return window.dmDb.collection('todos').doc(share.todoId).update({
             collaborators: firebase.firestore.FieldValue.arrayUnion(user.uid),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          }).catch(function(err) {
-            console.warn('[dm-sync] Failed to add collaborator to todo:', err);
           });
         }
       }).then(function() {
-        // Sync the shared todo into local IDB so it appears in the list
+        // Step 3: Fetch the shared todo into local IDB so it appears in the list
         if (window.dmDb) {
           return window.dmDb.collection('todos').doc(share.todoId).get().then(function(doc) {
             if (doc.exists) {
               var todo = serializeTodo(doc);
               return idbPut(STORE_TODOS, todo);
             }
-          }).catch(function(err) {
-            console.warn('[dm-sync] Failed to sync shared todo:', err);
           });
         }
       }).then(function() {
@@ -2325,6 +2326,7 @@
 
   var _sharedTodosUnsubscribe = null;
   var _shareInvitesUnsubscribe = null;
+  var _ownerSharesUnsubscribe = null;
 
   function startSharedTaskListeners(userId) {
     stopSharedTaskListeners();
@@ -2382,6 +2384,31 @@
       }, function(err) {
         console.warn('[dm-sync] Share invites listener error:', err);
       });
+
+    // Listen for status changes on shares owned by this user (e.g. invitee accepted/declined)
+    _ownerSharesUnsubscribe = window.dmDb.collection('taskShares')
+      .where('ownerId', '==', userId)
+      .onSnapshot(function(snapshot) {
+        var hasChanges = false;
+        var chain = Promise.resolve();
+        snapshot.docChanges().forEach(function(change) {
+          var shareDoc = serializeTaskShare(change.doc);
+          if (change.type === 'added' || change.type === 'modified') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbPut(STORE_TASK_SHARES, shareDoc); });
+          } else if (change.type === 'removed') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbDelete(STORE_TASK_SHARES, shareDoc.id); });
+          }
+        });
+        if (hasChanges) {
+          chain.then(function() {
+            window.dispatchEvent(new CustomEvent('dm-task-shares-updated'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Owner shares listener error:', err);
+      });
   }
 
   function stopSharedTaskListeners() {
@@ -2392,6 +2419,10 @@
     if (_shareInvitesUnsubscribe) {
       _shareInvitesUnsubscribe();
       _shareInvitesUnsubscribe = null;
+    }
+    if (_ownerSharesUnsubscribe) {
+      _ownerSharesUnsubscribe();
+      _ownerSharesUnsubscribe = null;
     }
   }
 
