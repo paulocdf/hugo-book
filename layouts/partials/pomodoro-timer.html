@@ -2005,7 +2005,8 @@
         return;
       }
 
-      // Transition to the next subtask
+      // Transition to the next subtask — flush old notes and load new
+      transitionFocusNotes(nextSub.id);
       activeTodoId = nextSub.id;
       activeTodoTitle = nextSub.title || 'Task';
       titleEl.textContent = activeTodoTitle;
@@ -2769,6 +2770,33 @@
     setTimeout(function() { focusNotesStatus.classList.remove('visible'); }, 1500);
   }
 
+  // Flush notes for the current task and load notes + details for a new task
+  // Must be called BEFORE activeTodoId is changed so the flush saves to the old task
+  function transitionFocusNotes(newTodoId) {
+    // Flush pending save for the old task
+    if (_focusNotesTimer) {
+      clearTimeout(_focusNotesTimer);
+      _focusNotesTimer = null;
+    }
+    saveFocusNotes();
+    // Load notes and task details for the new task
+    if (window.dmSync && window.dmSync.getTodo && newTodoId) {
+      window.dmSync.getTodo(newTodoId).then(function(todo) {
+        _focusNotesOriginal = (todo && todo.notes) || '';
+        focusNotesTextarea.value = _focusNotesOriginal;
+        renderTaskDetails(todo);
+      }).catch(function() {
+        _focusNotesOriginal = '';
+        focusNotesTextarea.value = '';
+        renderTaskDetails(null);
+      });
+    } else {
+      _focusNotesOriginal = '';
+      focusNotesTextarea.value = '';
+      renderTaskDetails(null);
+    }
+  }
+
   focusNotesTextarea.addEventListener('input', function() {
     if (_focusNotesTimer) clearTimeout(_focusNotesTimer);
     _focusNotesTimer = setTimeout(function() {
@@ -3058,6 +3086,7 @@
               return;
             }
             // Set up timer for next subtask (paused, waiting for user)
+            transitionFocusNotes(nextSub.id);
             activeTodoId = nextSub.id;
             activeTodoTitle = nextSub.title || 'Task';
             activeParentId = completedParentId;
