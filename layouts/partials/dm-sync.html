@@ -1994,6 +1994,23 @@
         var now = Date.now();
         var todoTitle = (todo && todo.title) || '';
 
+        // Ensure the todo has a collaborators array in Firestore (backfill for
+        // todos created before the collaborators field was added to createTodo).
+        // The owner update rule allows this. We use set+merge so it only adds
+        // the field if missing, without overwriting existing collaborators.
+        var backfillPromise = Promise.resolve();
+        if (todo && (!todo.collaborators || !Array.isArray(todo.collaborators))) {
+          backfillPromise = window.dmDb.collection('todos').doc(todoId).set({
+            collaborators: []
+          }, { merge: true }).then(function() {
+            // Update local IDB copy too
+            todo.collaborators = [];
+            return idbPut(STORE_TODOS, todo);
+          }).catch(function(err) {
+            console.warn('[dm-sync] Collaborators backfill failed (non-fatal):', err.message);
+          });
+        }
+
         var shareData = {
           todoId: todoId,
           todoTitle: todoTitle,
@@ -2021,12 +2038,14 @@
           updatedAt: now
         };
 
-        return firestoreWrite({
-          collection: 'taskShares',
-          docId: shareId,
-          op: 'set',
-          data: shareData,
-          localOp: function() { return idbPut(STORE_TASK_SHARES, localShare); }
+        return backfillPromise.then(function() {
+          return firestoreWrite({
+            collection: 'taskShares',
+            docId: shareId,
+            op: 'set',
+            data: shareData,
+            localOp: function() { return idbPut(STORE_TASK_SHARES, localShare); }
+          });
         }).then(function() {
           window.dispatchEvent(new CustomEvent('dm-task-shares-updated'));
           return localShare;
@@ -2045,46 +2064,41 @@
   function acceptShare(shareId) {
     var user = window.dmAuth && window.dmAuth.currentUser;
     if (!user) return Promise.reject(new Error('Not authenticated'));
+    if (!window.dmDb) return Promise.reject(new Error('You must be online to accept a share'));
 
     return idbGet(STORE_TASK_SHARES, shareId).then(function(share) {
       if (!share) return Promise.reject(new Error('Share not found'));
       if (share.status !== 'pending') return Promise.reject(new Error('Share is not pending'));
 
-      share.status = 'accepted';
-      share.inviteeUid = user.uid;
-      share.updatedAt = Date.now();
-
-      // Step 1: Update the share document status to 'accepted'
-      return firestoreWrite({
-        collection: 'taskShares',
-        docId: shareId,
-        op: 'update',
-        data: {
-          status: 'accepted',
-          inviteeUid: user.uid,
-          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        },
-        localOp: function() { return idbPut(STORE_TASK_SHARES, share); }
+      // Step 1: Update the share document status to 'accepted' — must be a direct
+      // Firestore write (not firestoreWrite) because Step 2's security rule checks
+      // that the share status is 'accepted' in Firestore. Queuing would leave it 'pending'.
+      return window.dmDb.collection('taskShares').doc(shareId).update({
+        status: 'accepted',
+        inviteeUid: user.uid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(function() {
+        // Update local IDB copy
+        share.status = 'accepted';
+        share.inviteeUid = user.uid;
+        share.updatedAt = Date.now();
+        return idbPut(STORE_TASK_SHARES, share);
       }).then(function() {
         // Step 2: Add current user to the todo's collaborators array.
         // Security rules allow this because the deterministic taskShares doc
-        // (todoId_inviteeUid) exists with status 'accepted'.
-        if (window.dmDb) {
-          return window.dmDb.collection('todos').doc(share.todoId).update({
-            collaborators: firebase.firestore.FieldValue.arrayUnion(user.uid),
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        }
+        // (todoId_inviteeUid) now exists with status 'accepted' in Firestore.
+        return window.dmDb.collection('todos').doc(share.todoId).update({
+          collaborators: firebase.firestore.FieldValue.arrayUnion(user.uid),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
       }).then(function() {
         // Step 3: Fetch the shared todo into local IDB so it appears in the list
-        if (window.dmDb) {
-          return window.dmDb.collection('todos').doc(share.todoId).get().then(function(doc) {
-            if (doc.exists) {
-              var todo = serializeTodo(doc);
-              return idbPut(STORE_TODOS, todo);
-            }
-          });
-        }
+        return window.dmDb.collection('todos').doc(share.todoId).get().then(function(doc) {
+          if (doc.exists) {
+            var todo = serializeTodo(doc);
+            return idbPut(STORE_TODOS, todo);
+          }
+        });
       }).then(function() {
         window.dispatchEvent(new CustomEvent('dm-task-shares-updated'));
         window.dispatchEvent(new CustomEvent('dm-todos-updated'));

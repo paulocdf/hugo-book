@@ -5311,6 +5311,7 @@
       bujoType: bujoType || 'task',
       bujoState: 'open',
       kanbanStatus: 'todo',
+      collaborators: [],
       createdAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
       updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
       completedAt: null
