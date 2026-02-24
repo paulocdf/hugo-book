@@ -121,7 +121,7 @@
       btn.addEventListener('click', function() {
         var shareId = btn.getAttribute('data-accept-id');
         btn.disabled = true;
-        btn.textContent = '...';
+        btn.textContent = 'Accepting...';
         if (window.dmSync && window.dmSync.acceptShare) {
           window.dmSync.acceptShare(shareId).then(function() {
             removeCard(shareId);
@@ -129,6 +129,17 @@
             console.error('[invitations] Accept failed:', err);
             btn.disabled = false;
             btn.textContent = 'Accept';
+            // Show error message next to the button
+            var card = btn.closest('.dm-invitation-card');
+            if (card) {
+              var existing = card.querySelector('.dm-invitation-error');
+              if (existing) existing.remove();
+              var errEl = document.createElement('div');
+              errEl.className = 'dm-invitation-error';
+              errEl.style.cssText = 'color:#e74c3c;font-size:0.82em;margin-top:6px;';
+              errEl.textContent = 'Failed to accept: ' + (err.message || 'Unknown error');
+              card.appendChild(errEl);
+            }
           });
         }
       });
@@ -138,7 +149,7 @@
       btn.addEventListener('click', function() {
         var shareId = btn.getAttribute('data-decline-id');
         btn.disabled = true;
-        btn.textContent = '...';
+        btn.textContent = 'Declining...';
         if (window.dmSync && window.dmSync.declineShare) {
           window.dmSync.declineShare(shareId).then(function() {
             removeCard(shareId);
@@ -173,16 +184,33 @@
   function loadPendingInvites() {
     if (!window.dmSync || !window.dmSync.getPendingInvites) return;
     window.dmSync.getPendingInvites().then(function(invites) {
-      // Enrich with task titles if possible
+      // Enrich with task titles if not already on the share doc
       var enriched = [];
       var chain = Promise.resolve();
       invites.forEach(function(inv) {
         chain = chain.then(function() {
-          // Try to get the todo title from IDB if available
+          // Title already on the share doc (new shares include it)
+          if (inv.todoTitle) {
+            enriched.push(inv);
+            return Promise.resolve();
+          }
+          // Fallback: try local IDB
           if (window.dmSync.getTodo) {
             return window.dmSync.getTodo(inv.todoId).then(function(todo) {
-              inv.todoTitle = todo ? todo.title : '';
-              enriched.push(inv);
+              if (todo) {
+                inv.todoTitle = todo.title || '';
+                enriched.push(inv);
+              } else if (window.dmDb) {
+                // Last resort: fetch directly from Firestore
+                return window.dmDb.collection('todos').doc(inv.todoId).get().then(function(doc) {
+                  inv.todoTitle = doc.exists ? (doc.data().title || '') : '';
+                  enriched.push(inv);
+                }).catch(function() {
+                  enriched.push(inv);
+                });
+              } else {
+                enriched.push(inv);
+              }
             }).catch(function() {
               enriched.push(inv);
             });

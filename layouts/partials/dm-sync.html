@@ -1921,6 +1921,7 @@
     return {
       id: doc.id,
       todoId: data.todoId || '',
+      todoTitle: data.todoTitle || '',
       ownerId: data.ownerId || '',
       ownerEmail: data.ownerEmail || '',
       ownerName: data.ownerName || '',
@@ -1978,17 +1979,24 @@
       // Deterministic share ID: todoId_inviteeUid
       var shareId = todoId + '_' + invitee.uid;
 
-      // Check if already shared with this user
-      return idbGetAll(STORE_TASK_SHARES).then(function(shares) {
+      // Check if already shared with this user, and fetch todo title
+      return Promise.all([
+        idbGetAll(STORE_TASK_SHARES),
+        idbGet(STORE_TODOS, todoId)
+      ]).then(function(results) {
+        var shares = results[0];
+        var todo = results[1];
         var existing = shares.find(function(s) {
           return s.id === shareId && s.status !== 'declined';
         });
         if (existing) return Promise.reject(new Error('Already shared with ' + email));
 
         var now = Date.now();
+        var todoTitle = (todo && todo.title) || '';
 
         var shareData = {
           todoId: todoId,
+          todoTitle: todoTitle,
           ownerId: user.uid,
           ownerEmail: user.email || '',
           ownerName: user.displayName || '',
@@ -2002,6 +2010,7 @@
         var localShare = {
           id: shareId,
           todoId: todoId,
+          todoTitle: todoTitle,
           ownerId: user.uid,
           ownerEmail: user.email || '',
           ownerName: user.displayName || '',
