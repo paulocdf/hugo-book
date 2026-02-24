@@ -793,10 +793,6 @@
   transition: opacity 0.15s, color 0.15s;
   touch-action: none;
 }
-.todo-drag-handle-spacer {
-  width: 14px;
-  flex-shrink: 0;
-}
 .todo-item:hover .todo-drag-handle,
 .todo-item-group:hover > .todo-item .todo-drag-handle {
   opacity: 1;
@@ -3050,12 +3046,8 @@
     var stateClass = bujoState === 'migrated' ? ' migrated' : (bujoState === 'scheduled' ? ' scheduled' : '');
     var html = '<div class="todo-item' + doneClass + justCompletedClass + justAddedClass + stateClass + '" data-todo-id="' + todo.id + '">';
 
-    // Drag handle (only on active tasks — not done, migrated, or scheduled)
-    if (!todo.done && bujoState !== 'migrated' && bujoState !== 'scheduled') {
-      html += '<span class="todo-drag-handle" title="Drag to reorder"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/></svg></span>';
-    } else {
-      html += '<span class="todo-drag-handle-spacer"></span>';
-    }
+    // Drag handle (all tasks are draggable)
+    html += '<span class="todo-drag-handle" title="Drag to reorder"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/></svg></span>';
 
     // Subtask collapse toggle for parents with children
     if (!isSubtask && hasChildren) {
@@ -4519,9 +4511,6 @@
     if (draggedHasChildren) return false;
     // Don't nest if dragged is already a subtask of this target
     if (dragged.parentId === targetId) return false;
-    // Don't nest done/migrated/scheduled tasks
-    if (dragged.done || dragged.bujoState === 'migrated' || dragged.bujoState === 'scheduled') return false;
-    if (target.done || target.bujoState === 'migrated' || target.bujoState === 'scheduled') return false;
     // Don't nest into a subtask (target must be a top-level parent)
     if (target.parentId) return false;
     return true;
@@ -4550,7 +4539,6 @@
         delay: 150,
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
-        filter: '.done, .migrated, .scheduled',
         onStart: function(evt) {
           _nestDraggedId = evt.item.getAttribute('data-group-id');
           _isDragging = true;
@@ -4616,7 +4604,6 @@
         delay: 150,
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
-        filter: '.done, .migrated, .scheduled',
         onEnd: function(evt) {
           handleSubtaskDrop(evt);
         }
