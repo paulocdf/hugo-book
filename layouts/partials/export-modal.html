@@ -115,6 +115,10 @@
         <input type="checkbox" id="export-include-metadata" checked>
         <span>Include metadata (dates, tags, status)</span>
       </label>
+      <label class="export-option" id="export-kanban-group-option" style="display: none;">
+        <input type="checkbox" id="export-group-by-kanban">
+        <span>Group by board column (instead of date)</span>
+      </label>
     </div>
 
     <!-- Preview count -->
@@ -534,6 +538,11 @@
     for (var i = 0; i < btns.length; i++) {
       btns[i].classList.toggle('active', btns[i].dataset.scope === state.scope);
     }
+    // Show kanban group option only for tasks/vault/inbox scopes
+    var kanbanOpt = document.getElementById('export-kanban-group-option');
+    if (kanbanOpt) {
+      kanbanOpt.style.display = (state.scope === 'tasks' || state.scope === 'vault' || state.scope === 'inbox') ? '' : 'none';
+    }
   }
 
   // ─── Format buttons ───
@@ -634,12 +643,18 @@
   function todoToMarkdownLine(todo) {
     var check = todo.done ? '[x]' : '[ ]';
     var parts = ['- ' + check + ' ' + (todo.title || 'Untitled')];
+    if (todo.kanbanStatus === 'in_progress') parts[0] += ' **[In Progress]**';
     if (todo.category) parts[0] += ' `' + todo.category + '`';
     if (todo.estimatedMin) parts[0] += ' (' + todo.estimatedMin + 'min)';
     return parts[0];
   }
 
   function todosToMarkdown(todos, includeMetadata) {
+    // Check if user wants kanban column grouping
+    var kanbanCheckbox = document.getElementById('export-group-by-kanban');
+    if (kanbanCheckbox && kanbanCheckbox.checked) {
+      return todosToMarkdownByKanban(todos, includeMetadata);
+    }
     // Group by scheduledDate
     var byDate = {};
     var noDate = [];
@@ -701,6 +716,49 @@
       });
     }
 
+    return lines.join('\n');
+  }
+
+  function todosToMarkdownByKanban(todos, includeMetadata) {
+    var subtaskMap = {};
+    todos.forEach(function(t) {
+      if (t.parentId) {
+        if (!subtaskMap[t.parentId]) subtaskMap[t.parentId] = [];
+        subtaskMap[t.parentId].push(t);
+      }
+    });
+    Object.keys(subtaskMap).forEach(function(pid) {
+      subtaskMap[pid].sort(function(a, b) { return (a.kanbanOrder || 0) - (b.kanbanOrder || 0); });
+    });
+
+    var columns = { todo: [], in_progress: [], done: [] };
+    todos.forEach(function(t) {
+      if (t.parentId) return;
+      var col = t.kanbanStatus || 'todo';
+      if (!columns[col]) columns[col] = [];
+      columns[col].push(t);
+    });
+
+    var labels = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' };
+    var lines = ['# Tasks (Board View)'];
+    if (includeMetadata) {
+      lines.push('');
+      lines.push('> ' + todos.length + ' total, ' + columns.done.length + ' completed');
+    }
+
+    ['todo', 'in_progress', 'done'].forEach(function(col) {
+      lines.push('');
+      lines.push('## ' + labels[col] + ' (' + columns[col].length + ')');
+      columns[col].sort(function(a, b) { return (a.kanbanOrder || 0) - (b.kanbanOrder || 0); });
+      columns[col].forEach(function(t) {
+        lines.push(todoToMarkdownLine(t));
+        if (subtaskMap[t.id]) {
+          subtaskMap[t.id].forEach(function(st) {
+            lines.push('  ' + todoToMarkdownLine(st));
+          });
+        }
+      });
+    });
     return lines.join('\n');
   }
 
@@ -1008,6 +1066,11 @@
   }
 
   function todosToHtml(todos, includeMetadata) {
+    // Check if user wants kanban column grouping
+    var kanbanCheckbox = document.getElementById('export-group-by-kanban');
+    if (kanbanCheckbox && kanbanCheckbox.checked) {
+      return todosToHtmlByKanban(todos, includeMetadata);
+    }
     var h = '';
     // Group by date
     var byDate = {};
@@ -1035,6 +1098,7 @@
       var prefix = indent ? '&nbsp;&nbsp;&nbsp;&nbsp;' : '';
       var check = t.done ? '&#9745;' : '&#9744;';
       var extra = '';
+      if (t.kanbanStatus === 'in_progress') extra += ' <strong>[In Progress]</strong>';
       if (t.category) extra += ' <em>[' + escHtml(t.category) + ']</em>';
       if (t.estimatedMin) extra += ' <em>(' + t.estimatedMin + 'min)</em>';
       return '<div class="export-print-todo' + cls + '">' + prefix + check + ' ' + escHtml(t.title || '') + extra + '</div>';
@@ -1056,6 +1120,58 @@
         if (subtaskMap[t.id]) subtaskMap[t.id].forEach(function(st) { h += todoItemHtml(st, true); });
       });
     }
+    return h;
+  }
+
+  function todosToHtmlByKanban(todos, includeMetadata) {
+    var subtaskMap = {};
+    todos.forEach(function(t) {
+      if (t.parentId) {
+        if (!subtaskMap[t.parentId]) subtaskMap[t.parentId] = [];
+        subtaskMap[t.parentId].push(t);
+      }
+    });
+    Object.keys(subtaskMap).forEach(function(pid) {
+      subtaskMap[pid].sort(function(a, b) { return (a.kanbanOrder || 0) - (b.kanbanOrder || 0); });
+    });
+
+    var columns = { todo: [], in_progress: [], done: [] };
+    todos.forEach(function(t) {
+      if (t.parentId) return;
+      var col = t.kanbanStatus || 'todo';
+      if (!columns[col]) columns[col] = [];
+      columns[col].push(t);
+    });
+
+    function todoItemHtml(t, indent) {
+      var cls = t.done ? ' export-print-todo-done' : '';
+      var prefix = indent ? '&nbsp;&nbsp;&nbsp;&nbsp;' : '';
+      var check = t.done ? '&#9745;' : '&#9744;';
+      var extra = '';
+      if (t.kanbanStatus === 'in_progress') extra += ' <strong>[In Progress]</strong>';
+      if (t.category) extra += ' <em>[' + escHtml(t.category) + ']</em>';
+      if (t.estimatedMin) extra += ' <em>(' + t.estimatedMin + 'min)</em>';
+      return '<div class="export-print-todo' + cls + '">' + prefix + check + ' ' + escHtml(t.title || '') + extra + '</div>';
+    }
+
+    var labels = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' };
+    var h = '<h1>Tasks (Board View)</h1>';
+    if (includeMetadata) {
+      h += '<p><em>' + todos.length + ' total, ' + columns.done.length + ' completed</em></p>';
+    }
+
+    ['todo', 'in_progress', 'done'].forEach(function(col) {
+      h += '<h2>' + labels[col] + ' (' + columns[col].length + ')</h2>';
+      columns[col].sort(function(a, b) { return (a.kanbanOrder || 0) - (b.kanbanOrder || 0); });
+      columns[col].forEach(function(t) {
+        h += todoItemHtml(t, false);
+        if (subtaskMap[t.id]) {
+          subtaskMap[t.id].forEach(function(st) {
+            h += todoItemHtml(st, true);
+          });
+        }
+      });
+    });
     return h;
   }
 

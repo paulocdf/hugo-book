@@ -161,7 +161,7 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-  var DB_VERSION = 8;
+   var DB_VERSION = 10;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -240,6 +240,8 @@
           todoStore.createIndex('order', 'order', { unique: false });
           todoStore.createIndex('updatedAt', 'updatedAt', { unique: false });
           todoStore.createIndex('reminderAt', 'reminderAt', { unique: false });
+          todoStore.createIndex('kanbanStatus', 'kanbanStatus', { unique: false });
+          todoStore.createIndex('kanbanOrder', 'kanbanOrder', { unique: false });
         } else {
           // Upgrading existing todos store — add missing indexes
           var existingStore = tx.objectStore(STORE_TODOS);
@@ -249,6 +251,14 @@
           // v8: add status index for task lifecycle (active/done/archived/deleted)
           if (!existingStore.indexNames.contains('status')) {
             existingStore.createIndex('status', 'status', { unique: false });
+          }
+          // v9: add kanbanStatus index for kanban board (todo/in_progress/done)
+          if (!existingStore.indexNames.contains('kanbanStatus')) {
+            existingStore.createIndex('kanbanStatus', 'kanbanStatus', { unique: false });
+          }
+          // v10: add kanbanOrder index for board-specific ordering (separate from Inbox order)
+          if (!existingStore.indexNames.contains('kanbanOrder')) {
+            existingStore.createIndex('kanbanOrder', 'kanbanOrder', { unique: false });
           }
         }
         // Offline write queue store (v4)
@@ -730,6 +740,7 @@
       status: status,
       parentId: data.parentId || null,
       order: data.order || 0,
+      kanbanOrder: data.kanbanOrder != null ? data.kanbanOrder : (data.order || 0),
       scheduledDate: data.scheduledDate || null,
       reminderAt: reminderAt,
       reminderFired: !!data.reminderFired,
@@ -738,6 +749,7 @@
       bujoType: data.bujoType || 'task',
       bujoState: data.bujoState || (status === 'done' ? 'done' : 'open'),
       notes: data.notes || '',
+      kanbanStatus: data.kanbanStatus || (status === 'done' ? 'done' : 'todo'),
       deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
       createdAt: createdAt,
       updatedAt: updatedAt,

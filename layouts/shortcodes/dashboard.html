@@ -492,6 +492,14 @@
     html += '<div class="dashboard-stat-label">Tasks Done</div>';
     html += '</div>';
 
+    // In Progress (WIP) count
+    var inProgress = todos.filter(function(t) { return t.kanbanStatus === 'in_progress' && t.status === 'active'; }).length;
+    html += '<div class="dashboard-stat">';
+    html += '<div class="dashboard-stat-value">' + inProgress + '</div>';
+    html += '<div class="dashboard-stat-label">In Progress</div>';
+    html += '<div class="dashboard-stat-sub">on the board</div>';
+    html += '</div>';
+
     html += '<div class="dashboard-stat">';
     html += '<div class="dashboard-stat-value">' + totalActual + '<span style="font-size: 0.8rem; font-weight: 400;">min</span></div>';
     html += '<div class="dashboard-stat-label">Time Tracked</div>';
@@ -509,6 +517,29 @@
       html += '<div class="dashboard-stat-value" style="font-size: 1.2rem;">' + accuracy + '</div>';
       html += '<div class="dashboard-stat-label">Estimate Accuracy</div>';
       html += '<div class="dashboard-stat-sub">across ' + estCount + ' task' + (estCount !== 1 ? 's' : '') + '</div>';
+      html += '</div>';
+    }
+
+    // Board throughput (tasks completed per week, last 30 days)
+    var thirtyDaysAgo = Date.now() - (30 * 24 * 60 * 60 * 1000);
+    var recentDone = todos.filter(function(t) {
+      if (!t.completedAt) return false;
+      var ts = typeof t.completedAt === 'number' ? t.completedAt : (t.completedAt.seconds ? t.completedAt.seconds * 1000 : t.completedAt);
+      return ts >= thirtyDaysAgo;
+    });
+    if (recentDone.length > 0) {
+      // Find the earliest completedAt in the window to get actual span
+      var earliest = thirtyDaysAgo;
+      recentDone.forEach(function(t) {
+        var ts = typeof t.completedAt === 'number' ? t.completedAt : (t.completedAt.seconds ? t.completedAt.seconds * 1000 : t.completedAt);
+        if (ts < earliest) earliest = ts;
+      });
+      var weeksSpan = Math.max(1, (Date.now() - earliest) / (7 * 24 * 60 * 60 * 1000));
+      var throughput = Math.round(recentDone.length / weeksSpan * 10) / 10;
+      html += '<div class="dashboard-stat">';
+      html += '<div class="dashboard-stat-value">' + throughput + '<span style="font-size: 0.8rem; font-weight: 400;">/wk</span></div>';
+      html += '<div class="dashboard-stat-label">Throughput</div>';
+      html += '<div class="dashboard-stat-sub">tasks done per week (30d)</div>';
       html += '</div>';
     }
 

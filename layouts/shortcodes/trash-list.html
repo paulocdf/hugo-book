@@ -497,6 +497,8 @@
           data: {
             status: 'active',
             bujoState: 'open',
+            kanbanStatus: 'todo',
+            kanbanOrder: Date.now(),
             deletedAt: firebase.firestore.FieldValue.delete(),
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           },

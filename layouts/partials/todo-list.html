@@ -3839,19 +3839,25 @@
     if (newState === 'done') {
       firestoreUpdates.done = true;
       firestoreUpdates.status = 'done';
+      firestoreUpdates.kanbanStatus = 'done';
       localUpdates.done = true;
       localUpdates.status = 'done';
+      localUpdates.kanbanStatus = 'done';
     } else if (newState === 'open') {
       firestoreUpdates.done = false;
       firestoreUpdates.status = 'active';
+      firestoreUpdates.kanbanStatus = 'todo';
       localUpdates.done = false;
       localUpdates.status = 'active';
+      localUpdates.kanbanStatus = 'todo';
     } else {
-      // migrated / scheduled — keep status active (still visible)
+      // migrated / scheduled — keep status active, reset kanban to 'todo'
       firestoreUpdates.done = false;
       firestoreUpdates.status = 'active';
+      firestoreUpdates.kanbanStatus = 'todo';
       localUpdates.done = false;
       localUpdates.status = 'active';
+      localUpdates.kanbanStatus = 'todo';
     }
 
     if (newDate !== undefined) {
@@ -4292,19 +4298,51 @@
           if (result.bujoState === 'done') {
             firestoreUpdates.done = true;
             firestoreUpdates.status = 'done';
+            firestoreUpdates.kanbanStatus = 'done';
             localUpdates.done = true;
             localUpdates.status = 'done';
+            localUpdates.kanbanStatus = 'done';
           } else if (result.bujoState === 'open') {
             firestoreUpdates.done = false;
             firestoreUpdates.status = 'active';
+            firestoreUpdates.kanbanStatus = 'todo';
             localUpdates.done = false;
             localUpdates.status = 'active';
+            localUpdates.kanbanStatus = 'todo';
           } else {
-            // migrated / scheduled — keep active so item stays visible
+            // migrated / scheduled — keep active, reset kanban to 'todo'
             firestoreUpdates.done = false;
             firestoreUpdates.status = 'active';
+            firestoreUpdates.kanbanStatus = 'todo';
             localUpdates.done = false;
             localUpdates.status = 'active';
+            localUpdates.kanbanStatus = 'todo';
+          }
+        }
+        // Kanban status — only apply if BuJo state didn't already handle it
+        var bujoChanged = result.bujoState && result.bujoState !== (todo.bujoState || 'open');
+        if (!bujoChanged && result.kanbanStatus && result.kanbanStatus !== (todo.kanbanStatus || 'todo')) {
+          firestoreUpdates.kanbanStatus = result.kanbanStatus;
+          localUpdates.kanbanStatus = result.kanbanStatus;
+          if (result.kanbanStatus === 'done') {
+            firestoreUpdates.done = true;
+            firestoreUpdates.status = 'done';
+            firestoreUpdates.bujoState = 'done';
+            firestoreUpdates.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+            localUpdates.done = true;
+            localUpdates.status = 'done';
+            localUpdates.bujoState = 'done';
+            localUpdates.completedAt = Date.now();
+          } else if ((todo.kanbanStatus || 'todo') === 'done') {
+            // Moving out of Done — reopen
+            firestoreUpdates.done = false;
+            firestoreUpdates.status = 'active';
+            firestoreUpdates.bujoState = 'open';
+            firestoreUpdates.completedAt = null;
+            localUpdates.done = false;
+            localUpdates.status = 'active';
+            localUpdates.bujoState = 'open';
+            localUpdates.completedAt = null;
           }
         }
         if (Object.keys(firestoreUpdates).length > 0) {
@@ -4509,6 +4547,9 @@
         animation: 150,
         fallbackOnBody: true,
         swapThreshold: 0.65,
+        delay: 150,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 5,
         filter: '.done, .migrated, .scheduled',
         onStart: function(evt) {
           _nestDraggedId = evt.item.getAttribute('data-group-id');
@@ -4572,6 +4613,9 @@
         chosenClass: 'todo-drag-chosen',
         dragClass: 'todo-drag-active',
         animation: 150,
+        delay: 150,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 5,
         filter: '.done, .migrated, .scheduled',
         onEnd: function(evt) {
           handleSubtaskDrop(evt);
@@ -4606,8 +4650,8 @@
     var newOrder = calculateOrderForPosition(siblings, evt.newIndex, todoId);
 
     // Build update
-    var updates = { order: newOrder, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-    var localUpdates = { order: newOrder, updatedAt: Date.now() };
+    var updates = { order: newOrder, kanbanOrder: newOrder, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+    var localUpdates = { order: newOrder, kanbanOrder: newOrder, updatedAt: Date.now() };
 
     // Un-nesting: clear parentId to promote subtask to top-level task
     if (isUnnesting) {
@@ -4630,6 +4674,7 @@
 
     // Apply locally
     todo.order = newOrder;
+    todo.kanbanOrder = newOrder;
     if (localUpdates.scheduledDate !== undefined) todo.scheduledDate = localUpdates.scheduledDate;
     todo.updatedAt = Date.now();
 
@@ -4656,12 +4701,14 @@
     var updates = {
       parentId: targetParentId,
       order: newOrder,
+      kanbanOrder: newOrder,
       scheduledDate: newScheduledDate,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
     var localUpdates = {
       parentId: targetParentId,
       order: newOrder,
+      kanbanOrder: newOrder,
       scheduledDate: newScheduledDate,
       updatedAt: Date.now()
     };
@@ -4669,6 +4716,7 @@
     // Apply locally
     todo.parentId = targetParentId;
     todo.order = newOrder;
+    todo.kanbanOrder = newOrder;
     todo.scheduledDate = newScheduledDate;
     todo.updatedAt = Date.now();
 
@@ -5073,6 +5121,7 @@
       status: 'active',
       parentId: parentId || null,
       order: order,
+      kanbanOrder: order,
       scheduledDate: scheduledDate || null,
       reminderAt: reminderAtMs && typeof firebase !== 'undefined' ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
       reminderFired: false,
@@ -5080,6 +5129,7 @@
       source: source || null,
       bujoType: bujoType || 'task',
       bujoState: 'open',
+      kanbanStatus: 'todo',
       createdAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
       updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
       completedAt: null
@@ -5101,6 +5151,7 @@
       status: 'active',
       parentId: parentId || null,
       order: order,
+      kanbanOrder: order,
       scheduledDate: scheduledDate || null,
       reminderAt: reminderAtMs || null,
       reminderFired: false,
@@ -5108,6 +5159,7 @@
       source: source || null,
       bujoType: bujoType || 'task',
       bujoState: 'open',
+      kanbanStatus: 'todo',
       createdAt: Date.now(),
       updatedAt: Date.now(),
       completedAt: null
@@ -5144,6 +5196,7 @@
       done: todo.done,
       status: todo.status,
       bujoState: todo.bujoState,
+      kanbanStatus: todo.kanbanStatus,
       actualMin: todo.actualMin,
       category: todo.category,
       completedAt: todo.completedAt,
@@ -5166,6 +5219,7 @@
           done: snapshot.done,
           status: snapshot.status,
           bujoState: snapshot.bujoState,
+          kanbanStatus: snapshot.kanbanStatus,
           actualMin: snapshot.actualMin,
           category: snapshot.category,
           completedAt: snapshot.completedAt,
@@ -5175,6 +5229,7 @@
         todo.done = snapshot.done;
         todo.status = snapshot.status;
         todo.bujoState = snapshot.bujoState;
+        todo.kanbanStatus = snapshot.kanbanStatus;
         todo.actualMin = snapshot.actualMin;
         todo.category = snapshot.category;
         todo.completedAt = snapshot.completedAt;
@@ -5205,6 +5260,7 @@
       done: true,
       status: 'done',
       bujoState: 'done',
+      kanbanStatus: 'done',
       actualMin: actualMin,
       category: category,
       completedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -5215,6 +5271,7 @@
     todo.done = true;
     todo.status = 'done';
     todo.bujoState = 'done';
+    todo.kanbanStatus = 'done';
     todo.actualMin = actualMin;
     todo.category = category;
     todo.completedAt = Date.now();
@@ -5242,6 +5299,7 @@
         todo.done = false;
         todo.status = 'active';
         todo.bujoState = 'open';
+        todo.kanbanStatus = 'todo';
         todo.actualMin = null;
         todo.category = null;
         todo.completedAt = null;
@@ -5276,6 +5334,7 @@
     var updateData = {
       done: true,
       status: 'done',
+      kanbanStatus: 'done',
       actualMin: totalActual,
       category: categories.join(', ') || null,
       completedAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -5285,6 +5344,7 @@
     // Optimistic local update
     parent.done = true;
     parent.status = 'done';
+    parent.kanbanStatus = 'done';
     parent.actualMin = totalActual;
     parent.category = categories.join(', ') || null;
     parent.completedAt = Date.now();
@@ -5316,6 +5376,7 @@
       done: false,
       status: 'active',
       bujoState: 'open',
+      kanbanStatus: 'todo',
       actualMin: null,
       category: null,
       completedAt: null,
@@ -5326,6 +5387,7 @@
     todo.done = false;
     todo.status = 'active';
     todo.bujoState = 'open';
+    todo.kanbanStatus = 'todo';
     todo.actualMin = null;
     todo.category = null;
     todo.completedAt = null;
@@ -5879,6 +5941,16 @@
         }
         if (!t.bujoState) {
           t.bujoState = t.done ? 'done' : 'open';
+          migrated = true;
+        }
+        // Backfill kanbanStatus for tasks created before kanban board
+        if (!t.kanbanStatus) {
+          t.kanbanStatus = t.done ? 'done' : 'todo';
+          migrated = true;
+        }
+        // Backfill kanbanOrder for tasks created before board-specific ordering
+        if (t.kanbanOrder == null) {
+          t.kanbanOrder = t.order || 0;
           migrated = true;
         }
         if (migrated) needsMigration.push(t);

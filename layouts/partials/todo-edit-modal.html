@@ -53,6 +53,14 @@
         </div>
       </div>
 
+      <div class="todo-edit-kanban-wrapper" id="todo-edit-kanban-wrapper">
+        <select id="todo-edit-kanban-status" class="todo-edit-kanban-select" title="Board column" aria-label="Board column">
+          <option value="todo">To Do</option>
+          <option value="in_progress">In Progress</option>
+          <option value="done">Done</option>
+        </select>
+      </div>
+
       <input type="date" id="todo-edit-date" class="todo-edit-meta-date" title="Scheduled date" aria-label="Scheduled date">
 
       <div class="todo-edit-meta-estimate" id="todo-edit-estimate-field">
@@ -447,6 +455,34 @@
   color: var(--gray-400);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+/* Kanban column selector */
+.todo-edit-kanban-wrapper {
+  flex-shrink: 0;
+}
+.todo-edit-kanban-select {
+  height: 36px;
+  padding: 4px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: var(--body-font-color);
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+.todo-edit-kanban-select:focus {
+  outline: none;
+  border-color: var(--color-link);
 }
 
 /* Compact date input — no label, matches row height */
@@ -1434,6 +1470,10 @@
     dateInput.value = todo.scheduledDate || '';
     notesInput.value = todo.notes || '';
 
+    // Kanban column
+    var kanbanSelect = document.getElementById('todo-edit-kanban-status');
+    if (kanbanSelect) kanbanSelect.value = todo.kanbanStatus || 'todo';
+
     // Populate pomodoro state from task data
     _editPomodoroCount = todo.pomodoroCount || 0;
     var pomLen = todo.pomodoroLength || 0;
@@ -1542,7 +1582,8 @@
       category: newCategory,
       bujoType: _editBujoType,
       bujoState: _editBujoState,
-      notes: notesInput.value.trim()
+      notes: notesInput.value.trim(),
+      kanbanStatus: (document.getElementById('todo-edit-kanban-status') || {}).value || undefined
     };
 
     if (onSaveCallback) {
