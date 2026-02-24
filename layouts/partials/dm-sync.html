@@ -161,7 +161,7 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-   var DB_VERSION = 10;
+   var DB_VERSION = 12;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -169,6 +169,7 @@
   var STORE_VERSIONS = 'noteVersions';
   var STORE_ATTACHMENTS = 'attachments';
   var STORE_REVIEW_CARDS = 'reviewCards';
+  var STORE_TASK_SHARES = 'taskShares';
   var MAX_VERSIONS_PER_NOTE = 50;
   var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
   var SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -283,9 +284,41 @@
           reviewStore.createIndex('noteId', 'noteId', { unique: false });
           reviewStore.createIndex('nextReviewAt', 'nextReviewAt', { unique: false });
         }
+        // Task shares store (v11) — for collaborative task sharing
+        if (!db.objectStoreNames.contains(STORE_TASK_SHARES)) {
+          var shareStore = db.createObjectStore(STORE_TASK_SHARES, { keyPath: 'id' });
+          shareStore.createIndex('todoId', 'todoId', { unique: false });
+          shareStore.createIndex('ownerId', 'ownerId', { unique: false });
+          shareStore.createIndex('inviteeEmail', 'inviteeEmail', { unique: false });
+          shareStore.createIndex('status', 'status', { unique: false });
+        }
+      };
+      req.onblocked = function() {
+        console.warn('[dm-sync] IndexedDB upgrade blocked — close other tabs and reload');
       };
       req.onsuccess = function(e) {
         _db = e.target.result;
+        // Safety: if the taskShares store is still missing after upgrade, delete and re-open
+        if (!_db.objectStoreNames.contains(STORE_TASK_SHARES)) {
+          console.warn('[dm-sync] taskShares store missing after open — deleting DB and re-creating');
+          _db.close();
+          _db = null;
+          var delReq = indexedDB.deleteDatabase(DB_NAME);
+          delReq.onsuccess = function() {
+            openDB().then(resolve).catch(reject);
+          };
+          delReq.onerror = function() {
+            reject(new Error('Failed to delete and re-create IndexedDB'));
+          };
+          return;
+        }
+        // If another tab triggers a version upgrade, close this connection so it can proceed
+        _db.onversionchange = function() {
+          _db.close();
+          _db = null;
+          console.log('[dm-sync] Database version change detected — connection closed');
+          window.location.reload();
+        };
         resolve(_db);
       };
       req.onerror = function(e) {
@@ -753,7 +786,9 @@
       deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
       createdAt: createdAt,
       updatedAt: updatedAt,
-      completedAt: completedAt
+      completedAt: completedAt,
+      collaborators: data.collaborators || [],
+      sharedTaskId: data.sharedTaskId || null
     };
   }
 
@@ -943,6 +978,8 @@
       .then(function() { return syncAttachments(userId); })
       .then(function() { return syncReviewCards(userId); })
       .then(function() { return syncClosedDays(userId); })
+      .then(function() { return syncTaskShares(userId); })
+      .then(function() { return syncSharedTodos(userId); })
       .then(function() {
         _syncing = false;
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -1873,6 +1910,490 @@
       });
   }
 
+  // ─── Task Sharing ───
+
+  /**
+   * Serialize a taskShares Firestore document for IndexedDB storage.
+   */
+  function serializeTaskShare(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      todoId: data.todoId || '',
+      ownerId: data.ownerId || '',
+      ownerEmail: data.ownerEmail || '',
+      ownerName: data.ownerName || '',
+      inviteeEmail: data.inviteeEmail || '',
+      inviteeUid: data.inviteeUid || null,
+      status: data.status || 'pending',
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  /**
+   * Look up a user by email in the users collection.
+   * @param {string} email
+   * @returns {Promise<Object|null>} — user profile or null
+   */
+  function lookupUserByEmail(email) {
+    if (!window.dmDb) return Promise.resolve(null);
+    return window.dmDb.collection('users')
+      .where('email', '==', email)
+      .limit(1)
+      .get()
+      .then(function(snapshot) {
+        if (snapshot.empty) return null;
+        var doc = snapshot.docs[0];
+        var data = doc.data();
+        return {
+          uid: doc.id,
+          email: data.email || '',
+          displayName: data.displayName || '',
+          photoURL: data.photoURL || null
+        };
+      });
+  }
+
+  /**
+   * Share a task with another user by email.
+   * Creates a taskShares doc and adds the invitee's uid to the todo's collaborators array.
+   * @param {string} todoId — the task to share
+   * @param {string} email — invitee's email address
+   * @returns {Promise<Object>} — the created share doc
+   */
+  function shareTask(todoId, email) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+    if (!window.dmDb) return Promise.reject(new Error('Firestore not available'));
+    if (email === user.email) return Promise.reject(new Error('Cannot share with yourself'));
+
+    // Check if already shared with this email
+    return idbGetAll(STORE_TASK_SHARES).then(function(shares) {
+      var existing = shares.find(function(s) {
+        return s.todoId === todoId && s.inviteeEmail === email && s.status !== 'declined';
+      });
+      if (existing) return Promise.reject(new Error('Already shared with ' + email));
+
+      var shareId = window.dmDb.collection('taskShares').doc().id;
+      var now = Date.now();
+
+      var shareData = {
+        todoId: todoId,
+        ownerId: user.uid,
+        ownerEmail: user.email || '',
+        ownerName: user.displayName || '',
+        inviteeEmail: email,
+        inviteeUid: null,
+        status: 'pending',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      var localShare = {
+        id: shareId,
+        todoId: todoId,
+        ownerId: user.uid,
+        ownerEmail: user.email || '',
+        ownerName: user.displayName || '',
+        inviteeEmail: email,
+        inviteeUid: null,
+        status: 'pending',
+        createdAt: now,
+        updatedAt: now
+      };
+
+      // Look up invitee to pre-populate uid if they already have an account
+      return lookupUserByEmail(email).then(function(invitee) {
+        if (invitee) {
+          shareData.inviteeUid = invitee.uid;
+          localShare.inviteeUid = invitee.uid;
+        }
+
+        return firestoreWrite({
+          collection: 'taskShares',
+          docId: shareId,
+          op: 'set',
+          data: shareData,
+          localOp: function() { return idbPut(STORE_TASK_SHARES, localShare); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-task-shares-updated'));
+          return localShare;
+        });
+      });
+    });
+  }
+
+  /**
+   * Accept a pending share invitation.
+   * Updates status to 'accepted', sets inviteeUid, and adds current user to todo's collaborators.
+   * @param {string} shareId — the taskShares document ID
+   */
+  function acceptShare(shareId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+
+    return idbGet(STORE_TASK_SHARES, shareId).then(function(share) {
+      if (!share) return Promise.reject(new Error('Share not found'));
+      if (share.status !== 'pending') return Promise.reject(new Error('Share is not pending'));
+
+      share.status = 'accepted';
+      share.inviteeUid = user.uid;
+      share.updatedAt = Date.now();
+
+      // Update the share document
+      return firestoreWrite({
+        collection: 'taskShares',
+        docId: shareId,
+        op: 'update',
+        data: {
+          status: 'accepted',
+          inviteeUid: user.uid,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        },
+        localOp: function() { return idbPut(STORE_TASK_SHARES, share); }
+      }).then(function() {
+        // Add current user to the todo's collaborators array in Firestore
+        if (window.dmDb) {
+          return window.dmDb.collection('todos').doc(share.todoId).update({
+            collaborators: firebase.firestore.FieldValue.arrayUnion(user.uid),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).catch(function(err) {
+            console.warn('[dm-sync] Failed to add collaborator to todo:', err);
+          });
+        }
+      }).then(function() {
+        // Sync the shared todo into local IDB so it appears in the list
+        if (window.dmDb) {
+          return window.dmDb.collection('todos').doc(share.todoId).get().then(function(doc) {
+            if (doc.exists) {
+              var todo = serializeTodo(doc);
+              return idbPut(STORE_TODOS, todo);
+            }
+          }).catch(function(err) {
+            console.warn('[dm-sync] Failed to sync shared todo:', err);
+          });
+        }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-task-shares-updated'));
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+      });
+    });
+  }
+
+  /**
+   * Decline a pending share invitation.
+   * @param {string} shareId — the taskShares document ID
+   */
+  function declineShare(shareId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+
+    return idbGet(STORE_TASK_SHARES, shareId).then(function(share) {
+      if (!share) return Promise.reject(new Error('Share not found'));
+
+      share.status = 'declined';
+      share.inviteeUid = user.uid;
+      share.updatedAt = Date.now();
+
+      return firestoreWrite({
+        collection: 'taskShares',
+        docId: shareId,
+        op: 'update',
+        data: {
+          status: 'declined',
+          inviteeUid: user.uid,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        },
+        localOp: function() { return idbPut(STORE_TASK_SHARES, share); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-task-shares-updated'));
+      });
+    });
+  }
+
+  /**
+   * Remove sharing for a task with a specific user. Owner-only operation.
+   * Removes the share doc and the user from the todo's collaborators array.
+   * @param {string} shareId — the taskShares document ID
+   */
+  function unshareTask(shareId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+
+    return idbGet(STORE_TASK_SHARES, shareId).then(function(share) {
+      if (!share) return Promise.reject(new Error('Share not found'));
+      if (share.ownerId !== user.uid) return Promise.reject(new Error('Only the owner can unshare'));
+
+      var inviteeUid = share.inviteeUid;
+      var todoId = share.todoId;
+
+      // Delete the share document
+      return firestoreWrite({
+        collection: 'taskShares',
+        docId: shareId,
+        op: 'delete',
+        data: null,
+        localOp: function() { return idbDelete(STORE_TASK_SHARES, shareId); }
+      }).then(function() {
+        // Remove collaborator from todo's collaborators array
+        if (inviteeUid && window.dmDb) {
+          return window.dmDb.collection('todos').doc(todoId).update({
+            collaborators: firebase.firestore.FieldValue.arrayRemove(inviteeUid),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function() {
+            // Also update local IDB
+            return idbGet(STORE_TODOS, todoId).then(function(todo) {
+              if (todo && todo.collaborators) {
+                todo.collaborators = todo.collaborators.filter(function(uid) { return uid !== inviteeUid; });
+                todo.updatedAt = Date.now();
+                return idbPut(STORE_TODOS, todo);
+              }
+            });
+          }).catch(function(err) {
+            console.warn('[dm-sync] Failed to remove collaborator:', err);
+          });
+        }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-task-shares-updated'));
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+      });
+    });
+  }
+
+  /**
+   * Get all shares for a specific todo.
+   * @param {string} todoId
+   * @returns {Promise<Array>}
+   */
+  function getSharesForTodo(todoId) {
+    return idbGetAll(STORE_TASK_SHARES).then(function(shares) {
+      return shares.filter(function(s) { return s.todoId === todoId; });
+    });
+  }
+
+  /**
+   * Get pending share invitations for the current user.
+   * @returns {Promise<Array>}
+   */
+  function getPendingInvites() {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve([]);
+
+    return idbGetAll(STORE_TASK_SHARES).then(function(shares) {
+      return shares.filter(function(s) {
+        return s.inviteeEmail === user.email && s.status === 'pending';
+      });
+    });
+  }
+
+  /**
+   * Get all shares owned by the current user.
+   * @returns {Promise<Array>}
+   */
+  function getMyShares() {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve([]);
+
+    return idbGetAll(STORE_TASK_SHARES).then(function(shares) {
+      return shares.filter(function(s) { return s.ownerId === user.uid; });
+    });
+  }
+
+  /**
+   * Sync task shares from Firestore for the current user.
+   * Fetches shares where user is owner OR where user is invitee.
+   */
+  function syncTaskShares(userId) {
+    if (!window.dmDb) return Promise.resolve();
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve();
+
+    console.log('[dm-sync] Syncing task shares...');
+
+    // Two queries: shares I own + shares where I'm invited
+    var ownerQuery = window.dmDb.collection('taskShares')
+      .where('ownerId', '==', userId)
+      .get();
+
+    var inviteeQuery = window.dmDb.collection('taskShares')
+      .where('inviteeEmail', '==', user.email)
+      .get();
+
+    return Promise.all([ownerQuery, inviteeQuery]).then(function(results) {
+      var remoteShares = [];
+      var seen = {};
+
+      results.forEach(function(snapshot) {
+        snapshot.forEach(function(doc) {
+          if (!seen[doc.id]) {
+            seen[doc.id] = true;
+            remoteShares.push(serializeTaskShare(doc));
+          }
+        });
+      });
+
+      return idbGetAll(STORE_TASK_SHARES).then(function(localShares) {
+        var localMap = {};
+        localShares.forEach(function(s) { localMap[s.id] = s; });
+
+        var remoteMap = {};
+        remoteShares.forEach(function(s) { remoteMap[s.id] = s; });
+
+        var toUpsert = [];
+        remoteShares.forEach(function(rs) {
+          var ls = localMap[rs.id];
+          if (!ls || ls.updatedAt !== rs.updatedAt) {
+            toUpsert.push(rs);
+          }
+        });
+
+        var toDelete = [];
+        localShares.forEach(function(ls) {
+          if (!remoteMap[ls.id]) {
+            toDelete.push(ls.id);
+          }
+        });
+
+        var promises = [];
+        if (toUpsert.length > 0) {
+          promises.push(idbPutBatch(STORE_TASK_SHARES, toUpsert));
+        }
+        toDelete.forEach(function(id) {
+          promises.push(idbDelete(STORE_TASK_SHARES, id));
+        });
+
+        return Promise.all(promises).then(function() {
+          console.log('[dm-sync] Task shares sync complete. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
+          if (toUpsert.length > 0 || toDelete.length > 0) {
+            window.dispatchEvent(new CustomEvent('dm-task-shares-updated'));
+          }
+        });
+      });
+    });
+  }
+
+  /**
+   * Sync shared todos — fetch todos where current user is a collaborator.
+   * These are merged into the local todos store.
+   */
+  function syncSharedTodos(userId) {
+    if (!window.dmDb) return Promise.resolve();
+
+    console.log('[dm-sync] Syncing shared todos...');
+    return window.dmDb.collection('todos')
+      .where('collaborators', 'array-contains', userId)
+      .get()
+      .then(function(snapshot) {
+        var sharedTodos = [];
+        snapshot.forEach(function(doc) {
+          sharedTodos.push(serializeTodo(doc));
+        });
+
+        if (sharedTodos.length === 0) {
+          console.log('[dm-sync] No shared todos found');
+          return;
+        }
+
+        // Upsert shared todos into local IDB (merge with existing)
+        var toUpsert = [];
+        return idbGetAll(STORE_TODOS).then(function(localTodos) {
+          var localMap = {};
+          localTodos.forEach(function(t) { localMap[t.id] = t; });
+
+          sharedTodos.forEach(function(st) {
+            var lt = localMap[st.id];
+            if (!lt || lt.updatedAt !== st.updatedAt) {
+              toUpsert.push(st);
+            }
+          });
+
+          if (toUpsert.length > 0) {
+            return idbPutBatch(STORE_TODOS, toUpsert).then(function() {
+              console.log('[dm-sync] Shared todos synced: ' + toUpsert.length);
+              window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+            });
+          }
+        });
+      }).catch(function(err) {
+        console.warn('[dm-sync] Shared todos sync error:', err);
+      });
+  }
+
+  // ─── Real-Time Listeners for Shared Tasks ───
+
+  var _sharedTodosUnsubscribe = null;
+  var _shareInvitesUnsubscribe = null;
+
+  function startSharedTaskListeners(userId) {
+    stopSharedTaskListeners();
+    if (!window.dmDb) return;
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return;
+
+    // Listen for changes to todos where current user is a collaborator
+    _sharedTodosUnsubscribe = window.dmDb.collection('todos')
+      .where('collaborators', 'array-contains', userId)
+      .onSnapshot(function(snapshot) {
+        var changes = [];
+        snapshot.docChanges().forEach(function(change) {
+          if (change.type === 'added' || change.type === 'modified') {
+            changes.push(serializeTodo(change.doc));
+          } else if (change.type === 'removed') {
+            // Remove from local IDB if we're no longer a collaborator
+            idbGet(STORE_TODOS, change.doc.id).then(function(todo) {
+              if (todo && todo.userId !== userId) {
+                idbDelete(STORE_TODOS, change.doc.id);
+              }
+            });
+          }
+        });
+        if (changes.length > 0) {
+          idbPutBatch(STORE_TODOS, changes).then(function() {
+            window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Shared todos listener error:', err);
+      });
+
+    // Listen for incoming share invitations
+    _shareInvitesUnsubscribe = window.dmDb.collection('taskShares')
+      .where('inviteeEmail', '==', user.email)
+      .onSnapshot(function(snapshot) {
+        var hasChanges = false;
+        var chain = Promise.resolve();
+        snapshot.docChanges().forEach(function(change) {
+          var shareDoc = serializeTaskShare(change.doc);
+          if (change.type === 'added' || change.type === 'modified') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbPut(STORE_TASK_SHARES, shareDoc); });
+          } else if (change.type === 'removed') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbDelete(STORE_TASK_SHARES, shareDoc.id); });
+          }
+        });
+        if (hasChanges) {
+          chain.then(function() {
+            window.dispatchEvent(new CustomEvent('dm-task-shares-updated'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Share invites listener error:', err);
+      });
+  }
+
+  function stopSharedTaskListeners() {
+    if (_sharedTodosUnsubscribe) {
+      _sharedTodosUnsubscribe();
+      _sharedTodosUnsubscribe = null;
+    }
+    if (_shareInvitesUnsubscribe) {
+      _shareInvitesUnsubscribe();
+      _shareInvitesUnsubscribe = null;
+    }
+  }
+
   // ─── Public API ───
 
   // Helper: get all non-trashed notes from IDB
@@ -2249,6 +2770,7 @@
         idbClear(STORE_VERSIONS),
         idbClear(STORE_ATTACHMENTS),
         idbClear(STORE_REVIEW_CARDS),
+        idbClear(STORE_TASK_SHARES),
         clearQueue()
       ]).then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -2300,6 +2822,16 @@
     getReviewCards: getReviewCards,
     getDueCount: getDueCount,
 
+    // Task sharing
+    shareTask: shareTask,
+    acceptShare: acceptShare,
+    declineShare: declineShare,
+    unshareTask: unshareTask,
+    getSharesForTodo: getSharesForTodo,
+    getPendingInvites: getPendingInvites,
+    getMyShares: getMyShares,
+    lookupUserByEmail: lookupUserByEmail,
+
     // Closed days (day-level finalization for todo list)
     getClosedDays: function() {
       return idbGet(STORE_META, 'closedDays').then(function(meta) {
@@ -2341,12 +2873,15 @@
   if (window.dmAuth) {
     function handleSyncAuth(user) {
       if (user) {
+        // Register/update user profile for task sharing lookups
+        if (window.dmRegisterUser) window.dmRegisterUser(user);
+
         // Check if this is a different user than last cached session
         idbGet(STORE_META, 'currentUserId').then(function(meta) {
           var cachedUserId = meta ? meta.value : null;
           var proceed = cachedUserId === user.uid
             ? Promise.resolve()
-            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), clearQueue()]);
+            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), clearQueue()]);
 
           return proceed.then(function() {
             return idbPut(STORE_META, { key: 'currentUserId', value: user.uid });
@@ -2357,6 +2892,7 @@
             return syncAll(user.uid);
           }).then(function() {
             startBackgroundSync(user.uid);
+            startSharedTaskListeners(user.uid);
             scheduleAllReminders();
             updateOfflineIndicator();
           });
@@ -2379,14 +2915,16 @@
           // Still start background sync so it can retry
           if (user) {
             startBackgroundSync(user.uid);
+            startSharedTaskListeners(user.uid);
             scheduleAllReminders();
           }
         });
       } else {
         stopBackgroundSync();
+        stopSharedTaskListeners();
         clearAllReminderTimers();
         // Clear cache on sign-out so no data leaks to another user
-        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), clearQueue()])
+        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), clearQueue()])
           .then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));

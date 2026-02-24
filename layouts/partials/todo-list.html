@@ -3121,6 +3121,14 @@
     if (todo.source === 'ai') {
       html += '<span class="todo-item-ai-badge" title="Created by AI"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path></svg></span>';
     }
+    // Shared task indicator (shows collaborator count)
+    var isShared = todo.collaborators && todo.collaborators.length > 0;
+    var isOwnedByOther = todo.userId && window.dmAuth && window.dmAuth.currentUser && todo.userId !== window.dmAuth.currentUser.uid;
+    if (isShared || isOwnedByOther) {
+      var shareCount = (todo.collaborators ? todo.collaborators.length : 0) + 1; // +1 for owner
+      var shareTitle = isOwnedByOther ? 'Shared with you' : ('Shared with ' + (todo.collaborators ? todo.collaborators.length : 0) + ' user' + ((todo.collaborators && todo.collaborators.length !== 1) ? 's' : ''));
+      html += '<span class="todo-item-shared-badge" title="' + shareTitle + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>' + shareCount + '</span>';
+    }
     html += escapeHtml(todo.title) + '</div>';
     html += '<div class="todo-item-meta">';
 
@@ -3236,6 +3244,12 @@
     if (!todo.done) {
       html += '<button type="button" class="todo-item-action-btn migrate-forward" data-migrate-forward-id="' + todo.id + '" title="Migrate forward one day" aria-label="Migrate forward one day">';
       html += '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>';
+      html += '</button>';
+    }
+    // Share button (for top-level tasks owned by current user)
+    if (!isSubtask && !isOwnedByOther) {
+      html += '<button type="button" class="todo-item-action-btn share' + (isShared ? ' is-shared' : '') + '" data-share-id="' + todo.id + '" title="Share task" aria-label="Share task">';
+      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
       html += '</button>';
     }
     // Edit button (for all tasks, done or not)
@@ -4404,6 +4418,15 @@
       });
     });
 
+    // Share button
+    itemsEl.querySelectorAll('[data-share-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-share-id');
+        showSharePopover(btn, todoId);
+      });
+    });
+
     // Archive all completed button
     var archiveAllBtn = document.getElementById('todo-archive-all');
     if (archiveAllBtn) {
@@ -4923,6 +4946,167 @@
       if (e.key === 'Escape') { row.remove(); }
     });
     subAddBtn.addEventListener('click', function() { addSubtask(false); });
+  }
+
+  // ─── Share popover ───
+  var _activeSharePopover = null;
+
+  function closeSharePopover() {
+    if (_activeSharePopover) {
+      _activeSharePopover.remove();
+      _activeSharePopover = null;
+    }
+  }
+
+  function showSharePopover(anchorBtn, todoId) {
+    closeSharePopover();
+    closeReminderPopover();
+
+    var todo = allTodos.find(function(t) { return t.id === todoId; });
+    if (!todo) return;
+
+    var popover = document.createElement('div');
+    popover.className = 'dm-share-popover';
+
+    var html = '<div class="dm-share-popover-header">Share Task</div>';
+    html += '<div class="dm-share-popover-body">';
+    html += '<div class="dm-share-input-row">';
+    html += '<input type="email" class="dm-share-email-input" placeholder="Enter email address..." autocomplete="off">';
+    html += '<button type="button" class="dm-share-send-btn" title="Send invitation">Share</button>';
+    html += '</div>';
+    html += '<div class="dm-share-error" style="display:none;"></div>';
+    html += '<div class="dm-share-success" style="display:none;"></div>';
+    html += '<div class="dm-share-list"></div>';
+    html += '</div>';
+
+    popover.innerHTML = html;
+
+    // Position near the anchor button
+    document.body.appendChild(popover);
+    var rect = anchorBtn.getBoundingClientRect();
+    popover.style.position = 'fixed';
+    popover.style.zIndex = '1200';
+
+    // Position below the button, aligned right
+    var popoverWidth = 320;
+    var left = rect.right - popoverWidth;
+    if (left < 8) left = 8;
+    var top = rect.bottom + 6;
+    if (top + 300 > window.innerHeight) {
+      top = rect.top - 6;
+      popover.style.transform = 'translateY(-100%)';
+    }
+    popover.style.left = left + 'px';
+    popover.style.top = top + 'px';
+    popover.style.width = popoverWidth + 'px';
+
+    _activeSharePopover = popover;
+
+    var emailInput = popover.querySelector('.dm-share-email-input');
+    var sendBtn = popover.querySelector('.dm-share-send-btn');
+    var errorEl = popover.querySelector('.dm-share-error');
+    var successEl = popover.querySelector('.dm-share-success');
+    var listEl = popover.querySelector('.dm-share-list');
+
+    // Load existing shares for this task
+    function refreshShareList() {
+      if (!window.dmSync) return;
+      window.dmSync.getSharesForTodo(todoId).then(function(shares) {
+        if (shares.length === 0) {
+          listEl.innerHTML = '<div class="dm-share-empty">Not shared with anyone yet</div>';
+          return;
+        }
+        var listHtml = '<div class="dm-share-list-header">Shared with</div>';
+        shares.forEach(function(s) {
+          var statusClass = 'dm-share-status-' + s.status;
+          listHtml += '<div class="dm-share-list-item" data-share-item-id="' + s.id + '">';
+          listHtml += '<span class="dm-share-list-email">' + escapeHtml(s.inviteeEmail) + '</span>';
+          listHtml += '<span class="dm-share-list-status ' + statusClass + '">' + s.status + '</span>';
+          listHtml += '<button type="button" class="dm-share-remove-btn" data-unshare-id="' + s.id + '" title="Remove">&times;</button>';
+          listHtml += '</div>';
+        });
+        listEl.innerHTML = listHtml;
+
+        // Attach remove handlers
+        listEl.querySelectorAll('[data-unshare-id]').forEach(function(removeBtn) {
+          removeBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            var shareId = removeBtn.getAttribute('data-unshare-id');
+            window.dmSync.unshareTask(shareId).then(function() {
+              refreshShareList();
+              render();
+            }).catch(function(err) {
+              showShareError(err.message);
+            });
+          });
+        });
+      });
+    }
+
+    function showShareError(msg) {
+      errorEl.textContent = msg;
+      errorEl.style.display = '';
+      successEl.style.display = 'none';
+      setTimeout(function() { errorEl.style.display = 'none'; }, 4000);
+    }
+
+    function showShareSuccess(msg) {
+      successEl.textContent = msg;
+      successEl.style.display = '';
+      errorEl.style.display = 'none';
+      setTimeout(function() { successEl.style.display = 'none'; }, 3000);
+    }
+
+    function doShare() {
+      var email = emailInput.value.trim().toLowerCase();
+      if (!email || !email.includes('@')) {
+        showShareError('Please enter a valid email address');
+        return;
+      }
+      sendBtn.disabled = true;
+      sendBtn.textContent = '...';
+
+      window.dmSync.shareTask(todoId, email).then(function() {
+        emailInput.value = '';
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Share';
+        showShareSuccess('Invitation sent to ' + email);
+        refreshShareList();
+        render();
+      }).catch(function(err) {
+        sendBtn.disabled = false;
+        sendBtn.textContent = 'Share';
+        showShareError(err.message || 'Failed to share');
+      });
+    }
+
+    sendBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      doShare();
+    });
+
+    emailInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        doShare();
+      }
+      if (e.key === 'Escape') {
+        closeSharePopover();
+      }
+    });
+
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('click', function closeOnOutsideClick(e) {
+        if (_activeSharePopover && !_activeSharePopover.contains(e.target) && !anchorBtn.contains(e.target)) {
+          closeSharePopover();
+          document.removeEventListener('click', closeOnOutsideClick);
+        }
+      });
+    }, 0);
+
+    refreshShareList();
+    emailInput.focus();
   }
 
   // ─── Reminder popover ───

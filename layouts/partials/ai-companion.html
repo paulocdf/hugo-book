@@ -22,19 +22,8 @@
     </div>
   </div>
 
-  <!-- Settings panel (hidden by default) -->
+  <!-- Diagnostics panel (hidden by default) -->
   <div class="ai-settings" id="ai-settings" style="display:none;">
-    <div class="ai-settings-row">
-      <span class="ai-settings-label">AI Companion</span>
-      <label class="ai-toggle-switch">
-        <input type="checkbox" id="ai-enabled-toggle">
-        <span class="ai-toggle-slider"></span>
-      </label>
-    </div>
-    <div class="ai-settings-info">
-      <p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU.</p>
-      <p>First use downloads ~350 MB (cached for future visits). Requires ~1 GB GPU memory.</p>
-    </div>
     <div class="ai-settings-row" id="ai-webgpu-status-row">
       <span class="ai-settings-label">WebGPU</span>
       <span class="ai-settings-value" id="ai-webgpu-status">Checking...</span>
@@ -44,14 +33,6 @@
       <span class="ai-settings-value" id="ai-model-status">Not loaded</span>
     </div>
     <button type="button" class="ai-settings-unload" id="ai-unload-btn" style="display:none;">Unload model (free GPU memory)</button>
-    <div class="ai-settings-context">
-      <label class="ai-settings-label" for="ai-custom-context">Custom context</label>
-      <p class="ai-settings-context-hint">Add personal context or instructions to make the AI more useful (e.g. your role, preferences, goals).</p>
-      <textarea class="ai-custom-context" id="ai-custom-context" placeholder="e.g. I'm a software engineer. I prefer short actionable tasks. My work hours are 9am-6pm." rows="3"></textarea>
-      <div class="ai-settings-context-actions">
-        <span class="ai-settings-context-saved" id="ai-context-saved" style="display:none;">Saved</span>
-      </div>
-    </div>
   </div>
 
   <!-- Download progress (shown during first model load) -->
@@ -252,15 +233,6 @@
   font-size: 0.78rem;
   color: var(--gray-500);
 }
-.ai-settings-info {
-  padding: 8px 0;
-  font-size: 0.75rem;
-  color: var(--gray-500);
-  line-height: 1.5;
-}
-.ai-settings-info p {
-  margin: 0 0 4px;
-}
 .ai-settings-unload {
   width: 100%;
   padding: 8px;
@@ -318,52 +290,6 @@
 }
 
 /* ─── Download progress ─── */
-.ai-settings-context {
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--gray-200);
-}
-.ai-settings-context-hint {
-  font-size: 0.72rem;
-  color: var(--text-secondary, var(--gray-500));
-  margin: 4px 0 8px 0;
-  line-height: 1.4;
-}
-.ai-custom-context {
-  width: 100%;
-  font-size: 0.8rem;
-  font-family: inherit;
-  line-height: 1.4;
-  padding: 8px 10px;
-  border: 1px solid var(--gray-200);
-  border-radius: 6px;
-  background: var(--body-background);
-  color: var(--body-font-color);
-  resize: vertical;
-  min-height: 60px;
-  max-height: 150px;
-  box-sizing: border-box;
-}
-.ai-custom-context:focus {
-  outline: none;
-  border-color: var(--accent-ai);
-  box-shadow: 0 0 0 2px rgba(0, 188, 180, 0.15);
-}
-.ai-custom-context::placeholder {
-  color: var(--gray-400);
-  font-size: 0.75rem;
-}
-.ai-settings-context-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 4px;
-  min-height: 18px;
-}
-.ai-settings-context-saved {
-  font-size: 0.7rem;
-  color: var(--color-success, #34a853);
-  font-weight: 500;
-}
 .ai-download {
   padding: 16px;
   border-bottom: 1px solid var(--gray-200);
@@ -1577,7 +1503,7 @@
 
   function setAiEnabled(enabled) {
     localStorage.setItem(LS_KEY_ENABLED, enabled ? '1' : '0');
-    enabledToggle.checked = enabled;
+    if (enabledToggle) enabledToggle.checked = enabled;
     if (enabled) {
       quickActions.style.display = '';
       inputArea.style.display = '';
@@ -1594,6 +1520,9 @@
     // Notify other components (Quick Capture listens for this to show/hide AI mode)
     window.dispatchEvent(new CustomEvent('dm-ai-state-changed', { detail: { enabled: enabled } }));
   }
+
+  // Expose globally so settings modal can call it
+  window.dmAiSetEnabled = setAiEnabled;
 
   // ─── Panel open/close ───
   var closingTimeout = null;
@@ -2115,15 +2044,22 @@
   // Close
   panelClose.addEventListener('click', closePanel);
 
-  // Settings toggle
+  // Settings button — open shared settings modal
   settingsBtn.addEventListener('click', function() {
-    settingsPanel.style.display = settingsPanel.style.display === 'none' ? '' : 'none';
+    if (window.openSettingsModal) {
+      window.openSettingsModal();
+    } else {
+      // Fallback: toggle inline settings if modal not available
+      settingsPanel.style.display = settingsPanel.style.display === 'none' ? '' : 'none';
+    }
   });
 
-  // Enable/disable toggle
-  enabledToggle.addEventListener('change', function() {
-    setAiEnabled(enabledToggle.checked);
-  });
+  // Enable/disable toggle (inline toggle removed — now in shared settings modal)
+  if (enabledToggle) {
+    enabledToggle.addEventListener('change', function() {
+      setAiEnabled(enabledToggle.checked);
+    });
+  }
 
   // Unload button
   unloadBtn.addEventListener('click', function() {
@@ -2275,7 +2211,7 @@
 
   // Restore enabled state
   var enabled = isAiEnabled();
-  enabledToggle.checked = enabled;
+  if (enabledToggle) enabledToggle.checked = enabled;
   if (enabled) {
     if (!hasWebGPU) {
       notSupportedEl.style.display = '';

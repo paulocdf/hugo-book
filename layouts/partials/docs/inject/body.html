@@ -62,39 +62,158 @@
 })();
 </script>
 
-<!-- Sidebar collapse/expand toggle -->
+<!-- ─── Pending Share Invitations UI ─── -->
+<div class="dm-invitations-banner" id="dm-invitations-banner"></div>
+
 <script>
 (function() {
-  var toggle = document.getElementById('sidebar-toggle');
-  if (!toggle) return;
+  'use strict';
 
-  function isCollapsed() {
-    return document.documentElement.classList.contains('sidebar-collapsed');
+  var banner = document.getElementById('dm-invitations-banner');
+  if (!banner) return;
+
+  // Track dismissed invitations (per session)
+  var dismissed = {};
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
   }
 
-  function setSidebar(collapsed) {
-    if (collapsed) {
-      document.documentElement.classList.add('sidebar-collapsed');
-      toggle.setAttribute('aria-label', 'Expand sidebar');
-    } else {
-      document.documentElement.classList.remove('sidebar-collapsed');
-      toggle.setAttribute('aria-label', 'Collapse sidebar');
+  function renderInvitations(invites) {
+    // Filter out dismissed and only show pending
+    var pending = invites.filter(function(inv) {
+      return inv.status === 'pending' && !dismissed[inv.id];
+    });
+
+    if (pending.length === 0) {
+      banner.innerHTML = '';
+      return;
     }
-    try { localStorage.setItem('dm-sidebar-collapsed', collapsed ? '1' : '0'); } catch(e) {}
+
+    var html = '';
+    pending.forEach(function(inv) {
+      html += '<div class="dm-invitation-card" data-invitation-id="' + inv.id + '" style="position: relative;">';
+      html += '<button type="button" class="dm-invitation-dismiss" data-dismiss-id="' + inv.id + '" title="Dismiss">&times;</button>';
+      html += '<div class="dm-invitation-header">';
+      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
+      html += 'Task Shared With You';
+      html += '</div>';
+      html += '<div class="dm-invitation-body">';
+      html += '<span class="dm-invitation-from">' + escapeHtml(inv.ownerName || inv.ownerEmail || 'Someone') + '</span>';
+      html += ' shared a task';
+      if (inv.todoTitle) {
+        html += ': <span class="dm-invitation-task-title">"' + escapeHtml(inv.todoTitle) + '"</span>';
+      }
+      html += '</div>';
+      html += '<div class="dm-invitation-actions">';
+      html += '<button type="button" class="dm-invitation-accept" data-accept-id="' + inv.id + '">Accept</button>';
+      html += '<button type="button" class="dm-invitation-decline" data-decline-id="' + inv.id + '">Decline</button>';
+      html += '</div>';
+      html += '</div>';
+    });
+
+    banner.innerHTML = html;
+
+    // Attach event handlers
+    banner.querySelectorAll('[data-accept-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var shareId = btn.getAttribute('data-accept-id');
+        btn.disabled = true;
+        btn.textContent = '...';
+        if (window.dmSync && window.dmSync.acceptShare) {
+          window.dmSync.acceptShare(shareId).then(function() {
+            removeCard(shareId);
+          }).catch(function(err) {
+            console.error('[invitations] Accept failed:', err);
+            btn.disabled = false;
+            btn.textContent = 'Accept';
+          });
+        }
+      });
+    });
+
+    banner.querySelectorAll('[data-decline-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var shareId = btn.getAttribute('data-decline-id');
+        btn.disabled = true;
+        btn.textContent = '...';
+        if (window.dmSync && window.dmSync.declineShare) {
+          window.dmSync.declineShare(shareId).then(function() {
+            removeCard(shareId);
+          }).catch(function(err) {
+            console.error('[invitations] Decline failed:', err);
+            btn.disabled = false;
+            btn.textContent = 'Decline';
+          });
+        }
+      });
+    });
+
+    banner.querySelectorAll('[data-dismiss-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var shareId = btn.getAttribute('data-dismiss-id');
+        dismissed[shareId] = true;
+        removeCard(shareId);
+      });
+    });
   }
 
-  toggle.addEventListener('click', function() {
-    setSidebar(!isCollapsed());
+  function removeCard(shareId) {
+    var card = banner.querySelector('[data-invitation-id="' + shareId + '"]');
+    if (card) {
+      card.style.transition = 'opacity 0.2s, transform 0.2s';
+      card.style.opacity = '0';
+      card.style.transform = 'translateX(20px)';
+      setTimeout(function() { card.remove(); }, 200);
+    }
+  }
+
+  function loadPendingInvites() {
+    if (!window.dmSync || !window.dmSync.getPendingInvites) return;
+    window.dmSync.getPendingInvites().then(function(invites) {
+      // Enrich with task titles if possible
+      var enriched = [];
+      var chain = Promise.resolve();
+      invites.forEach(function(inv) {
+        chain = chain.then(function() {
+          // Try to get the todo title from IDB if available
+          if (window.dmSync.getTodo) {
+            return window.dmSync.getTodo(inv.todoId).then(function(todo) {
+              inv.todoTitle = todo ? todo.title : '';
+              enriched.push(inv);
+            }).catch(function() {
+              enriched.push(inv);
+            });
+          } else {
+            enriched.push(inv);
+            return Promise.resolve();
+          }
+        });
+      });
+      chain.then(function() {
+        renderInvitations(enriched);
+      });
+    });
+  }
+
+  // Listen for real-time share updates
+  window.addEventListener('dm-task-shares-updated', function() {
+    loadPendingInvites();
   });
 
-  // Keyboard shortcut: [ to toggle sidebar
-  document.addEventListener('keydown', function(e) {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
-    if (e.key === '[' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-      e.preventDefault();
-      setSidebar(!isCollapsed());
+  // Also load once on initial auth/sync — poll until dmSync is available
+  var _inviteInitRetries = 0;
+  function tryInitialLoad() {
+    if (window.dmSync && window.dmSync.getPendingInvites) {
+      loadPendingInvites();
+    } else if (_inviteInitRetries < 10) {
+      _inviteInitRetries++;
+      setTimeout(tryInitialLoad, 1000);
     }
-  });
+  }
+  setTimeout(tryInitialLoad, 1500);
 })();
 </script>
 
@@ -2633,7 +2752,7 @@
     // Replace sidebar content
     existingUl.innerHTML = html;
 
-    // Build settings footer at bottom of sidebar (outside nav, inside .book-menu-content)
+    // Build settings footer trigger at bottom of sidebar (outside nav, inside .book-menu-content)
     var menuContent = document.querySelector('.book-menu-content');
     if (menuContent) {
       // Remove existing settings footer if present (re-render safe)
@@ -2649,184 +2768,110 @@
       var footer = document.createElement('div');
       footer.className = 'sidebar-settings-footer';
       footer.innerHTML =
-        '<div class="sidebar-settings-panel" id="sidebar-settings-panel" style="display:none;">' +
-          '<div class="sidebar-settings-group-label">Short session</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-pomo-short-work">Work</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<input type="number" id="setting-pomo-short-work" class="sidebar-settings-input" min="1" max="120" value="25">' +
-              '<span class="sidebar-settings-unit">min</span>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-pomo-short-break">Break</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<input type="number" id="setting-pomo-short-break" class="sidebar-settings-input" min="1" max="60" value="5">' +
-              '<span class="sidebar-settings-unit">min</span>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-group-label" style="margin-top:4px;">Long session</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-pomo-long-work">Work</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<input type="number" id="setting-pomo-long-work" class="sidebar-settings-input" min="1" max="120" value="50">' +
-              '<span class="sidebar-settings-unit">min</span>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-pomo-long-break">Break</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<input type="number" id="setting-pomo-long-break" class="sidebar-settings-input" min="1" max="60" value="10">' +
-              '<span class="sidebar-settings-unit">min</span>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-pomo-count">Default pomodoros</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<input type="number" id="setting-pomo-count" class="sidebar-settings-input" min="0" max="20" value="1">' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-auto-schedule">Auto-schedule today</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<label class="sidebar-settings-toggle-switch">' +
-                '<input type="checkbox" id="setting-auto-schedule" checked>' +
-                '<span class="sidebar-settings-toggle-slider"></span>' +
-              '</label>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-auto-break">Auto-start break</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<label class="sidebar-settings-toggle-switch">' +
-                '<input type="checkbox" id="setting-auto-break" checked>' +
-                '<span class="sidebar-settings-toggle-slider"></span>' +
-              '</label>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-auto-work">Auto-start work</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<label class="sidebar-settings-toggle-switch">' +
-                '<input type="checkbox" id="setting-auto-work">' +
-                '<span class="sidebar-settings-toggle-slider"></span>' +
-              '</label>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-group-label" style="margin-top:4px;">Sounds</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-sound-work">Work end</label>' +
-            '<div class="sidebar-settings-control">' +
-               '<select id="setting-sound-work" class="sidebar-settings-select">' +
-                '<option value="chime">Chime</option>' +
-                '<option value="bell">Bell</option>' +
-                '<option value="digital">Digital</option>' +
-                '<option value="bowl">Singing bowl</option>' +
-                '<option value="ascending">Ascending</option>' +
-                '<option value="pulse">Soft pulse</option>' +
-                '<option value="plang">Plang</option>' +
-                '<option value="none">None</option>' +
-              '</select>' +
-              '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-work" title="Preview">' +
-                '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
-              '</button>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-sound-break">Break end</label>' +
-            '<div class="sidebar-settings-control">' +
-               '<select id="setting-sound-break" class="sidebar-settings-select">' +
-                '<option value="chime">Chime</option>' +
-                '<option value="bell">Bell</option>' +
-                '<option value="digital">Digital</option>' +
-                '<option value="bowl">Singing bowl</option>' +
-                '<option value="ascending">Ascending</option>' +
-                '<option value="pulse">Soft pulse</option>' +
-                '<option value="plang">Plang</option>' +
-                '<option value="none">None</option>' +
-              '</select>' +
-              '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-break" title="Preview">' +
-                '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
-              '</button>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-sound-tick">Tick</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<select id="setting-sound-tick" class="sidebar-settings-select">' +
-                '<option value="none">None</option>' +
-                '<option value="tick-soft">Soft tick</option>' +
-                '<option value="tick-click">Click</option>' +
-                '<option value="tick-woodblock">Woodblock</option>' +
-              '</select>' +
-              '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-tick" title="Preview">' +
-                '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
-              '</button>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-sound-ambient">Break ambient</label>' +
-            '<div class="sidebar-settings-control">' +
-              '<select id="setting-sound-ambient" class="sidebar-settings-select">' +
-                '<option value="none">None</option>' +
-                '<option value="ambient-rain">Rain</option>' +
-                '<option value="ambient-ocean">Ocean waves</option>' +
-                '<option value="ambient-wind">Wind</option>' +
-                '<option value="ambient-whitenoise">White noise</option>' +
-                '<option value="ambient-stream">Stream</option>' +
-                '<option value="ambient-campfire">Campfire</option>' +
-              '</select>' +
-              '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-ambient" title="Preview">' +
-                '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
-              '</button>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-sound-volume">Volume</label>' +
-            '<div class="sidebar-settings-control sidebar-settings-volume-control">' +
-              '<input type="range" id="setting-sound-volume" class="sidebar-settings-range" min="0" max="100" value="80" step="5">' +
-              '<span class="sidebar-settings-unit" id="setting-sound-volume-label">80%</span>' +
-            '</div>' +
-          '</div>' +
-          '<div class="sidebar-settings-row">' +
-            '<label class="sidebar-settings-label" for="setting-sound-ambient-volume">Ambient vol</label>' +
-            '<div class="sidebar-settings-control sidebar-settings-volume-control">' +
-              '<input type="range" id="setting-sound-ambient-volume" class="sidebar-settings-range" min="0" max="100" value="50" step="5">' +
-              '<span class="sidebar-settings-unit" id="setting-sound-ambient-volume-label">50%</span>' +
-            '</div>' +
-          '</div>' +
-        '</div>' +
         '<div class="sidebar-settings-trigger" id="sidebar-settings-toggle">' +
           avatarHtml +
           '<span class="sidebar-settings-name">' + escapeHtml(userName) + '</span>' +
           ICONS.settings +
         '</div>';
       menuContent.appendChild(footer);
+
+      // Update the settings modal with current user info
+      updateSettingsModalUser(user);
     }
 
-    // Initialize settings panel interactions
-    initSettingsPanel();
+    // Ensure settings modal is initialized (only once, idempotent)
+    initSettingsModal();
+
+    // Bind trigger to open modal
+    var trigger = document.getElementById('sidebar-settings-toggle');
+    if (trigger) {
+      trigger.addEventListener('click', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        openSettingsModal();
+      });
+    }
 
     // Cache sidebar HTML for instant restore on next navigation
     try { sessionStorage.setItem(SIDEBAR_CACHE_KEY, html); } catch (e) {}
   }
 
-  // ─── Settings panel logic ───
-  function initSettingsPanel() {
-    var toggle = document.getElementById('sidebar-settings-toggle');
-    var panel = document.getElementById('sidebar-settings-panel');
-    if (!toggle || !panel) return;
+  // ─── Settings Modal ───
+  var _settingsModalInitialized = false;
+  var _settingsModalOverlay = null;
+  var _ambientPreviewTimer = null;
+  var _ambientPreviewHandle = null;
+  var _ambientPreviewCtx = null;
+
+  function stopAmbientPreview() {
+    if (_ambientPreviewHandle && _ambientPreviewHandle.stop) {
+      try { _ambientPreviewHandle.stop(); } catch(ex) {}
+    }
+    _ambientPreviewHandle = null;
+    if (_ambientPreviewCtx) {
+      try { _ambientPreviewCtx.close(); } catch(ex) {}
+    }
+    _ambientPreviewCtx = null;
+    if (_ambientPreviewTimer) {
+      clearTimeout(_ambientPreviewTimer);
+      _ambientPreviewTimer = null;
+    }
+  }
+
+  function updateSettingsModalUser(user) {
+    if (!_settingsModalOverlay) return;
+    var avatarEl = _settingsModalOverlay.querySelector('.settings-modal-user-avatar');
+    var nameEl = _settingsModalOverlay.querySelector('.settings-modal-user-name');
+    var emailEl = _settingsModalOverlay.querySelector('.settings-modal-user-email');
+    if (avatarEl && user && user.photoURL) {
+      avatarEl.src = user.photoURL;
+      avatarEl.alt = user.displayName || '';
+      avatarEl.style.display = '';
+    } else if (avatarEl) {
+      avatarEl.style.display = 'none';
+    }
+    if (nameEl) nameEl.textContent = (user && user.displayName) || '';
+    if (emailEl) emailEl.textContent = (user && user.email) || '';
+  }
+
+  function openSettingsModal() {
+    if (!_settingsModalOverlay) return;
+    // Stop any leftover ambient preview
+    stopAmbientPreview();
+    // Re-apply all saved values from localStorage before showing
+    applySettingsFromStorage();
+    _settingsModalOverlay.style.display = '';
+    requestAnimationFrame(function() {
+      _settingsModalOverlay.classList.add('settings-modal-visible');
+    });
+  }
+
+  function closeSettingsModal() {
+    if (!_settingsModalOverlay) return;
+    stopAmbientPreview();
+    _settingsModalOverlay.classList.remove('settings-modal-visible');
+    setTimeout(function() {
+      if (!_settingsModalOverlay.classList.contains('settings-modal-visible')) {
+        _settingsModalOverlay.style.display = 'none';
+      }
+    }, 200);
+  }
+
+  // Expose globally so AI companion settings button can use it
+  window.openSettingsModal = openSettingsModal;
+
+  function applySettingsFromStorage() {
+    if (!_settingsModalOverlay) return;
 
     // ─── Migrate old single-key format ───
     var oldLen = null;
     try { var v = parseInt(localStorage.getItem('dm-pomodoro-length'), 10); if (v > 0) oldLen = v; } catch(e) {}
     if (oldLen) {
-      // Use old value as the short-work default if no short-work key exists yet
       try { if (!localStorage.getItem('dm-pomo-short-work')) localStorage.setItem('dm-pomo-short-work', oldLen); } catch(e) {}
       try { localStorage.removeItem('dm-pomodoro-length'); } catch(e) {}
     }
 
-    // ─── Read all mode values from localStorage ───
+    // ─── Read all values from localStorage ───
     var shortWork = 25;
     try { var v = parseInt(localStorage.getItem('dm-pomo-short-work'), 10); if (v > 0) shortWork = v; } catch(e) {}
     var shortBreak = 5;
@@ -2841,107 +2886,22 @@
 
     var autoSchedule = true;
     try { var v = localStorage.getItem('dm-auto-schedule-today'); if (v === 'false') autoSchedule = false; } catch(e) {}
-
     var autoBreak = true;
     try { var v = localStorage.getItem('dm-pomo-auto-break'); if (v === 'false') autoBreak = false; } catch(e) {}
     var autoWork = false;
     try { var v = localStorage.getItem('dm-pomo-auto-work'); if (v === 'true') autoWork = true; } catch(e) {}
 
-    var shortWorkInput = document.getElementById('setting-pomo-short-work');
-    var shortBreakInput = document.getElementById('setting-pomo-short-break');
-    var longWorkInput = document.getElementById('setting-pomo-long-work');
-    var longBreakInput = document.getElementById('setting-pomo-long-break');
-    var countInput = document.getElementById('setting-pomo-count');
-    var scheduleToggle = document.getElementById('setting-auto-schedule');
-    var autoBreakToggle = document.getElementById('setting-auto-break');
-    var autoWorkToggle = document.getElementById('setting-auto-work');
-
-    if (shortWorkInput) shortWorkInput.value = shortWork;
-    if (shortBreakInput) shortBreakInput.value = shortBreak;
-    if (longWorkInput) longWorkInput.value = longWork;
-    if (longBreakInput) longBreakInput.value = longBreak;
-    if (countInput) countInput.value = defaultPomoCount;
-    if (scheduleToggle) scheduleToggle.checked = autoSchedule;
-    if (autoBreakToggle) autoBreakToggle.checked = autoBreak;
-    if (autoWorkToggle) autoWorkToggle.checked = autoWork;
-
-    // Toggle panel visibility
-    toggle.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
-      panel.style.display = panel.style.display === 'none' ? '' : 'none';
-    });
-
-    // Helper: save a numeric setting on change
-    function bindNumericSetting(inputEl, lsKey, min, max, fallback) {
-      if (!inputEl) return;
-      inputEl.addEventListener('change', function() {
-        var val = parseInt(inputEl.value, 10);
-        if (val >= min && val <= max) {
-          try { localStorage.setItem(lsKey, val); } catch(e) {}
-          window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: lsKey, value: val } }));
-        } else {
-          inputEl.value = fallback;
-        }
-      });
-    }
-
-    bindNumericSetting(shortWorkInput, 'dm-pomo-short-work', 1, 120, shortWork);
-    bindNumericSetting(shortBreakInput, 'dm-pomo-short-break', 1, 60, shortBreak);
-    bindNumericSetting(longWorkInput, 'dm-pomo-long-work', 1, 120, longWork);
-    bindNumericSetting(longBreakInput, 'dm-pomo-long-break', 1, 60, longBreak);
-
-    // Save on change — Default Pomodoro count
-    if (countInput) {
-      countInput.addEventListener('change', function() {
-        var val = parseInt(countInput.value, 10);
-        if (val >= 0 && val <= 20) {
-          try { localStorage.setItem('dm-default-pomo-count', val); } catch(e) {}
-          window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-default-pomo-count', value: val } }));
-        } else {
-          countInput.value = defaultPomoCount;
-        }
-      });
-    }
-
-    // Save on change — Auto-schedule today
-    if (scheduleToggle) {
-      scheduleToggle.addEventListener('change', function() {
-        var val = scheduleToggle.checked;
-        try { localStorage.setItem('dm-auto-schedule-today', val ? 'true' : 'false'); } catch(e) {}
-        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-auto-schedule-today', value: val } }));
-      });
-    }
-
-    // Save on change — Auto-start break
-    if (autoBreakToggle) {
-      autoBreakToggle.addEventListener('change', function() {
-        var val = autoBreakToggle.checked;
-        try { localStorage.setItem('dm-pomo-auto-break', val ? 'true' : 'false'); } catch(e) {}
-        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-pomo-auto-break', value: val } }));
-      });
-    }
-
-    // Save on change — Auto-start work
-    if (autoWorkToggle) {
-      autoWorkToggle.addEventListener('change', function() {
-        var val = autoWorkToggle.checked;
-        try { localStorage.setItem('dm-pomo-auto-work', val ? 'true' : 'false'); } catch(e) {}
-        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-pomo-auto-work', value: val } }));
-      });
-    }
+    var el;
+    el = document.getElementById('setting-pomo-short-work');   if (el) el.value = shortWork;
+    el = document.getElementById('setting-pomo-short-break');  if (el) el.value = shortBreak;
+    el = document.getElementById('setting-pomo-long-work');    if (el) el.value = longWork;
+    el = document.getElementById('setting-pomo-long-break');   if (el) el.value = longBreak;
+    el = document.getElementById('setting-pomo-count');        if (el) el.value = defaultPomoCount;
+    el = document.getElementById('setting-auto-schedule');     if (el) el.checked = autoSchedule;
+    el = document.getElementById('setting-auto-break');        if (el) el.checked = autoBreak;
+    el = document.getElementById('setting-auto-work');         if (el) el.checked = autoWork;
 
     // ─── Sound settings ───
-    var soundWorkSelect = document.getElementById('setting-sound-work');
-    var soundBreakSelect = document.getElementById('setting-sound-break');
-    var soundTickSelect = document.getElementById('setting-sound-tick');
-    var soundAmbientSelect = document.getElementById('setting-sound-ambient');
-    var soundVolumeRange = document.getElementById('setting-sound-volume');
-    var soundVolumeLabel = document.getElementById('setting-sound-volume-label');
-    var soundAmbientVolumeRange = document.getElementById('setting-sound-ambient-volume');
-    var soundAmbientVolumeLabel = document.getElementById('setting-sound-ambient-volume-label');
-
-    // Read saved values
     var savedWorkSound = 'plang';
     try { var v = localStorage.getItem('dm-pomo-sound-work'); if (v) savedWorkSound = v; } catch(e) {}
     var savedBreakSound = 'ascending';
@@ -2955,17 +2915,328 @@
     var savedAmbientVolume = 50;
     try { var v = parseFloat(localStorage.getItem('dm-pomo-sound-ambient-volume')); if (v >= 0 && v <= 1) savedAmbientVolume = Math.round(v * 100); } catch(e) {}
 
-    if (soundWorkSelect) soundWorkSelect.value = savedWorkSound;
-    if (soundBreakSelect) soundBreakSelect.value = savedBreakSound;
-    if (soundTickSelect) soundTickSelect.value = savedTickSound;
-    if (soundAmbientSelect) soundAmbientSelect.value = savedAmbientSound;
-    if (soundVolumeRange) soundVolumeRange.value = savedVolume;
-    if (soundVolumeLabel) soundVolumeLabel.textContent = savedVolume + '%';
-    if (soundAmbientVolumeRange) soundAmbientVolumeRange.value = savedAmbientVolume;
-    if (soundAmbientVolumeLabel) soundAmbientVolumeLabel.textContent = savedAmbientVolume + '%';
+    el = document.getElementById('setting-sound-work');    if (el) el.value = savedWorkSound;
+    el = document.getElementById('setting-sound-break');   if (el) el.value = savedBreakSound;
+    el = document.getElementById('setting-sound-tick');     if (el) el.value = savedTickSound;
+    el = document.getElementById('setting-sound-ambient'); if (el) el.value = savedAmbientSound;
 
-    // Helper: bind a select sound setting
-    function bindSoundSelect(selectEl, lsKey) {
+    el = document.getElementById('setting-sound-volume');
+    var lbl = document.getElementById('setting-sound-volume-label');
+    if (el) el.value = savedVolume;
+    if (lbl) lbl.textContent = savedVolume + '%';
+
+    el = document.getElementById('setting-sound-ambient-volume');
+    lbl = document.getElementById('setting-sound-ambient-volume-label');
+    if (el) el.value = savedAmbientVolume;
+    if (lbl) lbl.textContent = savedAmbientVolume + '%';
+
+    // ─── AI settings ───
+    var aiEnabled = false;
+    try { aiEnabled = localStorage.getItem('dm-ai-enabled') === '1'; } catch(e) {}
+    el = document.getElementById('setting-ai-enabled');
+    if (el) el.checked = aiEnabled;
+
+    var customCtx = '';
+    try { customCtx = localStorage.getItem('dm-ai-custom-context') || ''; } catch(e) {}
+    el = document.getElementById('setting-ai-custom-context');
+    if (el) el.value = customCtx;
+  }
+
+  function initSettingsModal() {
+    if (_settingsModalInitialized) return;
+    _settingsModalInitialized = true;
+
+    // Create the modal overlay
+    _settingsModalOverlay = document.createElement('div');
+    _settingsModalOverlay.className = 'settings-modal-overlay';
+    _settingsModalOverlay.setAttribute('role', 'dialog');
+    _settingsModalOverlay.setAttribute('aria-modal', 'true');
+    _settingsModalOverlay.setAttribute('aria-label', 'Settings');
+    _settingsModalOverlay.style.display = 'none';
+    _settingsModalOverlay.innerHTML =
+      '<div class="settings-modal-backdrop"></div>' +
+      '<div class="settings-modal-dialog">' +
+        '<div class="settings-modal-header">' +
+          '<h2 class="settings-modal-title">Settings</h2>' +
+          '<button type="button" class="settings-modal-close" aria-label="Close">&times;</button>' +
+        '</div>' +
+        '<div class="settings-modal-body">' +
+
+          // ── Account section ──
+          '<div class="settings-modal-section">' +
+            '<div class="settings-modal-section-label">Account</div>' +
+            '<div class="settings-modal-user">' +
+              '<img class="settings-modal-user-avatar" src="" alt="" referrerpolicy="no-referrer" style="display:none;">' +
+              '<div class="settings-modal-user-info">' +
+                '<div class="settings-modal-user-name"></div>' +
+                '<div class="settings-modal-user-email"></div>' +
+              '</div>' +
+            '</div>' +
+            '<button type="button" class="settings-modal-signout" id="settings-modal-signout">Sign out</button>' +
+          '</div>' +
+
+          // ── Pomodoro section ──
+          '<div class="settings-modal-section">' +
+            '<div class="settings-modal-section-label">Pomodoro</div>' +
+            '<div class="settings-modal-group-label">Short session</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-pomo-short-work">Work</label>' +
+              '<div class="settings-modal-control">' +
+                '<input type="number" id="setting-pomo-short-work" class="settings-modal-input" min="1" max="120" value="25">' +
+                '<span class="settings-modal-unit">min</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-pomo-short-break">Break</label>' +
+              '<div class="settings-modal-control">' +
+                '<input type="number" id="setting-pomo-short-break" class="settings-modal-input" min="1" max="60" value="5">' +
+                '<span class="settings-modal-unit">min</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-group-label">Long session</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-pomo-long-work">Work</label>' +
+              '<div class="settings-modal-control">' +
+                '<input type="number" id="setting-pomo-long-work" class="settings-modal-input" min="1" max="120" value="50">' +
+                '<span class="settings-modal-unit">min</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-pomo-long-break">Break</label>' +
+              '<div class="settings-modal-control">' +
+                '<input type="number" id="setting-pomo-long-break" class="settings-modal-input" min="1" max="60" value="10">' +
+                '<span class="settings-modal-unit">min</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-pomo-count">Default pomodoros</label>' +
+              '<div class="settings-modal-control">' +
+                '<input type="number" id="setting-pomo-count" class="settings-modal-input" min="0" max="20" value="1">' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          // ── Automation section ──
+          '<div class="settings-modal-section">' +
+            '<div class="settings-modal-section-label">Automation</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-auto-schedule">Auto-schedule today</label>' +
+              '<div class="settings-modal-control">' +
+                '<label class="settings-modal-toggle-switch">' +
+                  '<input type="checkbox" id="setting-auto-schedule">' +
+                  '<span class="settings-modal-toggle-slider"></span>' +
+                '</label>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-auto-break">Auto-start break</label>' +
+              '<div class="settings-modal-control">' +
+                '<label class="settings-modal-toggle-switch">' +
+                  '<input type="checkbox" id="setting-auto-break">' +
+                  '<span class="settings-modal-toggle-slider"></span>' +
+                '</label>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-auto-work">Auto-start work</label>' +
+              '<div class="settings-modal-control">' +
+                '<label class="settings-modal-toggle-switch">' +
+                  '<input type="checkbox" id="setting-auto-work">' +
+                  '<span class="settings-modal-toggle-slider"></span>' +
+                '</label>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          // ── Sounds section ──
+          '<div class="settings-modal-section">' +
+            '<div class="settings-modal-section-label">Sounds</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-sound-work">Work end</label>' +
+              '<div class="settings-modal-control">' +
+                '<select id="setting-sound-work" class="settings-modal-select">' +
+                  '<option value="chime">Chime</option>' +
+                  '<option value="bell">Bell</option>' +
+                  '<option value="digital">Digital</option>' +
+                  '<option value="bowl">Singing bowl</option>' +
+                  '<option value="ascending">Ascending</option>' +
+                  '<option value="pulse">Soft pulse</option>' +
+                  '<option value="plang">Plang</option>' +
+                  '<option value="none">None</option>' +
+                '</select>' +
+                '<button type="button" class="settings-modal-preview" data-sound-select="setting-sound-work" title="Preview">' +
+                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-sound-break">Break end</label>' +
+              '<div class="settings-modal-control">' +
+                '<select id="setting-sound-break" class="settings-modal-select">' +
+                  '<option value="chime">Chime</option>' +
+                  '<option value="bell">Bell</option>' +
+                  '<option value="digital">Digital</option>' +
+                  '<option value="bowl">Singing bowl</option>' +
+                  '<option value="ascending">Ascending</option>' +
+                  '<option value="pulse">Soft pulse</option>' +
+                  '<option value="plang">Plang</option>' +
+                  '<option value="none">None</option>' +
+                '</select>' +
+                '<button type="button" class="settings-modal-preview" data-sound-select="setting-sound-break" title="Preview">' +
+                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-sound-tick">Tick</label>' +
+              '<div class="settings-modal-control">' +
+                '<select id="setting-sound-tick" class="settings-modal-select">' +
+                  '<option value="none">None</option>' +
+                  '<option value="tick-soft">Soft tick</option>' +
+                  '<option value="tick-click">Click</option>' +
+                  '<option value="tick-woodblock">Woodblock</option>' +
+                '</select>' +
+                '<button type="button" class="settings-modal-preview" data-sound-select="setting-sound-tick" title="Preview">' +
+                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-sound-ambient">Break ambient</label>' +
+              '<div class="settings-modal-control">' +
+                '<select id="setting-sound-ambient" class="settings-modal-select">' +
+                  '<option value="none">None</option>' +
+                  '<option value="ambient-rain">Rain</option>' +
+                  '<option value="ambient-ocean">Ocean waves</option>' +
+                  '<option value="ambient-wind">Wind</option>' +
+                  '<option value="ambient-whitenoise">White noise</option>' +
+                  '<option value="ambient-stream">Stream</option>' +
+                  '<option value="ambient-campfire">Campfire</option>' +
+                '</select>' +
+                '<button type="button" class="settings-modal-preview" data-sound-select="setting-sound-ambient" title="Preview">' +
+                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-sound-volume">Volume</label>' +
+              '<div class="settings-modal-control settings-modal-volume-control">' +
+                '<input type="range" id="setting-sound-volume" class="settings-modal-range" min="0" max="100" value="80" step="5">' +
+                '<span class="settings-modal-unit" id="setting-sound-volume-label">80%</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-sound-ambient-volume">Ambient vol</label>' +
+              '<div class="settings-modal-control settings-modal-volume-control">' +
+                '<input type="range" id="setting-sound-ambient-volume" class="settings-modal-range" min="0" max="100" value="50" step="5">' +
+                '<span class="settings-modal-unit" id="setting-sound-ambient-volume-label">50%</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          // ── AI Companion section ──
+          '<div class="settings-modal-section">' +
+            '<div class="settings-modal-section-label">AI Companion</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-ai-enabled">Enabled</label>' +
+              '<div class="settings-modal-control">' +
+                '<label class="settings-modal-toggle-switch">' +
+                  '<input type="checkbox" id="setting-ai-enabled">' +
+                  '<span class="settings-modal-toggle-slider"></span>' +
+                '</label>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-ai-info">' +
+              '<p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU. First use downloads ~350 MB.</p>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-ai-custom-context">Custom context</label>' +
+            '</div>' +
+            '<textarea class="settings-modal-textarea" id="setting-ai-custom-context" placeholder="e.g. I\'m a software engineer. I prefer short actionable tasks." rows="3"></textarea>' +
+          '</div>' +
+
+        '</div>' +
+      '</div>';
+
+    document.body.appendChild(_settingsModalOverlay);
+
+    // ─── Apply saved values ───
+    applySettingsFromStorage();
+
+    // ─── Bind close handlers ───
+    var backdrop = _settingsModalOverlay.querySelector('.settings-modal-backdrop');
+    var closeBtn = _settingsModalOverlay.querySelector('.settings-modal-close');
+
+    backdrop.addEventListener('click', closeSettingsModal);
+    closeBtn.addEventListener('click', closeSettingsModal);
+    _settingsModalOverlay.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        closeSettingsModal();
+      }
+    });
+
+    // ─── Sign out ───
+    var signoutBtn = document.getElementById('settings-modal-signout');
+    if (signoutBtn) {
+      signoutBtn.addEventListener('click', function() {
+        closeSettingsModal();
+        if (window.dmAuth) window.dmAuth.signOut();
+      });
+    }
+
+    // ─── Bind numeric settings ───
+    function bindNumericSetting(inputId, lsKey, min, max, fallback) {
+      var inputEl = document.getElementById(inputId);
+      if (!inputEl) return;
+      inputEl.addEventListener('change', function() {
+        var val = parseInt(inputEl.value, 10);
+        if (val >= min && val <= max) {
+          try { localStorage.setItem(lsKey, val); } catch(e) {}
+          window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: lsKey, value: val } }));
+        } else {
+          inputEl.value = fallback;
+        }
+      });
+    }
+
+    bindNumericSetting('setting-pomo-short-work', 'dm-pomo-short-work', 1, 120, 25);
+    bindNumericSetting('setting-pomo-short-break', 'dm-pomo-short-break', 1, 60, 5);
+    bindNumericSetting('setting-pomo-long-work', 'dm-pomo-long-work', 1, 120, 50);
+    bindNumericSetting('setting-pomo-long-break', 'dm-pomo-long-break', 1, 60, 10);
+
+    // Default pomo count
+    var countInput = document.getElementById('setting-pomo-count');
+    if (countInput) {
+      countInput.addEventListener('change', function() {
+        var val = parseInt(countInput.value, 10);
+        if (val >= 0 && val <= 20) {
+          try { localStorage.setItem('dm-default-pomo-count', val); } catch(e) {}
+          window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-default-pomo-count', value: val } }));
+        } else {
+          countInput.value = 1;
+        }
+      });
+    }
+
+    // ─── Toggle switches ───
+    function bindToggleSetting(inputId, lsKey, defaultVal) {
+      var el = document.getElementById(inputId);
+      if (!el) return;
+      el.addEventListener('change', function() {
+        var val = el.checked;
+        try { localStorage.setItem(lsKey, val ? 'true' : 'false'); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: lsKey, value: val } }));
+      });
+    }
+
+    bindToggleSetting('setting-auto-schedule', 'dm-auto-schedule-today', true);
+    bindToggleSetting('setting-auto-break', 'dm-pomo-auto-break', true);
+    bindToggleSetting('setting-auto-work', 'dm-pomo-auto-work', false);
+
+    // ─── Sound select dropdowns ───
+    function bindSoundSelect(selectId, lsKey) {
+      var selectEl = document.getElementById(selectId);
       if (!selectEl) return;
       selectEl.addEventListener('change', function() {
         var val = selectEl.value;
@@ -2974,12 +3245,14 @@
       });
     }
 
-    bindSoundSelect(soundWorkSelect, 'dm-pomo-sound-work');
-    bindSoundSelect(soundBreakSelect, 'dm-pomo-sound-break');
-    bindSoundSelect(soundTickSelect, 'dm-pomo-sound-tick');
-    bindSoundSelect(soundAmbientSelect, 'dm-pomo-sound-ambient');
+    bindSoundSelect('setting-sound-work', 'dm-pomo-sound-work');
+    bindSoundSelect('setting-sound-break', 'dm-pomo-sound-break');
+    bindSoundSelect('setting-sound-tick', 'dm-pomo-sound-tick');
+    bindSoundSelect('setting-sound-ambient', 'dm-pomo-sound-ambient');
 
-    // Volume slider
+    // ─── Volume sliders ───
+    var soundVolumeRange = document.getElementById('setting-sound-volume');
+    var soundVolumeLabel = document.getElementById('setting-sound-volume-label');
     if (soundVolumeRange) {
       soundVolumeRange.addEventListener('input', function() {
         var pct = parseInt(soundVolumeRange.value, 10);
@@ -2990,7 +3263,8 @@
       });
     }
 
-    // Ambient volume slider
+    var soundAmbientVolumeRange = document.getElementById('setting-sound-ambient-volume');
+    var soundAmbientVolumeLabel = document.getElementById('setting-sound-ambient-volume-label');
     if (soundAmbientVolumeRange) {
       soundAmbientVolumeRange.addEventListener('input', function() {
         var pct = parseInt(soundAmbientVolumeRange.value, 10);
@@ -3001,9 +3275,8 @@
       });
     }
 
-    // Preview buttons
-    var previewBtns = panel.querySelectorAll('.sidebar-settings-preview');
-    var _ambientPreviewTimer = null;
+    // ─── Sound preview buttons (with ambient overlap fix) ───
+    var previewBtns = _settingsModalOverlay.querySelectorAll('.settings-modal-preview');
     previewBtns.forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
@@ -3014,29 +3287,53 @@
         var soundId = selectEl.value;
         if (!window.dmSounds || !soundId || soundId === 'none') return;
 
-        // Ambient sounds need special preview handling: play for 5 seconds then auto-stop
         var preset = window.dmSounds.presets[soundId];
         if (preset && preset.type === 'ambient') {
-          // Stop any existing ambient preview
+          // Stop any existing ambient preview and timer ambient
           window.dmSounds.stopAmbient();
-          if (_ambientPreviewTimer) { clearTimeout(_ambientPreviewTimer); _ambientPreviewTimer = null; }
-          // Temporarily start ambient with the ambient volume
+          stopAmbientPreview();
+
           var ambientVol = soundAmbientVolumeRange ? parseInt(soundAmbientVolumeRange.value, 10) / 100 : 0.5;
           try {
-            var previewCtx = new (window.AudioContext || window.webkitAudioContext)();
-            var handle = preset.play(previewCtx, ambientVol);
+            _ambientPreviewCtx = new (window.AudioContext || window.webkitAudioContext)();
+            _ambientPreviewHandle = preset.play(_ambientPreviewCtx, ambientVol);
             _ambientPreviewTimer = setTimeout(function() {
-              if (handle && handle.stop) { try { handle.stop(); } catch(ex) {} }
-              try { previewCtx.close(); } catch(ex) {}
-              _ambientPreviewTimer = null;
+              stopAmbientPreview();
             }, 5000);
-          } catch(ex) {}
+          } catch(ex) {
+            _ambientPreviewCtx = null;
+            _ambientPreviewHandle = null;
+          }
         } else {
           var vol = soundVolumeRange ? parseInt(soundVolumeRange.value, 10) / 100 : 0.8;
           window.dmSounds.play(soundId, vol);
         }
       });
     });
+
+    // ─── AI settings ───
+    var aiEnabledToggle = document.getElementById('setting-ai-enabled');
+    if (aiEnabledToggle) {
+      aiEnabledToggle.addEventListener('change', function() {
+        var val = aiEnabledToggle.checked;
+        try { localStorage.setItem('dm-ai-enabled', val ? '1' : '0'); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-ai-enabled', value: val } }));
+        // Notify AI companion if it has a handler
+        if (window.dmAiSetEnabled) window.dmAiSetEnabled(val);
+      });
+    }
+
+    var aiContextEl = document.getElementById('setting-ai-custom-context');
+    var _contextSaveTimer = null;
+    if (aiContextEl) {
+      aiContextEl.addEventListener('input', function() {
+        if (_contextSaveTimer) clearTimeout(_contextSaveTimer);
+        _contextSaveTimer = setTimeout(function() {
+          try { localStorage.setItem('dm-ai-custom-context', aiContextEl.value); } catch(e) {}
+          _contextSaveTimer = null;
+        }, 500);
+      });
+    }
   }
 
   function renderAuthPrompt() {
@@ -3051,6 +3348,14 @@
     if (menuContent) {
       var existingFooter = menuContent.querySelector('.sidebar-settings-footer');
       if (existingFooter) existingFooter.remove();
+    }
+
+    // Close and remove settings modal on sign-out
+    closeSettingsModal();
+    if (_settingsModalOverlay) {
+      _settingsModalOverlay.remove();
+      _settingsModalOverlay = null;
+      _settingsModalInitialized = false;
     }
 
     // Clear cached sidebar since user signed out
@@ -3116,9 +3421,9 @@
           // Try to render from cache immediately
           if (window.dmSync) {
             window.dmSync.getAllNotes().then(function(notes) {
-              if (notes.length > 0) {
-                renderDynamicSidebar(notes, user);
-              }
+              // Always render sidebar for authenticated users (even with 0 notes)
+              // so settings footer trigger and modal are initialized
+              renderDynamicSidebar(notes, user);
               // Sync will fire dm-sync-complete which will re-render
             });
           }

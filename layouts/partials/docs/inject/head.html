@@ -59,6 +59,21 @@
       });
     };
 
+    // Register/update user profile in Firestore on sign-in (for task sharing lookups).
+    // Creates a lightweight doc at users/{uid} with email, displayName, photoURL.
+    window.dmRegisterUser = function(user) {
+      if (!user || !window.dmDb) return;
+      var userRef = window.dmDb.collection('users').doc(user.uid);
+      userRef.set({
+        email: user.email || '',
+        displayName: user.displayName || '',
+        photoURL: user.photoURL || null,
+        lastSeenAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(function(err) {
+        console.warn('[dm-auth] Failed to register user profile:', err);
+      });
+    };
+
     // dmAuthReady: resolves once Firebase auth state has settled.
     // Prevents the null→user flash on page load (Firebase loads persisted
     // session from IndexedDB asynchronously, causing a brief signed-out state).

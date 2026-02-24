@@ -98,6 +98,27 @@
       <textarea id="todo-edit-notes" class="todo-edit-notes-area" placeholder="Add notes..." rows="3"></textarea>
     </div>
 
+    <!-- Sharing / Collaborators section (visible for top-level tasks only) -->
+    <div class="todo-edit-sharing-section" id="todo-edit-sharing-section" style="display: none;">
+      <div class="todo-edit-sharing-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span>Sharing</span>
+      </div>
+      <!-- Shown when task is owned by someone else -->
+      <div class="todo-edit-sharing-owner-info" id="todo-edit-share-owner-info" style="display: none;">
+        Shared by <strong id="todo-edit-share-owner-name"></strong>
+      </div>
+      <!-- Shown when current user owns the task -->
+      <div id="todo-edit-share-controls" style="display: none;">
+        <div class="todo-edit-share-input-row">
+          <input type="email" class="todo-edit-share-email-input" id="todo-edit-share-email" placeholder="Enter email to share..." autocomplete="off">
+          <button type="button" class="todo-edit-share-send-btn" id="todo-edit-share-send">Share</button>
+        </div>
+        <div class="todo-edit-share-feedback" id="todo-edit-share-feedback" style="display: none;"></div>
+      </div>
+      <div class="todo-edit-share-list" id="todo-edit-share-list"></div>
+    </div>
+
     <!-- AI suggestions area -->
     <div class="todo-edit-ai-section" id="todo-edit-ai-section" style="display: none;">
       <div class="todo-edit-ai-header">
@@ -823,6 +844,16 @@
   var bujoPill = document.getElementById('todo-edit-bujo-pill');
   var bujoPopover = document.getElementById('todo-edit-bujo-popover');
 
+  // Sharing section elements
+  var sharingSection = document.getElementById('todo-edit-sharing-section');
+  var shareOwnerInfo = document.getElementById('todo-edit-share-owner-info');
+  var shareOwnerName = document.getElementById('todo-edit-share-owner-name');
+  var shareControls = document.getElementById('todo-edit-share-controls');
+  var shareEmailInput = document.getElementById('todo-edit-share-email');
+  var shareSendBtn = document.getElementById('todo-edit-share-send');
+  var shareFeedback = document.getElementById('todo-edit-share-feedback');
+  var shareListEl = document.getElementById('todo-edit-share-list');
+
   // Pomodoro group elements
   var editPomoGroup = document.getElementById('todo-edit-pomodoro-group');
   var editPomoMinusBtn = document.getElementById('todo-edit-pomo-minus');
@@ -1459,6 +1490,137 @@
     });
   }
 
+  // ─── Sharing section logic ───
+
+  var _shareFeedbackTimer = null;
+
+  function showShareFeedback(msg, isError) {
+    if (!shareFeedback) return;
+    clearTimeout(_shareFeedbackTimer);
+    shareFeedback.textContent = msg;
+    shareFeedback.className = 'todo-edit-share-feedback ' + (isError ? 'is-error' : 'is-success');
+    shareFeedback.style.display = '';
+    _shareFeedbackTimer = setTimeout(function() {
+      shareFeedback.style.display = 'none';
+    }, isError ? 4000 : 3000);
+  }
+
+  function refreshEditShareList(todoId) {
+    if (!shareListEl || !window.dmSync) return;
+    window.dmSync.getSharesForTodo(todoId).then(function(shares) {
+      if (shares.length === 0) {
+        shareListEl.innerHTML = '<div class="todo-edit-share-empty">Not shared with anyone</div>';
+        return;
+      }
+      var html = '<div class="todo-edit-share-list-label">Collaborators</div>';
+      shares.forEach(function(s) {
+        html += '<div class="todo-edit-share-item">';
+        html += '<span class="todo-edit-share-item-email">' + escapeHtml(s.inviteeEmail) + '</span>';
+        html += '<span class="todo-edit-share-item-status status-' + s.status + '">' + s.status + '</span>';
+        html += '<button type="button" class="todo-edit-share-item-remove" data-edit-unshare-id="' + s.id + '" title="Remove">&times;</button>';
+        html += '</div>';
+      });
+      shareListEl.innerHTML = html;
+
+      // Attach remove handlers
+      shareListEl.querySelectorAll('[data-edit-unshare-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var shareId = btn.getAttribute('data-edit-unshare-id');
+          btn.disabled = true;
+          window.dmSync.unshareTask(shareId).then(function() {
+            refreshEditShareList(todoId);
+          }).catch(function(err) {
+            showShareFeedback(err.message || 'Failed to remove', true);
+            btn.disabled = false;
+          });
+        });
+      });
+    });
+  }
+
+  function initSharingSection(todo) {
+    if (!sharingSection) return;
+
+    // Only show for top-level tasks
+    if (todo.parentId) {
+      sharingSection.style.display = 'none';
+      return;
+    }
+
+    sharingSection.style.display = '';
+    shareFeedback.style.display = 'none';
+
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    var isOwner = !todo.userId || (user && todo.userId === user.uid);
+
+    if (isOwner) {
+      // Show share controls for owner
+      shareOwnerInfo.style.display = 'none';
+      shareControls.style.display = '';
+      shareEmailInput.value = '';
+
+      // Wire up send button (remove old listeners by cloning)
+      var newSendBtn = shareSendBtn.cloneNode(true);
+      shareSendBtn.parentNode.replaceChild(newSendBtn, shareSendBtn);
+      shareSendBtn = newSendBtn;
+
+      var newEmailInput = shareEmailInput.cloneNode(true);
+      shareEmailInput.parentNode.replaceChild(newEmailInput, shareEmailInput);
+      shareEmailInput = newEmailInput;
+
+      function doEditShare() {
+        var email = shareEmailInput.value.trim().toLowerCase();
+        if (!email || !email.includes('@')) {
+          showShareFeedback('Please enter a valid email address', true);
+          return;
+        }
+        shareSendBtn.disabled = true;
+        shareSendBtn.textContent = '...';
+
+        window.dmSync.shareTask(todo.id, email).then(function() {
+          shareEmailInput.value = '';
+          shareSendBtn.disabled = false;
+          shareSendBtn.textContent = 'Share';
+          showShareFeedback('Invitation sent to ' + email, false);
+          refreshEditShareList(todo.id);
+        }).catch(function(err) {
+          shareSendBtn.disabled = false;
+          shareSendBtn.textContent = 'Share';
+          showShareFeedback(err.message || 'Failed to share', true);
+        });
+      }
+
+      shareSendBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        doEditShare();
+      });
+
+      shareEmailInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          doEditShare();
+        }
+      });
+    } else {
+      // Read-only: show who shared it — look up from taskShares
+      shareControls.style.display = 'none';
+      shareOwnerInfo.style.display = '';
+      shareOwnerName.textContent = 'someone';
+      // Try to get owner info from the share record
+      if (window.dmSync && window.dmSync.getSharesForTodo) {
+        window.dmSync.getSharesForTodo(todo.id).then(function(shares) {
+          if (shares.length > 0) {
+            var ownerShare = shares[0];
+            shareOwnerName.textContent = ownerShare.ownerName || ownerShare.ownerEmail || 'someone';
+          }
+        });
+      }
+    }
+
+    refreshEditShareList(todo.id);
+  }
+
   // ─── Open / Close ───
 
   function openModal(todo, onSave) {
@@ -1520,6 +1682,9 @@
     // Generate AI suggestions
     generateAiSuggestions(todo);
 
+    // Initialize sharing/collaborator section
+    initSharingSection(todo);
+
     // Load existing categories for autocomplete, then show
     loadExistingCategories().then(function() {
       modal.style.display = '';
@@ -1537,6 +1702,12 @@
     hideDropdown();
     aiSection.style.display = 'none';
     aiCardsEl.innerHTML = '';
+    // Clean up sharing section state
+    clearTimeout(_shareFeedbackTimer);
+    if (sharingSection) sharingSection.style.display = 'none';
+    if (shareFeedback) shareFeedback.style.display = 'none';
+    if (shareListEl) shareListEl.innerHTML = '';
+    if (shareEmailInput) shareEmailInput.value = '';
     currentTodo = null;
     onSaveCallback = null;
     categories = [];
