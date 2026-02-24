@@ -2765,10 +2765,34 @@
             '</div>' +
           '</div>' +
           '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-sound-ambient">Break ambient</label>' +
+            '<div class="sidebar-settings-control">' +
+              '<select id="setting-sound-ambient" class="sidebar-settings-select">' +
+                '<option value="none">None</option>' +
+                '<option value="ambient-rain">Rain</option>' +
+                '<option value="ambient-ocean">Ocean waves</option>' +
+                '<option value="ambient-wind">Wind</option>' +
+                '<option value="ambient-whitenoise">White noise</option>' +
+                '<option value="ambient-stream">Stream</option>' +
+                '<option value="ambient-campfire">Campfire</option>' +
+              '</select>' +
+              '<button type="button" class="sidebar-settings-preview" data-sound-select="setting-sound-ambient" title="Preview">' +
+                '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
             '<label class="sidebar-settings-label" for="setting-sound-volume">Volume</label>' +
             '<div class="sidebar-settings-control sidebar-settings-volume-control">' +
               '<input type="range" id="setting-sound-volume" class="sidebar-settings-range" min="0" max="100" value="80" step="5">' +
               '<span class="sidebar-settings-unit" id="setting-sound-volume-label">80%</span>' +
+            '</div>' +
+          '</div>' +
+          '<div class="sidebar-settings-row">' +
+            '<label class="sidebar-settings-label" for="setting-sound-ambient-volume">Ambient vol</label>' +
+            '<div class="sidebar-settings-control sidebar-settings-volume-control">' +
+              '<input type="range" id="setting-sound-ambient-volume" class="sidebar-settings-range" min="0" max="100" value="50" step="5">' +
+              '<span class="sidebar-settings-unit" id="setting-sound-ambient-volume-label">50%</span>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -2911,8 +2935,11 @@
     var soundWorkSelect = document.getElementById('setting-sound-work');
     var soundBreakSelect = document.getElementById('setting-sound-break');
     var soundTickSelect = document.getElementById('setting-sound-tick');
+    var soundAmbientSelect = document.getElementById('setting-sound-ambient');
     var soundVolumeRange = document.getElementById('setting-sound-volume');
     var soundVolumeLabel = document.getElementById('setting-sound-volume-label');
+    var soundAmbientVolumeRange = document.getElementById('setting-sound-ambient-volume');
+    var soundAmbientVolumeLabel = document.getElementById('setting-sound-ambient-volume-label');
 
     // Read saved values
     var savedWorkSound = 'plang';
@@ -2921,14 +2948,21 @@
     try { var v = localStorage.getItem('dm-pomo-sound-break'); if (v) savedBreakSound = v; } catch(e) {}
     var savedTickSound = 'none';
     try { var v = localStorage.getItem('dm-pomo-sound-tick'); if (v) savedTickSound = v; } catch(e) {}
+    var savedAmbientSound = 'none';
+    try { var v = localStorage.getItem('dm-pomo-sound-ambient'); if (v) savedAmbientSound = v; } catch(e) {}
     var savedVolume = 80;
     try { var v = parseFloat(localStorage.getItem('dm-pomo-sound-volume')); if (v >= 0 && v <= 1) savedVolume = Math.round(v * 100); } catch(e) {}
+    var savedAmbientVolume = 50;
+    try { var v = parseFloat(localStorage.getItem('dm-pomo-sound-ambient-volume')); if (v >= 0 && v <= 1) savedAmbientVolume = Math.round(v * 100); } catch(e) {}
 
     if (soundWorkSelect) soundWorkSelect.value = savedWorkSound;
     if (soundBreakSelect) soundBreakSelect.value = savedBreakSound;
     if (soundTickSelect) soundTickSelect.value = savedTickSound;
+    if (soundAmbientSelect) soundAmbientSelect.value = savedAmbientSound;
     if (soundVolumeRange) soundVolumeRange.value = savedVolume;
     if (soundVolumeLabel) soundVolumeLabel.textContent = savedVolume + '%';
+    if (soundAmbientVolumeRange) soundAmbientVolumeRange.value = savedAmbientVolume;
+    if (soundAmbientVolumeLabel) soundAmbientVolumeLabel.textContent = savedAmbientVolume + '%';
 
     // Helper: bind a select sound setting
     function bindSoundSelect(selectEl, lsKey) {
@@ -2943,6 +2977,7 @@
     bindSoundSelect(soundWorkSelect, 'dm-pomo-sound-work');
     bindSoundSelect(soundBreakSelect, 'dm-pomo-sound-break');
     bindSoundSelect(soundTickSelect, 'dm-pomo-sound-tick');
+    bindSoundSelect(soundAmbientSelect, 'dm-pomo-sound-ambient');
 
     // Volume slider
     if (soundVolumeRange) {
@@ -2955,8 +2990,20 @@
       });
     }
 
+    // Ambient volume slider
+    if (soundAmbientVolumeRange) {
+      soundAmbientVolumeRange.addEventListener('input', function() {
+        var pct = parseInt(soundAmbientVolumeRange.value, 10);
+        if (soundAmbientVolumeLabel) soundAmbientVolumeLabel.textContent = pct + '%';
+        var vol = pct / 100;
+        try { localStorage.setItem('dm-pomo-sound-ambient-volume', vol); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-pomo-sound-ambient-volume', value: vol } }));
+      });
+    }
+
     // Preview buttons
     var previewBtns = panel.querySelectorAll('.sidebar-settings-preview');
+    var _ambientPreviewTimer = null;
     previewBtns.forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
@@ -2965,7 +3012,26 @@
         var selectEl = document.getElementById(selectId);
         if (!selectEl) return;
         var soundId = selectEl.value;
-        if (window.dmSounds && soundId && soundId !== 'none') {
+        if (!window.dmSounds || !soundId || soundId === 'none') return;
+
+        // Ambient sounds need special preview handling: play for 5 seconds then auto-stop
+        var preset = window.dmSounds.presets[soundId];
+        if (preset && preset.type === 'ambient') {
+          // Stop any existing ambient preview
+          window.dmSounds.stopAmbient();
+          if (_ambientPreviewTimer) { clearTimeout(_ambientPreviewTimer); _ambientPreviewTimer = null; }
+          // Temporarily start ambient with the ambient volume
+          var ambientVol = soundAmbientVolumeRange ? parseInt(soundAmbientVolumeRange.value, 10) / 100 : 0.5;
+          try {
+            var previewCtx = new (window.AudioContext || window.webkitAudioContext)();
+            var handle = preset.play(previewCtx, ambientVol);
+            _ambientPreviewTimer = setTimeout(function() {
+              if (handle && handle.stop) { try { handle.stop(); } catch(ex) {} }
+              try { previewCtx.close(); } catch(ex) {}
+              _ambientPreviewTimer = null;
+            }, 5000);
+          } catch(ex) {}
+        } else {
           var vol = soundVolumeRange ? parseInt(soundVolumeRange.value, 10) / 100 : 0.8;
           window.dmSounds.play(soundId, vol);
         }

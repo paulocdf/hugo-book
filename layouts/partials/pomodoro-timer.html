@@ -1608,6 +1608,336 @@
       osc.start(ctx.currentTime);
       osc.stop(ctx.currentTime + 0.05);
       return 60;
+    }},
+
+    // ── Ambient sounds (continuous loops for break phase) ──
+    // Unlike notification/tick presets, ambient presets return { stop: fn } instead of a duration.
+    // They loop indefinitely until stop() is called.
+
+    'ambient-rain': { label: 'Rain', type: 'ambient', play: function(ctx, vol) {
+      // Filtered white noise shaped to sound like rainfall
+      var bufLen = Math.floor(ctx.sampleRate * 4); // 4-second loop
+      var buf = ctx.createBuffer(2, bufLen, ctx.sampleRate);
+      for (var ch = 0; ch < 2; ch++) {
+        var data = buf.getChannelData(ch);
+        for (var i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+      }
+      var src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+
+      // Rain character: highpass to remove rumble, then gentle bandpass for patter
+      var hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 800;
+      hp.Q.value = 0.5;
+
+      var bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 4000;
+      bp.Q.value = 0.3;
+
+      // Slow amplitude modulation for natural variation
+      var lfo = ctx.createOscillator();
+      var lfoGain = ctx.createGain();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.15; // very slow swell
+      lfoGain.gain.value = vol * 0.015;
+
+      var masterGain = ctx.createGain();
+      masterGain.gain.value = vol * 0.06;
+
+      src.connect(hp);
+      hp.connect(bp);
+      bp.connect(masterGain);
+      lfo.connect(lfoGain);
+      lfoGain.connect(masterGain.gain);
+      masterGain.connect(ctx.destination);
+
+      src.start(0);
+      lfo.start(0);
+
+      return { stop: function() {
+        try { src.stop(); } catch(e) {}
+        try { lfo.stop(); } catch(e) {}
+      }};
+    }},
+
+    'ambient-ocean': { label: 'Ocean waves', type: 'ambient', play: function(ctx, vol) {
+      // Noise shaped by a slow LFO to simulate waves rolling in and out
+      var bufLen = Math.floor(ctx.sampleRate * 4);
+      var buf = ctx.createBuffer(2, bufLen, ctx.sampleRate);
+      for (var ch = 0; ch < 2; ch++) {
+        var data = buf.getChannelData(ch);
+        for (var i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+      }
+      var src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+
+      // Low rumble: lowpass for deep ocean body
+      var lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 600;
+      lp.Q.value = 0.7;
+
+      // Slow wave-shaped amplitude modulation
+      var waveLfo = ctx.createOscillator();
+      var waveLfoGain = ctx.createGain();
+      waveLfo.type = 'sine';
+      waveLfo.frequency.value = 0.08; // ~12-second cycle
+      waveLfoGain.gain.value = vol * 0.035;
+
+      var masterGain = ctx.createGain();
+      masterGain.gain.value = vol * 0.05;
+
+      src.connect(lp);
+      lp.connect(masterGain);
+      waveLfo.connect(waveLfoGain);
+      waveLfoGain.connect(masterGain.gain);
+      masterGain.connect(ctx.destination);
+
+      // Second layer: higher-frequency wash for surf texture
+      var src2 = ctx.createBufferSource();
+      src2.buffer = buf;
+      src2.loop = true;
+      src2.loopStart = 1.5; // offset for decorrelation
+
+      var bp = ctx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = 2000;
+      bp.Q.value = 0.4;
+
+      var surfGain = ctx.createGain();
+      surfGain.gain.value = vol * 0.02;
+
+      // Surf LFO slightly offset from wave LFO
+      var surfLfo = ctx.createOscillator();
+      var surfLfoGain = ctx.createGain();
+      surfLfo.type = 'sine';
+      surfLfo.frequency.value = 0.1;
+      surfLfoGain.gain.value = vol * 0.018;
+
+      src2.connect(bp);
+      bp.connect(surfGain);
+      surfLfo.connect(surfLfoGain);
+      surfLfoGain.connect(surfGain.gain);
+      surfGain.connect(ctx.destination);
+
+      src.start(0);
+      src2.start(0);
+      waveLfo.start(0);
+      surfLfo.start(0);
+
+      return { stop: function() {
+        try { src.stop(); } catch(e) {}
+        try { src2.stop(); } catch(e) {}
+        try { waveLfo.stop(); } catch(e) {}
+        try { surfLfo.stop(); } catch(e) {}
+      }};
+    }},
+
+    'ambient-wind': { label: 'Wind', type: 'ambient', play: function(ctx, vol) {
+      // Brown noise (integrated white noise) with slow modulation
+      var bufLen = Math.floor(ctx.sampleRate * 4);
+      var buf = ctx.createBuffer(2, bufLen, ctx.sampleRate);
+      for (var ch = 0; ch < 2; ch++) {
+        var data = buf.getChannelData(ch);
+        var lastSample = 0;
+        for (var i = 0; i < bufLen; i++) {
+          var white = Math.random() * 2 - 1;
+          lastSample = (lastSample + (0.02 * white)) / 1.02;
+          data[i] = lastSample * 3.5;
+        }
+      }
+      var src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+
+      var lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 500;
+      lp.Q.value = 0.5;
+
+      // Slow gusting modulation
+      var lfo = ctx.createOscillator();
+      var lfoGain = ctx.createGain();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.07;
+      lfoGain.gain.value = vol * 0.03;
+
+      var masterGain = ctx.createGain();
+      masterGain.gain.value = vol * 0.08;
+
+      src.connect(lp);
+      lp.connect(masterGain);
+      lfo.connect(lfoGain);
+      lfoGain.connect(masterGain.gain);
+      masterGain.connect(ctx.destination);
+
+      src.start(0);
+      lfo.start(0);
+
+      return { stop: function() {
+        try { src.stop(); } catch(e) {}
+        try { lfo.stop(); } catch(e) {}
+      }};
+    }},
+
+    'ambient-whitenoise': { label: 'White noise', type: 'ambient', play: function(ctx, vol) {
+      // Clean white noise — simple and effective for focus/masking
+      var bufLen = Math.floor(ctx.sampleRate * 2);
+      var buf = ctx.createBuffer(2, bufLen, ctx.sampleRate);
+      for (var ch = 0; ch < 2; ch++) {
+        var data = buf.getChannelData(ch);
+        for (var i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+      }
+      var src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+
+      var masterGain = ctx.createGain();
+      masterGain.gain.value = vol * 0.04;
+
+      src.connect(masterGain);
+      masterGain.connect(ctx.destination);
+      src.start(0);
+
+      return { stop: function() {
+        try { src.stop(); } catch(e) {}
+      }};
+    }},
+
+    'ambient-stream': { label: 'Stream', type: 'ambient', play: function(ctx, vol) {
+      // Babbling brook: multiple bandpass-filtered noise layers
+      var bufLen = Math.floor(ctx.sampleRate * 3);
+      var buf = ctx.createBuffer(2, bufLen, ctx.sampleRate);
+      for (var ch = 0; ch < 2; ch++) {
+        var data = buf.getChannelData(ch);
+        for (var i = 0; i < bufLen; i++) data[i] = Math.random() * 2 - 1;
+      }
+
+      var nodes = [];
+      var masterGain = ctx.createGain();
+      masterGain.gain.value = vol * 0.05;
+      masterGain.connect(ctx.destination);
+
+      // Three frequency bands for water texture
+      var bands = [
+        { freq: 2500, q: 1.5, gain: 0.7, lfoFreq: 0.2 },
+        { freq: 5000, q: 1.2, gain: 0.4, lfoFreq: 0.3 },
+        { freq: 8000, q: 1.8, gain: 0.25, lfoFreq: 0.15 }
+      ];
+
+      bands.forEach(function(b) {
+        var src = ctx.createBufferSource();
+        src.buffer = buf;
+        src.loop = true;
+        src.loopStart = Math.random() * 2; // offset each band
+
+        var bp = ctx.createBiquadFilter();
+        bp.type = 'bandpass';
+        bp.frequency.value = b.freq;
+        bp.Q.value = b.q;
+
+        var bandGain = ctx.createGain();
+        bandGain.gain.value = b.gain;
+
+        var lfo = ctx.createOscillator();
+        var lfoGain = ctx.createGain();
+        lfo.type = 'sine';
+        lfo.frequency.value = b.lfoFreq;
+        lfoGain.gain.value = vol * 0.012;
+
+        src.connect(bp);
+        bp.connect(bandGain);
+        lfo.connect(lfoGain);
+        lfoGain.connect(bandGain.gain);
+        bandGain.connect(masterGain);
+
+        src.start(0);
+        lfo.start(0);
+        nodes.push(src, lfo);
+      });
+
+      return { stop: function() {
+        nodes.forEach(function(n) { try { n.stop(); } catch(e) {} });
+      }};
+    }},
+
+    'ambient-campfire': { label: 'Campfire', type: 'ambient', play: function(ctx, vol) {
+      // Crackling fire: burst-modulated noise with lowpass warmth
+      var bufLen = Math.floor(ctx.sampleRate * 3);
+      var buf = ctx.createBuffer(2, bufLen, ctx.sampleRate);
+      for (var ch = 0; ch < 2; ch++) {
+        var data = buf.getChannelData(ch);
+        for (var i = 0; i < bufLen; i++) {
+          // Crackle texture: random bursts
+          var burst = Math.random() < 0.03 ? (Math.random() * 4 - 2) : (Math.random() * 0.5 - 0.25);
+          data[i] = burst;
+        }
+      }
+
+      var src = ctx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+
+      // Warm lowpass for fire body
+      var lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 1200;
+      lp.Q.value = 0.3;
+
+      // Second layer: gentle low rumble (embers)
+      var bufLen2 = Math.floor(ctx.sampleRate * 4);
+      var buf2 = ctx.createBuffer(1, bufLen2, ctx.sampleRate);
+      var data2 = buf2.getChannelData(0);
+      var last = 0;
+      for (var j = 0; j < bufLen2; j++) {
+        last = (last + 0.02 * (Math.random() * 2 - 1)) / 1.02;
+        data2[j] = last * 3;
+      }
+      var src2 = ctx.createBufferSource();
+      src2.buffer = buf2;
+      src2.loop = true;
+
+      var lp2 = ctx.createBiquadFilter();
+      lp2.type = 'lowpass';
+      lp2.frequency.value = 300;
+      lp2.Q.value = 0.5;
+
+      var emberGain = ctx.createGain();
+      emberGain.gain.value = vol * 0.04;
+
+      // Crackle amplitude modulation
+      var lfo = ctx.createOscillator();
+      var lfoGain = ctx.createGain();
+      lfo.type = 'sine';
+      lfo.frequency.value = 0.12;
+      lfoGain.gain.value = vol * 0.02;
+
+      var masterGain = ctx.createGain();
+      masterGain.gain.value = vol * 0.06;
+
+      src.connect(lp);
+      lp.connect(masterGain);
+      lfo.connect(lfoGain);
+      lfoGain.connect(masterGain.gain);
+      masterGain.connect(ctx.destination);
+
+      src2.connect(lp2);
+      lp2.connect(emberGain);
+      emberGain.connect(ctx.destination);
+
+      src.start(0);
+      src2.start(0);
+      lfo.start(0);
+
+      return { stop: function() {
+        try { src.stop(); } catch(e) {}
+        try { src2.stop(); } catch(e) {}
+        try { lfo.stop(); } catch(e) {}
+      }};
     }}
   };
 
@@ -1682,11 +2012,53 @@
     }
   }
 
+  // ── Ambient sound playback manager ──
+  // Ambient sounds loop continuously during break phases. They use a dedicated
+  // AudioContext and return a stop handle, unlike one-shot notification/tick sounds.
+  var ambientAudioCtx = null;
+  var ambientStopHandle = null;
+
+  function getAmbientVolume() {
+    try { var v = parseFloat(localStorage.getItem('dm-pomo-sound-ambient-volume')); if (v >= 0 && v <= 1) return v; } catch(e) {}
+    return 0.5;
+  }
+
+  function startAmbientSound() {
+    stopAmbientSound(); // stop any existing ambient first
+    var ambientId = getSoundPref('dm-pomo-sound-ambient', 'none');
+    if (!ambientId || ambientId === 'none') return;
+    var preset = SOUND_PRESETS[ambientId];
+    if (!preset || preset.type !== 'ambient') return;
+    var vol = getAmbientVolume();
+    if (vol <= 0) return;
+    try {
+      ambientAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      ambientStopHandle = preset.play(ambientAudioCtx, vol);
+    } catch(e) {
+      ambientAudioCtx = null;
+      ambientStopHandle = null;
+    }
+  }
+
+  function stopAmbientSound() {
+    if (ambientStopHandle && ambientStopHandle.stop) {
+      try { ambientStopHandle.stop(); } catch(e) {}
+      ambientStopHandle = null;
+    }
+    if (ambientAudioCtx) {
+      try { ambientAudioCtx.close(); } catch(e) {}
+      ambientAudioCtx = null;
+    }
+  }
+
   // Expose globally for settings panel preview and dm-sync reminders
   window.dmSounds = {
     play: playSound,
     presets: SOUND_PRESETS,
-    getVolume: getSoundVolume
+    getVolume: getSoundVolume,
+    getAmbientVolume: getAmbientVolume,
+    startAmbient: startAmbientSound,
+    stopAmbient: stopAmbientSound
   };
 
   // ── Push Notification Scheduling (PWA / Service Worker) ──
@@ -1805,6 +2177,7 @@
         }
       } else {
         playBreakEndSound();
+        stopAmbientSound();
         // Break finished, start next work session
         sessionCount++;
         phase = 'work';
@@ -1838,6 +2211,8 @@
     isRunning = true;
     showPauseIcon();
     intervalId = setInterval(tick, 1000);
+    // Resume ambient sound if unpausing during break phase
+    if (phase === 'break') startAmbientSound();
     updateDisplay();
     saveStateImmediate();
     notifyStateChanged();
@@ -1853,6 +2228,7 @@
     isRunning = false;
     showPlayIcon();
     cancelScheduledNotification();
+    stopAmbientSound();
     // Accumulate partial work time
     if (phase === 'work') {
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
@@ -1872,6 +2248,7 @@
     }
     isRunning = false;
     cancelScheduledNotification();
+    stopAmbientSound();
     // If resetting during work, accumulate partial work time
     if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
@@ -1920,6 +2297,7 @@
       totalPhaseSeconds = BREAK_SECONDS;
     } else {
       // Move to next work session
+      stopAmbientSound();
       sessionCount++;
       phase = 'work';
       secondsLeft = WORK_SECONDS;
@@ -2064,6 +2442,7 @@
     }
     isRunning = false;
     cancelScheduledNotification();
+    stopAmbientSound();
 
     // Accumulate any remaining partial work
     if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
@@ -2155,6 +2534,7 @@
     }
     isRunning = false;
     cancelScheduledNotification();
+    stopAmbientSound();
     timerEl.style.display = 'none';
     categoryEl.style.display = 'none';
     categoryEl.textContent = '';
