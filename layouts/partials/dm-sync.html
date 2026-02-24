@@ -2350,22 +2350,23 @@
   var _sharedTodosUnsubscribe = null;
   var _shareInvitesUnsubscribe = null;
   var _ownerSharesUnsubscribe = null;
+  var _sharedTodosRetryTimer = null;
+  var _sharedTodosRetryCount = 0;
+  var SHARED_TODOS_MAX_RETRIES = 5;
 
-  function startSharedTaskListeners(userId) {
-    stopSharedTaskListeners();
+  function _attachSharedTodosListener(userId) {
     if (!window.dmDb) return;
-    var user = window.dmAuth && window.dmAuth.currentUser;
-    if (!user) return;
-
-    // Listen for changes to todos where current user is a collaborator
     _sharedTodosUnsubscribe = window.dmDb.collection('todos')
       .where('collaborators', 'array-contains', userId)
       .onSnapshot(function(snapshot) {
+        _sharedTodosRetryCount = 0; // reset on success
         var changes = [];
         snapshot.docChanges().forEach(function(change) {
           if (change.type === 'added' || change.type === 'modified') {
+            console.log('[dm-sync] Shared todo ' + change.type + ':', change.doc.id, change.doc.data().title);
             changes.push(serializeTodo(change.doc));
           } else if (change.type === 'removed') {
+            console.log('[dm-sync] Shared todo removed:', change.doc.id);
             // Remove from local IDB if we're no longer a collaborator
             idbGet(STORE_TODOS, change.doc.id).then(function(todo) {
               if (todo && todo.userId !== userId) {
@@ -2381,7 +2382,29 @@
         }
       }, function(err) {
         console.warn('[dm-sync] Shared todos listener error:', err);
+        // Retry with exponential backoff
+        if (_sharedTodosRetryCount < SHARED_TODOS_MAX_RETRIES) {
+          var delay = Math.min(1000 * Math.pow(2, _sharedTodosRetryCount), 30000);
+          _sharedTodosRetryCount++;
+          console.log('[dm-sync] Retrying shared todos listener in ' + delay + 'ms (attempt ' + _sharedTodosRetryCount + '/' + SHARED_TODOS_MAX_RETRIES + ')');
+          _sharedTodosRetryTimer = setTimeout(function() {
+            _attachSharedTodosListener(userId);
+          }, delay);
+        } else {
+          console.error('[dm-sync] Shared todos listener failed after ' + SHARED_TODOS_MAX_RETRIES + ' retries — falling back to periodic sync');
+        }
       });
+  }
+
+  function startSharedTaskListeners(userId) {
+    stopSharedTaskListeners();
+    if (!window.dmDb) return;
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return;
+
+    // Listen for changes to todos where current user is a collaborator
+    _sharedTodosRetryCount = 0;
+    _attachSharedTodosListener(userId);
 
     // Listen for incoming share invitations
     _shareInvitesUnsubscribe = window.dmDb.collection('taskShares')
@@ -2435,6 +2458,11 @@
   }
 
   function stopSharedTaskListeners() {
+    if (_sharedTodosRetryTimer) {
+      clearTimeout(_sharedTodosRetryTimer);
+      _sharedTodosRetryTimer = null;
+    }
+    _sharedTodosRetryCount = 0;
     if (_sharedTodosUnsubscribe) {
       _sharedTodosUnsubscribe();
       _sharedTodosUnsubscribe = null;
