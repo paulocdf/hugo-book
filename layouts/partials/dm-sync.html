@@ -902,7 +902,8 @@
           // Skip items with pending writes in the queue — they haven't synced yet
           var toDelete = [];
           localTodos.forEach(function(lt) {
-            if (!remoteMap[lt.id] && !pendingIds[lt.id]) {
+            var isCollaborator = lt.collaborators && lt.collaborators.indexOf(userId) !== -1;
+            if (!remoteMap[lt.id] && !pendingIds[lt.id] && !isCollaborator) {
               toDelete.push(lt.id);
             }
           });
