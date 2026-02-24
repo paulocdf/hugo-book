@@ -2348,10 +2348,13 @@
   // ─── Real-Time Listeners for Shared Tasks ───
 
   var _sharedTodosUnsubscribe = null;
+  var _ownTodosUnsubscribe = null;
   var _shareInvitesUnsubscribe = null;
   var _ownerSharesUnsubscribe = null;
   var _sharedTodosRetryTimer = null;
   var _sharedTodosRetryCount = 0;
+  var _ownTodosRetryTimer = null;
+  var _ownTodosRetryCount = 0;
   var SHARED_TODOS_MAX_RETRIES = 5;
 
   function _attachSharedTodosListener(userId) {
@@ -2396,6 +2399,42 @@
       });
   }
 
+  function _attachOwnTodosListener(userId) {
+    if (!window.dmDb) return;
+    _ownTodosUnsubscribe = window.dmDb.collection('todos')
+      .where('userId', '==', userId)
+      .onSnapshot(function(snapshot) {
+        _ownTodosRetryCount = 0; // reset on success
+        var changes = [];
+        snapshot.docChanges().forEach(function(change) {
+          if (change.type === 'added' || change.type === 'modified') {
+            // Skip local writes that haven't committed to server yet
+            if (change.doc.metadata.hasPendingWrites) return;
+            changes.push(serializeTodo(change.doc));
+          }
+          // Deletions of own todos are handled by syncTodos / user actions
+        });
+        if (changes.length > 0) {
+          idbPutBatch(STORE_TODOS, changes).then(function() {
+            window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Own todos listener error:', err);
+        // Retry with exponential backoff
+        if (_ownTodosRetryCount < SHARED_TODOS_MAX_RETRIES) {
+          var delay = Math.min(1000 * Math.pow(2, _ownTodosRetryCount), 30000);
+          _ownTodosRetryCount++;
+          console.log('[dm-sync] Retrying own todos listener in ' + delay + 'ms (attempt ' + _ownTodosRetryCount + '/' + SHARED_TODOS_MAX_RETRIES + ')');
+          _ownTodosRetryTimer = setTimeout(function() {
+            _attachOwnTodosListener(userId);
+          }, delay);
+        } else {
+          console.error('[dm-sync] Own todos listener failed after ' + SHARED_TODOS_MAX_RETRIES + ' retries — falling back to periodic sync');
+        }
+      });
+  }
+
   function startSharedTaskListeners(userId) {
     stopSharedTaskListeners();
     if (!window.dmDb) return;
@@ -2405,6 +2444,10 @@
     // Listen for changes to todos where current user is a collaborator
     _sharedTodosRetryCount = 0;
     _attachSharedTodosListener(userId);
+
+    // Listen for changes to user's own todos (e.g. collaborator edits)
+    _ownTodosRetryCount = 0;
+    _attachOwnTodosListener(userId);
 
     // Listen for incoming share invitations
     _shareInvitesUnsubscribe = window.dmDb.collection('taskShares')
@@ -2463,9 +2506,18 @@
       _sharedTodosRetryTimer = null;
     }
     _sharedTodosRetryCount = 0;
+    if (_ownTodosRetryTimer) {
+      clearTimeout(_ownTodosRetryTimer);
+      _ownTodosRetryTimer = null;
+    }
+    _ownTodosRetryCount = 0;
     if (_sharedTodosUnsubscribe) {
       _sharedTodosUnsubscribe();
       _sharedTodosUnsubscribe = null;
+    }
+    if (_ownTodosUnsubscribe) {
+      _ownTodosUnsubscribe();
+      _ownTodosUnsubscribe = null;
     }
     if (_shareInvitesUnsubscribe) {
       _shareInvitesUnsubscribe();
