@@ -427,6 +427,22 @@
     return (minutes / 25).toFixed(1);
   }
 
+  // Auto-scale minutes to hours, days, months, years
+  function formatTime(minutes) {
+    if (minutes == null || isNaN(minutes)) return '0m';
+    var abs = Math.abs(minutes);
+    var prefix = minutes < 0 ? '-' : '';
+    if (abs < 120) return prefix + Math.round(abs) + 'm';
+    var hours = abs / 60;
+    if (hours < 48) return prefix + hours.toFixed(1) + 'h';
+    var days = abs / 1440;
+    if (days < 60) return prefix + days.toFixed(1) + 'd';
+    var months = abs / 43200;
+    if (months < 24) return prefix + months.toFixed(1) + 'mo';
+    var years = abs / 525600;
+    return prefix + years.toFixed(1) + 'y';
+  }
+
   function showState(state) {
     authEl.style.display = state === 'auth' ? '' : 'none';
     loadingEl.style.display = state === 'loading' ? '' : 'none';
@@ -501,13 +517,13 @@
     html += '</div>';
 
     html += '<div class="dashboard-stat">';
-    html += '<div class="dashboard-stat-value">' + totalActual + '<span style="font-size: 0.8rem; font-weight: 400;">min</span></div>';
+    html += '<div class="dashboard-stat-value">' + formatTime(totalActual) + '</div>';
     html += '<div class="dashboard-stat-label">Time Tracked</div>';
     html += '<div class="dashboard-stat-sub">' + pom(totalActual) + ' pomodoros</div>';
     html += '</div>';
 
     html += '<div class="dashboard-stat">';
-    html += '<div class="dashboard-stat-value">' + totalEst + '<span style="font-size: 0.8rem; font-weight: 400;">min</span></div>';
+    html += '<div class="dashboard-stat-value">' + formatTime(totalEst) + '</div>';
     html += '<div class="dashboard-stat-label">Time Estimated</div>';
     html += '<div class="dashboard-stat-sub">' + pom(totalEst) + ' pomodoros</div>';
     html += '</div>';
@@ -612,11 +628,11 @@
       html += '<div class="dashboard-bar-track">';
       html += '<div class="dashboard-bar-pair">';
       html += '<div class="dashboard-bar estimated" style="width: ' + estPct + '%;"></div>';
-      html += '<span class="dashboard-bar-value">' + data.est + 'min <span class="dashboard-pom">(' + pom(data.est) + 'p)</span></span>';
+      html += '<span class="dashboard-bar-value">' + formatTime(data.est) + ' <span class="dashboard-pom">(' + pom(data.est) + 'p)</span></span>';
       html += '</div>';
       html += '<div class="dashboard-bar-pair">';
       html += '<div class="dashboard-bar actual" style="width: ' + actPct + '%;"></div>';
-      html += '<span class="dashboard-bar-value">' + data.actual + 'min <span class="dashboard-pom">(' + pom(data.actual) + 'p)</span></span>';
+      html += '<span class="dashboard-bar-value">' + formatTime(data.actual) + ' <span class="dashboard-pom">(' + pom(data.actual) + 'p)</span></span>';
       html += '<span class="dashboard-bar-accuracy ' + accClass + '">' + accText + '</span>';
       html += '</div>';
       html += '</div>';
@@ -666,7 +682,7 @@
       html += '<div class="dashboard-cat-label" title="' + escapeHtml(cat) + '">' + escapeHtml(cat) + '</div>';
       html += '<div class="dashboard-cat-track">';
       html += '<div class="dashboard-cat-bar" style="width: ' + pct + '%; background: ' + color + ';"></div>';
-      html += '<span class="dashboard-cat-value">' + minutes + 'min (' + share + '%) <span class="dashboard-pom">' + pom(minutes) + 'p</span></span>';
+      html += '<span class="dashboard-cat-value">' + formatTime(minutes) + ' (' + share + '%) <span class="dashboard-pom">' + pom(minutes) + 'p</span></span>';
       html += '</div>';
       html += '</div>';
     });
@@ -721,13 +737,13 @@
         html += '<span class="dashboard-activity-task-check">&#10003;</span>';
         html += '<span class="dashboard-activity-task-title" title="' + escapeHtml(t.title) + '">' + escapeHtml(t.title) + '</span>';
         if (t.actualMin) {
-          html += '<span class="dashboard-activity-task-time">' + t.actualMin + 'min</span>';
+          html += '<span class="dashboard-activity-task-time">' + formatTime(t.actualMin) + '</span>';
         }
         html += '</div>';
       });
 
       if (totalMin > 0) {
-        html += '<div class="dashboard-activity-summary">' + day.tasks.length + ' task' + (day.tasks.length !== 1 ? 's' : '') + ' &middot; ' + totalMin + 'min &middot; ' + pom(totalMin) + ' pom</div>';
+        html += '<div class="dashboard-activity-summary">' + day.tasks.length + ' task' + (day.tasks.length !== 1 ? 's' : '') + ' &middot; ' + formatTime(totalMin) + ' &middot; ' + pom(totalMin) + ' pom</div>';
       }
 
       html += '</div></div>';

@@ -65,6 +65,24 @@
   };
 
   // =========================================================================
+  // Time formatting — auto-scales minutes to hours, days, months, years
+  // =========================================================================
+  function formatTime(minutes) {
+    if (minutes == null || isNaN(minutes)) return '0m';
+    var abs = Math.abs(minutes);
+    var prefix = minutes < 0 ? '-' : '';
+    if (abs < 120) return prefix + Math.round(abs) + 'm';
+    var hours = abs / 60;
+    if (hours < 48) return prefix + hours.toFixed(1) + 'h';
+    var days = abs / 1440;
+    if (days < 60) return prefix + days.toFixed(1) + 'd';
+    var months = abs / 43200;
+    if (months < 24) return prefix + months.toFixed(1) + 'mo';
+    var years = abs / 525600;
+    return prefix + years.toFixed(1) + 'y';
+  }
+
+  // =========================================================================
   // State
   // =========================================================================
   const graphWrapper = document.getElementById('graph-wrapper');
@@ -1225,7 +1243,8 @@
     var statRow = document.createElement('div');
     statRow.className = 'time-stat-row';
 
-    function buildStatCard(value, label, suffix, prevValue) {
+    function buildStatCard(value, label, isTime, prevValue) {
+      var displayValue = isTime ? formatTime(value) : value;
       var deltaHtml = '';
       if (prevStats != null && prevValue != null) {
         var pct = pctChange(typeof value === 'number' ? value : parseFloat(value), prevValue);
@@ -1233,24 +1252,25 @@
         var isDown = pct < 0;
         var arrow = isUp ? '&#9650;' : (isDown ? '&#9660;' : '&#9644;');
         var cls = isUp ? 'up' : (isDown ? 'down' : 'neutral');
+        var prevDisplay = isTime ? formatTime(prevValue) : prevValue;
         deltaHtml = '<div class="time-stat-delta ' + cls + '">' +
           '<span class="time-stat-delta-arrow">' + arrow + '</span> ' +
           Math.abs(pct) + '%' +
-          '<span class="time-stat-delta-prev"> vs ' + prevValue + (suffix || '') + '</span>' +
+          '<span class="time-stat-delta-prev"> vs ' + prevDisplay + '</span>' +
         '</div>';
       }
       return '<div class="time-stat-card">' +
-        '<div class="time-stat-value">' + value + (suffix ? '<span style="font-size:0.9rem;font-weight:400;">' + suffix + '</span>' : '') + '</div>' +
+        '<div class="time-stat-value">' + displayValue + '</div>' +
         '<div class="time-stat-label">' + label + '</div>' +
         deltaHtml +
       '</div>';
     }
 
     statRow.innerHTML =
-      buildStatCard(currentStats.completed, 'Completed', '', prevStats ? prevStats.completed : null) +
-      buildStatCard(currentStats.totalActual, 'Actual Time', 'm', prevStats ? prevStats.totalActual : null) +
-      buildStatCard(currentStats.totalEstimated, 'Estimated', 'm', prevStats ? prevStats.totalEstimated : null) +
-      buildStatCard(currentStats.totalPomodoros, 'Pomodoros', '', prevStats ? prevStats.totalPomodoros : null);
+      buildStatCard(currentStats.completed, 'Completed', false, prevStats ? prevStats.completed : null) +
+      buildStatCard(currentStats.totalActual, 'Actual Time', true, prevStats ? prevStats.totalActual : null) +
+      buildStatCard(currentStats.totalEstimated, 'Estimated', true, prevStats ? prevStats.totalEstimated : null) +
+      buildStatCard(currentStats.totalPomodoros, 'Pomodoros', false, prevStats ? prevStats.totalPomodoros : null);
     contentArea.appendChild(statRow);
 
     // Animate stat cards
@@ -1401,7 +1421,7 @@
           var pct = Math.round(d.data.actual / prevTotal * 100);
           tooltip.innerHTML =
             '<div class="graph-tooltip-title">' + d.data.name + ' <span style="opacity:0.6">(prev period)</span></div>' +
-            '<div class="graph-tooltip-category">' + d.data.actual + ' min (' + pct + '%)</div>' +
+            '<div class="graph-tooltip-category">' + formatTime(d.data.actual) + ' (' + pct + '%)</div>' +
             '<div class="graph-tooltip-connections">' + d.data.count + ' task' + (d.data.count !== 1 ? 's' : '') + '</div>';
           tooltip.style.opacity = '1';
           moveTooltip(event);
@@ -1471,14 +1491,14 @@
         var pct = Math.round(d.data.actual / d3.sum(categoryData, function(c) { return c.actual; }) * 100);
         var hoverHtml =
           '<div class="graph-tooltip-title">' + d.data.name + '</div>' +
-          '<div class="graph-tooltip-category">' + d.data.actual + ' min (' + pct + '%)</div>' +
+          '<div class="graph-tooltip-category">' + formatTime(d.data.actual) + ' (' + pct + '%)</div>' +
           '<div class="graph-tooltip-connections">' + d.data.count + ' task' + (d.data.count !== 1 ? 's' : '') + '</div>';
         // Show comparison in tooltip if previous data exists for this category
         if (prevStats && prevStats.categoryMap[d.data.name]) {
           var prevCat = prevStats.categoryMap[d.data.name];
           var delta = d.data.actual - prevCat.actual;
           var sign = delta >= 0 ? '+' : '';
-          hoverHtml += '<div class="graph-tooltip-delta">' + sign + delta + ' min vs prev period</div>';
+          hoverHtml += '<div class="graph-tooltip-delta">' + sign + formatTime(delta) + ' vs prev period</div>';
         }
         tooltip.innerHTML = hoverHtml;
         tooltip.style.opacity = '1';
@@ -1499,25 +1519,10 @@
     centerG.append('text')
       .attr('text-anchor', 'middle')
       .attr('dominant-baseline', 'central')
-      .attr('dy', '-0.3em')
-      .text(totalMin)
+      .text(formatTime(totalMin))
       .style('fill', theme.text)
       .style('font-size', '1.6rem')
       .style('font-weight', '700')
-      .style('font-family', "'Inter', sans-serif")
-      .attr('opacity', 0)
-      .transition().delay(500).duration(400)
-      .attr('opacity', 1);
-
-    centerG.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dominant-baseline', 'central')
-      .attr('dy', '1.1em')
-      .text('minutes')
-      .style('fill', theme.textMuted)
-      .style('font-size', '0.7rem')
-      .style('text-transform', 'uppercase')
-      .style('letter-spacing', '0.08em')
       .style('font-family', "'Inter', sans-serif")
       .attr('opacity', 0)
       .transition().delay(500).duration(400)
@@ -1590,7 +1595,7 @@
     // Y axis
     g.append('g')
       .attr('class', 'time-axis')
-      .call(d3.axisLeft(y).ticks(5).tickFormat(function(d) { return d + 'm'; }));
+      .call(d3.axisLeft(y).ticks(5).tickFormat(function(d) { return formatTime(d); }));
 
     // ---- Previous period ghost bars (rendered first, behind current bars) ----
     if (prevStats) {
@@ -1625,7 +1630,7 @@
           if (!prev) return;
           tooltip.innerHTML =
             '<div class="graph-tooltip-title">' + catName + ' <span style="opacity:0.6">(prev period)</span></div>' +
-            '<div class="graph-tooltip-category">Estimated: ' + prev.estimated + ' min</div>';
+            '<div class="graph-tooltip-category">Estimated: ' + formatTime(prev.estimated) + '</div>';
           tooltip.style.opacity = '1';
           moveTooltip(event);
         })
@@ -1657,7 +1662,7 @@
           if (!prev) return;
           tooltip.innerHTML =
             '<div class="graph-tooltip-title">' + catName + ' <span style="opacity:0.6">(prev period)</span></div>' +
-            '<div class="graph-tooltip-category">Actual: ' + prev.actual + ' min</div>';
+            '<div class="graph-tooltip-category">Actual: ' + formatTime(prev.actual) + '</div>';
           tooltip.style.opacity = '1';
           moveTooltip(event);
         })
@@ -1688,7 +1693,7 @@
       .on('mouseover', function(event, d) {
         tooltip.innerHTML =
           '<div class="graph-tooltip-title">' + d.name + '</div>' +
-          '<div class="graph-tooltip-category">Estimated: ' + d.estimated + ' min</div>';
+          '<div class="graph-tooltip-category">Estimated: ' + formatTime(d.estimated) + '</div>';
         tooltip.style.opacity = '1';
         moveTooltip(event);
       })
@@ -1716,14 +1721,14 @@
         var sign = diff >= 0 ? '+' : '';
         var hoverHtml =
           '<div class="graph-tooltip-title">' + d.name + '</div>' +
-          '<div class="graph-tooltip-category">Actual: ' + d.actual + ' min</div>' +
-          '<div class="graph-tooltip-connections">' + sign + diff + ' min vs estimate</div>';
+          '<div class="graph-tooltip-category">Actual: ' + formatTime(d.actual) + '</div>' +
+          '<div class="graph-tooltip-connections">' + sign + formatTime(diff) + ' vs estimate</div>';
         // Show comparison to previous period
         if (prevStats && prevCatMap[d.name]) {
           var prevActual = prevCatMap[d.name].actual;
           var periodDiff = d.actual - prevActual;
           var periodSign = periodDiff >= 0 ? '+' : '';
-          hoverHtml += '<div class="graph-tooltip-delta">' + periodSign + periodDiff + ' min vs prev period</div>';
+          hoverHtml += '<div class="graph-tooltip-delta">' + periodSign + formatTime(periodDiff) + ' vs prev period</div>';
         }
         tooltip.innerHTML = hoverHtml;
         tooltip.style.opacity = '1';
