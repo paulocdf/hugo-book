@@ -193,7 +193,7 @@
   border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 6px;
-  cursor: pointer;
+  cursor: grab;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
   user-select: none;
 }
@@ -204,6 +204,7 @@
 }
 
 .kanban-card:active {
+  cursor: grabbing;
   transform: scale(0.98);
 }
 
@@ -501,6 +502,41 @@
   opacity: 0;
 }
 
+/* Clone that follows cursor during drag */
+.sortable-fallback.kanban-card {
+  opacity: 0.92 !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  transform: rotate(3deg) scale(1.04);
+  z-index: 9999;
+  cursor: grabbing;
+  border-color: var(--color-link);
+}
+
+/* Board-level drag state */
+.kanban-board--dragging .kanban-card {
+  cursor: grabbing;
+}
+
+/* Column highlight when a card is dragged over it */
+.kanban-column--dragover > .kanban-column-items {
+  background: color-mix(in srgb, var(--color-link) 6%, transparent);
+  border-radius: 8px;
+  transition: background 0.15s ease;
+}
+
+/* Empty column placeholder highlight during drag */
+.kanban-board--dragging .kanban-column-empty {
+  border-color: var(--border-medium);
+  color: var(--text-muted);
+  transition: border-color 0.15s ease, color 0.15s ease, background 0.15s ease;
+}
+.kanban-column--dragover .kanban-column-empty {
+  border-color: var(--color-link);
+  color: var(--color-link);
+  background: color-mix(in srgb, var(--color-link) 5%, transparent);
+  pointer-events: none;
+}
+
 /* Responsive */
 @media (max-width: 1024px) and (min-width: 769px) {
   .kanban-board {
@@ -536,7 +572,8 @@
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .kanban-card,
-  .kanban-card--chosen {
+  .kanban-card--chosen,
+  .sortable-fallback.kanban-card {
     transition: none;
     transform: none;
   }
@@ -1008,7 +1045,24 @@
         delay: 150,
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
+        onStart: function() {
+          var board = document.getElementById('kanban-board');
+          if (board) board.classList.add('kanban-board--dragging');
+        },
+        onMove: function(moveEvt) {
+          // Highlight the column being dragged over
+          var allCols = container.querySelectorAll('.kanban-column');
+          allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
+          var targetCol = moveEvt.to.closest('.kanban-column');
+          if (targetCol) targetCol.classList.add('kanban-column--dragover');
+        },
         onEnd: function(evt) {
+          // Clean up drag state classes
+          var board = document.getElementById('kanban-board');
+          if (board) board.classList.remove('kanban-board--dragging');
+          var allCols = container.querySelectorAll('.kanban-column');
+          allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
+
           var todoId = evt.item.getAttribute('data-todo-id');
           var newColumn = evt.to.closest('.kanban-column').getAttribute('data-kanban-status');
           var todo = allTodos.find(function(t) { return t.id === todoId; });
