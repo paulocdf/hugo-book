@@ -3187,7 +3187,7 @@
         }
         html += '</button>';
         // Stop button
-        html += '<button type="button" class="todo-item-pomo-inline pomo-stop" data-pomodoro-stop-id="' + todo.id + '" title="Stop &amp; record time" aria-label="Stop timer">';
+        html += '<button type="button" class="todo-item-pomo-inline pomo-stop" data-pomodoro-stop-id="' + todo.id + '" title="Discard &amp; close" aria-label="Discard timer">';
         html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>';
         html += '</button>';
       } else {
@@ -4446,7 +4446,8 @@
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
         if (window.dmPomodoro) {
-          window.dmPomodoro.stop();
+          window.dmPomodoro.reset(); // discard all accumulated time
+          window.dmPomodoro.stop();  // close the timer
           render();
         }
       });
