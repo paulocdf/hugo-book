@@ -1443,7 +1443,7 @@ aside nav ul a:hover {
   background: var(--body-background);
   border-radius: 14px;
   width: 94%;
-  max-width: 460px;
+  max-width: 640px;
   max-height: 85vh;
   display: flex;
   flex-direction: column;
@@ -1460,7 +1460,7 @@ aside nav ul a:hover {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
+  padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--gray-200);
   flex-shrink: 0;
 }
@@ -1488,13 +1488,13 @@ aside nav ul a:hover {
 
 .settings-modal-body {
   overflow-y: auto;
-  padding: 0.5rem 1.25rem 1.25rem;
+  padding: 0.5rem 1.5rem 1.5rem;
   flex: 1;
   min-height: 0;
 }
 
 .settings-modal-section {
-  padding: 0.75rem 0;
+  padding: 1rem 0;
 
   & + .settings-modal-section {
     border-top: 1px solid var(--gray-200);
@@ -1507,7 +1507,7 @@ aside nav ul a:hover {
   color: var(--color-link);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.65rem;
 }
 
 .settings-modal-group-label {
@@ -1516,16 +1516,37 @@ aside nav ul a:hover {
   color: var(--gray-400);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 4px 0 0;
+  padding: 4px 0 2px;
   margin-top: 4px;
+}
+
+.settings-modal-subgroup {
+  background: var(--gray-100);
+  border-radius: 8px;
+  padding: 2px 12px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+
+  .settings-modal-group-label {
+    margin-top: 0;
+    padding-top: 8px;
+  }
+
+  .settings-modal-row + .settings-modal-row {
+    border-top-color: var(--gray-200);
+  }
+
+  .settings-modal-row:last-child {
+    border-bottom: none;
+  }
 }
 
 .settings-modal-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 5px 0;
+  gap: 12px;
+  padding: 7px 0;
 
   & + .settings-modal-row {
     border-top: 1px solid var(--gray-100);
@@ -1533,7 +1554,7 @@ aside nav ul a:hover {
 }
 
 .settings-modal-label {
-  font-size: 0.8rem;
+  font-size: 0.83rem;
   font-weight: 500;
   color: var(--gray-500);
   white-space: nowrap;
@@ -1542,12 +1563,12 @@ aside nav ul a:hover {
 .settings-modal-control {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .settings-modal-input {
-  width: 52px;
-  padding: 4px 6px;
+  width: 60px;
+  padding: 5px 6px;
   border: 1px solid var(--gray-200);
   border-radius: 6px;
   font-size: 0.8rem;
@@ -1619,8 +1640,8 @@ aside nav ul a:hover {
 
 // Select dropdown
 .settings-modal-select {
-  width: 100px;
-  padding: 4px 6px;
+  width: 140px;
+  padding: 5px 6px;
   border: 1px solid var(--gray-200);
   border-radius: 6px;
   font-size: 0.78rem;
@@ -1668,7 +1689,7 @@ aside nav ul a:hover {
 }
 
 .settings-modal-range {
-  width: 80px;
+  width: 120px;
   height: 4px;
   appearance: none;
   -webkit-appearance: none;
@@ -1816,6 +1837,18 @@ aside nav ul a:hover {
 
   .settings-modal-body {
     padding: 0.25rem 1rem 1rem;
+  }
+
+  .settings-modal-select {
+    width: 110px;
+  }
+
+  .settings-modal-range {
+    width: 100px;
+  }
+
+  .settings-modal-subgroup {
+    padding: 2px 10px;
   }
 }
 

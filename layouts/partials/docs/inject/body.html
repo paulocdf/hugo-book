@@ -3006,34 +3006,38 @@
           // ── Pomodoro section ──
           '<div class="settings-modal-section">' +
             '<div class="settings-modal-section-label">Pomodoro</div>' +
-            '<div class="settings-modal-group-label">Short session</div>' +
-            '<div class="settings-modal-row">' +
-              '<label class="settings-modal-label" for="setting-pomo-short-work">Work</label>' +
-              '<div class="settings-modal-control">' +
-                '<input type="number" id="setting-pomo-short-work" class="settings-modal-input" min="1" max="120" value="25">' +
-                '<span class="settings-modal-unit">min</span>' +
+            '<div class="settings-modal-subgroup">' +
+              '<div class="settings-modal-group-label">Short session</div>' +
+              '<div class="settings-modal-row">' +
+                '<label class="settings-modal-label" for="setting-pomo-short-work">Work</label>' +
+                '<div class="settings-modal-control">' +
+                  '<input type="number" id="setting-pomo-short-work" class="settings-modal-input" min="1" max="120" value="25">' +
+                  '<span class="settings-modal-unit">min</span>' +
+                '</div>' +
+              '</div>' +
+              '<div class="settings-modal-row">' +
+                '<label class="settings-modal-label" for="setting-pomo-short-break">Break</label>' +
+                '<div class="settings-modal-control">' +
+                  '<input type="number" id="setting-pomo-short-break" class="settings-modal-input" min="1" max="60" value="5">' +
+                  '<span class="settings-modal-unit">min</span>' +
+                '</div>' +
               '</div>' +
             '</div>' +
-            '<div class="settings-modal-row">' +
-              '<label class="settings-modal-label" for="setting-pomo-short-break">Break</label>' +
-              '<div class="settings-modal-control">' +
-                '<input type="number" id="setting-pomo-short-break" class="settings-modal-input" min="1" max="60" value="5">' +
-                '<span class="settings-modal-unit">min</span>' +
+            '<div class="settings-modal-subgroup">' +
+              '<div class="settings-modal-group-label">Long session</div>' +
+              '<div class="settings-modal-row">' +
+                '<label class="settings-modal-label" for="setting-pomo-long-work">Work</label>' +
+                '<div class="settings-modal-control">' +
+                  '<input type="number" id="setting-pomo-long-work" class="settings-modal-input" min="1" max="120" value="50">' +
+                  '<span class="settings-modal-unit">min</span>' +
+                '</div>' +
               '</div>' +
-            '</div>' +
-            '<div class="settings-modal-group-label">Long session</div>' +
-            '<div class="settings-modal-row">' +
-              '<label class="settings-modal-label" for="setting-pomo-long-work">Work</label>' +
-              '<div class="settings-modal-control">' +
-                '<input type="number" id="setting-pomo-long-work" class="settings-modal-input" min="1" max="120" value="50">' +
-                '<span class="settings-modal-unit">min</span>' +
-              '</div>' +
-            '</div>' +
-            '<div class="settings-modal-row">' +
-              '<label class="settings-modal-label" for="setting-pomo-long-break">Break</label>' +
-              '<div class="settings-modal-control">' +
-                '<input type="number" id="setting-pomo-long-break" class="settings-modal-input" min="1" max="60" value="10">' +
-                '<span class="settings-modal-unit">min</span>' +
+              '<div class="settings-modal-row">' +
+                '<label class="settings-modal-label" for="setting-pomo-long-break">Break</label>' +
+                '<div class="settings-modal-control">' +
+                  '<input type="number" id="setting-pomo-long-break" class="settings-modal-input" min="1" max="60" value="10">' +
+                  '<span class="settings-modal-unit">min</span>' +
+                '</div>' +
               '</div>' +
             '</div>' +
             '<div class="settings-modal-row">' +
