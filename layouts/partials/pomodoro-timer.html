@@ -2196,6 +2196,7 @@
         secondsLeft = BREAK_SECONDS;
         totalPhaseSeconds = BREAK_SECONDS;
         updateDisplay();
+        persistProgressSnapshot();
         saveStateImmediate();
         // Auto-start break (if enabled in settings)
         var _autoBreak = true;
@@ -2212,6 +2213,7 @@
         secondsLeft = WORK_SECONDS;
         totalPhaseSeconds = WORK_SECONDS;
         updateDisplay();
+        persistProgressSnapshot();
         saveStateImmediate();
         // Auto-start work (if enabled in settings)
         var _autoWork = false;
@@ -2290,6 +2292,26 @@
     notifyStateChanged();
   }
 
+  // Persist current progress snapshot so tracked time and completed sessions
+  // survive browser crashes, navigation, or interrupted timers. Called after
+  // every phase transition (skip or natural completion).
+  function persistProgressSnapshot() {
+    if (!activeTodoId) return;
+    var trackedMinutes = Math.round(accumulatedWorkSeconds / 60);
+    if (trackedMinutes > 0) {
+      saveTrackedMinutes(activeTodoId, trackedMinutes);
+    }
+    // Compute sessionsCompleted using same logic as closeTimer()
+    var sessionsCompleted = sessionCount - 1;
+    if (phase === 'break') {
+      // Work for current session finished — count it
+      sessionsCompleted = sessionCount;
+    }
+    if (sessionsCompleted > 0 && totalSessions > 1) {
+      saveTaskProgress(activeTodoId, sessionsCompleted, accumulatedWorkSeconds, totalSessions, WORK_SECONDS, BREAK_SECONDS);
+    }
+  }
+
   function skipPhase() {
     if (intervalId) {
       clearInterval(intervalId);
@@ -2333,6 +2355,7 @@
     }
     showPlayIcon();
     updateDisplay();
+    persistProgressSnapshot();
     saveStateImmediate();
     notifyStateChanged();
   }
