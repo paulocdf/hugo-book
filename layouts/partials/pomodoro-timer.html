@@ -49,9 +49,6 @@
           <div class="pomodoro-focus-category" id="focus-category" style="display:none;"></div>
         </div>
         <div class="pomodoro-focus-header-actions">
-          <button type="button" class="pomodoro-focus-viz-toggle" id="focus-viz-toggle" title="Switch visualizer mode" aria-label="Switch visualizer mode">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-          </button>
           <button type="button" class="pomodoro-focus-collapse" id="focus-collapse" title="Exit focus mode" aria-label="Exit focus mode">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
           </button>
@@ -505,6 +502,7 @@
   overflow: hidden;
   border-radius: 19px 19px 0 0;
   background: #0a0a14;
+  cursor: pointer;
 }
 .pomodoro-focus-viz-canvas {
   position: absolute;
@@ -857,22 +855,6 @@
   letter-spacing: 0.04em;
   margin-top: 2px;
 }
-/* Visualizer toggle in header strip */
-.pomodoro-focus-viz-toggle {
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  padding: 3px 5px;
-  line-height: 1;
-  border-radius: 4px;
-  transition: color 0.15s, border-color 0.15s;
-  font-size: 0.6rem;
-}
-.pomodoro-focus-viz-toggle:hover {
-  color: rgba(255, 255, 255, 0.95);
-  border-color: rgba(255, 255, 255, 0.5);
-}
 /* Responsive: tablets / smaller desktops */
 @media (max-width: 800px) {
   .pomodoro-focus-card {
@@ -1091,7 +1073,7 @@
   var _focusNotesTimer = null;
   var _focusNotesOriginal = '';
   var focusVizCanvas = document.getElementById('focus-viz-canvas');
-  var focusVizToggle = document.getElementById('focus-viz-toggle');
+  var focusHeaderStrip = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-header-strip') : null;
   var focusVizContainer = focusVizCanvas ? focusVizCanvas.parentElement : null;
 
   var activeTodoId = null;
@@ -3090,9 +3072,11 @@
     }
   }
 
-  // Toggle visualizer mode
-  if (focusVizToggle) {
-    focusVizToggle.addEventListener('click', function() {
+  // Toggle visualizer mode by clicking the header strip
+  if (focusHeaderStrip) {
+    focusHeaderStrip.addEventListener('click', function(e) {
+      // Don't toggle viz when clicking action buttons in the header
+      if (e.target.closest('.pomodoro-focus-header-actions')) return;
       vizMode = vizMode === 'aurora' ? 'wave' : 'aurora';
       // Clear canvas on mode switch for clean transition
       if (focusVizCanvas && focusVizContainer) {
