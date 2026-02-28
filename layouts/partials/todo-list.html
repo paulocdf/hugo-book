@@ -6281,5 +6281,82 @@
     }
   }
 
+  // ── Public API: expose minimal interface for cross-component use ──
+  window.dmTodoList = {
+    /**
+     * getNextTask(currentTodoId)
+     * Returns the next undone task in the same day group, after the given task.
+     * Follows the same sort order used in rendering (undone first, then by order).
+     * Returns { id: string, title: string } or null if no next task.
+     */
+    getNextTask: function(currentTodoId) {
+      if (!currentTodoId || !allTodos.length) return null;
+
+      // Find the current task
+      var current = null;
+      for (var i = 0; i < allTodos.length; i++) {
+        if (allTodos[i].id === currentTodoId) { current = allTodos[i]; break; }
+      }
+      if (!current) return null;
+
+      // Determine the day group key — use parent's scheduledDate if this is a subtask
+      var groupDate = current.scheduledDate;
+      if (current.parentId) {
+        for (var i = 0; i < allTodos.length; i++) {
+          if (allTodos[i].id === current.parentId) {
+            groupDate = allTodos[i].scheduledDate;
+            break;
+          }
+        }
+      }
+
+      // Collect all top-level tasks in the same day group
+      var groupParents = allTodos.filter(function(t) {
+        var s = t.status || 'active';
+        if (s !== 'active' && s !== 'done') return false;
+        if (t.parentId) return false;
+        if (t.bujoType && t.bujoType !== 'task') return false;
+        if (groupDate) return t.scheduledDate === groupDate;
+        return !t.scheduledDate; // unscheduled group
+      });
+
+      // Sort the same way as render: undone first, then by order
+      groupParents.sort(function(a, b) {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        return (a.order || 0) - (b.order || 0);
+      });
+
+      // Build ordered list: for each parent, interleave its undone subtasks
+      var ordered = [];
+      groupParents.forEach(function(p) {
+        ordered.push(p);
+        // Add undone subtask children (sorted by order)
+        var children = allTodos.filter(function(t) {
+          return t.parentId === p.id && !t.done && (t.bujoType === 'task' || !t.bujoType);
+        });
+        children.sort(function(a, b) {
+          return (a.order || 0) - (b.order || 0);
+        });
+        children.forEach(function(c) { ordered.push(c); });
+      });
+
+      // Find the current task's position
+      var idx = -1;
+      for (var i = 0; i < ordered.length; i++) {
+        if (ordered[i].id === currentTodoId) { idx = i; break; }
+      }
+      if (idx === -1) return null;
+
+      // Find the next undone task after the current one
+      for (var i = idx + 1; i < ordered.length; i++) {
+        if (!ordered[i].done) {
+          return { id: ordered[i].id, title: ordered[i].title };
+        }
+      }
+
+      return null; // No next task
+    }
+  };
+
 })();
 </script>
