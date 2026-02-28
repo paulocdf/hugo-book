@@ -1268,7 +1268,7 @@
   // Stores { todoId: { sessionsCompleted, accWorkSeconds, totalSessions, workSeconds, breakSeconds, savedAt } }
   // Survives task switches so users can resume where they left off.
 
-  function saveTaskProgress(todoId, sessionsCompleted, accWorkSec, totalSess, workSec, breakSec) {
+  function saveTaskProgress(todoId, sessionsCompleted, accWorkSec, totalSess, workSec, breakSec, remainingSec) {
     try {
       var all = {};
       var raw = localStorage.getItem(PROGRESS_KEY);
@@ -1279,6 +1279,7 @@
         totalSessions: totalSess,
         workSeconds: workSec,
         breakSeconds: breakSec,
+        remainingSeconds: remainingSec != null ? remainingSec : workSec,
         savedAt: Date.now()
       };
       localStorage.setItem(PROGRESS_KEY, JSON.stringify(all));
@@ -2308,7 +2309,8 @@
       sessionsCompleted = sessionCount;
     }
     if (accumulatedWorkSeconds > 0) {
-      saveTaskProgress(activeTodoId, sessionsCompleted, accumulatedWorkSeconds, totalSessions, WORK_SECONDS, BREAK_SECONDS);
+      // After a phase transition, remaining time for the next work session is always WORK_SECONDS
+      saveTaskProgress(activeTodoId, sessionsCompleted, accumulatedWorkSeconds, totalSessions, WORK_SECONDS, BREAK_SECONDS, WORK_SECONDS);
     }
   }
 
@@ -2460,12 +2462,15 @@
 
       // Check for prior progress on the next subtask
       var priorProgress = loadTaskProgress(nextSub.id);
-      if (priorProgress && priorProgress.sessionsCompleted > 0) {
+      var subRestoredRemaining = 0;
+      if (priorProgress && priorProgress.totalSessions === totalSessions) {
         sessionCount = priorProgress.sessionsCompleted + 1;
         accumulatedWorkSeconds = priorProgress.accWorkSeconds || 0;
-        if (priorProgress.totalSessions) totalSessions = priorProgress.totalSessions;
-        if (priorProgress.workSeconds) WORK_SECONDS = priorProgress.workSeconds;
-        if (priorProgress.breakSeconds) BREAK_SECONDS = priorProgress.breakSeconds;
+        if (priorProgress.workSeconds > 0) WORK_SECONDS = priorProgress.workSeconds;
+        if (priorProgress.breakSeconds > 0) BREAK_SECONDS = priorProgress.breakSeconds;
+        if (priorProgress.remainingSeconds > 0 && priorProgress.remainingSeconds <= WORK_SECONDS) {
+          subRestoredRemaining = priorProgress.remainingSeconds;
+        }
       } else {
         sessionCount = 1;
         accumulatedWorkSeconds = 0;
@@ -2473,8 +2478,8 @@
 
       // Set up timer for the new subtask (paused)
       phase = 'work';
-      secondsLeft = WORK_SECONDS;
-      totalPhaseSeconds = WORK_SECONDS;
+      secondsLeft = subRestoredRemaining || WORK_SECONDS;
+      totalPhaseSeconds = secondsLeft;
       isRunning = false;
       showPlayIcon();
 
@@ -2530,6 +2535,7 @@
     var closedWorkSec = WORK_SECONDS;
     var closedBreakSec = BREAK_SECONDS;
     var closedPhase = phase;
+    var closedSecondsLeft = secondsLeft;
     activeTodoId = null;
     activeTodoTitle = '';
     activeTodoCategory = '';
@@ -2554,7 +2560,11 @@
 
     // Save per-task progress if there's accumulated work and remaining sessions
     if (closedTodoId && !allDone && closedAccWork > 0) {
-      saveTaskProgress(closedTodoId, sessionsCompleted, closedAccWork, closedTotalSessions, closedWorkSec, closedBreakSec);
+      // If closed during work phase, save the remaining seconds so the timer can
+      // resume from the exact position. If closed during break, the next session
+      // starts fresh so remaining = full work duration.
+      var closedRemaining = closedPhase === 'work' ? closedSecondsLeft : closedWorkSec;
+      saveTaskProgress(closedTodoId, sessionsCompleted, closedAccWork, closedTotalSessions, closedWorkSec, closedBreakSec, closedRemaining);
     } else if (closedTodoId && allDone) {
       // All sessions complete — clear any prior progress
       clearTaskProgress(closedTodoId);
@@ -3997,6 +4007,7 @@
       function initAndStart() {
         // Check for prior session progress on this task
         var prior = loadTaskProgress(todoId);
+        var restoredRemaining = 0;
         if (prior && prior.totalSessions === totalSessions) {
           // Restore: resume from the next uncompleted session
           sessionCount = prior.sessionsCompleted + 1;
@@ -4004,14 +4015,18 @@
           // Use stored durations if they match (user may have changed settings)
           if (prior.workSeconds > 0) WORK_SECONDS = prior.workSeconds;
           if (prior.breakSeconds > 0) BREAK_SECONDS = prior.breakSeconds;
-          console.log('[pomo] Resuming task with ' + prior.sessionsCompleted + '/' + prior.totalSessions + ' sessions completed');
+          // Restore the exact timer position within the work phase
+          if (prior.remainingSeconds > 0 && prior.remainingSeconds <= WORK_SECONDS) {
+            restoredRemaining = prior.remainingSeconds;
+          }
+          console.log('[pomo] Resuming task with ' + prior.sessionsCompleted + '/' + prior.totalSessions + ' sessions completed, ' + (restoredRemaining || WORK_SECONDS) + 's remaining');
         } else {
           sessionCount = 1;
           accumulatedWorkSeconds = 0;
         }
         phase = 'work';
-        secondsLeft = WORK_SECONDS;
-        totalPhaseSeconds = WORK_SECONDS;
+        secondsLeft = restoredRemaining || WORK_SECONDS;
+        totalPhaseSeconds = secondsLeft;
         startedAt = Date.now();
         isRunning = false;
         showPlayIcon();
