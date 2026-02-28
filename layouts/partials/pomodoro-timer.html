@@ -2307,7 +2307,7 @@
       // Work for current session finished — count it
       sessionsCompleted = sessionCount;
     }
-    if (sessionsCompleted > 0 && totalSessions > 1) {
+    if (accumulatedWorkSeconds > 0) {
       saveTaskProgress(activeTodoId, sessionsCompleted, accumulatedWorkSeconds, totalSessions, WORK_SECONDS, BREAK_SECONDS);
     }
   }
@@ -2552,8 +2552,8 @@
     var allDone = (closedTotalSessions > 1 && sessionsCompleted >= closedTotalSessions) ||
                   (closedTotalSessions <= 1 && sessionsCompleted >= 1);
 
-    // Save per-task progress if there are remaining sessions
-    if (closedTodoId && !allDone && sessionsCompleted > 0) {
+    // Save per-task progress if there's accumulated work and remaining sessions
+    if (closedTodoId && !allDone && closedAccWork > 0) {
       saveTaskProgress(closedTodoId, sessionsCompleted, closedAccWork, closedTotalSessions, closedWorkSec, closedBreakSec);
     } else if (closedTodoId && allDone) {
       // All sessions complete — clear any prior progress
@@ -3997,7 +3997,7 @@
       function initAndStart() {
         // Check for prior session progress on this task
         var prior = loadTaskProgress(todoId);
-        if (prior && prior.sessionsCompleted > 0 && prior.totalSessions === totalSessions) {
+        if (prior && prior.totalSessions === totalSessions) {
           // Restore: resume from the next uncompleted session
           sessionCount = prior.sessionsCompleted + 1;
           accumulatedWorkSeconds = prior.accWorkSeconds || 0;
