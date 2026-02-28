@@ -6,7 +6,7 @@
       <button type="button" class="pomodoro-timer-expand" id="pomodoro-expand" title="Focus mode" aria-label="Focus mode">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
       </button>
-      <button type="button" class="pomodoro-timer-close" id="pomodoro-close" title="Cancel &amp; discard time" aria-label="Cancel timer">&times;</button>
+      <button type="button" class="pomodoro-timer-close" id="pomodoro-close" title="Save &amp; close" aria-label="Save and close timer">&times;</button>
     </div>
   </div>
   <div class="pomodoro-timer-category" id="pomodoro-category" style="display:none;"></div>
@@ -16,18 +16,12 @@
     <div class="pomodoro-timer-progress-bar" id="pomodoro-progress"></div>
   </div>
   <div class="pomodoro-timer-controls">
-    <button type="button" class="pomodoro-btn pomodoro-btn-secondary" id="pomodoro-reset" title="Reset">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-    </button>
     <button type="button" class="pomodoro-btn pomodoro-btn-primary" id="pomodoro-toggle">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="pomodoro-play-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="pomodoro-pause-icon" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
     </button>
-    <button type="button" class="pomodoro-btn pomodoro-btn-secondary" id="pomodoro-skip" title="Skip to next phase">
+    <button type="button" class="pomodoro-btn pomodoro-btn-secondary" id="pomodoro-skip" title="Skip to next phase" style="display:none;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-    </button>
-    <button type="button" class="pomodoro-btn pomodoro-btn-stop" id="pomodoro-stop" title="Stop &amp; record time">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
     </button>
     <button type="button" class="pomodoro-btn pomodoro-btn-done" id="pomodoro-done" title="Mark task complete">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -61,7 +55,7 @@
           <button type="button" class="pomodoro-focus-collapse" id="focus-collapse" title="Exit focus mode" aria-label="Exit focus mode">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
           </button>
-          <button type="button" class="pomodoro-focus-close-btn" id="focus-close" title="Cancel &amp; discard time" aria-label="Cancel timer">&times;</button>
+          <button type="button" class="pomodoro-focus-close-btn" id="focus-close" title="Save &amp; close" aria-label="Save and close timer">&times;</button>
         </div>
       </div>
     </div>
@@ -76,18 +70,12 @@
           <div class="pomodoro-focus-progress-bar" id="focus-progress"></div>
         </div>
         <div class="pomodoro-focus-controls">
-          <button type="button" class="pomodoro-btn pomodoro-focus-btn-secondary" id="focus-reset" title="Reset">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-          </button>
           <button type="button" class="pomodoro-btn pomodoro-focus-btn-primary" id="focus-toggle">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" id="focus-play-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" id="focus-pause-icon" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
           </button>
-          <button type="button" class="pomodoro-btn pomodoro-focus-btn-secondary" id="focus-skip" title="Skip to next phase">
+          <button type="button" class="pomodoro-btn pomodoro-focus-btn-secondary" id="focus-skip" title="Skip to next phase" style="display:none;">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
-          </button>
-          <button type="button" class="pomodoro-btn pomodoro-focus-btn-stop" id="focus-stop" title="Stop &amp; record time">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
           </button>
           <button type="button" class="pomodoro-btn pomodoro-focus-btn-done" id="focus-done" title="Mark task complete">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
@@ -184,7 +172,7 @@
   padding: 0 2px;
   line-height: 1;
 }
-.pomodoro-timer-close:hover { color: var(--color-danger); }
+.pomodoro-timer-close:hover { color: var(--body-font-color); }
 .pomodoro-timer-header-actions {
   display: flex;
   align-items: center;
@@ -284,16 +272,6 @@
 .pomodoro-btn-secondary:hover {
   background: var(--gray-200);
   color: var(--body-font-color);
-}
-.pomodoro-btn-stop {
-  width: 30px;
-  height: 30px;
-  background: var(--gray-100);
-  color: var(--color-danger, #ea4335);
-}
-.pomodoro-btn-stop:hover {
-  background: rgba(234, 67, 53, 0.12);
-  color: var(--color-danger, #ea4335);
 }
 .pomodoro-btn-done {
   width: 30px;
@@ -584,7 +562,7 @@
   padding: 0 3px;
   line-height: 1;
 }
-.pomodoro-focus-close-btn:hover { color: var(--color-danger); }
+.pomodoro-focus-close-btn:hover { color: rgba(255, 255, 255, 0.95); }
 .pomodoro-focus-category {
   font-size: 0.72rem;
   font-weight: 500;
@@ -686,16 +664,6 @@
 .pomodoro-focus-btn-secondary:hover {
   background: var(--gray-200);
   color: var(--body-font-color);
-}
-.pomodoro-focus-btn-stop {
-  width: 42px;
-  height: 42px;
-  background: var(--gray-100);
-  color: var(--color-danger, #ea4335);
-}
-.pomodoro-focus-btn-stop:hover {
-  background: rgba(234, 67, 53, 0.12);
-  color: var(--color-danger, #ea4335);
 }
 .pomodoro-focus-btn-done {
   width: 42px;
@@ -1073,9 +1041,7 @@
   var toggleBtn = document.getElementById('pomodoro-toggle');
   var playIcon = document.getElementById('pomodoro-play-icon');
   var pauseIcon = document.getElementById('pomodoro-pause-icon');
-  var resetBtn = document.getElementById('pomodoro-reset');
   var skipBtn = document.getElementById('pomodoro-skip');
-  var stopBtn = document.getElementById('pomodoro-stop');
   var doneBtn = document.getElementById('pomodoro-done');
   var closeBtn = document.getElementById('pomodoro-close');
   var sessionEl = document.getElementById('pomodoro-session');
@@ -1098,9 +1064,7 @@
   var focusToggleBtn = document.getElementById('focus-toggle');
   var focusPlayIcon = document.getElementById('focus-play-icon');
   var focusPauseIcon = document.getElementById('focus-pause-icon');
-  var focusResetBtn = document.getElementById('focus-reset');
   var focusSkipBtn = document.getElementById('focus-skip');
-  var focusStopBtn = document.getElementById('focus-stop');
   var focusDoneBtn = document.getElementById('focus-done');
   var focusSessionEl = document.getElementById('focus-session');
   var focusInfoEl = document.getElementById('focus-info');
@@ -1348,6 +1312,10 @@
     focusPhaseEl.className = 'pomodoro-focus-phase' + (phase === 'break' ? ' break' : '');
     progressEl.className = 'pomodoro-timer-progress-bar' + (phase === 'break' ? ' break' : '');
     focusProgressEl.className = 'pomodoro-focus-progress-bar' + (phase === 'break' ? ' break' : '');
+
+    // Show skip button only during break phases
+    skipBtn.style.display = phase === 'break' ? '' : 'none';
+    focusSkipBtn.style.display = phase === 'break' ? '' : 'none';
 
     var sessionText = 'Session ' + sessionCount;
     if (totalSessions > 1) {
@@ -2685,46 +2653,11 @@
     }
   });
 
-  resetBtn.addEventListener('click', resetTimer);
   skipBtn.addEventListener('click', skipPhase);
 
-  // Stop button: confirm and record tracked time
-  stopBtn.addEventListener('click', function() {
-    if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
-      var trackedSoFar = accumulatedWorkSeconds;
-      if (phase === 'work') trackedSoFar += (totalPhaseSeconds - secondsLeft);
-      var mins = Math.round(trackedSoFar / 60);
-      if (mins > 0) {
-        window.dmConfirm({
-          title: 'Stop timer?',
-          message: mins + ' minute' + (mins !== 1 ? 's' : '') + ' of work will be recorded.',
-          confirmLabel: 'Stop',
-          cancelLabel: 'Keep going',
-          danger: false
-        }).then(function(confirmed) {
-          if (confirmed) closeTimer();
-        });
-        return;
-      }
-    }
-    closeTimer();
-  });
-
-  // Close (x) button: cancel without recording time
+  // Close (x) button: save progress and close timer
   closeBtn.addEventListener('click', function() {
-    if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
-      window.dmConfirm({
-        title: 'Cancel timer?',
-        message: 'Tracked time will be discarded.',
-        confirmLabel: 'Discard',
-        cancelLabel: 'Keep going',
-        danger: true
-      }).then(function(confirmed) {
-        if (confirmed) cancelTimer();
-      });
-      return;
-    }
-    cancelTimer();
+    closeTimer();
   });
 
   // Done (checkmark) button: finish task and mark complete
@@ -3196,44 +3129,11 @@
     }
   });
 
-  focusResetBtn.addEventListener('click', resetTimer);
   focusSkipBtn.addEventListener('click', skipPhase);
 
-  focusStopBtn.addEventListener('click', function() {
-    if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
-      var trackedSoFar = accumulatedWorkSeconds;
-      if (phase === 'work') trackedSoFar += (totalPhaseSeconds - secondsLeft);
-      var mins = Math.round(trackedSoFar / 60);
-      if (mins > 0) {
-        window.dmConfirm({
-          title: 'Stop timer?',
-          message: mins + ' minute' + (mins !== 1 ? 's' : '') + ' of work will be recorded.',
-          confirmLabel: 'Stop',
-          cancelLabel: 'Keep going',
-          danger: false
-        }).then(function(confirmed) {
-          if (confirmed) closeTimer();
-        });
-        return;
-      }
-    }
-    closeTimer();
-  });
-
+  // Focus close (x) button: save progress and close timer
   focusCloseBtn.addEventListener('click', function() {
-    if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
-      window.dmConfirm({
-        title: 'Cancel timer?',
-        message: 'Tracked time will be discarded.',
-        confirmLabel: 'Discard',
-        cancelLabel: 'Keep going',
-        danger: true
-      }).then(function(confirmed) {
-        if (confirmed) cancelTimer();
-      });
-      return;
-    }
-    cancelTimer();
+    closeTimer();
   });
 
   // Focus Done (checkmark) button: finish task and mark complete
