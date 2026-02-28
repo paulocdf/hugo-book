@@ -473,6 +473,13 @@
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
+  transition: background 0.6s ease;
+}
+.pomodoro-focus-backdrop.work {
+  background: rgba(180, 30, 30, 0.55);
+}
+.pomodoro-focus-backdrop.break {
+  background: rgba(30, 120, 50, 0.50);
 }
 .pomodoro-focus-card {
   position: relative;
@@ -1053,6 +1060,7 @@
 
   // Focus overlay elements
   var focusOverlay = document.getElementById('pomodoro-focus-overlay');
+  var focusBackdropEl = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-backdrop') : null;
   var expandBtn = document.getElementById('pomodoro-expand');
   var collapseBtn = document.getElementById('focus-collapse');
   var focusCloseBtn = document.getElementById('focus-close');
@@ -1312,6 +1320,9 @@
     focusPhaseEl.className = 'pomodoro-focus-phase' + (phase === 'break' ? ' break' : '');
     progressEl.className = 'pomodoro-timer-progress-bar' + (phase === 'break' ? ' break' : '');
     focusProgressEl.className = 'pomodoro-focus-progress-bar' + (phase === 'break' ? ' break' : '');
+    if (focusBackdropEl) {
+      focusBackdropEl.className = 'pomodoro-focus-backdrop ' + (phase === 'break' ? 'break' : 'work');
+    }
 
     var sessionText = 'Session ' + sessionCount;
     if (totalSessions > 1) {
