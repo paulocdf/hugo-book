@@ -1150,6 +1150,7 @@
   var _fsUnsubscribe = null; // onSnapshot unsubscribe
   var _fsSyncing = false;    // guard: true while applying remote state
   var _lastFsSavedAt = 0;    // timestamp of last Firestore write (to skip stale snapshots)
+  var _localDelete = false;   // guard: true when we initiated the Firestore delete
 
   function _getTimerDocRef() {
     if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) return null;
@@ -1213,6 +1214,7 @@
     var ref = _getTimerDocRef();
     if (!ref) return;
     _lastFsSavedAt = Date.now();
+    _localDelete = true;
     ref.delete().catch(function(err) {
       console.warn('[pomo-sync] Firestore delete failed:', err.message);
     });
@@ -3861,6 +3863,11 @@
 
     _fsUnsubscribe = ref.onSnapshot(function(doc) {
       if (!doc.exists) {
+        // Skip our own deletes (e.g. when switching tasks via closeTimer → start)
+        if (_localDelete) {
+          _localDelete = false;
+          return;
+        }
         // Remote timer was closed/cancelled — close local timer too
         if (activeTodoId && !_fsSyncing) {
           _fsSyncing = true;
