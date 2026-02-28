@@ -4014,9 +4014,36 @@
           }
           if (newState === 'done' && bujoType === 'task') {
             closeStatePicker();
-            // Instant completion with celebratory toast
-            var prefillMin = todo.estimatedMin || null;
+            // Instant completion — check pomodoro tracked time (same logic as bullet click)
+            var pomodoroMinutes = 0;
+            if (window.dmPomodoro && window.dmPomodoro.isActive(todo.id)) {
+              pomodoroMinutes = _pomodoroTrackedMinutes[todo.id] || 0;
+              window.dmPomodoro.stop();
+              if (_pomodoroTrackedMinutes[todo.id]) {
+                pomodoroMinutes = _pomodoroTrackedMinutes[todo.id];
+              }
+            } else if (_pomodoroTrackedMinutes[todo.id]) {
+              pomodoroMinutes = _pomodoroTrackedMinutes[todo.id];
+            }
+
+            var prefillMin = pomodoroMinutes > 0 ? pomodoroMinutes : (todo.estimatedMin || null);
             completeTodoWithToast(todo, prefillMin, todo.category || null);
+
+            // Clean up tracked minutes
+            delete _pomodoroTrackedMinutes[todo.id];
+            try {
+              var _tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
+              delete _tracked[todo.id];
+              if (Object.keys(_tracked).length === 0) {
+                localStorage.removeItem('dm-pomodoro-tracked');
+              } else {
+                localStorage.setItem('dm-pomodoro-tracked', JSON.stringify(_tracked));
+              }
+            } catch(e) {}
+            // Clean up per-task session progress
+            if (window.dmPomodoro && window.dmPomodoro.clearTaskProgress) {
+              window.dmPomodoro.clearTaskProgress(todo.id);
+            }
             return;
           }
           if (newState === 'done' && bujoType !== 'task') {
@@ -6189,6 +6216,41 @@
   // Listen for Pomodoro timer state changes (pause/resume/reset/skip) — re-render inline indicators
   window.addEventListener('dm-pomodoro-state-changed', function() {
     render();
+  });
+
+  // Listen for Pomodoro "Done" button — mark the task complete with tracked time
+  window.addEventListener('dm-pomodoro-completed', function(e) {
+    var detail = e.detail || {};
+    if (!detail.todoId) return;
+    var todo = allTodos.find(function(t) { return t.id === detail.todoId; });
+    if (!todo) { console.warn('[todo-list] dm-pomodoro-completed: todo not found for id:', detail.todoId); return; }
+
+    // Use tracked minutes from the event, fall back to stored tracked time, then estimate
+    var actualMin = detail.trackedMinutes;
+    if (!actualMin && _pomodoroTrackedMinutes[detail.todoId]) {
+      actualMin = _pomodoroTrackedMinutes[detail.todoId];
+    }
+    if (!actualMin) {
+      actualMin = todo.estimatedMin || null;
+    }
+
+    completeTodoWithToast(todo, actualMin, detail.category || todo.category || null);
+
+    // Clean up tracked minutes
+    delete _pomodoroTrackedMinutes[detail.todoId];
+    try {
+      var _tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
+      delete _tracked[detail.todoId];
+      if (Object.keys(_tracked).length === 0) {
+        localStorage.removeItem('dm-pomodoro-tracked');
+      } else {
+        localStorage.setItem('dm-pomodoro-tracked', JSON.stringify(_tracked));
+      }
+    } catch(e) {}
+    // Clean up per-task session progress
+    if (window.dmPomodoro && window.dmPomodoro.clearTaskProgress) {
+      window.dmPomodoro.clearTaskProgress(detail.todoId);
+    }
   });
 
   // Initial load when auth is ready

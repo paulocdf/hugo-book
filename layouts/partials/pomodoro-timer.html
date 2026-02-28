@@ -29,6 +29,9 @@
     <button type="button" class="pomodoro-btn pomodoro-btn-stop" id="pomodoro-stop" title="Stop &amp; record time">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
     </button>
+    <button type="button" class="pomodoro-btn pomodoro-btn-done" id="pomodoro-done" title="Mark task complete">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+    </button>
   </div>
   <div class="pomodoro-timer-session" id="pomodoro-session">Session 1</div>
   <div class="pomodoro-timer-subtasks" id="pomodoro-subtasks" style="display:none;"></div>
@@ -85,6 +88,9 @@
           </button>
           <button type="button" class="pomodoro-btn pomodoro-focus-btn-stop" id="focus-stop" title="Stop &amp; record time">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>
+          </button>
+          <button type="button" class="pomodoro-btn pomodoro-focus-btn-done" id="focus-done" title="Mark task complete">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
           </button>
         </div>
         <div class="pomodoro-focus-session" id="focus-session">Session 1</div>
@@ -288,6 +294,16 @@
 .pomodoro-btn-stop:hover {
   background: rgba(234, 67, 53, 0.12);
   color: var(--color-danger, #ea4335);
+}
+.pomodoro-btn-done {
+  width: 30px;
+  height: 30px;
+  background: var(--gray-100);
+  color: var(--color-success, #34a853);
+}
+.pomodoro-btn-done:hover {
+  background: rgba(52, 168, 83, 0.12);
+  color: var(--color-success, #34a853);
 }
 .pomodoro-timer-session {
   text-align: center;
@@ -681,6 +697,16 @@
   background: rgba(234, 67, 53, 0.12);
   color: var(--color-danger, #ea4335);
 }
+.pomodoro-focus-btn-done {
+  width: 42px;
+  height: 42px;
+  background: var(--gray-100);
+  color: var(--color-success, #34a853);
+}
+.pomodoro-focus-btn-done:hover {
+  background: rgba(52, 168, 83, 0.12);
+  color: var(--color-success, #34a853);
+}
 .pomodoro-focus-session {
   text-align: center;
   font-size: 0.78rem;
@@ -1050,6 +1076,7 @@
   var resetBtn = document.getElementById('pomodoro-reset');
   var skipBtn = document.getElementById('pomodoro-skip');
   var stopBtn = document.getElementById('pomodoro-stop');
+  var doneBtn = document.getElementById('pomodoro-done');
   var closeBtn = document.getElementById('pomodoro-close');
   var sessionEl = document.getElementById('pomodoro-session');
   var infoEl = document.getElementById('pomodoro-info');
@@ -1074,6 +1101,7 @@
   var focusResetBtn = document.getElementById('focus-reset');
   var focusSkipBtn = document.getElementById('focus-skip');
   var focusStopBtn = document.getElementById('focus-stop');
+  var focusDoneBtn = document.getElementById('focus-done');
   var focusSessionEl = document.getElementById('focus-session');
   var focusInfoEl = document.getElementById('focus-info');
   var focusStartedAtEl = document.getElementById('focus-started-at');
@@ -2570,6 +2598,49 @@
     notifyStateChanged();
   }
 
+  // Finish task: stop timer, record time, AND mark the task as complete
+  function finishTask() {
+    // Compute tracked time so far (same logic as closeTimer/stop handler)
+    var trackedSoFar = accumulatedWorkSeconds;
+    if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
+      trackedSoFar += (totalPhaseSeconds - secondsLeft);
+    }
+    var mins = Math.round(trackedSoFar / 60);
+    var todoId = activeTodoId;
+    var todoCategory = activeTodoCategory;
+
+    if (!todoId) return;
+
+    // Confirm with user showing tracked time
+    var msgParts = [];
+    if (mins > 0) {
+      msgParts.push(mins + ' minute' + (mins !== 1 ? 's' : '') + ' tracked.');
+    }
+    msgParts.push('Mark task complete?');
+
+    window.dmConfirm({
+      title: 'Complete task?',
+      message: msgParts.join(' '),
+      confirmLabel: 'Complete',
+      cancelLabel: 'Keep going',
+      danger: false
+    }).then(function(confirmed) {
+      if (!confirmed) return;
+
+      // Close the timer (records time via dm-pomodoro-stopped)
+      closeTimer();
+
+      // Dispatch completion event so todo-list can mark it done
+      window.dispatchEvent(new CustomEvent('dm-pomodoro-completed', {
+        detail: {
+          todoId: todoId,
+          trackedMinutes: mins > 0 ? mins : null,
+          category: todoCategory || null
+        }
+      }));
+    });
+  }
+
   // ── Button handlers ──
   toggleBtn.addEventListener('click', function() {
     if (isRunning) {
@@ -2620,6 +2691,9 @@
     }
     cancelTimer();
   });
+
+  // Done (checkmark) button: finish task and mark complete
+  doneBtn.addEventListener('click', finishTask);
 
   // ── Focus overlay helpers ──
 
@@ -3126,6 +3200,9 @@
     }
     cancelTimer();
   });
+
+  // Focus Done (checkmark) button: finish task and mark complete
+  focusDoneBtn.addEventListener('click', finishTask);
 
   // Backdrop click → collapse back to compact
   focusOverlay.querySelector('.pomodoro-focus-backdrop').addEventListener('click', function() {
@@ -3984,6 +4061,7 @@
       }
     },
     stop: closeTimer,
+    finish: finishTask,
     pause: pauseTimer,
     resume: startTimer,
     togglePause: function() {
