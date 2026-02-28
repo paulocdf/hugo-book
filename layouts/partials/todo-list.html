@@ -3158,10 +3158,17 @@
       }
       html += '<span class="todo-item-timer-active' + (timerRunning ? '' : ' paused') + '"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ' + timerLabel + '</span>';
     } else if (!todo.done && window.dmPomodoro && window.dmPomodoro.getTaskProgress) {
-      // Show prior session progress for tasks that have been partially completed
+      // Show prior session progress for tasks that have been partially worked on
       var priorProgress = window.dmPomodoro.getTaskProgress(todo.id);
-      if (priorProgress && priorProgress.sessionsCompleted > 0 && priorProgress.totalSessions > 1) {
-        html += '<span class="todo-item-timer-progress">' + priorProgress.sessionsCompleted + '/' + priorProgress.totalSessions + ' done</span>';
+      if (priorProgress && (priorProgress.accWorkSeconds > 0 || priorProgress.sessionsCompleted > 0)) {
+        var progressLabel;
+        if (priorProgress.sessionsCompleted > 0 && priorProgress.totalSessions > 1) {
+          progressLabel = priorProgress.sessionsCompleted + '/' + priorProgress.totalSessions + ' done';
+        } else {
+          var workedMin = Math.round((priorProgress.accWorkSeconds || 0) / 60);
+          progressLabel = 'started' + (workedMin > 0 ? ' \u00b7 ' + workedMin + 'min' : '');
+        }
+        html += '<span class="todo-item-timer-progress">' + progressLabel + '</span>';
       }
     }
 
