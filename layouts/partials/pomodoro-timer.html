@@ -108,6 +108,12 @@
           <div class="pomodoro-focus-stats-grid" id="focus-stats-grid"></div>
         </div>
 
+        <!-- Up Next panel -->
+        <div class="pomodoro-focus-panel" id="focus-panel-upnext">
+          <div class="pomodoro-focus-panel-label">Up Next</div>
+          <div class="pomodoro-focus-upnext-list" id="focus-upnext-list"></div>
+        </div>
+
         <!-- Notes panel -->
         <div class="pomodoro-focus-panel pomodoro-focus-notes-panel" id="focus-panel-notes">
           <div class="pomodoro-focus-panel-label">
@@ -855,6 +861,32 @@
   letter-spacing: 0.04em;
   margin-top: 2px;
 }
+/* Up Next queue */
+.pomodoro-focus-upnext-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pomodoro-focus-upnext-item {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  padding: 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+.pomodoro-focus-upnext-item:first-child {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+  padding-bottom: 6px;
+}
+.pomodoro-focus-upnext-empty {
+  font-size: 0.76rem;
+  color: var(--gray-400);
+  font-style: italic;
+}
 /* Responsive: tablets / smaller desktops */
 @media (max-width: 800px) {
   .pomodoro-focus-card {
@@ -1068,6 +1100,7 @@
   var focusTimelineBlocksEl = document.getElementById('focus-timeline-blocks');
   var focusDetailsGridEl = document.getElementById('focus-details-grid');
   var focusStatsGridEl = document.getElementById('focus-stats-grid');
+  var focusUpNextListEl = document.getElementById('focus-upnext-list');
   var focusNotesTextarea = document.getElementById('focus-notes-textarea');
   var focusNotesStatus = document.getElementById('focus-notes-status');
   var _focusNotesTimer = null;
@@ -2192,8 +2225,11 @@
     updateDisplay();
     // Persist every 5 seconds to avoid excessive writes
     if (secondsLeft % 5 === 0) saveState();
-    // Refresh today's stats every 60 seconds in focus mode
-    if (isFocusMode && secondsLeft % 60 === 0) renderTodayStats();
+    // Refresh today's stats and up next queue every 60 seconds in focus mode
+    if (isFocusMode && secondsLeft % 60 === 0) {
+      renderTodayStats();
+      updateUpNext();
+    }
   }
 
   function startTimer() {
@@ -2857,6 +2893,26 @@
     });
   }
 
+  // Render the Up Next task queue
+  function updateUpNext() {
+    if (!focusUpNextListEl) return;
+    if (!activeTodoId || !window.dmTodoList || !window.dmTodoList.getNextTasks) {
+      focusUpNextListEl.innerHTML = '<div class="pomodoro-focus-upnext-empty">No upcoming tasks</div>';
+      return;
+    }
+    var tasks = window.dmTodoList.getNextTasks(activeTodoId, 5);
+    if (!tasks || !tasks.length) {
+      focusUpNextListEl.innerHTML = '<div class="pomodoro-focus-upnext-empty">No upcoming tasks</div>';
+      return;
+    }
+    var html = '';
+    tasks.forEach(function(t) {
+      var escaped = t.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      html += '<div class="pomodoro-focus-upnext-item">' + escaped + '</div>';
+    });
+    focusUpNextListEl.innerHTML = html;
+  }
+
   // ── Ambient Visualizer ──
   var vizMode = 'aurora'; // 'aurora' | 'wave'
   var vizAnimId = null;
@@ -3129,6 +3185,9 @@
 
     // Load today's stats
     renderTodayStats();
+
+    // Load up next queue
+    updateUpNext();
 
     updateDisplay();
   }
@@ -3435,6 +3494,7 @@
     focusTimelineBlocksEl.innerHTML = '';
     focusDetailsGridEl.innerHTML = '';
     focusStatsGridEl.innerHTML = '';
+    focusUpNextListEl.innerHTML = '';
   }
 
   // ── Restore persisted timer state on page load ──
@@ -3988,6 +4048,7 @@
       focusTimelineBlocksEl.innerHTML = '';
       focusDetailsGridEl.innerHTML = '';
       focusStatsGridEl.innerHTML = '';
+      focusUpNextListEl.innerHTML = '';
       focusNotesTextarea.value = '';
       _focusNotesOriginal = '';
 
