@@ -161,6 +161,45 @@
   border-color: var(--color-link);
 }
 
+/* Project filter bar */
+.kanban-project-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.kanban-project-filter-label {
+  color: var(--gray-500);
+  display: flex;
+  align-items: center;
+}
+.kanban-project-filter-select {
+  padding: 3px 8px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: auto;
+}
+
+/* Project badge on cards */
+.kanban-card-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  color: var(--gray-600);
+}
+.kanban-card-project-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
 /* Column status dots */
 .kanban-column-dot {
   width: 10px;
@@ -616,6 +655,15 @@
   </div>
 
   <div class="kanban-content" id="kanban-content" style="display: none;">
+    <div class="kanban-project-filter" id="kanban-project-filter" style="display:none;">
+      <label class="kanban-project-filter-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+      </label>
+      <select id="kanban-project-filter-select" class="kanban-project-filter-select">
+        <option value="">All projects</option>
+        <option value="__none__">No project</option>
+      </select>
+    </div>
     <div class="kanban-board" id="kanban-board">
       <div class="kanban-column" data-kanban-status="todo">
         <div class="kanban-column-header">
@@ -689,7 +737,42 @@
   var allTodos = [];
   var _sortableInstances = [];
   var _doneFilter = 'today'; // 'today' | '7days' | 'all'
+  var _kanbanProjectMap = {}; // { projectId: { name, color } }
+  var _kanbanFilterProjectId = null; // null = all, '__none__' = no project, else projectId
   var doneFilterEl = document.getElementById('kanban-done-filter');
+  var kanbanProjectFilterBar = document.getElementById('kanban-project-filter');
+  var kanbanProjectFilterSelect = document.getElementById('kanban-project-filter-select');
+
+  function updateKanbanProjectFilter() {
+    if (!kanbanProjectFilterBar || !kanbanProjectFilterSelect) return;
+    var projectIds = Object.keys(_kanbanProjectMap);
+    if (projectIds.length === 0) {
+      kanbanProjectFilterBar.style.display = 'none';
+      return;
+    }
+    kanbanProjectFilterBar.style.display = '';
+    var currentVal = kanbanProjectFilterSelect.value;
+    var html = '<option value="">All projects</option>';
+    html += '<option value="__none__">No project</option>';
+    projectIds.forEach(function(pid) {
+      var p = _kanbanProjectMap[pid];
+      html += '<option value="' + pid + '">' + escapeHtml(p.name) + '</option>';
+    });
+    kanbanProjectFilterSelect.innerHTML = html;
+    if (currentVal && kanbanProjectFilterSelect.querySelector('option[value="' + currentVal + '"]')) {
+      kanbanProjectFilterSelect.value = currentVal;
+    } else {
+      kanbanProjectFilterSelect.value = '';
+      _kanbanFilterProjectId = null;
+    }
+  }
+
+  if (kanbanProjectFilterSelect) {
+    kanbanProjectFilterSelect.addEventListener('change', function() {
+      _kanbanFilterProjectId = kanbanProjectFilterSelect.value || null;
+      renderBoard();
+    });
+  }
 
   function getStartOfDay(date) {
     return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
@@ -779,6 +862,17 @@
     return { label: label, cssClass: cssClass };
   }
 
+  // Helper: map light-mode color to dark-mode equivalent
+  function getProjectDarkColor(lightColor) {
+    var map = {
+      '#1976d2': '#64b5f6', '#388e3c': '#81c784', '#e65100': '#ffb74d',
+      '#7b1fa2': '#ce93d8', '#00897b': '#4db6ac', '#c62828': '#ef5350',
+      '#f9a825': '#fff176', '#ad1457': '#f06292', '#283593': '#7986cb',
+      '#546e7a': '#90a4ae'
+    };
+    return map[lightColor] || null;
+  }
+
   function renderCard(todo) {
     var bujoIcon = BUJO_ICONS[todo.bujoType] || BUJO_ICONS.task;
     var title = escapeHtml(todo.title || 'Untitled');
@@ -787,6 +881,12 @@
     var metaParts = [];
     if (todo.category) {
       metaParts.push('<span class="kanban-card-category">' + escapeHtml(todo.category) + '</span>');
+    }
+    if (todo.projectId && _kanbanProjectMap[todo.projectId]) {
+      var proj = _kanbanProjectMap[todo.projectId];
+      var isDarkMode = document.documentElement.classList.contains('dark');
+      var dotColor = isDarkMode ? (getProjectDarkColor(proj.color) || proj.color) : proj.color;
+      metaParts.push('<span class="kanban-card-project"><span class="kanban-card-project-dot" style="background:' + dotColor + ';"></span>' + escapeHtml(proj.name) + '</span>');
     }
     if (todo.estimatedMin) {
       metaParts.push('<span class="kanban-card-time">' + formatMinutes(todo.estimatedMin) + '</span>');
@@ -841,6 +941,15 @@
       var s = t.status || 'active';
       return s === 'active' || s === 'done';
     });
+
+    // Apply project filter
+    if (_kanbanFilterProjectId) {
+      if (_kanbanFilterProjectId === '__none__') {
+        visibleTodos = visibleTodos.filter(function(t) { return !t.projectId; });
+      } else {
+        visibleTodos = visibleTodos.filter(function(t) { return t.projectId === _kanbanFilterProjectId; });
+      }
+    }
 
     // Backfill kanbanStatus for legacy tasks
     visibleTodos.forEach(function(t) {
@@ -1353,6 +1462,7 @@
         estimatedMin: estimatedMin,
         actualMin: null,
         category: null,
+        projectId: _kanbanFilterProjectId && _kanbanFilterProjectId !== '__none__' ? _kanbanFilterProjectId : null,
         pomodoroCount: 1,
         pomodoroLength: null,
         breakLength: null,
@@ -1381,6 +1491,7 @@
         estimatedMin: estimatedMin,
         actualMin: null,
         category: null,
+        projectId: _kanbanFilterProjectId && _kanbanFilterProjectId !== '__none__' ? _kanbanFilterProjectId : null,
         pomodoroCount: 1,
         pomodoroLength: null,
         breakLength: null,
@@ -1436,8 +1547,17 @@
 
     showState('loading');
 
-    window.dmSync.getAllTodos().then(function(todos) {
-      allTodos = todos || [];
+    var todosPromise = window.dmSync.getAllTodos();
+    var projectsPromise = window.dmSync.getAllProjects().then(function(projects) {
+      _kanbanProjectMap = {};
+      projects.forEach(function(p) {
+        _kanbanProjectMap[p.id] = { name: p.name, color: p.color || '' };
+      });
+      updateKanbanProjectFilter();
+    }).catch(function() { /* keep existing */ });
+
+    Promise.all([todosPromise, projectsPromise]).then(function(results) {
+      allTodos = results[0] || [];
 
       // Filter to active + done (not archived/deleted)
       var visible = allTodos.filter(function(t) {
@@ -1641,6 +1761,12 @@
 
   window.addEventListener('dm-sync-complete', function() {
     if (contentEl.style.display !== 'none' || emptyEl.style.display !== 'none') {
+      loadBoard();
+    }
+  });
+
+  window.addEventListener('dm-projects-updated', function() {
+    if (contentEl.style.display !== 'none') {
       loadBoard();
     }
   });

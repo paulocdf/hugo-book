@@ -51,6 +51,16 @@
   }
 }
 
+// Light mode: make toggle more visible against white background
+:root:not([data-theme="dark"]) .theme-toggle {
+  border: 1.5px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+
+  &:hover {
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
+  }
+}
+
 // When in dark mode, show sun (to switch to light)
 :root[data-theme="dark"] .theme-toggle {
   .theme-icon--sun {

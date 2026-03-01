@@ -1587,6 +1587,9 @@
   var accumulatedWorkSeconds = 0; // total work seconds done for this todo
   var startedAt = null; // Date.now() when timer started
   var activeTodoCategory = ''; // category for restored timer display
+  var activeProjectId = '';    // project fields for restored timer display
+  var activeProjectName = '';
+  var activeProjectColor = '';
   var subtaskRemainingMin = 0; // total estimated minutes of uncompleted subtasks
   var activeParentId = null; // parent context for subtask list (equals activeTodoId when timing a parent)
   var isFocusMode = false;
@@ -1615,6 +1618,9 @@
       activeTodoId: activeTodoId,
       activeTodoTitle: activeTodoTitle,
       activeTodoCategory: activeTodoCategory,
+      activeProjectId: activeProjectId,
+      activeProjectName: activeProjectName,
+      activeProjectColor: activeProjectColor,
       activeParentId: activeParentId,
       phase: phase,
       secondsLeft: secondsLeft,
@@ -1679,6 +1685,9 @@
         activeTodoId: activeTodoId,
         activeTodoTitle: activeTodoTitle,
         activeTodoCategory: activeTodoCategory,
+        activeProjectId: activeProjectId,
+        activeProjectName: activeProjectName,
+        activeProjectColor: activeProjectColor,
         activeParentId: activeParentId,
         phase: phase,
         secondsLeft: secondsLeft,
@@ -3125,6 +3134,7 @@
     var mins = Math.round(trackedSoFar / 60);
     var todoId = activeTodoId;
     var todoCategory = activeTodoCategory;
+    var todoProjectId = activeProjectId;
 
     if (!todoId) return;
 
@@ -3152,7 +3162,8 @@
         detail: {
           todoId: todoId,
           trackedMinutes: mins > 0 ? mins : null,
-          category: todoCategory || null
+          category: todoCategory || null,
+          projectId: todoProjectId || null
         }
       }));
     });
@@ -3169,6 +3180,7 @@
     var mins = Math.round(trackedSoFar / 60);
     var todoId = activeTodoId;
     var todoCategory = activeTodoCategory;
+    var todoProjectId = activeProjectId;
 
     if (!todoId) return;
 
@@ -3186,7 +3198,8 @@
       detail: {
         todoId: todoId,
         trackedMinutes: mins > 0 ? mins : null,
-        category: todoCategory || null
+        category: todoCategory || null,
+        projectId: todoProjectId || null
       }
     }));
 
@@ -4280,6 +4293,9 @@
     activeTodoId = s.activeTodoId;
     activeTodoTitle = s.activeTodoTitle || 'Task';
     activeTodoCategory = s.activeTodoCategory || '';
+    activeProjectId = s.activeProjectId || '';
+    activeProjectName = s.activeProjectName || '';
+    activeProjectColor = s.activeProjectColor || '';
     activeParentId = s.activeParentId || s.activeTodoId;
     totalSessions = s.totalSessions || 1;
     startedAt = s.startedAt;
@@ -4526,6 +4542,9 @@
     activeTodoId = s.activeTodoId;
     activeTodoTitle = s.activeTodoTitle || 'Task';
     activeTodoCategory = s.activeTodoCategory || '';
+    activeProjectId = s.activeProjectId || '';
+    activeProjectName = s.activeProjectName || '';
+    activeProjectColor = s.activeProjectColor || '';
     activeParentId = s.activeParentId || s.activeTodoId;
     totalSessions = s.totalSessions || 1;
     startedAt = s.startedAt;
@@ -4755,6 +4774,9 @@
       activeTodoId = todoId;
       activeTodoTitle = todoTitle || 'Task';
       activeTodoCategory = '';
+      activeProjectId = '';
+      activeProjectName = '';
+      activeProjectColor = '';
       titleEl.textContent = activeTodoTitle;
       focusTitleEl.textContent = activeTodoTitle;
 
@@ -4828,6 +4850,16 @@
               focusCategoryEl.textContent = todo.category;
               focusCategoryEl.style.display = '';
               activeTodoCategory = todo.category;
+            }
+            // Populate project fields from task's projectId
+            if (todo.projectId && window.dmSync && window.dmSync.getProject) {
+              window.dmSync.getProject(todo.projectId).then(function(proj) {
+                if (proj && activeTodoId === todoId) {
+                  activeProjectId = proj.id;
+                  activeProjectName = proj.name;
+                  activeProjectColor = proj.color || '';
+                }
+              }).catch(function() {});
             }
             if (todo.pomodoroLength && todo.pomodoroLength > 0) {
               WORK_SECONDS = todo.pomodoroLength * 60;

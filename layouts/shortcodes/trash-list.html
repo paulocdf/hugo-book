@@ -205,6 +205,21 @@
   background: var(--gray-100);
   font-size: 0.75rem;
 }
+.trash-item-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: var(--gray-100);
+  font-size: 0.75rem;
+}
+.trash-project-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 .trash-item-expiry {
   color: var(--color-danger, #e53e3e);
   font-size: 0.75rem;
@@ -278,6 +293,7 @@
   var activeTab = 'all'; // 'all', 'notes', 'todos'
   var cachedNotes = [];
   var cachedTodos = [];
+  var _trashProjectMap = {};
 
   var restoreIcon = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     + '<polyline points="1 4 1 10 7 10"></polyline>'
@@ -357,6 +373,11 @@
     var days = daysUntilPurge(todo.deletedAt);
     var expiryText = days <= 0 ? 'Expiring soon' : days + ' day' + (days !== 1 ? 's' : '') + ' left';
     var catHtml = todo.category ? '<span class="trash-item-dest">' + escapeHtml(todo.category) + '</span>' : '';
+    var projHtml = '';
+    if (todo.projectId && _trashProjectMap[todo.projectId]) {
+      var proj = _trashProjectMap[todo.projectId];
+      projHtml = '<span class="trash-item-project"><span class="trash-project-dot" style="background:' + (proj.color || 'var(--gray-400)') + ';"></span>' + escapeHtml(proj.name) + '</span>';
+    }
     var notesPreview = todo.notes || '';
     if (notesPreview.length > 200) notesPreview = notesPreview.substring(0, 200) + '...';
 
@@ -366,6 +387,7 @@
       + '<div class="trash-item-meta">'
       + '<span class="trash-item-type trash-item-type-task">' + bujoLabel(todo.bujoType) + '</span>'
       + catHtml
+      + projHtml
       + '<span>Deleted ' + formatDate(todo.deletedAt) + '</span>'
       + '<span class="trash-item-expiry">' + expiryText + '</span>'
       + '</div>'
@@ -616,12 +638,16 @@
   function loadFromCache() {
     if (!window.dmSync) return;
     showState('loading');
+    var projectsP = (window.dmSync.getAllProjectsIncludingArchived || window.dmSync.getAllProjects || function() { return Promise.resolve([]); })();
     Promise.all([
       window.dmSync.getTrashedNotes(),
-      window.dmSync.getTrashedTodos()
+      window.dmSync.getTrashedTodos(),
+      projectsP
     ]).then(function(results) {
       cachedNotes = results[0] || [];
       cachedTodos = results[1] || [];
+      _trashProjectMap = {};
+      (results[2] || []).forEach(function(p) { _trashProjectMap[p.id] = p; });
       renderTrash();
     }).catch(function(err) {
       console.error('Error loading trash:', err);

@@ -1,0 +1,1194 @@
+<!-- Project List: CRUD interface for managing projects -->
+<!-- Reads from IndexedDB projects store via window.dmSync -->
+<!-- Projects are named containers for grouping tasks toward a common goal -->
+
+<style>
+/* --- Project List --- */
+.project-list {
+  width: 100%;
+  max-width: 800px;
+}
+
+/* Auth */
+.project-auth {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+.project-auth-card {
+  text-align: center;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  max-width: 380px;
+}
+.project-auth-card h3 { margin: 1rem 0 0.5rem; }
+.project-auth-card p { color: var(--gray-500); margin-bottom: 1.5rem; font-size: 0.9rem; }
+.project-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--body-font-color);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: box-shadow 0.15s, background 0.15s;
+}
+.project-signin-btn:hover {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  background: var(--gray-100);
+}
+
+/* Loading */
+.project-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2rem;
+  justify-content: center;
+  color: var(--gray-500);
+  font-size: 0.9rem;
+}
+.project-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--color-link);
+  border-radius: 50%;
+  animation: project-spin 0.8s linear infinite;
+}
+@keyframes project-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Header */
+.project-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+  gap: 12px;
+}
+.project-header h2 {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+.project-header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.project-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.project-add-btn:hover { opacity: 0.85; }
+.project-add-btn svg { width: 14px; height: 14px; }
+
+.project-archive-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--gray-500);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.project-archive-toggle:hover { background: var(--gray-100); }
+
+/* Empty */
+.project-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--gray-500);
+}
+.project-empty p { margin: 0.5rem 0; }
+.project-empty-hint { font-size: 0.85rem; }
+
+/* Grid */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+/* Card */
+.project-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--body-background);
+  cursor: pointer;
+  transition: box-shadow 0.15s, border-color 0.15s;
+  position: relative;
+}
+.project-card:hover {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  border-color: var(--gray-300);
+}
+.project-card--archived {
+  opacity: 0.6;
+}
+.project-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.project-color-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.project-card-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-card-desc {
+  font-size: 0.82rem;
+  color: var(--gray-500);
+  margin-bottom: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: var(--gray-500);
+}
+.project-card-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.project-card-meta svg {
+  width: 12px;
+  height: 12px;
+}
+.project-card-deadline--overdue {
+  color: var(--color-danger, #c62828);
+  font-weight: 500;
+}
+
+/* ─── Detail View ─── */
+.project-detail { display: none; }
+.project-detail.active { display: block; }
+
+.project-detail-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  color: var(--color-link);
+  font-size: 0.85rem;
+  cursor: pointer;
+  border: none;
+  background: none;
+  margin-bottom: 1rem;
+}
+.project-detail-back:hover { text-decoration: underline; }
+.project-detail-back svg { width: 14px; height: 14px; }
+
+.project-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 1.5rem;
+}
+.project-detail-color {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.project-detail-info {
+  flex: 1;
+  min-width: 0;
+}
+.project-detail-name {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin: 0 0 4px;
+  word-break: break-word;
+}
+.project-detail-desc {
+  font-size: 0.88rem;
+  color: var(--gray-500);
+  margin: 0 0 8px;
+  word-break: break-word;
+}
+.project-detail-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.8rem;
+  color: var(--gray-500);
+}
+.project-detail-meta span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.project-detail-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.project-detail-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.project-detail-actions button:hover { background: var(--gray-100); }
+.project-detail-actions button svg { width: 13px; height: 13px; }
+.project-detail-actions .project-btn-danger {
+  color: var(--color-danger, #c62828);
+  border-color: var(--color-danger, #c62828);
+}
+.project-detail-actions .project-btn-danger:hover {
+  background: rgba(198, 40, 40, 0.08);
+}
+
+/* Progress bar */
+.project-progress {
+  margin-bottom: 1.5rem;
+}
+.project-progress-bar {
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.project-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+.project-progress-label {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+}
+
+/* Task list in detail */
+.project-tasks-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+.project-tasks-header h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+.project-task-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  margin-bottom: 6px;
+  background: var(--body-background);
+  transition: background 0.12s;
+}
+.project-task-item:hover {
+  background: var(--gray-100);
+}
+.project-task-checkbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--gray-300);
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+.project-task-checkbox:hover {
+  border-color: var(--color-link);
+}
+.project-task-checkbox.checked {
+  background: var(--color-link);
+  border-color: var(--color-link);
+}
+.project-task-checkbox.checked::after {
+  content: '';
+  width: 6px;
+  height: 10px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  margin-top: -2px;
+}
+.project-task-title {
+  flex: 1;
+  font-size: 0.88rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-task-title.done {
+  text-decoration: line-through;
+  color: var(--gray-400);
+}
+.project-task-category {
+  font-size: 0.72rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+.project-tasks-empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: var(--gray-500);
+  font-size: 0.85rem;
+}
+
+/* ─── Modal ─── */
+.project-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 1100;
+  align-items: center;
+  justify-content: center;
+}
+.project-modal-overlay.active {
+  display: flex;
+}
+.project-modal {
+  background: var(--body-background);
+  border-radius: 14px;
+  padding: 24px;
+  width: 90%;
+  max-width: 440px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+}
+.project-modal h3 {
+  margin: 0 0 16px;
+  font-size: 1.05rem;
+}
+.project-modal-field {
+  margin-bottom: 14px;
+}
+.project-modal-field label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 500;
+  margin-bottom: 4px;
+  color: var(--gray-600);
+}
+.project-modal-field input,
+.project-modal-field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 0.88rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.project-modal-field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+.project-modal-field input:focus,
+.project-modal-field textarea:focus {
+  outline: none;
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 2px rgba(25, 118, 210, 0.15);
+}
+
+/* Color picker */
+.project-color-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.project-color-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+}
+.project-color-swatch:hover {
+  transform: scale(1.15);
+}
+.project-color-swatch.selected {
+  border-color: var(--body-font-color);
+  transform: scale(1.15);
+}
+
+/* Modal buttons */
+.project-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+.project-modal-actions button {
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  border: 1px solid var(--gray-200);
+}
+.project-modal-cancel {
+  background: var(--body-background);
+  color: var(--body-font-color);
+}
+.project-modal-cancel:hover { background: var(--gray-100); }
+.project-modal-save {
+  background: var(--color-link);
+  color: #fff;
+  border-color: var(--color-link);
+}
+.project-modal-save:hover { opacity: 0.85; }
+
+/* ─── Confirm Dialog ─── */
+.project-confirm-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 1200;
+  align-items: center;
+  justify-content: center;
+}
+.project-confirm-overlay.active { display: flex; }
+.project-confirm {
+  background: var(--body-background);
+  border-radius: 12px;
+  padding: 24px;
+  width: 90%;
+  max-width: 380px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+  text-align: center;
+}
+.project-confirm h3 { margin: 0 0 8px; font-size: 1rem; }
+.project-confirm p { margin: 0 0 18px; font-size: 0.85rem; color: var(--gray-500); }
+.project-confirm-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+.project-confirm-actions button {
+  padding: 8px 18px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--gray-200);
+}
+.project-confirm-cancel {
+  background: var(--body-background);
+  color: var(--body-font-color);
+}
+.project-confirm-delete {
+  background: var(--color-danger, #c62828);
+  color: #fff;
+  border-color: var(--color-danger, #c62828);
+}
+.project-confirm-delete:hover { opacity: 0.85; }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .project-grid { grid-template-columns: 1fr; }
+  .project-detail-header { flex-direction: column; }
+  .project-detail-actions { margin-top: 8px; }
+  .project-header { flex-wrap: wrap; }
+}
+</style>
+
+<div class="project-list" id="project-list-root">
+  <!-- Auth gate -->
+  <div class="project-auth" id="project-auth" style="display:none;">
+    <div class="project-auth-card">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <h3>Projects</h3>
+      <p>Sign in to organize your tasks into projects.</p>
+      <button class="project-signin-btn" id="project-signin-btn">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#4285F4" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#34A853" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#EA4335" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div class="project-loading" id="project-loading" style="display:none;">
+    <div class="project-spinner"></div>
+    Loading projects...
+  </div>
+
+  <!-- Main view: project list -->
+  <div id="project-list-view" style="display:none;">
+    <div class="project-header">
+      <h2>Projects</h2>
+      <div class="project-header-actions">
+        <button class="project-archive-toggle" id="project-archive-toggle" title="Show archived projects">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          Archive
+        </button>
+        <button class="project-add-btn" id="project-add-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          New Project
+        </button>
+      </div>
+    </div>
+    <div id="project-grid" class="project-grid"></div>
+    <div class="project-empty" id="project-empty" style="display:none;">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      <p>No projects yet</p>
+      <p class="project-empty-hint">Create a project to group related tasks together.</p>
+    </div>
+  </div>
+
+  <!-- Detail view -->
+  <div class="project-detail" id="project-detail-view">
+    <button class="project-detail-back" id="project-detail-back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      Back to Projects
+    </button>
+    <div class="project-detail-header">
+      <div class="project-detail-color" id="project-detail-color"></div>
+      <div class="project-detail-info">
+        <h2 class="project-detail-name" id="project-detail-name"></h2>
+        <p class="project-detail-desc" id="project-detail-desc"></p>
+        <div class="project-detail-meta" id="project-detail-meta"></div>
+      </div>
+      <div class="project-detail-actions">
+        <button id="project-edit-btn" title="Edit project">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          Edit
+        </button>
+        <button id="project-archive-btn" title="Archive project">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+          Archive
+        </button>
+        <button id="project-delete-btn" class="project-btn-danger" title="Delete project">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Delete
+        </button>
+      </div>
+    </div>
+    <div class="project-progress" id="project-progress">
+      <div class="project-progress-bar">
+        <div class="project-progress-fill" id="project-progress-fill"></div>
+      </div>
+      <span class="project-progress-label" id="project-progress-label"></span>
+    </div>
+    <div class="project-tasks-header">
+      <h3>Tasks</h3>
+    </div>
+    <div id="project-task-list"></div>
+    <div class="project-tasks-empty" id="project-tasks-empty" style="display:none;">
+      No tasks assigned to this project yet.<br>
+      Assign tasks from the Inbox or Board.
+    </div>
+  </div>
+</div>
+
+<!-- Create / Edit Modal -->
+<div class="project-modal-overlay" id="project-modal-overlay">
+  <div class="project-modal">
+    <h3 id="project-modal-title">New Project</h3>
+    <div class="project-modal-field">
+      <label for="project-modal-name">Name</label>
+      <input type="text" id="project-modal-name" placeholder="e.g. Website Redesign" maxlength="200" autocomplete="off">
+    </div>
+    <div class="project-modal-field">
+      <label for="project-modal-desc">Description <span style="font-weight:normal;color:var(--gray-400)">(optional)</span></label>
+      <textarea id="project-modal-desc" placeholder="What is this project about?" maxlength="1000"></textarea>
+    </div>
+    <div class="project-modal-field">
+      <label>Color</label>
+      <div class="project-color-picker" id="project-color-picker"></div>
+    </div>
+    <div class="project-modal-field">
+      <label for="project-modal-deadline">Deadline <span style="font-weight:normal;color:var(--gray-400)">(optional)</span></label>
+      <input type="date" id="project-modal-deadline">
+    </div>
+    <div class="project-modal-actions">
+      <button class="project-modal-cancel" id="project-modal-cancel">Cancel</button>
+      <button class="project-modal-save" id="project-modal-save">Create</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm -->
+<div class="project-confirm-overlay" id="project-confirm-overlay">
+  <div class="project-confirm">
+    <h3>Delete Project?</h3>
+    <p id="project-confirm-msg">All tasks in this project will be moved to trash.</p>
+    <div class="project-confirm-actions">
+      <button class="project-confirm-cancel" id="project-confirm-cancel">Cancel</button>
+      <button class="project-confirm-delete" id="project-confirm-delete">Delete</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ─── Color Palette ───
+  var isDark = document.documentElement.classList.contains('dark') ||
+    (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
+     !document.documentElement.classList.contains('light'));
+
+  var COLORS = [
+    { name: 'Blue',   light: '#1976d2', dark: '#64b5f6' },
+    { name: 'Green',  light: '#388e3c', dark: '#81c784' },
+    { name: 'Orange', light: '#e65100', dark: '#ffb74d' },
+    { name: 'Purple', light: '#7b1fa2', dark: '#ce93d8' },
+    { name: 'Teal',   light: '#00897b', dark: '#4db6ac' },
+    { name: 'Red',    light: '#c62828', dark: '#ef5350' },
+    { name: 'Amber',  light: '#f9a825', dark: '#fff176' },
+    { name: 'Pink',   light: '#ad1457', dark: '#f06292' },
+    { name: 'Indigo', light: '#283593', dark: '#7986cb' },
+    { name: 'Gray',   light: '#546e7a', dark: '#90a4ae' }
+  ];
+
+  function getColor(c) {
+    var entry = COLORS.find(function(e) { return e.light === c || e.dark === c; });
+    if (entry) return isDark ? entry.dark : entry.light;
+    return c || (isDark ? '#64b5f6' : '#1976d2');
+  }
+
+  // Returns the "canonical" (light-mode) value for storage
+  function getCanonicalColor(c) {
+    var entry = COLORS.find(function(e) { return e.light === c || e.dark === c; });
+    return entry ? entry.light : (c || '#1976d2');
+  }
+
+  function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text || '';
+    return div.innerHTML;
+  }
+
+  function formatDate(dateStr) {
+    if (!dateStr) return '';
+    var d = new Date(dateStr);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function isOverdue(deadline) {
+    if (!deadline) return false;
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return new Date(deadline) < today;
+  }
+
+  // ─── State ───
+  var _projects = [];
+  var _showArchived = false;
+  var _currentProjectId = null;
+  var _editingProjectId = null; // null = create, string = edit
+  var _selectedColor = COLORS[0].light;
+  var _todoCounts = {}; // projectId -> { total, done }
+
+  // ─── DOM refs ───
+  var authEl = document.getElementById('project-auth');
+  var loadingEl = document.getElementById('project-loading');
+  var listView = document.getElementById('project-list-view');
+  var gridEl = document.getElementById('project-grid');
+  var emptyEl = document.getElementById('project-empty');
+  var detailView = document.getElementById('project-detail-view');
+  var modalOverlay = document.getElementById('project-modal-overlay');
+  var confirmOverlay = document.getElementById('project-confirm-overlay');
+
+  // ─── Init ───
+  function init() {
+    if (!window.dmSync) {
+      authEl.style.display = '';
+      return;
+    }
+
+    // Sign-in button
+    document.getElementById('project-signin-btn').addEventListener('click', function() {
+      if (window.dmSignIn) window.dmSignIn();
+    });
+
+    // Wait for auth
+    function checkAuth() {
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      if (user) {
+        authEl.style.display = 'none';
+        loadingEl.style.display = '';
+        loadData();
+      } else {
+        authEl.style.display = '';
+        loadingEl.style.display = 'none';
+        listView.style.display = 'none';
+      }
+    }
+
+    // Listen for sync complete
+    window.addEventListener('dm-sync-complete', function() { checkAuth(); });
+    window.addEventListener('dm-projects-updated', function() {
+      if (window.dmAuth && window.dmAuth.currentUser) loadData();
+    });
+    window.addEventListener('dm-todos-updated', function() {
+      if (_currentProjectId) renderDetail(_currentProjectId);
+      else if (listView.style.display !== 'none') renderList();
+    });
+
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(function() {
+        if (window.dmAuth) window.dmAuth.onAuthStateChanged(checkAuth);
+        checkAuth();
+      });
+    } else {
+      checkAuth();
+    }
+
+    // Button handlers
+    document.getElementById('project-add-btn').addEventListener('click', function() { openModal(null); });
+    document.getElementById('project-archive-toggle').addEventListener('click', toggleArchived);
+    document.getElementById('project-detail-back').addEventListener('click', showList);
+    document.getElementById('project-edit-btn').addEventListener('click', function() { openModal(_currentProjectId); });
+    document.getElementById('project-archive-btn').addEventListener('click', handleArchiveToggle);
+    document.getElementById('project-delete-btn').addEventListener('click', function() { openConfirm(_currentProjectId); });
+
+    // Modal
+    document.getElementById('project-modal-cancel').addEventListener('click', closeModal);
+    document.getElementById('project-modal-save').addEventListener('click', handleSave);
+    modalOverlay.addEventListener('click', function(e) { if (e.target === modalOverlay) closeModal(); });
+
+    // Confirm
+    document.getElementById('project-confirm-cancel').addEventListener('click', closeConfirm);
+    document.getElementById('project-confirm-delete').addEventListener('click', handleDelete);
+    confirmOverlay.addEventListener('click', function(e) { if (e.target === confirmOverlay) closeConfirm(); });
+
+    // Build color picker
+    buildColorPicker();
+
+    // Keyboard
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') {
+        if (confirmOverlay.classList.contains('active')) closeConfirm();
+        else if (modalOverlay.classList.contains('active')) closeModal();
+      }
+    });
+  }
+
+  // ─── Data Loading ───
+  function loadData() {
+    var method = _showArchived ? 'getAllProjectsIncludingArchived' : 'getAllProjects';
+    window.dmSync[method]().then(function(projects) {
+      _projects = projects;
+      return loadTodoCounts();
+    }).then(function() {
+      loadingEl.style.display = 'none';
+      showList();
+    });
+  }
+
+  function loadTodoCounts() {
+    return window.dmSync.getAllTodos().then(function(todos) {
+      _todoCounts = {};
+      todos.forEach(function(t) {
+        if (t.projectId) {
+          if (!_todoCounts[t.projectId]) _todoCounts[t.projectId] = { total: 0, done: 0 };
+          _todoCounts[t.projectId].total++;
+          if (t.done) _todoCounts[t.projectId].done++;
+        }
+      });
+    });
+  }
+
+  // ─── List View ───
+  function showList() {
+    _currentProjectId = null;
+    detailView.classList.remove('active');
+    listView.style.display = '';
+    renderList();
+  }
+
+  function renderList() {
+    var projects = _projects;
+    if (!projects.length) {
+      gridEl.innerHTML = '';
+      emptyEl.style.display = '';
+      return;
+    }
+    emptyEl.style.display = 'none';
+
+    var html = '';
+    projects.forEach(function(p) {
+      var counts = _todoCounts[p.id] || { total: 0, done: 0 };
+      var color = getColor(p.color);
+      var archivedClass = p.archived ? ' project-card--archived' : '';
+      var deadlineHtml = '';
+      if (p.deadline) {
+        var overdue = isOverdue(p.deadline) && !p.archived;
+        deadlineHtml = '<span class="' + (overdue ? 'project-card-deadline--overdue' : '') + '">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
+          formatDate(p.deadline) + '</span>';
+      }
+
+      html += '<div class="project-card' + archivedClass + '" data-project-id="' + p.id + '">' +
+        '<div class="project-card-top">' +
+          '<div class="project-color-dot" style="background:' + color + '"></div>' +
+          '<span class="project-card-name">' + escapeHtml(p.name) + '</span>' +
+          (p.archived ? '<span style="font-size:0.72rem;color:var(--gray-400);padding:1px 6px;border:1px solid var(--gray-200);border-radius:4px;">Archived</span>' : '') +
+        '</div>' +
+        (p.description ? '<div class="project-card-desc">' + escapeHtml(p.description) + '</div>' : '') +
+        '<div class="project-card-meta">' +
+          '<span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>' +
+            counts.done + '/' + counts.total + ' tasks</span>' +
+          deadlineHtml +
+        '</div>' +
+      '</div>';
+    });
+    gridEl.innerHTML = html;
+
+    // Bind click
+    gridEl.querySelectorAll('.project-card').forEach(function(card) {
+      card.addEventListener('click', function() {
+        var id = card.getAttribute('data-project-id');
+        showDetail(id);
+      });
+    });
+  }
+
+  // ─── Detail View ───
+  function showDetail(projectId) {
+    _currentProjectId = projectId;
+    listView.style.display = 'none';
+    detailView.classList.add('active');
+    renderDetail(projectId);
+  }
+
+  function renderDetail(projectId) {
+    var project = _projects.find(function(p) { return p.id === projectId; });
+    if (!project) {
+      // Project may have been deleted, go back
+      showList();
+      return;
+    }
+
+    var color = getColor(project.color);
+    document.getElementById('project-detail-color').style.background = color;
+    document.getElementById('project-detail-name').textContent = project.name;
+    document.getElementById('project-detail-desc').textContent = project.description || '';
+    document.getElementById('project-detail-desc').style.display = project.description ? '' : 'none';
+
+    // Meta
+    var metaHtml = '';
+    if (project.deadline) {
+      var overdue = isOverdue(project.deadline) && !project.archived;
+      metaHtml += '<span class="' + (overdue ? 'project-card-deadline--overdue' : '') + '">' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' +
+        (overdue ? 'Overdue: ' : 'Due: ') + formatDate(project.deadline) + '</span>';
+    }
+    metaHtml += '<span>Created ' + formatDate(new Date(project.createdAt).toISOString().slice(0, 10)) + '</span>';
+    document.getElementById('project-detail-meta').innerHTML = metaHtml;
+
+    // Archive button label
+    var archBtn = document.getElementById('project-archive-btn');
+    if (project.archived) {
+      archBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg> Unarchive';
+    } else {
+      archBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg> Archive';
+    }
+
+    // Load tasks
+    window.dmSync.getProjectTodos(projectId).then(function(todos) {
+      // Sort: active first, then by order/creation
+      todos.sort(function(a, b) {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        return (a.createdAt || 0) - (b.createdAt || 0);
+      });
+
+      // Progress
+      var total = todos.length;
+      var done = todos.filter(function(t) { return t.done; }).length;
+      var pct = total > 0 ? Math.round((done / total) * 100) : 0;
+      document.getElementById('project-progress-fill').style.width = pct + '%';
+      document.getElementById('project-progress-fill').style.background = color;
+      document.getElementById('project-progress-label').textContent = done + ' of ' + total + ' tasks done (' + pct + '%)';
+      document.getElementById('project-progress').style.display = total > 0 ? '' : 'none';
+
+      // Task list
+      var taskListEl = document.getElementById('project-task-list');
+      var tasksEmpty = document.getElementById('project-tasks-empty');
+
+      if (!todos.length) {
+        taskListEl.innerHTML = '';
+        tasksEmpty.style.display = '';
+        return;
+      }
+      tasksEmpty.style.display = 'none';
+
+      var html = '';
+      todos.forEach(function(t) {
+        var doneClass = t.done ? ' checked' : '';
+        var titleClass = t.done ? ' done' : '';
+        var catHtml = t.category ? '<span class="project-task-category">' + escapeHtml(t.category) + '</span>' : '';
+        html += '<div class="project-task-item" data-todo-id="' + t.id + '">' +
+          '<div class="project-task-checkbox' + doneClass + '" data-todo-id="' + t.id + '"></div>' +
+          '<span class="project-task-title' + titleClass + '">' + escapeHtml(t.title) + '</span>' +
+          catHtml +
+        '</div>';
+      });
+      taskListEl.innerHTML = html;
+
+      // Bind checkbox clicks
+      taskListEl.querySelectorAll('.project-task-checkbox').forEach(function(cb) {
+        cb.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var todoId = cb.getAttribute('data-todo-id');
+          toggleTodoDone(todoId);
+        });
+      });
+    });
+  }
+
+  function toggleTodoDone(todoId) {
+    window.dmSync.getTodo(todoId).then(function(todo) {
+      if (!todo) return;
+      todo.done = !todo.done;
+      todo.status = todo.done ? 'done' : 'active';
+      todo.bujoState = todo.done ? 'done' : 'open';
+      if (todo.done) {
+        todo.completedAt = Date.now();
+      } else {
+        todo.completedAt = null;
+      }
+      todo.updatedAt = Date.now();
+      return window.dmSync.putTodo(todo);
+    }).then(function() {
+      renderDetail(_currentProjectId);
+      loadTodoCounts().then(function() { renderList(); });
+    });
+  }
+
+  // ─── Archived Toggle ───
+  function toggleArchived() {
+    _showArchived = !_showArchived;
+    var btn = document.getElementById('project-archive-toggle');
+    btn.textContent = _showArchived ? 'Hide Archived' : 'Archive';
+    // Prepend icon back
+    var icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('width', '14');
+    icon.setAttribute('height', '14');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('fill', 'none');
+    icon.setAttribute('stroke', 'currentColor');
+    icon.setAttribute('stroke-width', '2');
+    icon.setAttribute('stroke-linecap', 'round');
+    icon.setAttribute('stroke-linejoin', 'round');
+    icon.innerHTML = '<polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>';
+    btn.insertBefore(icon, btn.firstChild);
+
+    loadData();
+  }
+
+  // ─── Modal ───
+  function buildColorPicker() {
+    var picker = document.getElementById('project-color-picker');
+    var html = '';
+    COLORS.forEach(function(c) {
+      var displayColor = isDark ? c.dark : c.light;
+      html += '<div class="project-color-swatch" data-color="' + c.light + '" style="background:' + displayColor + '" title="' + c.name + '"></div>';
+    });
+    picker.innerHTML = html;
+
+    picker.querySelectorAll('.project-color-swatch').forEach(function(swatch) {
+      swatch.addEventListener('click', function() {
+        _selectedColor = swatch.getAttribute('data-color');
+        picker.querySelectorAll('.project-color-swatch').forEach(function(s) { s.classList.remove('selected'); });
+        swatch.classList.add('selected');
+      });
+    });
+  }
+
+  function openModal(projectId) {
+    _editingProjectId = projectId;
+    var title = document.getElementById('project-modal-title');
+    var nameInput = document.getElementById('project-modal-name');
+    var descInput = document.getElementById('project-modal-desc');
+    var deadlineInput = document.getElementById('project-modal-deadline');
+    var saveBtn = document.getElementById('project-modal-save');
+
+    if (projectId) {
+      // Edit mode
+      var project = _projects.find(function(p) { return p.id === projectId; });
+      if (!project) return;
+      title.textContent = 'Edit Project';
+      saveBtn.textContent = 'Save';
+      nameInput.value = project.name;
+      descInput.value = project.description || '';
+      deadlineInput.value = project.deadline || '';
+      _selectedColor = getCanonicalColor(project.color);
+    } else {
+      // Create mode
+      title.textContent = 'New Project';
+      saveBtn.textContent = 'Create';
+      nameInput.value = '';
+      descInput.value = '';
+      deadlineInput.value = '';
+      _selectedColor = COLORS[0].light;
+    }
+
+    // Highlight selected color
+    document.querySelectorAll('.project-color-swatch').forEach(function(s) {
+      s.classList.toggle('selected', s.getAttribute('data-color') === _selectedColor);
+    });
+
+    modalOverlay.classList.add('active');
+    setTimeout(function() { nameInput.focus(); }, 50);
+  }
+
+  function closeModal() {
+    modalOverlay.classList.remove('active');
+    _editingProjectId = null;
+  }
+
+  function handleSave() {
+    var nameInput = document.getElementById('project-modal-name');
+    var descInput = document.getElementById('project-modal-desc');
+    var deadlineInput = document.getElementById('project-modal-deadline');
+    var name = nameInput.value.trim();
+    if (!name) {
+      nameInput.focus();
+      nameInput.style.borderColor = 'var(--color-danger, #c62828)';
+      setTimeout(function() { nameInput.style.borderColor = ''; }, 1500);
+      return;
+    }
+
+    var data = {
+      name: name,
+      description: descInput.value.trim(),
+      color: _selectedColor,
+      deadline: deadlineInput.value || null
+    };
+
+    var promise;
+    if (_editingProjectId) {
+      promise = window.dmSync.updateProject(_editingProjectId, data);
+    } else {
+      promise = window.dmSync.createProject(data);
+    }
+
+    promise.then(function() {
+      closeModal();
+      loadData();
+    });
+  }
+
+  // ─── Archive ───
+  function handleArchiveToggle() {
+    if (!_currentProjectId) return;
+    var project = _projects.find(function(p) { return p.id === _currentProjectId; });
+    if (!project) return;
+
+    var promise = project.archived
+      ? window.dmSync.unarchiveProject(_currentProjectId)
+      : window.dmSync.archiveProject(_currentProjectId);
+
+    promise.then(function() {
+      loadData().then ? loadData().then(function() {
+        if (_showArchived || !project.archived) {
+          showDetail(_currentProjectId);
+        } else {
+          showList();
+        }
+      }) : loadData();
+    });
+  }
+
+  // ─── Delete ───
+  var _deleteProjectId = null;
+
+  function openConfirm(projectId) {
+    _deleteProjectId = projectId;
+    var project = _projects.find(function(p) { return p.id === projectId; });
+    var counts = _todoCounts[projectId] || { total: 0 };
+    var msg = 'This will permanently delete "' + (project ? project.name : '') + '"';
+    if (counts.total > 0) {
+      msg += ' and move ' + counts.total + ' task' + (counts.total > 1 ? 's' : '') + ' to trash.';
+    } else {
+      msg += '.';
+    }
+    document.getElementById('project-confirm-msg').textContent = msg;
+    confirmOverlay.classList.add('active');
+  }
+
+  function closeConfirm() {
+    confirmOverlay.classList.remove('active');
+    _deleteProjectId = null;
+  }
+
+  function handleDelete() {
+    if (!_deleteProjectId) return;
+    window.dmSync.deleteProject(_deleteProjectId).then(function() {
+      closeConfirm();
+      _currentProjectId = null;
+      loadData();
+    });
+  }
+
+  // ─── Bootstrap ───
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>

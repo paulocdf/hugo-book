@@ -46,7 +46,21 @@
       <div id="dashboard-categories"></div>
     </div>
 
-    <!-- Panel 4: Activity log -->
+    <!-- Panel 4: Time by Project -->
+    <div class="dashboard-panel" id="dashboard-projects-panel" style="display: none;">
+      <h3 class="dashboard-panel-title">Time by Project</h3>
+      <p class="dashboard-panel-subtitle">Time tracked across projects</p>
+      <div id="dashboard-projects"></div>
+    </div>
+
+    <!-- Panel 5: Project Progress -->
+    <div class="dashboard-panel" id="dashboard-project-progress-panel" style="display: none;">
+      <h3 class="dashboard-panel-title">Project Progress</h3>
+      <p class="dashboard-panel-subtitle">Completion status of active projects</p>
+      <div id="dashboard-project-progress"></div>
+    </div>
+
+    <!-- Panel 6: Activity log -->
     <div class="dashboard-panel">
       <h3 class="dashboard-panel-title">Recent Activity</h3>
       <p class="dashboard-panel-subtitle">Tasks completed by day</p>
@@ -390,6 +404,98 @@
   .dashboard-activity-date {
     width: 60px;
   }
+  .dashboard-proj-label {
+    width: 70px;
+    font-size: 0.72rem;
+  }
+}
+
+/* Project time bars */
+.dashboard-proj-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.dashboard-proj-row:last-child { margin-bottom: 0; }
+.dashboard-proj-label {
+  width: 100px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--body-font-color);
+  text-align: right;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.dashboard-proj-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dashboard-proj-track {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dashboard-proj-bar {
+  height: 18px;
+  border-radius: 4px;
+  min-width: 2px;
+  transition: width 0.4s ease-out;
+}
+.dashboard-proj-value {
+  font-size: 0.72rem;
+  color: var(--gray-500);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Project progress rows */
+.dashboard-progress-row {
+  margin-bottom: 12px;
+}
+.dashboard-progress-row:last-child { margin-bottom: 0; }
+.dashboard-progress-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.dashboard-progress-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--body-font-color);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dashboard-progress-count {
+  font-size: 0.72rem;
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+.dashboard-progress-track {
+  height: 8px;
+  background: var(--gray-100);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.dashboard-progress-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s ease-out;
 }
 </style>
 
@@ -690,6 +796,132 @@
     el.innerHTML = html;
   }
 
+  // Project dark-mode color mapping
+  var PROJECT_DARK_COLORS = {
+    '#1976d2': '#64b5f6', '#388e3c': '#81c784', '#e65100': '#ffb74d',
+    '#7b1fa2': '#ce93d8', '#00897b': '#4db6ac', '#c62828': '#ef5350',
+    '#f9a825': '#fff176', '#ad1457': '#f06292', '#283593': '#7986cb',
+    '#546e7a': '#90a4ae'
+  };
+  function getProjectDisplayColor(color) {
+    if (!color) return 'var(--gray-400)';
+    var isDark = document.documentElement.classList.contains('dark') ||
+                 (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
+                  !document.documentElement.classList.contains('light'));
+    return isDark ? (PROJECT_DARK_COLORS[color.toLowerCase()] || color) : color;
+  }
+
+  function renderProjectTime(todos, projectMap) {
+    var panelEl = document.getElementById('dashboard-projects-panel');
+    var el = document.getElementById('dashboard-projects');
+    if (!el || !panelEl) return;
+
+    var done = todos.filter(function(t) { return (t.status === 'archived' || t.status === 'done') && t.actualMin && t.projectId; });
+    if (!done.length) {
+      panelEl.style.display = 'none';
+      return;
+    }
+
+    var projs = {};
+    var totalMin = 0;
+    done.forEach(function(t) {
+      var pid = t.projectId;
+      if (!projs[pid]) projs[pid] = 0;
+      projs[pid] += (t.actualMin || 0);
+      totalMin += (t.actualMin || 0);
+    });
+
+    var projIds = Object.keys(projs).sort(function(a, b) {
+      return projs[b] - projs[a];
+    });
+
+    var maxVal = projs[projIds[0]] || 1;
+
+    var html = '';
+    projIds.forEach(function(pid) {
+      var proj = projectMap[pid];
+      var name = proj ? proj.name : 'Unknown';
+      var color = proj ? getProjectDisplayColor(proj.color) : 'var(--gray-400)';
+      var minutes = projs[pid];
+      var pct = Math.max((minutes / maxVal) * 100, 2);
+      var share = totalMin > 0 ? Math.round((minutes / totalMin) * 100) : 0;
+
+      html += '<div class="dashboard-proj-row">';
+      html += '<div class="dashboard-proj-label" title="' + escapeHtml(name) + '">';
+      html += '<span class="dashboard-proj-dot" style="background: ' + color + ';"></span>';
+      html += escapeHtml(name);
+      html += '</div>';
+      html += '<div class="dashboard-proj-track">';
+      html += '<div class="dashboard-proj-bar" style="width: ' + pct + '%; background: ' + color + ';"></div>';
+      html += '<span class="dashboard-proj-value">' + formatTime(minutes) + ' (' + share + '%) <span class="dashboard-pom">' + pom(minutes) + 'p</span></span>';
+      html += '</div>';
+      html += '</div>';
+    });
+
+    el.innerHTML = html;
+    panelEl.style.display = '';
+  }
+
+  function renderProjectProgress(todos, projectMap) {
+    var panelEl = document.getElementById('dashboard-project-progress-panel');
+    var el = document.getElementById('dashboard-project-progress');
+    if (!el || !panelEl) return;
+
+    // Get active (non-archived) projects that have at least one task
+    var projStats = {};
+    todos.forEach(function(t) {
+      if (!t.projectId) return;
+      if (t.deletedAt) return;
+      if (!projStats[t.projectId]) projStats[t.projectId] = { done: 0, total: 0 };
+      projStats[t.projectId].total++;
+      if (t.status === 'archived' || t.status === 'done') {
+        projStats[t.projectId].done++;
+      }
+    });
+
+    // Filter to projects that exist in projectMap and are not archived
+    var projIds = Object.keys(projStats).filter(function(pid) {
+      var proj = projectMap[pid];
+      return proj && !proj.archived;
+    });
+
+    if (!projIds.length) {
+      panelEl.style.display = 'none';
+      return;
+    }
+
+    // Sort by completion percentage ascending (least complete first)
+    projIds.sort(function(a, b) {
+      var pctA = projStats[a].total > 0 ? projStats[a].done / projStats[a].total : 0;
+      var pctB = projStats[b].total > 0 ? projStats[b].done / projStats[b].total : 0;
+      return pctA - pctB;
+    });
+
+    var html = '';
+    projIds.forEach(function(pid) {
+      var proj = projectMap[pid];
+      var stats = projStats[pid];
+      var pct = stats.total > 0 ? Math.round((stats.done / stats.total) * 100) : 0;
+      var color = getProjectDisplayColor(proj.color);
+
+      html += '<div class="dashboard-progress-row">';
+      html += '<div class="dashboard-progress-header">';
+      html += '<div class="dashboard-progress-name">';
+      html += '<span class="dashboard-proj-dot" style="background: ' + color + ';"></span>';
+      html += escapeHtml(proj.name);
+      html += '</div>';
+      html += '<span class="dashboard-progress-count">' + stats.done + '/' + stats.total + ' (' + pct + '%)</span>';
+      html += '</div>';
+      html += '<div class="dashboard-progress-track">';
+      html += '<div class="dashboard-progress-fill" style="width: ' + pct + '%; background: ' + color + ';"></div>';
+      html += '</div>';
+      html += '</div>';
+    });
+
+    el.innerHTML = html;
+    panelEl.style.display = '';
+  }
+
   function renderActivity(todos) {
     var el = document.getElementById('dashboard-activity');
     if (!el) return;
@@ -763,8 +995,16 @@
 
     showState('loading');
 
-    window.dmSync.getAllTodos().then(function(todos) {
-      if (!todos) todos = [];
+    var todosPromise = window.dmSync.getAllTodos();
+    var projectsPromise = (window.dmSync.getAllProjectsIncludingArchived || window.dmSync.getAllProjects || function() { return Promise.resolve([]); })();
+
+    Promise.all([todosPromise, projectsPromise]).then(function(results) {
+      var todos = results[0] || [];
+      var projects = results[1] || [];
+
+      // Build project lookup map
+      var projectMap = {};
+      projects.forEach(function(p) { projectMap[p.id] = p; });
 
       // Migrate legacy todos: backfill status field from done boolean
       todos.forEach(function(t) {
@@ -786,6 +1026,8 @@
       renderSummary(todos);
       renderEstVsActual(todos);
       renderCategories(todos);
+      renderProjectTime(todos, projectMap);
+      renderProjectProgress(todos, projectMap);
       renderActivity(todos);
     }).catch(function(err) {
       console.error('[dashboard] Error loading todos:', err);
@@ -803,6 +1045,7 @@
 
   window.addEventListener('dm-todos-updated', renderDashboard);
   window.addEventListener('dm-sync-complete', renderDashboard);
+  window.addEventListener('dm-projects-updated', renderDashboard);
 
   if (window.dmAuth) {
     function subscribeDashboardAuth() {

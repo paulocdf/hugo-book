@@ -161,7 +161,7 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-   var DB_VERSION = 12;
+   var DB_VERSION = 13;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -170,6 +170,7 @@
   var STORE_ATTACHMENTS = 'attachments';
   var STORE_REVIEW_CARDS = 'reviewCards';
   var STORE_TASK_SHARES = 'taskShares';
+  var STORE_PROJECTS = 'projects';
   var MAX_VERSIONS_PER_NOTE = 50;
   var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
   var SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -243,6 +244,7 @@
           todoStore.createIndex('reminderAt', 'reminderAt', { unique: false });
           todoStore.createIndex('kanbanStatus', 'kanbanStatus', { unique: false });
           todoStore.createIndex('kanbanOrder', 'kanbanOrder', { unique: false });
+          todoStore.createIndex('projectId', 'projectId', { unique: false });
         } else {
           // Upgrading existing todos store — add missing indexes
           var existingStore = tx.objectStore(STORE_TODOS);
@@ -260,6 +262,10 @@
           // v10: add kanbanOrder index for board-specific ordering (separate from Inbox order)
           if (!existingStore.indexNames.contains('kanbanOrder')) {
             existingStore.createIndex('kanbanOrder', 'kanbanOrder', { unique: false });
+          }
+          // v13: add projectId index for project-based task grouping
+          if (!existingStore.indexNames.contains('projectId')) {
+            existingStore.createIndex('projectId', 'projectId', { unique: false });
           }
         }
         // Offline write queue store (v4)
@@ -291,6 +297,13 @@
           shareStore.createIndex('ownerId', 'ownerId', { unique: false });
           shareStore.createIndex('inviteeEmail', 'inviteeEmail', { unique: false });
           shareStore.createIndex('status', 'status', { unique: false });
+        }
+        // Projects store (v13) — for grouping tasks into projects
+        if (!db.objectStoreNames.contains(STORE_PROJECTS)) {
+          var projectStore = db.createObjectStore(STORE_PROJECTS, { keyPath: 'id' });
+          projectStore.createIndex('userId', 'userId', { unique: false });
+          projectStore.createIndex('archived', 'archived', { unique: false });
+          projectStore.createIndex('order', 'order', { unique: false });
         }
       };
       req.onblocked = function() {
@@ -788,7 +801,27 @@
       updatedAt: updatedAt,
       completedAt: completedAt,
       collaborators: data.collaborators || [],
-      sharedTaskId: data.sharedTaskId || null
+      sharedTaskId: data.sharedTaskId || null,
+      projectId: data.projectId || null
+    };
+  }
+
+  function serializeProject(doc) {
+    var data = doc.data();
+    var createdAt = data.createdAt ? data.createdAt.toMillis() : 0;
+    var updatedAt = data.updatedAt ? data.updatedAt.toMillis() : 0;
+    var deadline = data.deadline || null;
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      name: data.name || '',
+      color: data.color || '#64b5f6',
+      description: data.description || '',
+      deadline: deadline,
+      archived: !!data.archived,
+      order: data.order || 0,
+      createdAt: createdAt,
+      updatedAt: updatedAt
     };
   }
 
@@ -926,6 +959,67 @@
       });
   }
 
+  function syncProjects(userId) {
+    if (!window.dmDb) return Promise.reject(new Error('Firestore not available'));
+
+    console.log('[dm-sync] Syncing projects...');
+    var startTime = Date.now();
+
+    return window.dmDb.collection('projects')
+      .where('userId', '==', userId)
+      .get()
+      .then(function(snapshot) {
+        var remoteProjects = [];
+        snapshot.forEach(function(doc) {
+          remoteProjects.push(serializeProject(doc));
+        });
+
+        return idbGetAll(STORE_PROJECTS).then(function(localProjects) {
+          return getAllQueued().then(function(queueEntries) {
+          var pendingIds = {};
+          queueEntries.forEach(function(q) {
+            if (q.op === 'set' && q.collection === 'projects') pendingIds[q.docId] = true;
+          });
+
+          var localMap = {};
+          localProjects.forEach(function(p) { localMap[p.id] = p; });
+
+          var remoteMap = {};
+          remoteProjects.forEach(function(p) { remoteMap[p.id] = p; });
+
+          var toUpsert = [];
+          remoteProjects.forEach(function(rp) {
+            var lp = localMap[rp.id];
+            if (!lp || lp.updatedAt !== rp.updatedAt) {
+              toUpsert.push(rp);
+            }
+          });
+
+          var toDelete = [];
+          localProjects.forEach(function(lp) {
+            if (!remoteMap[lp.id] && !pendingIds[lp.id]) {
+              toDelete.push(lp.id);
+            }
+          });
+
+          var promises = [];
+          if (toUpsert.length > 0) {
+            promises.push(idbPutBatch(STORE_PROJECTS, toUpsert));
+          }
+          toDelete.forEach(function(id) {
+            promises.push(idbDelete(STORE_PROJECTS, id));
+          });
+
+          return Promise.all(promises).then(function() {
+            var elapsed = Date.now() - startTime;
+            console.log('[dm-sync] Projects sync complete in ' + elapsed + 'ms. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
+            return { upserted: toUpsert.length, deleted: toDelete.length };
+          });
+          });
+        });
+      });
+  }
+
   // ─── Auto-purge expired trash ───
 
   function purgeExpiredTrash() {
@@ -975,6 +1069,7 @@
 
     return syncNotes(userId)
       .then(function() { return syncTodos(userId); })
+      .then(function() { return syncProjects(userId); })
       .then(function() { return syncVersions(userId); })
       .then(function() { return syncAttachments(userId); })
       .then(function() { return syncReviewCards(userId); })
@@ -2729,6 +2824,190 @@
         window.dispatchEvent(new CustomEvent('dm-todos-updated'));
       });
     },
+
+    // IndexedDB operations — Projects
+    getAllProjects: function() {
+      return idbGetAll(STORE_PROJECTS).then(function(projects) {
+        return projects.filter(function(p) { return !p.archived; })
+          .sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      });
+    },
+    getAllProjectsIncludingArchived: function() {
+      return idbGetAll(STORE_PROJECTS).then(function(projects) {
+        return projects.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      });
+    },
+    getArchivedProjects: function() {
+      return idbGetAll(STORE_PROJECTS).then(function(projects) {
+        return projects.filter(function(p) { return !!p.archived; })
+          .sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      });
+    },
+    getProject: function(id) {
+      return idbGet(STORE_PROJECTS, id);
+    },
+    createProject: function(projectData) {
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      if (!user) return Promise.reject(new Error('Not authenticated'));
+      var id = projectData.id || (user.uid + '_proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+      var now = Date.now();
+      var project = {
+        id: id,
+        userId: user.uid,
+        name: projectData.name || '',
+        color: projectData.color || '#64b5f6',
+        description: projectData.description || '',
+        deadline: projectData.deadline || null,
+        archived: false,
+        order: projectData.order || 0,
+        createdAt: now,
+        updatedAt: now
+      };
+      var firestoreData = {
+        userId: user.uid,
+        name: project.name,
+        color: project.color,
+        description: project.description,
+        deadline: project.deadline,
+        archived: false,
+        order: project.order,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'projects',
+        docId: id,
+        op: 'set',
+        data: firestoreData,
+        localOp: function() { return idbPut(STORE_PROJECTS, project); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+        return project;
+      });
+    },
+    updateProject: function(id, updates) {
+      return idbGet(STORE_PROJECTS, id).then(function(project) {
+        if (!project) return Promise.reject(new Error('Project not found: ' + id));
+        var firestoreUpdates = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        if (updates.name !== undefined) { project.name = updates.name; firestoreUpdates.name = updates.name; }
+        if (updates.color !== undefined) { project.color = updates.color; firestoreUpdates.color = updates.color; }
+        if (updates.description !== undefined) { project.description = updates.description; firestoreUpdates.description = updates.description; }
+        if (updates.deadline !== undefined) { project.deadline = updates.deadline; firestoreUpdates.deadline = updates.deadline; }
+        if (updates.archived !== undefined) { project.archived = updates.archived; firestoreUpdates.archived = updates.archived; }
+        if (updates.order !== undefined) { project.order = updates.order; firestoreUpdates.order = updates.order; }
+        project.updatedAt = Date.now();
+        return firestoreWrite({
+          collection: 'projects',
+          docId: id,
+          op: 'update',
+          data: firestoreUpdates,
+          localOp: function() { return idbPut(STORE_PROJECTS, project); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+          return project;
+        });
+      });
+    },
+    deleteProject: function(id) {
+      // Delete the project and soft-delete all its tasks
+      return idbGetAll(STORE_TODOS).then(function(todos) {
+        var projectTodos = todos.filter(function(t) { return t.projectId === id && !t.deletedAt; });
+        var trashPromises = projectTodos.map(function(t) {
+          t.deletedAt = Date.now();
+          t.updatedAt = Date.now();
+          return firestoreWrite({
+            collection: 'todos',
+            docId: t.id,
+            op: 'update',
+            data: {
+              deletedAt: firebase.firestore.Timestamp.fromMillis(t.deletedAt),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            localOp: function() { return idbPut(STORE_TODOS, t); }
+          });
+        });
+        return Promise.all(trashPromises);
+      }).then(function() {
+        return firestoreWrite({
+          collection: 'projects',
+          docId: id,
+          op: 'delete',
+          data: null,
+          localOp: function() { return idbDelete(STORE_PROJECTS, id); }
+        });
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+      });
+    },
+    archiveProject: function(id) {
+      return idbGet(STORE_PROJECTS, id).then(function(project) {
+        if (!project) return;
+        project.archived = true;
+        project.updatedAt = Date.now();
+        return firestoreWrite({
+          collection: 'projects',
+          docId: id,
+          op: 'update',
+          data: {
+            archived: true,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          },
+          localOp: function() { return idbPut(STORE_PROJECTS, project); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+          return project;
+        });
+      });
+    },
+    unarchiveProject: function(id) {
+      return idbGet(STORE_PROJECTS, id).then(function(project) {
+        if (!project) return;
+        project.archived = false;
+        project.updatedAt = Date.now();
+        return firestoreWrite({
+          collection: 'projects',
+          docId: id,
+          op: 'update',
+          data: {
+            archived: false,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          },
+          localOp: function() { return idbPut(STORE_PROJECTS, project); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+          return project;
+        });
+      });
+    },
+    getProjectTodos: function(projectId) {
+      return idbGetAll(STORE_TODOS).then(function(todos) {
+        return todos.filter(function(t) { return t.projectId === projectId && !t.deletedAt; });
+      });
+    },
+    reorderProjects: function(orderedIds) {
+      var promises = orderedIds.map(function(id, index) {
+        return idbGet(STORE_PROJECTS, id).then(function(project) {
+          if (!project) return;
+          project.order = index;
+          project.updatedAt = Date.now();
+          return firestoreWrite({
+            collection: 'projects',
+            docId: id,
+            op: 'update',
+            data: {
+              order: index,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            localOp: function() { return idbPut(STORE_PROJECTS, project); }
+          });
+        });
+      });
+      return Promise.all(promises).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+      });
+    },
+
     setReminder: function(todoId, reminderAtMs) {
       return idbGet(STORE_TODOS, todoId).then(function(todo) {
         if (!todo) return;
@@ -2885,6 +3164,7 @@
     sync: function(userId) { return syncAll(userId); },
     syncNotes: function(userId) { return syncNotes(userId); },
     syncTodos: function(userId) { return syncTodos(userId); },
+    syncProjects: function(userId) { return syncProjects(userId); },
     startBackgroundSync: startBackgroundSync,
     stopBackgroundSync: stopBackgroundSync,
 
@@ -2906,6 +3186,7 @@
         idbClear(STORE_ATTACHMENTS),
         idbClear(STORE_REVIEW_CARDS),
         idbClear(STORE_TASK_SHARES),
+        idbClear(STORE_PROJECTS),
         clearQueue()
       ]).then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -3016,7 +3297,7 @@
           var cachedUserId = meta ? meta.value : null;
           var proceed = cachedUserId === user.uid
             ? Promise.resolve()
-            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), clearQueue()]);
+            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), clearQueue()]);
 
           return proceed.then(function() {
             return idbPut(STORE_META, { key: 'currentUserId', value: user.uid });
@@ -3059,7 +3340,7 @@
         stopSharedTaskListeners();
         clearAllReminderTimers();
         // Clear cache on sign-out so no data leaks to another user
-        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), clearQueue()])
+        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), clearQueue()])
           .then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));

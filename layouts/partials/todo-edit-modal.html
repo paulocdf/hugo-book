@@ -90,6 +90,13 @@
       </div>
     </div>
 
+    <div class="todo-edit-field">
+      <label>Project</label>
+      <select id="todo-edit-project-select" class="todo-edit-project-select">
+        <option value="">None</option>
+      </select>
+    </div>
+
     <div class="todo-edit-notes-box" id="todo-edit-notes-box">
       <div class="todo-edit-notes-label">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
@@ -318,6 +325,18 @@
 .todo-edit-category-option:hover,
 .todo-edit-category-option.active {
   background: var(--gray-100);
+}
+.todo-edit-project-select {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  cursor: pointer;
+  appearance: auto;
 }
 .todo-edit-category-option .cat-highlight {
   font-weight: 700;
@@ -853,6 +872,9 @@
   var shareSendBtn = document.getElementById('todo-edit-share-send');
   var shareFeedback = document.getElementById('todo-edit-share-feedback');
   var shareListEl = document.getElementById('todo-edit-share-list');
+
+  // Project select
+  var projectSelect = document.getElementById('todo-edit-project-select');
 
   // Pomodoro group elements
   var editPomoGroup = document.getElementById('todo-edit-pomodoro-group');
@@ -1676,6 +1698,22 @@
     categoryInput.value = '';
     hideDropdown();
 
+    // Populate project selector
+    if (projectSelect && window.dmSync) {
+      window.dmSync.getAllProjects().then(function(projects) {
+        var html = '<option value="">None</option>';
+        projects.forEach(function(p) {
+          var selected = todo.projectId === p.id ? ' selected' : '';
+          html += '<option value="' + p.id + '"' + selected + '>' + (p.name || 'Untitled') + '</option>';
+        });
+        projectSelect.innerHTML = html;
+      }).catch(function() {
+        projectSelect.innerHTML = '<option value="">None</option>';
+      });
+    } else if (projectSelect) {
+      projectSelect.innerHTML = '<option value="">None</option>';
+    }
+
     saveBtn.disabled = false;
     saveBtn.textContent = 'Save Changes';
 
@@ -1751,6 +1789,7 @@
       pomodoroLength: pomLen,
       breakLength: pomBreakLen,
       category: newCategory,
+      projectId: projectSelect ? (projectSelect.value || null) : undefined,
       bujoType: _editBujoType,
       bujoState: _editBujoState,
       notes: notesInput.value.trim(),

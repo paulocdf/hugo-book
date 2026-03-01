@@ -852,10 +852,11 @@
   var hasWebGPU = typeof navigator !== 'undefined' && !!navigator.gpu;
 
   // ─── System prompt builder (optimized for Qwen2.5-0.5B) ───
-  function buildSystemPrompt(tasks) {
+  function buildSystemPrompt(tasks, projectMap) {
     var now = new Date();
     var todayStr = now.toISOString().split('T')[0];
     var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
+    projectMap = projectMap || {};
 
     var prompt = 'You are a proactive productivity assistant and executive task manager. Today: ' + dayName + ', ' + todayStr + '.\n';
     prompt += 'Rules:\n';
@@ -880,6 +881,15 @@
     if (!tasks || tasks.length === 0) {
       prompt += 'The user has no tasks. Suggest they start by adding tasks for today.\n';
       return prompt;
+    }
+
+    // List active projects so AI can reference them
+    var activeProjects = Object.keys(projectMap).filter(function(pid) {
+      return !projectMap[pid].archived;
+    }).map(function(pid) { return projectMap[pid]; });
+    if (activeProjects.length > 0) {
+      prompt += 'Active projects: ' + activeProjects.map(function(p) { return p.name; }).join(', ') + '\n';
+      prompt += 'Tasks can belong to a project. When creating tasks, assign them to a relevant project if applicable.\n\n';
     }
 
     // Categorize tasks
@@ -917,6 +927,7 @@
         unscheduled.slice(0, 7).forEach(function(t) {
           prompt += '- ' + t.title;
           if (t.category) prompt += ' [' + t.category + ']';
+          if (t.projectId && projectMap[t.projectId]) prompt += ' {project: ' + projectMap[t.projectId].name + '}';
           if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
           prompt += '\n';
         });
@@ -927,6 +938,7 @@
         prompt += '\nUpcoming (' + futureTasks.length + '):\n';
         futureTasks.slice(0, 5).forEach(function(t) {
           prompt += '- ' + t.title + ' (' + t.scheduledDate + ')';
+          if (t.projectId && projectMap[t.projectId]) prompt += ' {project: ' + projectMap[t.projectId].name + '}';
           prompt += '\n';
         });
         if (futureTasks.length > 5) prompt += '- +' + (futureTasks.length - 5) + ' more\n';
@@ -939,6 +951,7 @@
       overdue.forEach(function(t) {
         prompt += '- ' + t.title;
         if (t.scheduledDate) prompt += ' (was: ' + t.scheduledDate + ')';
+        if (t.projectId && projectMap[t.projectId]) prompt += ' {project: ' + projectMap[t.projectId].name + '}';
         prompt += '\n';
       });
     }
@@ -950,6 +963,7 @@
         todayTasks.forEach(function(t) {
           prompt += '- ' + t.title;
           if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
+          if (t.projectId && projectMap[t.projectId]) prompt += ' {project: ' + projectMap[t.projectId].name + '}';
           prompt += '\n';
         });
       }
@@ -962,13 +976,19 @@
   function getTaskContext() {
     return new Promise(function(resolve) {
       if (!window.dmSync || !window.dmSync.getAllTodos) {
-        resolve([]);
+        resolve({ tasks: [], projectMap: {} });
         return;
       }
-      window.dmSync.getAllTodos().then(function(todos) {
-        resolve(todos || []);
+      var todosP = window.dmSync.getAllTodos().catch(function() { return []; });
+      var projectsP = (window.dmSync.getAllProjects || function() { return Promise.resolve([]); })().catch(function() { return []; });
+      Promise.all([todosP, projectsP]).then(function(results) {
+        var tasks = results[0] || [];
+        var projects = results[1] || [];
+        var projectMap = {};
+        projects.forEach(function(p) { projectMap[p.id] = p; });
+        resolve({ tasks: tasks, projectMap: projectMap });
       }).catch(function() {
-        resolve([]);
+        resolve({ tasks: [], projectMap: {} });
       });
     });
   }
@@ -1118,8 +1138,10 @@
     enginePromise.then(function(eng) {
       engine = eng || engine;
       return getTaskContext();
-    }).then(function(tasks) {
-      var systemPrompt = systemOverride || buildSystemPrompt(tasks);
+    }).then(function(ctx) {
+      var tasks = ctx.tasks || ctx;
+      var projectMap = ctx.projectMap || {};
+      var systemPrompt = systemOverride || buildSystemPrompt(tasks, projectMap);
       var messages = [{ role: 'system', content: systemPrompt }];
 
       // Include recent chat history (last 10 messages for context window)
@@ -1894,6 +1916,7 @@
         scheduledDate: details.scheduledDate,
         estimatedMin: details.estimatedMin,
         category: details.category,
+        projectId: details.projectId || null,
         bujoType: details.bujoType || 'task',
         source: 'ai'
       }
@@ -1932,6 +1955,7 @@
     }
     if (details.priority) meta.push(details.priority + ' priority');
     if (details.category) meta.push(details.category);
+    if (details.projectName) meta.push(details.projectName);
     if (details.estimatedMin) meta.push(details.estimatedMin + ' min');
 
     if (meta.length > 0) {

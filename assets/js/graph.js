@@ -922,6 +922,7 @@
   // TIME VIEW — todo time tracking analytics
   // =========================================================================
   var _allTodos = null; // cached across filter changes
+  var _allProjectMap = {}; // project id -> project object
   var _timeFilterState = {
     mode: localStorage.getItem('dm-time-filter') || 'all',
     customFrom: localStorage.getItem('dm-time-custom-from') || '',
@@ -948,18 +949,34 @@
 
       _allTodos = todos;
 
-      // ---- Build filter bar ----
-      var filterBar = buildTimeFilterBar();
-      timeWrapper.appendChild(filterBar.bar);
-      timeWrapper.appendChild(filterBar.customRow);
+      // Load projects for project-based charts
+      var projectsReady = Promise.resolve();
+      if (window.dmSync.getAllProjectsIncludingArchived) {
+        projectsReady = window.dmSync.getAllProjectsIncludingArchived().then(function(projects) {
+          _allProjectMap = {};
+          (projects || []).forEach(function(p) { _allProjectMap[p.id] = p; });
+        }).catch(function() { _allProjectMap = {}; });
+      } else if (window.dmSync.getAllProjects) {
+        projectsReady = window.dmSync.getAllProjects().then(function(projects) {
+          _allProjectMap = {};
+          (projects || []).forEach(function(p) { _allProjectMap[p.id] = p; });
+        }).catch(function() { _allProjectMap = {}; });
+      }
 
-      // ---- Content area (swapped on filter change) ----
-      var contentArea = document.createElement('div');
-      contentArea.className = 'time-content-area';
-      timeWrapper.appendChild(contentArea);
+      projectsReady.then(function() {
+        // ---- Build filter bar ----
+        var filterBar = buildTimeFilterBar();
+        timeWrapper.appendChild(filterBar.bar);
+        timeWrapper.appendChild(filterBar.customRow);
 
-      // Initial render
-      renderTimeContent(contentArea, todos, theme, true);
+        // ---- Content area (swapped on filter change) ----
+        var contentArea = document.createElement('div');
+        contentArea.className = 'time-content-area';
+        timeWrapper.appendChild(contentArea);
+
+        // Initial render
+        renderTimeContent(contentArea, todos, theme, true);
+      });
 
     }).catch(function(err) {
       console.error('Time view: failed to load todos', err);
@@ -1150,13 +1167,37 @@
       };
     }).sort(function(a, b) { return b.actual - a.actual; });
 
+    // Aggregate by project
+    var projectAggMap = {};
+    completedTodos.forEach(function(t) {
+      if (!t.projectId) return;
+      if (!projectAggMap[t.projectId]) {
+        projectAggMap[t.projectId] = { estimated: 0, actual: 0, count: 0 };
+      }
+      projectAggMap[t.projectId].estimated += (t.estimatedMin || 25);
+      projectAggMap[t.projectId].actual += (t.actualMin || 0);
+      projectAggMap[t.projectId].count++;
+    });
+
+    var projectData = Object.keys(projectAggMap).map(function(pid) {
+      var proj = _allProjectMap[pid];
+      return {
+        name: proj ? proj.name : 'Unknown',
+        color: proj ? proj.color : null,
+        estimated: projectAggMap[pid].estimated,
+        actual: projectAggMap[pid].actual,
+        count: projectAggMap[pid].count
+      };
+    }).sort(function(a, b) { return b.actual - a.actual; });
+
     return {
       completed: completedTodos.length,
       totalEstimated: totalEstimated,
       totalActual: totalActual,
       totalPomodoros: totalPomodoros,
       categoryData: categoryData,
-      categoryMap: categoryMap
+      categoryMap: categoryMap,
+      projectData: projectData
     };
   }
 
@@ -1323,6 +1364,34 @@
 
     // ---- Grouped Bar Chart ----
     renderComparisonChart(barPanel, currentStats.categoryData, catColor, theme, prevStats);
+
+    // ---- Panel 3: Project donut chart (only if tasks have projects) ----
+    if (currentStats.projectData.length > 0) {
+      var projDonutPanel = document.createElement('div');
+      projDonutPanel.className = 'time-chart-panel';
+      projDonutPanel.innerHTML = '<div class="time-chart-title">Time by Project</div>';
+      grid.appendChild(projDonutPanel);
+
+      // Use project colors directly (dark mode handled)
+      var PROJECT_DARK_COLORS = {
+        '#1976d2': '#64b5f6', '#388e3c': '#81c784', '#e65100': '#ffb74d',
+        '#7b1fa2': '#ce93d8', '#00897b': '#4db6ac', '#c62828': '#ef5350',
+        '#f9a825': '#fff176', '#ad1457': '#f06292', '#283593': '#7986cb',
+        '#546e7a': '#90a4ae'
+      };
+      var isDark = document.documentElement.classList.contains('dark') ||
+                   (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
+                    !document.documentElement.classList.contains('light'));
+      function projColor(i) {
+        var proj = currentStats.projectData[i];
+        if (proj && proj.color) {
+          return isDark ? (PROJECT_DARK_COLORS[proj.color.toLowerCase()] || proj.color) : proj.color;
+        }
+        return palette[i % palette.length];
+      }
+      var projPrevStats = prevStats && prevStats.projectData && prevStats.projectData.length > 0 ? { categoryData: prevStats.projectData } : null;
+      renderDonutChart(projDonutPanel, currentStats.projectData, projColor, theme, projPrevStats);
+    }
 
     // ---- Update time legend ----
     if (timeLegend) {

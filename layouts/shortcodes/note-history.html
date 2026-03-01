@@ -377,6 +377,24 @@
   font-weight: 500;
   margin-left: 6px;
 }
+.history-day-task-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+  font-size: 0.65rem;
+  font-weight: 500;
+  margin-left: 4px;
+}
+.history-project-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
 /* Responsive: compact cells on small screens */
 @media screen and (max-width: 600px) {
@@ -483,6 +501,7 @@
   // ─── State ───
   var allTodos = [];
   var closedDays = {}; // { 'YYYY-MM-DD': true }
+  var _historyProjectMap = {};
   var currentYear = new Date().getFullYear();
   var currentMonth = new Date().getMonth(); // 0-indexed
   var selectedDay = null; // 'YYYY-MM-DD' or null
@@ -768,10 +787,15 @@
       html += '<span class="' + bulletClass + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg></span>';
     }
 
-    // Title + category
+    // Title + category + project
     html += '<span class="' + titleClass + '">' + escapeHtml(task.title || 'Untitled');
     if (task.category && !isSubtask) {
       html += '<span class="history-day-task-category">' + escapeHtml(task.category) + '</span>';
+    }
+    if (task.projectId && _historyProjectMap[task.projectId] && !isSubtask) {
+      var proj = _historyProjectMap[task.projectId];
+      var pColor = proj.color || 'var(--gray-400)';
+      html += '<span class="history-day-task-project"><span class="history-project-dot" style="background:' + pColor + ';"></span>' + escapeHtml(proj.name) + '</span>';
     }
     html += '</span>';
 
@@ -826,9 +850,13 @@
     }).catch(function() {});
 
     var todosPromise = window.dmSync.getAllTodos();
+    var projectsPromise = (window.dmSync.getAllProjectsIncludingArchived || window.dmSync.getAllProjects || function() { return Promise.resolve([]); })();
 
-    Promise.all([closedPromise, todosPromise]).then(function(results) {
+    Promise.all([closedPromise, todosPromise, projectsPromise]).then(function(results) {
       allTodos = results[1] || [];
+      var projects = results[2] || [];
+      _historyProjectMap = {};
+      projects.forEach(function(p) { _historyProjectMap[p.id] = p; });
       // Filter to only active/done (not archived/deleted)
       allTodos = allTodos.filter(function(t) {
         return t.status === 'active' || t.status === 'done';

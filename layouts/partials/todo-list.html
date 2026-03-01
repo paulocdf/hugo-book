@@ -74,6 +74,19 @@
           <span class="todo-add-chip-text" id="todo-add-category-chip-text"></span>
           <button type="button" class="todo-add-chip-clear" id="todo-add-category-chip-clear" aria-label="Clear category">&times;</button>
         </span>
+        <div class="todo-add-project-icon-wrap" id="todo-add-project-icon-wrap">
+          <button type="button" class="todo-add-icon-btn" id="todo-add-project-icon" title="Assign project" aria-label="Assign project">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+          </button>
+          <div class="todo-add-project-popover" id="todo-add-project-popover" style="display:none;">
+            <div class="todo-add-project-dropdown" id="todo-add-project-dropdown"></div>
+          </div>
+        </div>
+        <span class="todo-add-chip todo-add-project-chip" id="todo-add-project-chip" style="display:none;">
+          <span class="todo-add-project-dot" id="todo-add-project-chip-dot"></span>
+          <span class="todo-add-chip-text" id="todo-add-project-chip-text"></span>
+          <button type="button" class="todo-add-chip-clear" id="todo-add-project-chip-clear" aria-label="Clear project">&times;</button>
+        </span>
       </div>
       <div class="todo-add-hints" id="todo-add-hints">
         <span><kbd>Enter</kbd> to add</span>
@@ -82,6 +95,17 @@
         <span class="todo-add-hints-sep">&middot;</span>
         <span><kbd>Esc</kbd> to close</span>
       </div>
+    </div>
+
+    <!-- Project filter bar -->
+    <div class="todo-project-filter" id="todo-project-filter" style="display:none;">
+      <label class="todo-project-filter-label">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+      </label>
+      <select id="todo-project-filter-select" class="todo-project-filter-select">
+        <option value="">All projects</option>
+        <option value="__none__">No project</option>
+      </select>
     </div>
 
     <!-- Todo items rendered here -->
@@ -2101,7 +2125,17 @@
   var addCategoryChipText = document.getElementById('todo-add-category-chip-text');
   var addCategoryChipClear = document.getElementById('todo-add-category-chip-clear');
   var addCategoryDropdown = document.getElementById('todo-add-category-dropdown');
+  var addProjectIconWrap = document.getElementById('todo-add-project-icon-wrap');
+  var addProjectIcon = document.getElementById('todo-add-project-icon');
+  var addProjectPopover = document.getElementById('todo-add-project-popover');
+  var addProjectDropdown = document.getElementById('todo-add-project-dropdown');
+  var addProjectChip = document.getElementById('todo-add-project-chip');
+  var addProjectChipDot = document.getElementById('todo-add-project-chip-dot');
+  var addProjectChipText = document.getElementById('todo-add-project-chip-text');
+  var addProjectChipClear = document.getElementById('todo-add-project-chip-clear');
   var addMicBtn = document.getElementById('todo-add-mic-btn');
+  var projectFilterBar = document.getElementById('todo-project-filter');
+  var projectFilterSelect = document.getElementById('todo-project-filter-select');
 
   if (!container || !itemsEl) return;
 
@@ -2119,6 +2153,11 @@
   var _addFormCategory = null; // Selected category string for new task
   var _addFormCategoryPrompted = false; // True when Enter opened category popover (submit on select/skip)
   var _addFormBujoType = 'task'; // Selected BuJo type for new item (task/event/note)
+  var _addFormProjectId = null; // Selected project ID for new task
+  var _addFormProjectName = ''; // Display name for selected project
+  var _addFormProjectColor = ''; // Color of selected project
+  var _projectMap = {}; // { projectId: { name, color } } — populated in render() for display
+  var _filterProjectId = null; // Active project filter (null = all projects)
   var _existingCategories = []; // Cached list of existing categories for autocomplete
   var _catDropdownActiveIdx = -1; // Active index in category dropdown
   var _defaultPomodoroCount = 1;
@@ -2957,7 +2996,136 @@
         !addCategoryChip.contains(e.target)) {
       hideCatPopover();
     }
+    if (addProjectPopover && addProjectPopover.style.display !== 'none' &&
+        !addProjectIconWrap.contains(e.target) &&
+        !addProjectChip.contains(e.target)) {
+      hideProjectPopover();
+    }
   });
+
+  // ─── Project selector for add form ───
+  function updateProjectChip() {
+    if (_addFormProjectId) {
+      addProjectChip.style.display = '';
+      addProjectChipText.textContent = _addFormProjectName || 'Project';
+      addProjectChipDot.style.background = _addFormProjectColor || 'var(--gray-400)';
+      addProjectIcon.parentElement.style.display = 'none';
+    } else {
+      addProjectChip.style.display = 'none';
+      addProjectIcon.parentElement.style.display = '';
+    }
+  }
+
+  function showProjectPopover() {
+    if (!window.dmSync) return;
+    window.dmSync.getAllProjects().then(function(projects) {
+      if (!projects.length) {
+        addProjectDropdown.innerHTML = '<div style="padding:8px 12px;color:var(--gray-500);font-size:0.82rem;">No projects yet</div>';
+      } else {
+        var isDark = document.documentElement.classList.contains('dark');
+        var html = '';
+        projects.forEach(function(p) {
+          var color = isDark ? (getProjectDarkColor(p.color) || p.color) : p.color;
+          var selected = _addFormProjectId === p.id ? ' style="background:var(--gray-100);font-weight:500;"' : '';
+          html += '<div class="todo-add-project-option" data-project-id="' + p.id + '" data-project-name="' + escapeHtml(p.name) + '" data-project-color="' + (p.color || '') + '"' + selected + '>' +
+            '<span class="todo-add-project-dot" style="background:' + color + ';width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:8px;flex-shrink:0;"></span>' +
+            '<span>' + escapeHtml(p.name) + '</span>' +
+          '</div>';
+        });
+        addProjectDropdown.innerHTML = html;
+        addProjectDropdown.querySelectorAll('.todo-add-project-option').forEach(function(opt) {
+          opt.addEventListener('click', function(e) {
+            e.stopPropagation();
+            _addFormProjectId = opt.getAttribute('data-project-id');
+            _addFormProjectName = opt.getAttribute('data-project-name');
+            _addFormProjectColor = opt.getAttribute('data-project-color');
+            updateProjectChip();
+            hideProjectPopover();
+          });
+        });
+      }
+      addProjectPopover.style.display = '';
+    });
+  }
+
+  function hideProjectPopover() {
+    if (addProjectPopover) addProjectPopover.style.display = 'none';
+  }
+
+  // Helper: map light-mode color to dark-mode equivalent
+  function getProjectDarkColor(lightColor) {
+    var map = {
+      '#1976d2': '#64b5f6', '#388e3c': '#81c784', '#e65100': '#ffb74d',
+      '#7b1fa2': '#ce93d8', '#00897b': '#4db6ac', '#c62828': '#ef5350',
+      '#f9a825': '#fff176', '#ad1457': '#f06292', '#283593': '#7986cb',
+      '#546e7a': '#90a4ae'
+    };
+    return map[lightColor] || null;
+  }
+
+  if (addProjectIcon) {
+    addProjectIcon.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (addProjectPopover.style.display !== 'none') {
+        hideProjectPopover();
+      } else {
+        showProjectPopover();
+      }
+    });
+  }
+
+  if (addProjectChipClear) {
+    addProjectChipClear.addEventListener('click', function(e) {
+      e.stopPropagation();
+      _addFormProjectId = null;
+      _addFormProjectName = '';
+      _addFormProjectColor = '';
+      updateProjectChip();
+    });
+  }
+
+  if (addProjectChip) {
+    addProjectChip.addEventListener('click', function(e) {
+      if (e.target === addProjectChipClear || e.target.closest('.todo-add-chip-clear')) return;
+      showProjectPopover();
+    });
+  }
+
+  // ─── Project filter bar ───
+  function updateProjectFilterBar() {
+    if (!projectFilterBar || !projectFilterSelect) return;
+    var projectIds = Object.keys(_projectMap);
+    if (projectIds.length === 0) {
+      projectFilterBar.style.display = 'none';
+      return;
+    }
+    projectFilterBar.style.display = '';
+    // Preserve current selection
+    var currentVal = projectFilterSelect.value;
+    var isDark = document.documentElement.classList.contains('dark');
+    var html = '<option value="">All projects</option>';
+    html += '<option value="__none__">No project</option>';
+    projectIds.forEach(function(pid) {
+      var p = _projectMap[pid];
+      html += '<option value="' + pid + '">' + escapeHtml(p.name) + '</option>';
+    });
+    projectFilterSelect.innerHTML = html;
+    // Restore selection if still valid
+    if (currentVal && projectFilterSelect.querySelector('option[value="' + currentVal + '"]')) {
+      projectFilterSelect.value = currentVal;
+    } else {
+      projectFilterSelect.value = '';
+      _filterProjectId = null;
+    }
+  }
+
+  if (projectFilterSelect) {
+    projectFilterSelect.addEventListener('change', function() {
+      var val = projectFilterSelect.value;
+      _filterProjectId = val || null;
+      render();
+    });
+  }
 
   // ─── Pomodoro count button handlers ───
   function updatePomodoroCountDisplay() {
@@ -3201,6 +3369,16 @@
       html += '<span class="todo-item-category">' + escapeHtml(todo.category) + '</span>';
     }
 
+    // Project indicator (color dot + name)
+    if (todo.projectId && _projectMap[todo.projectId]) {
+      var proj = _projectMap[todo.projectId];
+      var isDark = document.documentElement.classList.contains('dark');
+      var dotColor = isDark ? (getProjectDarkColor(proj.color) || proj.color) : proj.color;
+      html += '<span class="todo-item-project" title="Project: ' + escapeHtml(proj.name) + '">' +
+        '<span class="todo-item-project-dot" style="background:' + dotColor + ';"></span>' +
+        escapeHtml(proj.name) + '</span>';
+    }
+
     // Notes indicator icon
     if (todo.notes) {
       html += '<span class="todo-item-has-notes" title="Has notes"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></span>';
@@ -3274,12 +3452,24 @@
   function render() {
     container.style.display = '';
 
+    // Update project filter bar options
+    updateProjectFilterBar();
+
     // Filter to only active and done tasks (exclude archived, deleted, and trashed)
     var visibleTodos = allTodos.filter(function(t) {
       if (t.deletedAt) return false;
       var s = t.status || 'active';
       return s === 'active' || s === 'done';
     });
+
+    // Apply project filter
+    if (_filterProjectId) {
+      if (_filterProjectId === '__none__') {
+        visibleTodos = visibleTodos.filter(function(t) { return !t.projectId; });
+      } else {
+        visibleTodos = visibleTodos.filter(function(t) { return t.projectId === _filterProjectId; });
+      }
+    }
 
     // Separate parents and children
     var parents = [];
@@ -4321,6 +4511,11 @@
           firestoreUpdates.category = result.category || null;
           localUpdates.category = result.category || null;
         }
+        // Project
+        if (result.projectId !== undefined && result.projectId !== (todo.projectId || null)) {
+          firestoreUpdates.projectId = result.projectId || null;
+          localUpdates.projectId = result.projectId || null;
+        }
         // BuJo type
         if (result.bujoType && result.bujoType !== (todo.bujoType || 'task')) {
           firestoreUpdates.bujoType = result.bujoType;
@@ -4955,8 +5150,14 @@
       // Subtasks inherit parent's scheduledDate
       var parent = allTodos.find(function(t) { return t.id === parentId; });
       var scheduledDate = parent ? parent.scheduledDate : null;
-      createTodo(title, est, parentId, scheduledDate, null, null, false, 1, null, function() {
-        if (keepOpen) showSubtaskInput(parentId);
+      createTodo({
+        title: title,
+        estimatedMin: est,
+        parentId: parentId,
+        scheduledDate: scheduledDate,
+        onDone: function() {
+          if (keepOpen) showSubtaskInput(parentId);
+        }
       });
       if (!keepOpen) row.remove();
       else {
@@ -5292,7 +5493,23 @@
     return minOrder - 1;
   }
 
-  function createTodo(title, estimatedMin, parentId, scheduledDate, reminderAtMs, category, atTop, pomodoroCount, pomodoroLength, onDone, source, breakLength, bujoType) {
+  function createTodo(opts) {
+    // Accept options object; extract fields with defaults
+    var title = opts.title;
+    var estimatedMin = opts.estimatedMin;
+    var parentId = opts.parentId || null;
+    var scheduledDate = opts.scheduledDate || null;
+    var reminderAtMs = opts.reminderAtMs || null;
+    var category = opts.category || null;
+    var atTop = !!opts.atTop;
+    var pomodoroCount = opts.pomodoroCount;
+    var pomodoroLength = opts.pomodoroLength;
+    var onDone = opts.onDone || null;
+    var source = opts.source || null;
+    var breakLength = opts.breakLength || null;
+    var bujoType = opts.bujoType || 'task';
+    var projectId = opts.projectId || null;
+
     if (!window.dmSync) {
       showTodoError('Data layer not ready — please reload');
       if (onDone) onDone();
@@ -5314,7 +5531,7 @@
         return;
       }
 
-    var order = atTop ? getMinOrder(parentId || null) : getNextOrder(parentId || null);
+    var order = atTop ? getMinOrder(parentId) : getNextOrder(parentId);
 
     // Request notification permission early if setting a reminder
     if (reminderAtMs && typeof Notification !== 'undefined' && Notification.permission === 'default') {
@@ -5324,26 +5541,33 @@
     var pCount = pomodoroCount || 1;
     var pLength = pomodoroLength || (_addFormPomoMode === 'long' ? _globalPomoLongWork : _globalPomoShortWork);
 
+    // Subtasks inherit parent's projectId if not explicitly set
+    if (!projectId && parentId) {
+      var parentTodo = allTodos.find(function(t) { return t.id === parentId; });
+      if (parentTodo && parentTodo.projectId) projectId = parentTodo.projectId;
+    }
+
     var todoData = {
       userId: userId,
       title: title,
       estimatedMin: estimatedMin || (pCount * pLength),
       actualMin: null,
-      category: category || null,
+      category: category,
+      projectId: projectId,
       pomodoroCount: pCount,
       pomodoroLength: pLength,
-      breakLength: breakLength || null,
+      breakLength: breakLength,
       done: false,
       status: 'active',
-      parentId: parentId || null,
+      parentId: parentId,
       order: order,
       kanbanOrder: order,
-      scheduledDate: scheduledDate || null,
+      scheduledDate: scheduledDate,
       reminderAt: reminderAtMs && typeof firebase !== 'undefined' ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
       reminderFired: false,
       reminderAcked: false,
-      source: source || null,
-      bujoType: bujoType || 'task',
+      source: source,
+      bujoType: bujoType,
       bujoState: 'open',
       kanbanStatus: 'todo',
       collaborators: [],
@@ -5360,21 +5584,22 @@
       title: title,
       estimatedMin: estimatedMin || (pCount * pLength),
       actualMin: null,
-      category: category || null,
+      category: category,
+      projectId: projectId,
       pomodoroCount: pCount,
       pomodoroLength: pLength,
-      breakLength: breakLength || null,
+      breakLength: breakLength,
       done: false,
       status: 'active',
-      parentId: parentId || null,
+      parentId: parentId,
       order: order,
       kanbanOrder: order,
-      scheduledDate: scheduledDate || null,
+      scheduledDate: scheduledDate,
       reminderAt: reminderAtMs || null,
       reminderFired: false,
       reminderAcked: false,
-      source: source || null,
-      bujoType: bujoType || 'task',
+      source: source,
+      bujoType: bujoType,
       bujoState: 'open',
       kanbanStatus: 'todo',
       createdAt: Date.now(),
@@ -5985,9 +6210,22 @@
     var reminderAtMs = _addFormReminderMs && _addFormReminderMs > Date.now() ? _addFormReminderMs : null;
     var category = _addFormCategory || null;
     addBtn.disabled = true;
-    createTodo(title, est, null, scheduledDate, reminderAtMs, category, true, pomCount, pomLen, function() {
-      addBtn.disabled = false;
-    }, null, pomBreakLen, _addFormBujoType);
+    createTodo({
+      title: title,
+      estimatedMin: est,
+      scheduledDate: scheduledDate,
+      reminderAtMs: reminderAtMs,
+      category: category,
+      atTop: true,
+      pomodoroCount: pomCount,
+      pomodoroLength: pomLen,
+      breakLength: pomBreakLen,
+      bujoType: _addFormBujoType,
+      projectId: _addFormProjectId || null,
+      onDone: function() {
+        addBtn.disabled = false;
+      }
+    });
     addTitleInput.value = '';
     addCustomMinInput.value = '';
     // Reset pomodoro count to default but keep date and category sticky for rapid task creation
@@ -6003,11 +6241,17 @@
       var taskBtn = bujoTypeToggle.querySelector('[data-bujo-type="task"]');
       if (taskBtn) taskBtn.classList.add('active');
     }
+    // Reset project (not sticky — projects change less frequently than categories)
+    _addFormProjectId = null;
+    _addFormProjectName = '';
+    _addFormProjectColor = '';
+    updateProjectChip();
     if (addPomoGroup) addPomoGroup.style.display = '';
     if (addCustomMinInput) addCustomMinInput.style.display = '';
     addTitleInput.placeholder = 'What needs to be done?';
     closeAddFormPopover();
     hideCatPopover();
+    hideProjectPopover();
     closePomodoroConfigPopover();
     if (keepOpen) {
       addTitleInput.focus();
@@ -6131,7 +6375,7 @@
   function loadTodos() {
     if (!window.dmSync) return;
 
-    // Load closed days and todos in parallel
+    // Load closed days, todos, and projects in parallel
     var closedDaysPromise = window.dmSync.getClosedDays().then(function(days) {
       _closedDays = {};
       days.forEach(function(d) { _closedDays[d] = true; });
@@ -6139,7 +6383,14 @@
 
     var todosPromise = window.dmSync.getAllTodos();
 
-    Promise.all([closedDaysPromise, todosPromise]).then(function(results) {
+    var projectsPromise = window.dmSync.getAllProjects().then(function(projects) {
+      _projectMap = {};
+      projects.forEach(function(p) {
+        _projectMap[p.id] = { name: p.name, color: p.color || '' };
+      });
+    }).catch(function() { /* keep existing _projectMap */ });
+
+    Promise.all([closedDaysPromise, todosPromise, projectsPromise]).then(function(results) {
       var todos = results[1];
       // Migrate legacy todos: backfill status field from done boolean
       var needsMigration = [];
@@ -6187,6 +6438,7 @@
   // Listen for todo updates
   window.addEventListener('dm-todos-updated', loadTodos);
   window.addEventListener('dm-sync-complete', loadTodos);
+  window.addEventListener('dm-projects-updated', loadTodos);
 
   // Listen for AI-suggested task creation
   window.addEventListener('dm-ai-create-task', function(e) {
@@ -6195,9 +6447,19 @@
     if (!title) return;
     // AI-created tasks default to today if no date specified (proactive scheduling)
     var scheduledDate = detail.scheduledDate || getTodayStr();
-    createTodo(title, detail.estimatedMin || null, null, scheduledDate, null, detail.category || null, true, null, null, function() {
-      loadTodos();
-    }, detail.source || 'ai', null, detail.bujoType || 'task');
+    createTodo({
+      title: title,
+      estimatedMin: detail.estimatedMin || null,
+      scheduledDate: scheduledDate,
+      category: detail.category || null,
+      atTop: true,
+      source: detail.source || 'ai',
+      bujoType: detail.bujoType || 'task',
+      projectId: detail.projectId || null,
+      onDone: function() {
+        loadTodos();
+      }
+    });
   });
 
   // Listen for AI-suggested subtask creation (from edit modal)
@@ -6206,9 +6468,18 @@
     var title = (detail.title || '').trim();
     if (!title || !detail.parentId) return;
     var scheduledDate = detail.scheduledDate || getTodayStr();
-    createTodo(title, detail.estimatedMin || null, detail.parentId, scheduledDate, null, detail.category || null, false, null, null, function() {
-      loadTodos();
-    }, detail.source || 'ai');
+    createTodo({
+      title: title,
+      estimatedMin: detail.estimatedMin || null,
+      parentId: detail.parentId,
+      scheduledDate: scheduledDate,
+      category: detail.category || null,
+      source: detail.source || 'ai',
+      projectId: detail.projectId || null,
+      onDone: function() {
+        loadTodos();
+      }
+    });
   });
 
   // Listen for Pomodoro timer stop — store tracked time and re-render
