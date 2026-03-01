@@ -306,6 +306,12 @@
   font-size: 0.78rem;
   color: var(--gray-500);
 }
+.project-progress-time {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--gray-400);
+  margin-top: 2px;
+}
 
 /* Task list in detail */
 .project-tasks-header {
@@ -1162,6 +1168,7 @@
         <div class="project-progress-fill" id="project-progress-fill"></div>
       </div>
       <span class="project-progress-label" id="project-progress-label"></span>
+      <span class="project-progress-time" id="project-progress-time"></span>
     </div>
     <div class="project-tasks-header">
       <h3>Tasks</h3>
@@ -1321,6 +1328,15 @@
     var div = document.createElement('div');
     div.textContent = text || '';
     return div.innerHTML;
+  }
+
+  function formatMinutes(min) {
+    if (!min || min <= 0) return '0m';
+    var h = Math.floor(min / 60);
+    var m = min % 60;
+    if (h > 0 && m > 0) return h + 'h ' + m + 'm';
+    if (h > 0) return h + 'h';
+    return m + 'm';
   }
 
   function formatDate(dateStr) {
@@ -1573,6 +1589,21 @@
       document.getElementById('project-progress-fill').style.background = color;
       document.getElementById('project-progress-label').textContent = done + ' of ' + total + ' tasks done (' + pct + '%)';
       document.getElementById('project-progress').style.display = total > 0 ? '' : 'none';
+
+      // Time progress
+      var totalEstimated = 0;
+      var timeSpent = 0;
+      todos.forEach(function(t) {
+        totalEstimated += (t.estimatedMin || 0);
+        if (t.done) timeSpent += (t.actualMin != null ? t.actualMin : (t.estimatedMin || 0));
+      });
+      var timeEl = document.getElementById('project-progress-time');
+      if (totalEstimated > 0) {
+        timeEl.textContent = formatMinutes(timeSpent) + ' spent \u00b7 ' + formatMinutes(totalEstimated) + ' total';
+        timeEl.style.display = '';
+      } else {
+        timeEl.style.display = 'none';
+      }
 
       // Toggle button label
       var toggleBtn = document.getElementById('project-done-toggle');
