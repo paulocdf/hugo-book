@@ -80,6 +80,15 @@
           </label>
         </div>
       </div>
+      <div class="pomodoro-focus-settings-group">
+        <div class="pomodoro-focus-toggle-row">
+          <span class="pomodoro-focus-settings-label" style="margin-bottom:0;">Today's progress</span>
+          <label class="pomodoro-focus-toggle-switch">
+            <input type="checkbox" id="focus-show-progress" checked>
+            <span class="pomodoro-focus-toggle-slider"></span>
+          </label>
+        </div>
+      </div>
     </div>
 
     <!-- Auto-advance countdown overlay -->
@@ -134,6 +143,14 @@
           <div class="pomodoro-focus-notes-status" id="focus-notes-status"></div>
         </div>
       </div>
+    </div>
+
+    <!-- Today's progress strip -->
+    <div class="pomodoro-focus-progress-strip" id="focus-progress-strip" style="display:none;">
+      <div class="pomodoro-focus-progress-strip-bar">
+        <div class="pomodoro-focus-progress-strip-fill" id="focus-progress-strip-fill"></div>
+      </div>
+      <span class="pomodoro-focus-progress-strip-text" id="focus-progress-strip-text"></span>
     </div>
 
     <!-- Up Next footer strip -->
@@ -902,6 +919,36 @@
 .pomodoro-focus-upnext-item:first-child::before {
   display: none;
 }
+/* Today's progress strip */
+.pomodoro-focus-progress-strip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid var(--gray-200);
+  padding: 8px 24px;
+  flex-shrink: 0;
+}
+.pomodoro-focus-progress-strip-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--gray-200);
+  border-radius: 2px;
+  overflow: hidden;
+  min-width: 80px;
+}
+.pomodoro-focus-progress-strip-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--accent-blue, #4285f4);
+  border-radius: 2px;
+  transition: width 0.6s ease;
+}
+.pomodoro-focus-progress-strip-text {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 /* Focus settings gear button (in header actions) */
 .pomodoro-focus-settings-btn {
   background: none;
@@ -1145,6 +1192,9 @@
   .pomodoro-focus-upnext-strip {
     padding: 6px 20px;
   }
+  .pomodoro-focus-progress-strip {
+    padding: 6px 20px;
+  }
 }
 /* Mobile: full-screen */
 @media (max-width: 600px) {
@@ -1198,6 +1248,10 @@
   }
   .pomodoro-focus-upnext-item:first-child {
     max-width: 200px;
+  }
+  .pomodoro-focus-progress-strip {
+    padding: 6px 16px;
+    gap: 8px;
   }
   .pomodoro-focus-countdown-overlay {
     border-radius: 0;
@@ -1348,6 +1402,11 @@
   var focusCountdownCancel = document.getElementById('focus-countdown-cancel');
   var _countdownTimer = null;
   var _countdownSeconds = 0;
+  // Focus overlay — progress strip
+  var focusProgressStrip = document.getElementById('focus-progress-strip');
+  var focusProgressStripFill = document.getElementById('focus-progress-strip-fill');
+  var focusProgressStripText = document.getElementById('focus-progress-strip-text');
+  var focusShowProgressCheckbox = document.getElementById('focus-show-progress');
 
   // ── Focus theme definitions ──
   var FOCUS_THEMES = [
@@ -1388,6 +1447,14 @@
   }
   function setAutoAdvance(val) {
     try { localStorage.setItem(AUTO_ADVANCE_KEY, val ? 'true' : 'false'); } catch(e) {}
+  }
+  var SHOW_PROGRESS_KEY = 'dm-pomo-show-progress';
+  function isShowProgress() {
+    try { var v = localStorage.getItem(SHOW_PROGRESS_KEY); if (v === 'false') return false; } catch(e) {}
+    return true; // default on
+  }
+  function setShowProgress(val) {
+    try { localStorage.setItem(SHOW_PROGRESS_KEY, val ? 'true' : 'false'); } catch(e) {}
   }
 
   // Apply custom color CSS variables to the backdrop element
@@ -2536,6 +2603,7 @@
     if (isFocusMode && secondsLeft % 60 === 0) {
       updateInlineStats();
       updateUpNext();
+      updateProgressStrip();
     }
   }
 
@@ -3156,6 +3224,56 @@
     focusUpNextStripEl.style.display = 'flex';
   }
 
+  // ── Today's Progress Strip ──
+  function updateProgressStrip() {
+    if (!focusProgressStrip || !isShowProgress()) {
+      if (focusProgressStrip) focusProgressStrip.style.display = 'none';
+      return;
+    }
+    if (!window.dmSync || !window.dmSync.getAllTodos) {
+      focusProgressStrip.style.display = 'none';
+      return;
+    }
+    window.dmSync.getAllTodos().then(function(todos) {
+      var todayStr = new Date().toISOString().slice(0, 10);
+      var todayTasks = (todos || []).filter(function(t) {
+        return t.scheduledDate === todayStr && t.status !== 'deleted' && !t.parentId;
+      });
+      if (todayTasks.length === 0) {
+        focusProgressStrip.style.display = 'none';
+        return;
+      }
+      var doneCount = todayTasks.filter(function(t) { return t.done; }).length;
+      var pct = Math.round((doneCount / todayTasks.length) * 100);
+      focusProgressStripFill.style.width = pct + '%';
+
+      var parts = [doneCount + ' of ' + todayTasks.length + ' done'];
+      // Time remaining from undone tasks
+      var remainMin = 0;
+      todayTasks.forEach(function(t) {
+        if (!t.done && t.estimatedMin) remainMin += t.estimatedMin;
+      });
+      // Subtract active task's tracked time
+      if (activeTodoId) {
+        var activeInToday = todayTasks.some(function(t) { return t.id === activeTodoId && !t.done; });
+        if (activeInToday) {
+          var elapsedMin = Math.round(accumulatedWorkSeconds / 60);
+          remainMin = Math.max(0, remainMin - elapsedMin);
+        }
+      }
+      if (remainMin > 0) {
+        var rText = remainMin >= 60
+          ? Math.floor(remainMin / 60) + 'h ' + (remainMin % 60) + 'm'
+          : remainMin + 'm';
+        parts.push('~' + rText + ' left');
+      }
+      focusProgressStripText.textContent = parts.join(' \u00b7 ');
+      focusProgressStrip.style.display = 'flex';
+    }).catch(function() {
+      focusProgressStrip.style.display = 'none';
+    });
+  }
+
   // ── Focus Settings Popover ──
   function renderThemeGrid() {
     if (!focusThemeGrid) return;
@@ -3229,6 +3347,15 @@
     });
   }
 
+  // Show-progress checkbox
+  if (focusShowProgressCheckbox) {
+    focusShowProgressCheckbox.checked = isShowProgress();
+    focusShowProgressCheckbox.addEventListener('change', function() {
+      setShowProgress(focusShowProgressCheckbox.checked);
+      updateProgressStrip();
+    });
+  }
+
   // Settings popover toggle
   if (focusSettingsBtn && focusSettingsPopover) {
     focusSettingsBtn.addEventListener('click', function(e) {
@@ -3239,6 +3366,7 @@
       } else {
         renderThemeGrid();
         focusAutoAdvanceCheckbox.checked = isAutoAdvance();
+        if (focusShowProgressCheckbox) focusShowProgressCheckbox.checked = isShowProgress();
         focusSettingsPopover.classList.add('visible');
       }
     });
@@ -3588,6 +3716,9 @@
 
     // Load up next queue
     updateUpNext();
+
+    // Load today's progress strip
+    updateProgressStrip();
 
     updateDisplay();
   }
@@ -4376,6 +4507,9 @@
   window.addEventListener('dm-todos-updated', function() {
     if (activeParentId) {
       loadSubtasks(activeParentId);
+    }
+    if (isFocusMode) {
+      updateProgressStrip();
     }
   });
 
