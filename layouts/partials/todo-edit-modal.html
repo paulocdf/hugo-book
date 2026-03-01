@@ -1,27 +1,22 @@
-<!-- Todo Edit Modal — shown when user clicks the edit button on a task -->
-<!-- Exposes: window.dmTodoEdit.open(todo, onSave), window.dmTodoEdit.close() -->
-<div class="todo-edit-modal" id="todo-edit-modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="todo-edit-heading">
-  <div class="todo-edit-backdrop" id="todo-edit-backdrop"></div>
-  <div class="todo-edit-dialog">
-    <div class="todo-edit-header">
-      <h3 id="todo-edit-heading">Edit Task</h3>
-      <button type="button" class="todo-edit-close" id="todo-edit-close">&times;</button>
-    </div>
+<!-- Todo Inline Edit Panel — slides open below the clicked task row -->
+<!-- Exposes: window.dmTodoEdit.open(todo, onSave, anchorEl), window.dmTodoEdit.close() -->
 
+<template id="todo-edit-template">
+  <div class="todo-edit-panel" data-ref="panel">
     <div class="todo-edit-field todo-edit-title-field">
-      <textarea id="todo-edit-title" class="todo-edit-input todo-edit-title-area" placeholder="What needs to be done?" autocomplete="off" ></textarea>
+      <textarea data-ref="title" class="todo-edit-input todo-edit-title-area" placeholder="What needs to be done?" autocomplete="off"></textarea>
     </div>
 
     <div class="todo-edit-metadata-row">
-      <div class="todo-edit-bujo-wrapper" id="todo-edit-bujo-wrapper">
-        <button type="button" class="todo-edit-bujo-pill" id="todo-edit-bujo-pill" title="Change type &amp; state">
+      <div class="todo-edit-bujo-wrapper" data-ref="bujo-wrapper">
+        <button type="button" class="todo-edit-bujo-pill" data-ref="bujo-pill" title="Change type &amp; state">
           <span class="todo-edit-bujo-pill-arrow"></span>
-          <span class="todo-edit-bujo-summary-text" id="todo-edit-bujo-summary-text">Task &middot; Open</span>
+          <span class="todo-edit-bujo-summary-text" data-ref="bujo-summary-text">Task &middot; Open</span>
         </button>
-        <div class="todo-edit-bujo-popover" id="todo-edit-bujo-popover">
+        <div class="todo-edit-bujo-popover" data-ref="bujo-popover">
           <div class="todo-edit-field todo-edit-half">
             <label>Type</label>
-            <div class="todo-edit-bujo-toggle" id="todo-edit-bujo-type">
+            <div class="todo-edit-bujo-toggle" data-ref="bujo-type">
               <button type="button" class="todo-edit-bujo-btn active" data-bujo-type="task" title="Task">
                 <svg width="12" height="12" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg> Task
               </button>
@@ -33,9 +28,9 @@
               </button>
             </div>
           </div>
-          <div class="todo-edit-field todo-edit-half" id="todo-edit-state-field">
+          <div class="todo-edit-field todo-edit-half" data-ref="state-field">
             <label>State</label>
-            <div class="todo-edit-bujo-toggle" id="todo-edit-bujo-state">
+            <div class="todo-edit-bujo-toggle" data-ref="bujo-state">
               <button type="button" class="todo-edit-bujo-btn active" data-bujo-state="open" title="Open">
                 <svg width="10" height="10" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg> Open
               </button>
@@ -53,30 +48,30 @@
         </div>
       </div>
 
-      <div class="todo-edit-kanban-wrapper" id="todo-edit-kanban-wrapper">
-        <select id="todo-edit-kanban-status" class="todo-edit-kanban-select" title="Board column" aria-label="Board column">
+      <div class="todo-edit-kanban-wrapper">
+        <select data-ref="kanban-status" class="todo-edit-kanban-select" title="Board column" aria-label="Board column">
           <option value="todo">To Do</option>
           <option value="in_progress">In Progress</option>
           <option value="done">Done</option>
         </select>
       </div>
 
-      <input type="date" id="todo-edit-date" class="todo-edit-meta-date" title="Scheduled date" aria-label="Scheduled date">
+      <input type="date" data-ref="date" class="todo-edit-meta-date" title="Scheduled date" aria-label="Scheduled date">
 
-      <div class="todo-edit-meta-estimate" id="todo-edit-estimate-field">
-        <div class="todo-edit-pomodoro-group" id="todo-edit-pomodoro-group">
-          <button type="button" class="todo-edit-pomo-minus" id="todo-edit-pomo-minus" title="Remove pomodoro" aria-label="Decrease pomodoro count">
+      <div class="todo-edit-meta-estimate" data-ref="estimate-field">
+        <div class="todo-edit-pomodoro-group">
+          <button type="button" class="todo-edit-pomo-minus" data-ref="pomo-minus" title="Remove pomodoro" aria-label="Decrease pomodoro count">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"></line></svg>
           </button>
-          <button type="button" class="todo-edit-pomodoro-btn" id="todo-edit-pomodoro-btn" title="Short session (click tomato to switch)" aria-label="Pomodoro count">
+          <button type="button" class="todo-edit-pomodoro-btn" data-ref="pomo-btn" title="Short session (click tomato to switch)" aria-label="Pomodoro count">
             <span class="todo-edit-pomodoro-icon todo-pomo-icon-short" style="font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;position:relative;top:3px;">&#x1F345;</span>
             <img class="todo-edit-pomodoro-icon todo-pomo-icon-long" src="{{ "oxheart_tomato.png" | relURL }}" width="22" height="22" alt="Long pomodoro" style="display:none;">
-            <span class="todo-edit-pomodoro-count" id="todo-edit-pomodoro-count">1</span>
+            <span class="todo-edit-pomodoro-count" data-ref="pomo-count">1</span>
           </button>
-          <button type="button" class="todo-edit-pomo-plus" id="todo-edit-pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
+          <button type="button" class="todo-edit-pomo-plus" data-ref="pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"></line><line x1="6" y1="12" x2="18" y2="12"></line></svg>
           </button>
-          <input type="number" id="todo-edit-custom-min" class="todo-edit-custom-min" placeholder="min" min="0" max="999" title="Custom time override (minutes)" aria-label="Custom time in minutes">
+          <input type="number" data-ref="custom-min" class="todo-edit-custom-min" placeholder="min" min="0" max="999" title="Custom time override (minutes)" aria-label="Custom time in minutes">
         </div>
       </div>
     </div>
@@ -84,110 +79,99 @@
     <div class="todo-edit-field">
       <label>Category</label>
       <div class="todo-edit-category-row" style="position: relative;">
-        <div class="todo-edit-category-chips" id="todo-edit-category-chips"></div>
-        <input type="text" id="todo-edit-category-input" class="todo-edit-category-input" placeholder="Add category + Enter" autocomplete="off">
-        <div class="todo-edit-category-dropdown" id="todo-edit-category-dropdown"></div>
+        <div class="todo-edit-category-chips" data-ref="category-chips"></div>
+        <input type="text" data-ref="category-input" class="todo-edit-category-input" placeholder="Add category + Enter" autocomplete="off">
+        <div class="todo-edit-category-dropdown" data-ref="category-dropdown"></div>
       </div>
     </div>
 
     <div class="todo-edit-field">
       <label>Project</label>
-      <select id="todo-edit-project-select" class="todo-edit-project-select">
+      <select data-ref="project-select" class="todo-edit-project-select">
         <option value="">None</option>
       </select>
     </div>
 
-    <div class="todo-edit-notes-box" id="todo-edit-notes-box">
-      <div class="todo-edit-notes-label">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-        Notes
-      </div>
-      <textarea id="todo-edit-notes" class="todo-edit-notes-area" placeholder="Add notes..." rows="3"></textarea>
-    </div>
-
     <!-- Sharing / Collaborators section (visible for top-level tasks only) -->
-    <div class="todo-edit-sharing-section" id="todo-edit-sharing-section" style="display: none;">
+    <div class="todo-edit-sharing-section" data-ref="sharing-section" style="display: none;">
       <div class="todo-edit-sharing-header">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
         <span>Sharing</span>
       </div>
-      <!-- Shown when task is owned by someone else -->
-      <div class="todo-edit-sharing-owner-info" id="todo-edit-share-owner-info" style="display: none;">
-        Shared by <strong id="todo-edit-share-owner-name"></strong>
+      <div class="todo-edit-sharing-owner-info" data-ref="share-owner-info" style="display: none;">
+        Shared by <strong data-ref="share-owner-name"></strong>
       </div>
-      <!-- Shown when current user owns the task -->
-      <div id="todo-edit-share-controls" style="display: none;">
+      <div data-ref="share-controls" style="display: none;">
         <div class="todo-edit-share-input-row">
-          <input type="email" class="todo-edit-share-email-input" id="todo-edit-share-email" placeholder="Enter email to share..." autocomplete="off">
-          <button type="button" class="todo-edit-share-send-btn" id="todo-edit-share-send">Share</button>
+          <input type="email" class="todo-edit-share-email-input" data-ref="share-email" placeholder="Enter email to share..." autocomplete="off">
+          <button type="button" class="todo-edit-share-send-btn" data-ref="share-send">Share</button>
         </div>
-        <div class="todo-edit-share-feedback" id="todo-edit-share-feedback" style="display: none;"></div>
+        <div class="todo-edit-share-feedback" data-ref="share-feedback" style="display: none;"></div>
       </div>
-      <div class="todo-edit-share-list" id="todo-edit-share-list"></div>
+      <div class="todo-edit-share-list" data-ref="share-list"></div>
     </div>
 
-    <!-- AI suggestions area -->
-    <div class="todo-edit-ai-section" id="todo-edit-ai-section" style="display: none;">
-      <div class="todo-edit-ai-header">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
-        <span>AI Suggestions</span>
+    <!-- Collapsible "More" section — notes + AI suggestions -->
+    <div class="todo-edit-more-section" data-ref="more-section">
+      <button type="button" class="todo-edit-more-toggle" data-ref="more-toggle">
+        <svg class="todo-edit-more-arrow" data-ref="more-arrow" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 11,8 6,13"/></svg>
+        More (notes, AI suggestions)
+      </button>
+      <div class="todo-edit-more-content" data-ref="more-content" style="display: none;">
+        <div class="todo-edit-notes-box">
+          <div class="todo-edit-notes-label">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            Notes
+          </div>
+          <textarea data-ref="notes" class="todo-edit-notes-area" placeholder="Add notes..." rows="3"></textarea>
+        </div>
+        <div class="todo-edit-ai-section" data-ref="ai-section" style="display: none;">
+          <div class="todo-edit-ai-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            <span>AI Suggestions</span>
+          </div>
+          <div class="todo-edit-ai-cards" data-ref="ai-cards"></div>
+        </div>
       </div>
-      <div class="todo-edit-ai-cards" id="todo-edit-ai-cards"></div>
     </div>
 
     <div class="todo-edit-actions">
-      <button type="button" class="todo-edit-btn-cancel" id="todo-edit-cancel">Cancel</button>
-      <button type="button" class="todo-edit-btn-save" id="todo-edit-save">Save Changes</button>
+      <button type="button" class="todo-edit-btn-cancel" data-ref="cancel">Cancel</button>
+      <button type="button" class="todo-edit-btn-save" data-ref="save">Save Changes</button>
     </div>
     <div class="todo-edit-hints">
       <kbd>Esc</kbd> cancel &middot; <kbd>Cmd+Enter</kbd> save
     </div>
   </div>
-</div>
+</template>
 
 <style>
-.todo-edit-modal {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-  z-index: 1100;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* ─── Anchor row active state ─── */
+.todo-edit-anchor-active {
+  border-bottom-left-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-bottom-color: transparent !important;
+  position: relative;
+  z-index: 2;
 }
-.todo-edit-backdrop {
-  position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.5);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-}
-.todo-edit-dialog {
+
+/* ─── Inline edit panel ─── */
+.todo-edit-panel {
   position: relative;
   background: var(--body-background);
-  border-radius: 14px;
-  padding: 1.75rem;
-  width: 94%;
-  max-width: 680px;
-  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
-  animation: todo-edit-in 0.2s ease-out;
-  max-height: 90vh;
-  overflow-y: auto;
+  border: 1.5px solid var(--gray-200);
+  border-top: none;
+  border-radius: 0 0 12px 12px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+  animation: todo-edit-slide-down 0.2s ease-out;
+  z-index: 1;
+  margin-bottom: 4px;
 }
-@keyframes todo-edit-in {
-  from { opacity: 0; transform: translateY(12px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+@keyframes todo-edit-slide-down {
+  from { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+  to { opacity: 1; max-height: 800px; }
 }
-.todo-edit-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-.todo-edit-header h3 { margin: 0; font-size: 1.05rem; font-weight: 700; }
-.todo-edit-close {
-  background: none; border: none; font-size: 1.5rem;
-  cursor: pointer; color: var(--body-font-color); padding: 4px 8px;
-  border-radius: 6px; transition: background 0.15s;
-}
-.todo-edit-close:hover { background: var(--gray-100); }
 
 .todo-edit-field {
   margin-bottom: 0.85rem;
@@ -589,6 +573,40 @@
 .todo-edit-bujo-btn[data-bujo-state="done"].active { color: #7a7a7a; }
 .todo-edit-bujo-btn[data-bujo-state="migrated"].active { color: #8b6e4e; }
 .todo-edit-bujo-btn[data-bujo-state="scheduled"].active { color: #5b7a8a; }
+
+/* ─── Collapsible "More" section ─── */
+.todo-edit-more-section {
+  margin-bottom: 0.85rem;
+}
+.todo-edit-more-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gray-400);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-family: inherit;
+  font-weight: 500;
+  transition: color 0.15s, background 0.15s;
+}
+.todo-edit-more-toggle:hover {
+  color: var(--body-font-color);
+  background: var(--gray-100);
+}
+.todo-edit-more-arrow {
+  transition: transform 0.2s ease;
+}
+.todo-edit-more-arrow.expanded {
+  transform: rotate(90deg);
+}
+.todo-edit-more-content {
+  margin-top: 8px;
+}
+
 .todo-edit-ai-section {
   margin-bottom: 0.85rem;
   border: 1.5px solid var(--gray-200);
@@ -708,7 +726,7 @@
   color: var(--gray-500);
 }
 
-/* ─── Pomodoro group in edit modal ─── */
+/* ─── Pomodoro group in edit panel ─── */
 .todo-edit-pomodoro-group {
   display: inline-flex;
   align-items: center;
@@ -822,10 +840,9 @@
 }
 
 @media screen and (max-width: 600px) {
-  .todo-edit-dialog {
-    width: 96%;
-    padding: 1.25rem;
-    border-radius: 12px;
+  .todo-edit-panel {
+    padding: 1rem;
+    border-radius: 0 0 10px 10px;
   }
   .todo-edit-metadata-row {
     flex-wrap: wrap;
@@ -844,254 +861,58 @@
 (function() {
   'use strict';
 
-  var modal = document.getElementById('todo-edit-modal');
-  if (!modal) return;
+  var template = document.getElementById('todo-edit-template');
+  if (!template) return;
 
-  var backdrop = document.getElementById('todo-edit-backdrop');
-  var closeBtn = document.getElementById('todo-edit-close');
-  var cancelBtn = document.getElementById('todo-edit-cancel');
-  var saveBtn = document.getElementById('todo-edit-save');
-  var titleInput = document.getElementById('todo-edit-title');
-  var dateInput = document.getElementById('todo-edit-date');
-  var categoryChipsEl = document.getElementById('todo-edit-category-chips');
-  var categoryInput = document.getElementById('todo-edit-category-input');
-  var categoryDropdown = document.getElementById('todo-edit-category-dropdown');
-  var aiSection = document.getElementById('todo-edit-ai-section');
-  var aiCardsEl = document.getElementById('todo-edit-ai-cards');
-  var notesInput = document.getElementById('todo-edit-notes');
-  var bujoSummaryText = document.getElementById('todo-edit-bujo-summary-text');
-  var bujoPill = document.getElementById('todo-edit-bujo-pill');
-  var bujoPopover = document.getElementById('todo-edit-bujo-popover');
+  // ─── Global pomodoro settings (same keys as todo-list.html) ───
+  var _globalPomoShortWork = 25;
+  try { var s = parseInt(localStorage.getItem('dm-pomo-short-work'), 10); if (s > 0) _globalPomoShortWork = s; } catch(e) {}
+  var _globalPomoShortBreak = 5;
+  try { var s = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (s > 0) _globalPomoShortBreak = s; } catch(e) {}
+  var _globalPomoLongWork = 50;
+  try { var s = parseInt(localStorage.getItem('dm-pomo-long-work'), 10); if (s > 0) _globalPomoLongWork = s; } catch(e) {}
+  var _globalPomoLongBreak = 10;
+  try { var s = parseInt(localStorage.getItem('dm-pomo-long-break'), 10); if (s > 0) _globalPomoLongBreak = s; } catch(e) {}
 
-  // Sharing section elements
-  var sharingSection = document.getElementById('todo-edit-sharing-section');
-  var shareOwnerInfo = document.getElementById('todo-edit-share-owner-info');
-  var shareOwnerName = document.getElementById('todo-edit-share-owner-name');
-  var shareControls = document.getElementById('todo-edit-share-controls');
-  var shareEmailInput = document.getElementById('todo-edit-share-email');
-  var shareSendBtn = document.getElementById('todo-edit-share-send');
-  var shareFeedback = document.getElementById('todo-edit-share-feedback');
-  var shareListEl = document.getElementById('todo-edit-share-list');
+  // Keep in sync if user changes settings while panel is open
+  window.addEventListener('dm-settings-changed', function(e) {
+    var detail = e.detail || {};
+    if (detail.key === 'dm-pomo-short-work' && detail.value > 0) _globalPomoShortWork = detail.value;
+    if (detail.key === 'dm-pomo-short-break' && detail.value > 0) _globalPomoShortBreak = detail.value;
+    if (detail.key === 'dm-pomo-long-work' && detail.value > 0) _globalPomoLongWork = detail.value;
+    if (detail.key === 'dm-pomo-long-break' && detail.value > 0) _globalPomoLongBreak = detail.value;
+  });
 
-  // Project select
-  var projectSelect = document.getElementById('todo-edit-project-select');
-
-  // Pomodoro group elements
-  var editPomoGroup = document.getElementById('todo-edit-pomodoro-group');
-  var editPomoMinusBtn = document.getElementById('todo-edit-pomo-minus');
-  var editPomoPlusBtn = document.getElementById('todo-edit-pomo-plus');
-  var editPomoBtn = document.getElementById('todo-edit-pomodoro-btn');
-  var editPomoCountEl = document.getElementById('todo-edit-pomodoro-count');
-  var editCustomMinInput = document.getElementById('todo-edit-custom-min');
-  var editEstimateField = document.getElementById('todo-edit-estimate-field');
-
-  var currentTodo = null;
-  var categories = [];
-  var onSaveCallback = null;
-  var existingCategories = [];
-  var dropdownActiveIdx = -1;
+  // ─── Panel state ───
+  var _panelEl = null;       // Current DOM panel element (or null)
+  var _anchorEl = null;      // The row that was clicked
+  var _currentTodo = null;
+  var _onSaveCallback = null;
+  var _categories = [];
+  var _existingCategories = [];
+  var _dropdownActiveIdx = -1;
   var _dropdownJustClosed = false;
   var _editBujoType = 'task';
   var _editBujoState = 'open';
-
-  // Pomodoro state for edit modal
   var _editPomodoroCount = 1;
-  var _editPomoMode = 'short'; // 'short' | 'long'
+  var _editPomoMode = 'short';
+  var _shareFeedbackTimer = null;
+  var _moreExpanded = false;
 
-  // Auto-grow textarea for title
-  function autoGrowTitle() {
-    if (!titleInput) return;
-    titleInput.style.height = 'auto';
-    titleInput.style.height = Math.min(titleInput.scrollHeight, 200) + 'px';
-  }
-  if (titleInput) {
-    titleInput.addEventListener('input', autoGrowTitle);
-  }
+  // Element refs (populated from cloned template)
+  var $ = {};
 
-  // BuJo type/state elements
-  var bujoTypeToggle = document.getElementById('todo-edit-bujo-type');
-  var bujoStateToggle = document.getElementById('todo-edit-bujo-state');
-  var bujoStateField = document.getElementById('todo-edit-state-field');
+  function ref(name) { return $[name]; }
 
-  // Capitalize first letter helper
-  function _capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
-
-  // Update the <summary> label to reflect current type + state
-  function updateBujoSummaryText() {
-    if (!bujoSummaryText) return;
-    var typeLabel = _capitalize(_editBujoType || 'task');
-    var stateLabel = _capitalize(_editBujoState || 'open');
-    // Only show state for tasks (events/notes don't have meaningful states)
-    if (_editBujoType === 'task') {
-      bujoSummaryText.textContent = typeLabel + ' \u00B7 ' + stateLabel;
-    } else {
-      bujoSummaryText.textContent = typeLabel;
-    }
-  }
-
-  function updateBujoTypeUI() {
-    if (!bujoTypeToggle) return;
-    bujoTypeToggle.querySelectorAll('.todo-edit-bujo-btn').forEach(function(b) {
-      b.classList.toggle('active', b.getAttribute('data-bujo-type') === _editBujoType);
+  function populateRefs(panel) {
+    $ = {};
+    panel.querySelectorAll('[data-ref]').forEach(function(el) {
+      $[el.getAttribute('data-ref')] = el;
     });
-    // Show state selector only for tasks
-    if (bujoStateField) {
-      bujoStateField.style.display = _editBujoType === 'task' ? '' : 'none';
-    }
-    // Show pomodoro/estimate field only for tasks
-    if (editEstimateField) {
-      editEstimateField.style.display = _editBujoType === 'task' ? '' : 'none';
-    }
-    updateBujoSummaryText();
+    $['panel'] = panel;
   }
 
-  function updateBujoStateUI() {
-    if (!bujoStateToggle) return;
-    bujoStateToggle.querySelectorAll('.todo-edit-bujo-btn').forEach(function(b) {
-      b.classList.toggle('active', b.getAttribute('data-bujo-state') === _editBujoState);
-    });
-    updateBujoSummaryText();
-  }
-
-  // Wire up bujo type toggle clicks
-  if (bujoTypeToggle) {
-    bujoTypeToggle.querySelectorAll('.todo-edit-bujo-btn').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        _editBujoType = btn.getAttribute('data-bujo-type');
-        // When switching to event/note, reset state to open
-        if (_editBujoType !== 'task') {
-          _editBujoState = 'open';
-          updateBujoStateUI();
-        }
-        updateBujoTypeUI();
-      });
-    });
-  }
-
-  // Wire up bujo state toggle clicks
-  if (bujoStateToggle) {
-    bujoStateToggle.querySelectorAll('.todo-edit-bujo-btn').forEach(function(btn) {
-      btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        _editBujoState = btn.getAttribute('data-bujo-state');
-        updateBujoStateUI();
-      });
-    });
-  }
-
-  // ─── BuJo pill popover toggle ───
-  function closeBujoPopover() {
-    if (bujoPopover) bujoPopover.classList.remove('show');
-    if (bujoPill) bujoPill.classList.remove('active');
-  }
-  function toggleBujoPopover() {
-    if (!bujoPopover) return;
-    var isOpen = bujoPopover.classList.contains('show');
-    if (isOpen) {
-      closeBujoPopover();
-    } else {
-      bujoPopover.classList.add('show');
-      if (bujoPill) bujoPill.classList.add('active');
-    }
-  }
-  if (bujoPill) {
-    bujoPill.addEventListener('click', function(e) {
-      e.stopPropagation();
-      toggleBujoPopover();
-    });
-  }
-  // Close popover on outside click
-  document.addEventListener('click', function(e) {
-    if (bujoPopover && bujoPopover.classList.contains('show')) {
-      var wrapper = document.getElementById('todo-edit-bujo-wrapper');
-      if (wrapper && !wrapper.contains(e.target)) {
-        closeBujoPopover();
-      }
-    }
-  });
-
-  // ─── Pomodoro controls ───
-
-  // Read global pomodoro settings (same keys as todo-list.html)
-  var _editGlobalPomoShortWork = 25;
-  try { var s = parseInt(localStorage.getItem('dm-pomo-short-work'), 10); if (s > 0) _editGlobalPomoShortWork = s; } catch(e) {}
-  var _editGlobalPomoShortBreak = 5;
-  try { var s = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (s > 0) _editGlobalPomoShortBreak = s; } catch(e) {}
-  var _editGlobalPomoLongWork = 50;
-  try { var s = parseInt(localStorage.getItem('dm-pomo-long-work'), 10); if (s > 0) _editGlobalPomoLongWork = s; } catch(e) {}
-  var _editGlobalPomoLongBreak = 10;
-  try { var s = parseInt(localStorage.getItem('dm-pomo-long-break'), 10); if (s > 0) _editGlobalPomoLongBreak = s; } catch(e) {}
-
-  // Keep in sync if user changes settings while modal is open
-  window.addEventListener('dm-settings-changed', function(e) {
-    var detail = e.detail || {};
-    if (detail.key === 'dm-pomo-short-work' && detail.value > 0) _editGlobalPomoShortWork = detail.value;
-    if (detail.key === 'dm-pomo-short-break' && detail.value > 0) _editGlobalPomoShortBreak = detail.value;
-    if (detail.key === 'dm-pomo-long-work' && detail.value > 0) _editGlobalPomoLongWork = detail.value;
-    if (detail.key === 'dm-pomo-long-break' && detail.value > 0) _editGlobalPomoLongBreak = detail.value;
-  });
-
-  function updateEditPomodoroDisplay() {
-    if (!editPomoCountEl) return;
-    editPomoCountEl.textContent = _editPomodoroCount;
-    if (_editPomodoroCount > 0) {
-      editPomoBtn.classList.add('has-count');
-      editPomoMinusBtn.disabled = false;
-    } else {
-      editPomoBtn.classList.remove('has-count');
-      editPomoMinusBtn.disabled = true;
-    }
-    // Swap tomato icon based on mode
-    var isLong = _editPomoMode === 'long';
-    var shortIcon = editPomoBtn.querySelector('.todo-pomo-icon-short');
-    var longIcon = editPomoBtn.querySelector('.todo-pomo-icon-long');
-    if (shortIcon) shortIcon.style.display = isLong ? 'none' : '';
-    if (longIcon) longIcon.style.display = isLong ? '' : 'none';
-    var workMin = isLong ? _editGlobalPomoLongWork : _editGlobalPomoShortWork;
-    var breakMin = isLong ? _editGlobalPomoLongBreak : _editGlobalPomoShortBreak;
-    editPomoBtn.title = (isLong ? 'Long' : 'Short') + ' session (' + workMin + '/' + breakMin + 'min) \u2014 click tomato to switch';
-  }
-
-  // Plus button
-  if (editPomoPlusBtn) {
-    editPomoPlusBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      e.preventDefault();
-      _editPomodoroCount++;
-      updateEditPomodoroDisplay();
-    });
-  }
-
-  // Minus button
-  if (editPomoMinusBtn) {
-    editPomoMinusBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      e.preventDefault();
-      if (_editPomodoroCount > 0) {
-        _editPomodoroCount--;
-        updateEditPomodoroDisplay();
-      }
-    });
-  }
-
-  // Tomato button: toggle short/long mode
-  if (editPomoBtn) {
-    editPomoBtn.addEventListener('click', function(e) {
-      e.stopPropagation();
-      _editPomoMode = _editPomoMode === 'long' ? 'short' : 'long';
-      updateEditPomodoroDisplay();
-    });
-  }
-
-  // Prevent Enter in custom min input from saving the form
-  if (editCustomMinInput) {
-    editCustomMinInput.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); titleInput.focus(); }
-    });
-  }
-
-  // ─── Category helpers (same pattern as completion modal) ───
+  // ─── Helpers ───
 
   function escapeHtml(text) {
     var div = document.createElement('div');
@@ -1099,9 +920,104 @@
     return div.innerHTML;
   }
 
+  function _capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  // ─── Auto-grow title ───
+  function autoGrowTitle() {
+    var el = ref('title');
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+  }
+
+  // ─── BuJo type/state ───
+
+  function updateBujoSummaryText() {
+    var el = ref('bujo-summary-text');
+    if (!el) return;
+    var typeLabel = _capitalize(_editBujoType || 'task');
+    var stateLabel = _capitalize(_editBujoState || 'open');
+    if (_editBujoType === 'task') {
+      el.textContent = typeLabel + ' \u00B7 ' + stateLabel;
+    } else {
+      el.textContent = typeLabel;
+    }
+  }
+
+  function updateBujoTypeUI() {
+    var toggle = ref('bujo-type');
+    if (!toggle) return;
+    toggle.querySelectorAll('.todo-edit-bujo-btn').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-bujo-type') === _editBujoType);
+    });
+    var stateField = ref('state-field');
+    if (stateField) stateField.style.display = _editBujoType === 'task' ? '' : 'none';
+    var estimateField = ref('estimate-field');
+    if (estimateField) estimateField.style.display = _editBujoType === 'task' ? '' : 'none';
+    updateBujoSummaryText();
+  }
+
+  function updateBujoStateUI() {
+    var toggle = ref('bujo-state');
+    if (!toggle) return;
+    toggle.querySelectorAll('.todo-edit-bujo-btn').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-bujo-state') === _editBujoState);
+    });
+    updateBujoSummaryText();
+  }
+
+  function closeBujoPopover() {
+    var popover = ref('bujo-popover');
+    var pill = ref('bujo-pill');
+    if (popover) popover.classList.remove('show');
+    if (pill) pill.classList.remove('active');
+  }
+
+  function toggleBujoPopover() {
+    var popover = ref('bujo-popover');
+    if (!popover) return;
+    var isOpen = popover.classList.contains('show');
+    if (isOpen) {
+      closeBujoPopover();
+    } else {
+      popover.classList.add('show');
+      var pill = ref('bujo-pill');
+      if (pill) pill.classList.add('active');
+    }
+  }
+
+  // ─── Pomodoro ───
+
+  function updatePomodoroDisplay() {
+    var countEl = ref('pomo-count');
+    var pomoBtn = ref('pomo-btn');
+    var minusBtn = ref('pomo-minus');
+    if (!countEl || !pomoBtn) return;
+    countEl.textContent = _editPomodoroCount;
+    if (_editPomodoroCount > 0) {
+      pomoBtn.classList.add('has-count');
+      if (minusBtn) minusBtn.disabled = false;
+    } else {
+      pomoBtn.classList.remove('has-count');
+      if (minusBtn) minusBtn.disabled = true;
+    }
+    var isLong = _editPomoMode === 'long';
+    var shortIcon = pomoBtn.querySelector('.todo-pomo-icon-short');
+    var longIcon = pomoBtn.querySelector('.todo-pomo-icon-long');
+    if (shortIcon) shortIcon.style.display = isLong ? 'none' : '';
+    if (longIcon) longIcon.style.display = isLong ? '' : 'none';
+    var workMin = isLong ? _globalPomoLongWork : _globalPomoShortWork;
+    var breakMin = isLong ? _globalPomoLongBreak : _globalPomoShortBreak;
+    pomoBtn.title = (isLong ? 'Long' : 'Short') + ' session (' + workMin + '/' + breakMin + 'min) \u2014 click tomato to switch';
+  }
+
+  // ─── Category helpers ───
+
   function renderCategories() {
-    categoryChipsEl.innerHTML = '';
-    categories.forEach(function(cat, idx) {
+    var chipsEl = ref('category-chips');
+    if (!chipsEl) return;
+    chipsEl.innerHTML = '';
+    _categories.forEach(function(cat, idx) {
       var chip = document.createElement('span');
       chip.className = 'todo-edit-category-chip';
       chip.textContent = cat;
@@ -1112,16 +1028,16 @@
       removeBtn.title = 'Remove category';
       removeBtn.setAttribute('aria-label', 'Remove ' + cat);
       removeBtn.addEventListener('click', function() {
-        categories.splice(idx, 1);
+        _categories.splice(idx, 1);
         renderCategories();
       });
       chip.appendChild(removeBtn);
-      categoryChipsEl.appendChild(chip);
+      chipsEl.appendChild(chip);
     });
   }
 
   function loadExistingCategories() {
-    existingCategories = [];
+    _existingCategories = [];
     if (!window.dmSync) return Promise.resolve();
     return window.dmSync.getAllTodos().then(function(todos) {
       var catSet = {};
@@ -1133,15 +1049,15 @@
           });
         }
       });
-      existingCategories = Object.keys(catSet).sort();
+      _existingCategories = Object.keys(catSet).sort();
     });
   }
 
   function getFilteredSuggestions(query) {
     var q = query.trim().toLowerCase();
-    if (!q) return existingCategories.filter(function(c) { return categories.indexOf(c) === -1; });
-    return existingCategories.filter(function(c) {
-      return c.indexOf(q) !== -1 && categories.indexOf(c) === -1;
+    if (!q) return _existingCategories.filter(function(c) { return _categories.indexOf(c) === -1; });
+    return _existingCategories.filter(function(c) {
+      return c.indexOf(q) !== -1 && _categories.indexOf(c) === -1;
     });
   }
 
@@ -1156,15 +1072,18 @@
   }
 
   function showDropdown() {
-    var query = categoryInput.value.trim().toLowerCase();
+    var input = ref('category-input');
+    var dropdown = ref('category-dropdown');
+    if (!input || !dropdown) return;
+    var query = input.value.trim().toLowerCase();
     var suggestions = getFilteredSuggestions(query);
-    dropdownActiveIdx = -1;
+    _dropdownActiveIdx = -1;
     if (suggestions.length === 0) {
-      categoryDropdown.classList.remove('show');
-      categoryDropdown.innerHTML = '';
+      dropdown.classList.remove('show');
+      dropdown.innerHTML = '';
       return;
     }
-    categoryDropdown.innerHTML = '';
+    dropdown.innerHTML = '';
     suggestions.forEach(function(cat, idx) {
       var opt = document.createElement('div');
       opt.className = 'todo-edit-category-option';
@@ -1174,94 +1093,53 @@
         e.preventDefault();
         selectCategory(cat);
       });
-      categoryDropdown.appendChild(opt);
+      dropdown.appendChild(opt);
     });
-    categoryDropdown.classList.add('show');
+    dropdown.classList.add('show');
   }
 
   function hideDropdown() {
-    categoryDropdown.classList.remove('show');
-    categoryDropdown.innerHTML = '';
-    dropdownActiveIdx = -1;
+    var dropdown = ref('category-dropdown');
+    if (!dropdown) return;
+    dropdown.classList.remove('show');
+    dropdown.innerHTML = '';
+    _dropdownActiveIdx = -1;
   }
 
   function selectCategory(cat) {
-    if (categories.indexOf(cat) === -1) {
-      categories.push(cat);
+    if (_categories.indexOf(cat) === -1) {
+      _categories.push(cat);
       renderCategories();
     }
-    categoryInput.value = '';
+    var input = ref('category-input');
+    if (input) { input.value = ''; input.focus(); }
     hideDropdown();
-    categoryInput.focus();
   }
 
   function navigateDropdown(direction) {
-    var options = categoryDropdown.querySelectorAll('.todo-edit-category-option');
+    var dropdown = ref('category-dropdown');
+    if (!dropdown) return;
+    var options = dropdown.querySelectorAll('.todo-edit-category-option');
     if (options.length === 0) return;
-    if (dropdownActiveIdx >= 0 && dropdownActiveIdx < options.length) {
-      options[dropdownActiveIdx].classList.remove('active');
+    if (_dropdownActiveIdx >= 0 && _dropdownActiveIdx < options.length) {
+      options[_dropdownActiveIdx].classList.remove('active');
     }
-    dropdownActiveIdx += direction;
-    if (dropdownActiveIdx < 0) dropdownActiveIdx = options.length - 1;
-    if (dropdownActiveIdx >= options.length) dropdownActiveIdx = 0;
-    options[dropdownActiveIdx].classList.add('active');
-    options[dropdownActiveIdx].scrollIntoView({ block: 'nearest' });
+    _dropdownActiveIdx += direction;
+    if (_dropdownActiveIdx < 0) _dropdownActiveIdx = options.length - 1;
+    if (_dropdownActiveIdx >= options.length) _dropdownActiveIdx = 0;
+    options[_dropdownActiveIdx].classList.add('active');
+    options[_dropdownActiveIdx].scrollIntoView({ block: 'nearest' });
   }
-
-  categoryInput.addEventListener('input', showDropdown);
-  categoryInput.addEventListener('focus', showDropdown);
-  categoryInput.addEventListener('blur', function() {
-    setTimeout(hideDropdown, 150);
-  });
-
-  categoryInput.addEventListener('keydown', function(e) {
-    var isDropdownVisible = categoryDropdown.classList.contains('show');
-    var options = categoryDropdown.querySelectorAll('.todo-edit-category-option');
-
-    if (e.key === 'ArrowDown' && isDropdownVisible) {
-      e.preventDefault();
-      navigateDropdown(1);
-      return;
-    }
-    if (e.key === 'ArrowUp' && isDropdownVisible) {
-      e.preventDefault();
-      navigateDropdown(-1);
-      return;
-    }
-    if (e.key === 'Tab' && isDropdownVisible && dropdownActiveIdx >= 0 && dropdownActiveIdx < options.length) {
-      e.preventDefault();
-      selectCategory(options[dropdownActiveIdx].getAttribute('data-cat'));
-      return;
-    }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (isDropdownVisible && dropdownActiveIdx >= 0 && dropdownActiveIdx < options.length) {
-        selectCategory(options[dropdownActiveIdx].getAttribute('data-cat'));
-        return;
-      }
-      var val = categoryInput.value.trim().toLowerCase();
-      if (val && categories.indexOf(val) === -1) {
-        categories.push(val);
-        renderCategories();
-      }
-      categoryInput.value = '';
-      hideDropdown();
-    }
-    if (e.key === 'Backspace' && !categoryInput.value && categories.length > 0) {
-      categories.pop();
-      renderCategories();
-    }
-    if (e.key === 'Escape' && isDropdownVisible) {
-      e.stopPropagation();
-      _dropdownJustClosed = true;
-      hideDropdown();
-      return;
-    }
-  });
 
   // ─── AI Suggestions ───
 
   function generateAiSuggestions(todo) {
+    var aiSection = ref('ai-section');
+    var aiCardsEl = ref('ai-cards');
+    var dateInput = ref('date');
+    var customMinInput = ref('custom-min');
+    if (!aiSection || !aiCardsEl) return;
+
     aiSection.style.display = 'none';
     aiCardsEl.innerHTML = '';
 
@@ -1276,7 +1154,7 @@
         type: 'schedule',
         text: 'Schedule for today',
         action: function() {
-          dateInput.value = todayStr;
+          if (dateInput) dateInput.value = todayStr;
         }
       });
       var tmr = new Date();
@@ -1288,7 +1166,7 @@
         type: 'schedule',
         text: 'Schedule for tomorrow',
         action: function() {
-          dateInput.value = tmrStr;
+          if (dateInput) dateInput.value = tmrStr;
         }
       });
     }
@@ -1299,27 +1177,27 @@
         type: 'estimate',
         text: 'Quick task (15 min)',
         action: function() {
-          editCustomMinInput.value = '15';
+          if (customMinInput) customMinInput.value = '15';
           _editPomodoroCount = 1;
-          updateEditPomodoroDisplay();
+          updatePomodoroDisplay();
         }
       });
       suggestions.push({
         type: 'estimate',
         text: 'Medium task (30 min)',
         action: function() {
-          editCustomMinInput.value = '30';
+          if (customMinInput) customMinInput.value = '30';
           _editPomodoroCount = 1;
-          updateEditPomodoroDisplay();
+          updatePomodoroDisplay();
         }
       });
       suggestions.push({
         type: 'estimate',
         text: 'Deep work (60 min)',
         action: function() {
-          editCustomMinInput.value = '60';
+          if (customMinInput) customMinInput.value = '60';
           _editPomodoroCount = 1;
-          updateEditPomodoroDisplay();
+          updatePomodoroDisplay();
         }
       });
     }
@@ -1332,7 +1210,6 @@
         type: 'breakdown',
         text: 'Break into subtasks (task seems broad)',
         action: function() {
-          // Create subtask prompt — use AI to suggest breakdown
           if (window.dmAI && window.dmAI._getEngine) {
             var card = aiCardsEl.querySelector('[data-type="breakdown"]');
             if (card) {
@@ -1400,7 +1277,6 @@
         type: 'follow-up',
         text: followUp,
         action: function() {
-          // Create as a new task via dm-ai-create-task
           if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
             var detail = { title: followUp, source: 'ai' };
             if (window.dmAI && window.dmAI._parseTaskDetails) {
@@ -1411,7 +1287,6 @@
               detail.category = det.category;
             }
             window.dispatchEvent(new CustomEvent('dm-ai-create-task', { detail: detail }));
-            // Mark as added
             var cards = aiCardsEl.querySelectorAll('.todo-edit-ai-card');
             cards.forEach(function(c) {
               if (c.querySelector('.todo-edit-ai-card-text') &&
@@ -1463,7 +1338,10 @@
   }
 
   function showSubtaskSuggestions(subtasks) {
-    // Replace breakdown card with subtask suggestions
+    var aiCardsEl = ref('ai-cards');
+    var dateInput = ref('date');
+    if (!aiCardsEl) return;
+
     var breakdownCard = aiCardsEl.querySelector('[data-type="breakdown"]');
     if (breakdownCard) breakdownCard.remove();
 
@@ -1486,13 +1364,12 @@
       actionBtn.textContent = 'Add';
       actionBtn.addEventListener('click', function(e) {
         e.stopPropagation();
-        if (currentTodo && window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
-          // Create subtask under the current task
+        if (_currentTodo && window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
           window.dispatchEvent(new CustomEvent('dm-ai-create-subtask', {
             detail: {
               title: subtaskTitle,
-              parentId: currentTodo.id,
-              scheduledDate: dateInput.value || currentTodo.scheduledDate || null,
+              parentId: _currentTodo.id,
+              scheduledDate: (dateInput ? dateInput.value : '') || _currentTodo.scheduledDate || null,
               source: 'ai'
             }
           }));
@@ -1514,20 +1391,20 @@
 
   // ─── Sharing section logic ───
 
-  var _shareFeedbackTimer = null;
-
   function showShareFeedback(msg, isError) {
-    if (!shareFeedback) return;
+    var feedbackEl = ref('share-feedback');
+    if (!feedbackEl) return;
     clearTimeout(_shareFeedbackTimer);
-    shareFeedback.textContent = msg;
-    shareFeedback.className = 'todo-edit-share-feedback ' + (isError ? 'is-error' : 'is-success');
-    shareFeedback.style.display = '';
+    feedbackEl.textContent = msg;
+    feedbackEl.className = 'todo-edit-share-feedback ' + (isError ? 'is-error' : 'is-success');
+    feedbackEl.style.display = '';
     _shareFeedbackTimer = setTimeout(function() {
-      shareFeedback.style.display = 'none';
+      feedbackEl.style.display = 'none';
     }, isError ? 4000 : 3000);
   }
 
   function refreshEditShareList(todoId) {
+    var shareListEl = ref('share-list');
     if (!shareListEl || !window.dmSync) return;
     window.dmSync.getSharesForTodo(todoId).then(function(shares) {
       if (shares.length === 0) {
@@ -1544,7 +1421,6 @@
       });
       shareListEl.innerHTML = html;
 
-      // Attach remove handlers
       shareListEl.querySelectorAll('[data-edit-unshare-id]').forEach(function(btn) {
         btn.addEventListener('click', function() {
           var shareId = btn.getAttribute('data-edit-unshare-id');
@@ -1561,34 +1437,30 @@
   }
 
   function initSharingSection(todo) {
+    var sharingSection = ref('sharing-section');
     if (!sharingSection) return;
 
-    // Only show for top-level tasks
     if (todo.parentId) {
       sharingSection.style.display = 'none';
       return;
     }
 
     sharingSection.style.display = '';
-    shareFeedback.style.display = 'none';
+    var feedbackEl = ref('share-feedback');
+    if (feedbackEl) feedbackEl.style.display = 'none';
 
     var user = window.dmAuth && window.dmAuth.currentUser;
     var isOwner = !todo.userId || (user && todo.userId === user.uid);
+    var shareOwnerInfo = ref('share-owner-info');
+    var shareControls = ref('share-controls');
+    var shareEmailInput = ref('share-email');
+    var shareSendBtn = ref('share-send');
+    var shareOwnerName = ref('share-owner-name');
 
     if (isOwner) {
-      // Show share controls for owner
-      shareOwnerInfo.style.display = 'none';
-      shareControls.style.display = '';
-      shareEmailInput.value = '';
-
-      // Wire up send button (remove old listeners by cloning)
-      var newSendBtn = shareSendBtn.cloneNode(true);
-      shareSendBtn.parentNode.replaceChild(newSendBtn, shareSendBtn);
-      shareSendBtn = newSendBtn;
-
-      var newEmailInput = shareEmailInput.cloneNode(true);
-      shareEmailInput.parentNode.replaceChild(newEmailInput, shareEmailInput);
-      shareEmailInput = newEmailInput;
+      if (shareOwnerInfo) shareOwnerInfo.style.display = 'none';
+      if (shareControls) shareControls.style.display = '';
+      if (shareEmailInput) shareEmailInput.value = '';
 
       function doEditShare() {
         var email = shareEmailInput.value.trim().toLowerCase();
@@ -1612,29 +1484,31 @@
         });
       }
 
-      shareSendBtn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        doEditShare();
-      });
-
-      shareEmailInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-          e.preventDefault();
+      if (shareSendBtn) {
+        shareSendBtn.addEventListener('click', function(e) {
           e.stopPropagation();
           doEditShare();
-        }
-      });
+        });
+      }
+
+      if (shareEmailInput) {
+        shareEmailInput.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            doEditShare();
+          }
+        });
+      }
     } else {
-      // Read-only: show who shared it — look up from taskShares
-      shareControls.style.display = 'none';
-      shareOwnerInfo.style.display = '';
-      shareOwnerName.textContent = 'someone';
-      // Try to get owner info from the share record
+      if (shareControls) shareControls.style.display = 'none';
+      if (shareOwnerInfo) shareOwnerInfo.style.display = '';
+      if (shareOwnerName) shareOwnerName.textContent = 'someone';
       if (window.dmSync && window.dmSync.getSharesForTodo) {
         window.dmSync.getSharesForTodo(todo.id).then(function(shares) {
           if (shares.length > 0) {
             var ownerShare = shares[0];
-            shareOwnerName.textContent = ownerShare.ownerName || ownerShare.ownerEmail || 'someone';
+            if (shareOwnerName) shareOwnerName.textContent = ownerShare.ownerName || ownerShare.ownerEmail || 'someone';
           }
         });
       }
@@ -1643,134 +1517,272 @@
     refreshEditShareList(todo.id);
   }
 
-  // ─── Open / Close ───
+  // ─── Wire up events on a freshly cloned panel ───
 
-  function openModal(todo, onSave) {
-    currentTodo = todo;
-    onSaveCallback = onSave || null;
+  function wirePanel() {
+    // Title auto-grow
+    var titleEl = ref('title');
+    if (titleEl) titleEl.addEventListener('input', autoGrowTitle);
 
-    // Populate fields
-    titleInput.value = todo.title || '';
-    dateInput.value = todo.scheduledDate || '';
-    notesInput.value = todo.notes || '';
-
-    // Kanban column
-    var kanbanSelect = document.getElementById('todo-edit-kanban-status');
-    if (kanbanSelect) kanbanSelect.value = todo.kanbanStatus || 'todo';
-
-    // Populate pomodoro state from task data
-    _editPomodoroCount = todo.pomodoroCount || 0;
-    var pomLen = todo.pomodoroLength || 0;
-    // Detect mode: if pomodoroLength matches global long-work, use long; otherwise short
-    if (pomLen > 0 && pomLen === _editGlobalPomoLongWork) {
-      _editPomoMode = 'long';
-    } else {
-      _editPomoMode = 'short';
-    }
-    // If the task has a custom pomodoroLength that doesn't match either preset,
-    // put it in the custom min override field
-    var isShortPreset = pomLen === _editGlobalPomoShortWork || pomLen === 0;
-    var isLongPreset = pomLen === _editGlobalPomoLongWork;
-    if (pomLen > 0 && !isShortPreset && !isLongPreset) {
-      editCustomMinInput.value = pomLen;
-    } else {
-      editCustomMinInput.value = '';
-    }
-    updateEditPomodoroDisplay();
-
-    // BuJo type/state
-    _editBujoType = todo.bujoType || 'task';
-    _editBujoState = todo.bujoState || 'open';
-    updateBujoTypeUI();
-    updateBujoStateUI();
-    // Close the type/state popover on each open
-    closeBujoPopover();
-
-    // Parse category
-    categories = [];
-    if (todo.category) {
-      todo.category.split(',').forEach(function(c) {
-        var trimmed = c.trim();
-        if (trimmed) categories.push(trimmed.toLowerCase());
+    // BuJo pill toggle
+    var bujoPill = ref('bujo-pill');
+    if (bujoPill) {
+      bujoPill.addEventListener('click', function(e) {
+        e.stopPropagation();
+        toggleBujoPopover();
       });
     }
-    renderCategories();
-    categoryInput.value = '';
-    hideDropdown();
 
-    // Populate project selector
-    if (projectSelect && window.dmSync) {
-      window.dmSync.getAllProjects().then(function(projects) {
-        var html = '<option value="">None</option>';
-        projects.forEach(function(p) {
-          var selected = todo.projectId === p.id ? ' selected' : '';
-          html += '<option value="' + p.id + '"' + selected + '>' + (p.name || 'Untitled') + '</option>';
+    // BuJo type buttons
+    var bujoTypeToggle = ref('bujo-type');
+    if (bujoTypeToggle) {
+      bujoTypeToggle.querySelectorAll('.todo-edit-bujo-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          _editBujoType = btn.getAttribute('data-bujo-type');
+          if (_editBujoType !== 'task') {
+            _editBujoState = 'open';
+            updateBujoStateUI();
+          }
+          updateBujoTypeUI();
         });
-        projectSelect.innerHTML = html;
-      }).catch(function() {
-        projectSelect.innerHTML = '<option value="">None</option>';
       });
-    } else if (projectSelect) {
-      projectSelect.innerHTML = '<option value="">None</option>';
     }
 
-    saveBtn.disabled = false;
-    saveBtn.textContent = 'Save Changes';
+    // BuJo state buttons
+    var bujoStateToggle = ref('bujo-state');
+    if (bujoStateToggle) {
+      bujoStateToggle.querySelectorAll('.todo-edit-bujo-btn').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          _editBujoState = btn.getAttribute('data-bujo-state');
+          updateBujoStateUI();
+        });
+      });
+    }
 
-    // Generate AI suggestions
-    generateAiSuggestions(todo);
+    // Pomodoro controls
+    var pomoPlusBtn = ref('pomo-plus');
+    if (pomoPlusBtn) {
+      pomoPlusBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        _editPomodoroCount++;
+        updatePomodoroDisplay();
+      });
+    }
 
-    // Initialize sharing/collaborator section
-    initSharingSection(todo);
+    var pomoMinusBtn = ref('pomo-minus');
+    if (pomoMinusBtn) {
+      pomoMinusBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        e.preventDefault();
+        if (_editPomodoroCount > 0) {
+          _editPomodoroCount--;
+          updatePomodoroDisplay();
+        }
+      });
+    }
 
-    // Load existing categories for autocomplete, then show
-    loadExistingCategories().then(function() {
-      modal.style.display = '';
-      autoGrowTitle();
-      setTimeout(function() { titleInput.focus(); titleInput.select(); }, 50);
-    }).catch(function() {
-      modal.style.display = '';
-      autoGrowTitle();
-      setTimeout(function() { titleInput.focus(); titleInput.select(); }, 50);
-    });
+    var pomoBtn = ref('pomo-btn');
+    if (pomoBtn) {
+      pomoBtn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        _editPomoMode = _editPomoMode === 'long' ? 'short' : 'long';
+        updatePomodoroDisplay();
+      });
+    }
+
+    var customMinInput = ref('custom-min');
+    if (customMinInput) {
+      customMinInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); if (titleEl) titleEl.focus(); }
+      });
+    }
+
+    // Category input
+    var categoryInput = ref('category-input');
+    if (categoryInput) {
+      categoryInput.addEventListener('input', showDropdown);
+      categoryInput.addEventListener('focus', showDropdown);
+      categoryInput.addEventListener('blur', function() {
+        setTimeout(hideDropdown, 150);
+      });
+      categoryInput.addEventListener('keydown', function(e) {
+        var dropdown = ref('category-dropdown');
+        var isDropdownVisible = dropdown && dropdown.classList.contains('show');
+        var options = dropdown ? dropdown.querySelectorAll('.todo-edit-category-option') : [];
+
+        if (e.key === 'ArrowDown' && isDropdownVisible) {
+          e.preventDefault();
+          navigateDropdown(1);
+          return;
+        }
+        if (e.key === 'ArrowUp' && isDropdownVisible) {
+          e.preventDefault();
+          navigateDropdown(-1);
+          return;
+        }
+        if (e.key === 'Tab' && isDropdownVisible && _dropdownActiveIdx >= 0 && _dropdownActiveIdx < options.length) {
+          e.preventDefault();
+          selectCategory(options[_dropdownActiveIdx].getAttribute('data-cat'));
+          return;
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          if (isDropdownVisible && _dropdownActiveIdx >= 0 && _dropdownActiveIdx < options.length) {
+            selectCategory(options[_dropdownActiveIdx].getAttribute('data-cat'));
+            return;
+          }
+          var val = categoryInput.value.trim().toLowerCase();
+          if (val && _categories.indexOf(val) === -1) {
+            _categories.push(val);
+            renderCategories();
+          }
+          categoryInput.value = '';
+          hideDropdown();
+        }
+        if (e.key === 'Backspace' && !categoryInput.value && _categories.length > 0) {
+          _categories.pop();
+          renderCategories();
+        }
+        if (e.key === 'Escape' && isDropdownVisible) {
+          e.stopPropagation();
+          _dropdownJustClosed = true;
+          hideDropdown();
+          return;
+        }
+      });
+    }
+
+    // More toggle
+    var moreToggle = ref('more-toggle');
+    var moreContent = ref('more-content');
+    var moreArrow = ref('more-arrow');
+    if (moreToggle && moreContent) {
+      moreToggle.addEventListener('click', function(e) {
+        e.stopPropagation();
+        _moreExpanded = !_moreExpanded;
+        moreContent.style.display = _moreExpanded ? '' : 'none';
+        if (moreArrow) moreArrow.classList.toggle('expanded', _moreExpanded);
+      });
+    }
+
+    // Cancel button
+    var cancelBtn = ref('cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', closePanel);
+
+    // Save button
+    var saveBtn = ref('save');
+    if (saveBtn) saveBtn.addEventListener('click', saveAndClose);
+
+    // Title: Enter saves, prevent newlines
+    if (titleEl) {
+      titleEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          saveAndClose();
+        }
+      });
+
+      // NLP auto-parse on title blur
+      titleEl.addEventListener('blur', function() {
+        if (!window.dmAI || !window.dmAI._parseTaskDetails) return;
+        var text = titleEl.value.trim();
+        if (!text) return;
+
+        var details = window.dmAI._parseTaskDetails(text);
+        var dateInput = ref('date');
+        var customMinInput = ref('custom-min');
+
+        if (details.scheduledDate && dateInput && !dateInput.value) {
+          dateInput.value = details.scheduledDate;
+        }
+        if (details.estimatedMin && customMinInput && !customMinInput.value && _editPomodoroCount === 0) {
+          customMinInput.value = details.estimatedMin;
+          _editPomodoroCount = 1;
+          updatePomodoroDisplay();
+        }
+        if (details.category && _categories.length === 0) {
+          _categories.push(details.category.toLowerCase());
+          renderCategories();
+        }
+        if (details.title && details.title !== text) {
+          titleEl.value = details.title;
+          autoGrowTitle();
+        }
+      });
+    }
   }
 
-  function closeModal() {
-    modal.style.display = 'none';
-    hideDropdown();
-    aiSection.style.display = 'none';
-    aiCardsEl.innerHTML = '';
-    // Clean up sharing section state
-    clearTimeout(_shareFeedbackTimer);
-    if (sharingSection) sharingSection.style.display = 'none';
-    if (shareFeedback) shareFeedback.style.display = 'none';
-    if (shareListEl) shareListEl.innerHTML = '';
-    if (shareEmailInput) shareEmailInput.value = '';
-    currentTodo = null;
-    onSaveCallback = null;
-    categories = [];
+  // ─── Click-outside handler ───
+
+  function onDocumentClick(e) {
+    if (!_panelEl) return;
+    // Close BuJo popover if clicking outside its wrapper
+    var bujoWrapper = ref('bujo-wrapper');
+    var bujoPopover = ref('bujo-popover');
+    if (bujoPopover && bujoPopover.classList.contains('show') && bujoWrapper && !bujoWrapper.contains(e.target)) {
+      closeBujoPopover();
+    }
+    // Close panel if clicking outside both anchor and panel
+    if (_anchorEl && _anchorEl.contains(e.target)) return;
+    if (_panelEl.contains(e.target)) return;
+    closePanel();
   }
+
+  // ─── Keyboard handler ───
+
+  function onDocumentKeydown(e) {
+    if (!_panelEl) return;
+    if (e.key === 'Escape') {
+      if (_dropdownJustClosed) {
+        _dropdownJustClosed = false;
+        return;
+      }
+      var dropdown = ref('category-dropdown');
+      if (dropdown && dropdown.classList.contains('show')) return;
+      e.preventDefault();
+      closePanel();
+    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      saveAndClose();
+    }
+  }
+
+  // ─── Save and close ───
 
   function saveAndClose() {
-    if (!currentTodo) return;
+    if (!_currentTodo) return;
 
-    var newTitle = titleInput.value.trim();
+    var titleEl = ref('title');
+    var newTitle = titleEl ? titleEl.value.trim() : '';
     if (!newTitle) {
-      titleInput.focus();
+      if (titleEl) titleEl.focus();
       return;
     }
 
-    saveBtn.disabled = true;
-    saveBtn.textContent = 'Saving...';
+    var saveBtn = ref('save');
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+    }
 
-    var newDate = dateInput.value || null;
-    var newCategory = categories.length > 0 ? categories.join(', ') : null;
+    var dateInput = ref('date');
+    var customMinInput = ref('custom-min');
+    var projectSelect = ref('project-select');
+    var kanbanSelect = ref('kanban-status');
+    var notesInput = ref('notes');
 
-    // Compute pomodoro fields (mirrors addFromForm logic in todo-list.html)
-    var customMin = editCustomMinInput.value ? parseInt(editCustomMinInput.value, 10) : null;
+    var newDate = dateInput ? (dateInput.value || null) : null;
+    var newCategory = _categories.length > 0 ? _categories.join(', ') : null;
+
+    // Compute pomodoro fields
+    var customMin = customMinInput && customMinInput.value ? parseInt(customMinInput.value, 10) : null;
     var pomCount = _editPomodoroCount;
-    var pomLen = _editPomoMode === 'long' ? _editGlobalPomoLongWork : _editGlobalPomoShortWork;
-    var pomBreakLen = _editPomoMode === 'long' ? _editGlobalPomoLongBreak : _editGlobalPomoShortBreak;
+    var pomLen = _editPomoMode === 'long' ? _globalPomoLongWork : _globalPomoShortWork;
+    var pomBreakLen = _editPomoMode === 'long' ? _globalPomoLongBreak : _globalPomoShortBreak;
     var est;
     if (customMin != null && customMin >= 0) {
       pomLen = customMin;
@@ -1792,85 +1804,198 @@
       projectId: projectSelect ? (projectSelect.value || null) : undefined,
       bujoType: _editBujoType,
       bujoState: _editBujoState,
-      notes: notesInput.value.trim(),
-      kanbanStatus: (document.getElementById('todo-edit-kanban-status') || {}).value || undefined
+      notes: notesInput ? notesInput.value.trim() : '',
+      kanbanStatus: kanbanSelect ? (kanbanSelect.value || undefined) : undefined
     };
 
-    if (onSaveCallback) {
-      onSaveCallback(result);
+    if (_onSaveCallback) {
+      _onSaveCallback(result);
     }
 
-    modal.style.display = 'none';
-    aiSection.style.display = 'none';
-    aiCardsEl.innerHTML = '';
-    currentTodo = null;
-    onSaveCallback = null;
-    categories = [];
+    closePanel();
   }
 
-  // ─── Event bindings ───
-  saveBtn.addEventListener('click', saveAndClose);
-  backdrop.addEventListener('click', closeModal);
-  closeBtn.addEventListener('click', closeModal);
-  cancelBtn.addEventListener('click', closeModal);
+  // ─── Open panel ───
 
-  document.addEventListener('keydown', function(e) {
-    if (modal.style.display === 'none') return;
-    if (e.key === 'Escape') {
-      if (_dropdownJustClosed) {
-        _dropdownJustClosed = false;
-        return;
-      }
-      if (categoryDropdown.classList.contains('show')) return;
-      e.preventDefault();
-      closeModal();
+  function openPanel(todo, onSave, anchorEl) {
+    // Close any existing panel first
+    if (_panelEl) {
+      closePanel();
     }
-    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-      e.preventDefault();
-      saveAndClose();
-    }
-  });
 
-  // ─── NLP auto-parse on title blur ───
-  // Prevent Enter from adding newlines in title textarea — Enter saves
-  titleInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      saveAndClose();
-    }
-  });
+    _currentTodo = todo;
+    _onSaveCallback = onSave || null;
+    _anchorEl = anchorEl || null;
 
-  titleInput.addEventListener('blur', function() {
-    if (!window.dmAI || !window.dmAI._parseTaskDetails) return;
-    var text = titleInput.value.trim();
-    if (!text) return;
+    // Clone template
+    var clone = template.content.cloneNode(true);
+    var panel = clone.querySelector('.todo-edit-panel');
+    _panelEl = panel;
 
-    var details = window.dmAI._parseTaskDetails(text);
+    // Insert after anchor element
+    if (_anchorEl) {
+      _anchorEl.classList.add('todo-edit-anchor-active');
+      _anchorEl.after(panel);
+    } else {
+      // Fallback: append to body (shouldn't happen normally)
+      document.body.appendChild(panel);
+    }
 
-    // Only auto-fill empty fields (don't overwrite user's explicit values)
-    if (details.scheduledDate && !dateInput.value) {
-      dateInput.value = details.scheduledDate;
+    // Populate refs from the live DOM panel
+    populateRefs(_panelEl);
+
+    // Wire all events
+    wirePanel();
+
+    // Populate fields
+    var titleEl = ref('title');
+    if (titleEl) titleEl.value = todo.title || '';
+
+    var dateInput = ref('date');
+    if (dateInput) dateInput.value = todo.scheduledDate || '';
+
+    var notesInput = ref('notes');
+    if (notesInput) notesInput.value = todo.notes || '';
+
+    var kanbanSelect = ref('kanban-status');
+    if (kanbanSelect) kanbanSelect.value = todo.kanbanStatus || 'todo';
+
+    // Pomodoro state
+    _editPomodoroCount = todo.pomodoroCount || 0;
+    var pomLen = todo.pomodoroLength || 0;
+    if (pomLen > 0 && pomLen === _globalPomoLongWork) {
+      _editPomoMode = 'long';
+    } else {
+      _editPomoMode = 'short';
     }
-    if (details.estimatedMin && !editCustomMinInput.value && _editPomodoroCount === 0) {
-      editCustomMinInput.value = details.estimatedMin;
-      _editPomodoroCount = 1;
-      updateEditPomodoroDisplay();
+    var isShortPreset = pomLen === _globalPomoShortWork || pomLen === 0;
+    var isLongPreset = pomLen === _globalPomoLongWork;
+    var customMinInput = ref('custom-min');
+    if (pomLen > 0 && !isShortPreset && !isLongPreset) {
+      if (customMinInput) customMinInput.value = pomLen;
+    } else {
+      if (customMinInput) customMinInput.value = '';
     }
-    if (details.category && categories.length === 0) {
-      categories.push(details.category.toLowerCase());
-      renderCategories();
+    updatePomodoroDisplay();
+
+    // BuJo type/state
+    _editBujoType = todo.bujoType || 'task';
+    _editBujoState = todo.bujoState || 'open';
+    updateBujoTypeUI();
+    updateBujoStateUI();
+    closeBujoPopover();
+
+    // Categories
+    _categories = [];
+    if (todo.category) {
+      todo.category.split(',').forEach(function(c) {
+        var trimmed = c.trim();
+        if (trimmed) _categories.push(trimmed.toLowerCase());
+      });
     }
-    // Update title to cleaned version
-    if (details.title && details.title !== text) {
-      titleInput.value = details.title;
+    renderCategories();
+    var categoryInput = ref('category-input');
+    if (categoryInput) categoryInput.value = '';
+    hideDropdown();
+
+    // Project selector
+    var projectSelect = ref('project-select');
+    if (projectSelect && window.dmSync) {
+      window.dmSync.getAllProjects().then(function(projects) {
+        var html = '<option value="">None</option>';
+        projects.forEach(function(p) {
+          var selected = todo.projectId === p.id ? ' selected' : '';
+          html += '<option value="' + p.id + '"' + selected + '>' + (p.name || 'Untitled') + '</option>';
+        });
+        projectSelect.innerHTML = html;
+      }).catch(function() {
+        projectSelect.innerHTML = '<option value="">None</option>';
+      });
+    } else if (projectSelect) {
+      projectSelect.innerHTML = '<option value="">None</option>';
+    }
+
+    var saveBtn = ref('save');
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Changes';
+    }
+
+    // More section — auto-expand if notes or AI suggestions exist
+    _moreExpanded = false;
+    if ((todo.notes || '').trim()) {
+      _moreExpanded = true;
+    }
+    var moreContent = ref('more-content');
+    var moreArrow = ref('more-arrow');
+    if (moreContent) moreContent.style.display = _moreExpanded ? '' : 'none';
+    if (moreArrow) moreArrow.classList.toggle('expanded', _moreExpanded);
+
+    // Generate AI suggestions
+    generateAiSuggestions(todo);
+
+    // Initialize sharing section
+    initSharingSection(todo);
+
+    // Load existing categories, then focus title
+    loadExistingCategories().then(function() {
       autoGrowTitle();
+      setTimeout(function() {
+        if (titleEl) { titleEl.focus(); titleEl.select(); }
+      }, 50);
+    }).catch(function() {
+      autoGrowTitle();
+      setTimeout(function() {
+        if (titleEl) { titleEl.focus(); titleEl.select(); }
+      }, 50);
+    });
+
+    // Scroll panel into view
+    setTimeout(function() {
+      if (_panelEl) {
+        _panelEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 100);
+
+    // Attach document-level listeners
+    document.addEventListener('click', onDocumentClick, true);
+    document.addEventListener('keydown', onDocumentKeydown);
+  }
+
+  // ─── Close panel ───
+
+  function closePanel() {
+    // Remove document-level listeners
+    document.removeEventListener('click', onDocumentClick, true);
+    document.removeEventListener('keydown', onDocumentKeydown);
+
+    // Remove anchor styling
+    if (_anchorEl) {
+      _anchorEl.classList.remove('todo-edit-anchor-active');
+      _anchorEl = null;
     }
-  });
+
+    // Remove panel from DOM
+    if (_panelEl && _panelEl.parentNode) {
+      _panelEl.parentNode.removeChild(_panelEl);
+    }
+    _panelEl = null;
+
+    // Clean up state
+    clearTimeout(_shareFeedbackTimer);
+    _currentTodo = null;
+    _onSaveCallback = null;
+    _categories = [];
+    _dropdownActiveIdx = -1;
+    _dropdownJustClosed = false;
+    _moreExpanded = false;
+    $ = {};
+  }
 
   // ─── Public API ───
   window.dmTodoEdit = {
-    open: openModal,
-    close: closeModal
+    open: openPanel,
+    close: closePanel
   };
 })();
 </script>

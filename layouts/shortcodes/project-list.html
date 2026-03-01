@@ -1635,14 +1635,14 @@
         });
       });
 
-      // Click on task row to open edit modal
+      // Click on task row to open inline edit panel
       taskListEl.querySelectorAll('.project-task-item[data-todo-id]').forEach(function(row) {
         row.style.cursor = 'pointer';
         row.addEventListener('click', function(e) {
           // Don't trigger if clicking checkbox or buttons
           if (e.target.closest('input, button, .project-task-checkbox')) return;
           var todoId = row.getAttribute('data-todo-id');
-          openEditForTodo(todoId);
+          openEditForTodo(todoId, row);
         });
       });
 
@@ -1657,11 +1657,11 @@
     });
   }
 
-  // ─── Edit Task via Modal ───
-  function openEditForTodo(todoId) {
+  // ─── Edit Task via Inline Panel ───
+  function openEditForTodo(todoId, anchorEl) {
     window.dmSync.getTodo(todoId).then(function(todo) {
       if (!todo || !window.dmTodoEdit) return;
-      window.dmTodoEdit.open(todo, function(result) {
+      function onEditSave(result) {
         if (!result) return;
 
         // Build diff of changed fields for both Firestore and local
@@ -1731,7 +1731,8 @@
           renderDetail(_currentProjectId);
           loadTodoCounts().then(function() { renderList(); });
         });
-      });
+      }
+      window.dmTodoEdit.open(todo, onEditSave, anchorEl);
     });
   }
 

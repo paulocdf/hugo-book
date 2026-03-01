@@ -4474,11 +4474,11 @@
       });
     });
 
-    // Shared edit handler — opens the edit modal for a given todo ID
-    function openEditForTodo(todoId) {
+    // Shared edit handler — opens the inline edit panel for a given todo ID
+    function openEditForTodo(todoId, anchorEl) {
       var todo = allTodos.find(function(t) { return t.id === todoId; });
       if (!todo || !window.dmTodoEdit) return;
-      window.dmTodoEdit.open(todo, function(result) {
+      function onEditSave(result) {
         if (!result) return;
         var firestoreUpdates = {};
         var localUpdates = {};
@@ -4586,14 +4586,16 @@
           updateTodoField(todoId, firestoreUpdates, localUpdates);
           render();
         }
-      });
+      }
+      window.dmTodoEdit.open(todo, onEditSave, anchorEl);
     }
 
     // Edit button
     itemsEl.querySelectorAll('[data-edit-id]').forEach(function(btn) {
       btn.addEventListener('click', function(e) {
         e.stopPropagation();
-        openEditForTodo(btn.getAttribute('data-edit-id'));
+        var row = btn.closest('.todo-item');
+        openEditForTodo(btn.getAttribute('data-edit-id'), row);
       });
     });
 
@@ -4603,7 +4605,7 @@
         // Don't trigger if double-clicking on checkbox, buttons, or links
         if (e.target.closest('input, button, a, .todo-drag-handle')) return;
         e.preventDefault();
-        openEditForTodo(item.getAttribute('data-todo-id'));
+        openEditForTodo(item.getAttribute('data-todo-id'), item);
       });
     });
 

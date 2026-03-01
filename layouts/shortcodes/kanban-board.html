@@ -994,7 +994,7 @@
     // Set up click handlers on cards
     container.querySelectorAll('.kanban-card').forEach(function(card) {
       card.addEventListener('click', function(e) {
-        // Don't open edit modal if user is dragging
+        // Don't open edit panel if user is dragging
         if (card.classList.contains('sortable-chosen')) return;
         var todoId = card.getAttribute('data-todo-id');
         var todo = allTodos.find(function(t) { return t.id === todoId; });
@@ -1002,7 +1002,7 @@
           window.dmTodoEdit.open(todo, function(result) {
             if (!result) return;
             applyEditResult(todo, result);
-          });
+          }, card);
         }
       });
     });
@@ -1712,11 +1712,12 @@
       if (!_focusedCardId) return;
       var todo = allTodos.find(function(t) { return t.id === _focusedCardId; });
       if (todo && window.dmTodoEdit) {
+        var focusedCard = container.querySelector('.kanban-card[data-todo-id="' + _focusedCardId + '"]');
         window.dmTodoEdit.open(todo, function(result) {
           if (result) {
             applyEditResult(todo, result);
           }
-        });
+        }, focusedCard);
       }
     } else if (e.key === 'n') {
       e.preventDefault();
