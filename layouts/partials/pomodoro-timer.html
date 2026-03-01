@@ -3184,37 +3184,44 @@
 
     if (!todoId) return;
 
-    // Find the next task BEFORE closing (dmTodoList needs the current task context)
+    // Helper: complete current task and optionally advance to next
+    function _completeAndAdvance(nextTodo) {
+      // Close the timer (records time via dm-pomodoro-stopped)
+      closeTimer();
+
+      // Dispatch completion event for instant completion with undo toast
+      window.dispatchEvent(new CustomEvent('dm-pomodoro-completed', {
+        detail: {
+          todoId: todoId,
+          trackedMinutes: mins > 0 ? mins : null,
+          category: todoCategory || null,
+          projectId: todoProjectId || null
+        }
+      }));
+
+      // Auto-advance to next task, or just stay closed
+      if (nextTodo) {
+        // Small delay to let the completion event process and render
+        setTimeout(function() {
+          window.dmPomodoro.start(nextTodo.id, nextTodo.title);
+        }, 100);
+      }
+    }
+
+    // If working on a project task, use self-contained async lookup
+    if (todoProjectId) {
+      _findNextProjectTasks(todoId, todoProjectId, 1).then(function(tasks) {
+        _completeAndAdvance(tasks.length ? tasks[0] : null);
+      });
+      return;
+    }
+
+    // No project — use dmTodoList day-group lookup (sync, inbox page only)
     var nextTodo = null;
-    if (window.dmTodoList) {
-      // If working on a project task, advance within the project
-      if (todoProjectId && window.dmTodoList.getNextProjectTask) {
-        nextTodo = window.dmTodoList.getNextProjectTask(todoId, todoProjectId);
-      } else if (window.dmTodoList.getNextTask) {
-        nextTodo = window.dmTodoList.getNextTask(todoId);
-      }
+    if (window.dmTodoList && window.dmTodoList.getNextTask) {
+      nextTodo = window.dmTodoList.getNextTask(todoId);
     }
-
-    // Close the timer (records time via dm-pomodoro-stopped)
-    closeTimer();
-
-    // Dispatch completion event for instant completion with undo toast
-    window.dispatchEvent(new CustomEvent('dm-pomodoro-completed', {
-      detail: {
-        todoId: todoId,
-        trackedMinutes: mins > 0 ? mins : null,
-        category: todoCategory || null,
-        projectId: todoProjectId || null
-      }
-    }));
-
-    // Auto-advance to next task, or just stay closed
-    if (nextTodo) {
-      // Small delay to let the completion event process and render
-      setTimeout(function() {
-        window.dmPomodoro.start(nextTodo.id, nextTodo.title);
-      }, 100);
-    }
+    _completeAndAdvance(nextTodo);
   }
 
   // ── Button handlers ──
@@ -3325,35 +3332,95 @@
     }
   }
 
+  // ── Self-contained project task lookup (works on any page) ──
+  // Queries dmSync.getAllTodos() directly so the timer doesn't depend on
+  // window.dmTodoList (which only exists on the inbox page).
+  function _findNextProjectTasks(currentTodoId, projectId, count) {
+    if (!currentTodoId || !projectId || !window.dmSync || !window.dmSync.getAllTodos) {
+      return Promise.resolve([]);
+    }
+    return window.dmSync.getAllTodos().then(function(allTodos) {
+      // Collect top-level project tasks
+      var parents = allTodos.filter(function(t) {
+        if (t.projectId !== projectId) return false;
+        var s = t.status || 'active';
+        if (s !== 'active' && s !== 'done') return false;
+        if (t.deletedAt) return false;
+        if (t.parentId) return false;
+        if (t.bujoType && t.bujoType !== 'task') return false;
+        return true;
+      });
+      // Sort: undone first, then by order
+      parents.sort(function(a, b) {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        return (a.order || 0) - (b.order || 0);
+      });
+      // Interleave undone subtasks after each parent
+      var ordered = [];
+      parents.forEach(function(p) {
+        ordered.push(p);
+        var children = allTodos.filter(function(t) {
+          return t.parentId === p.id && !t.done && !t.deletedAt && (t.bujoType === 'task' || !t.bujoType);
+        });
+        children.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+        children.forEach(function(c) { ordered.push(c); });
+      });
+      // Find current position
+      var idx = -1;
+      for (var i = 0; i < ordered.length; i++) {
+        if (ordered[i].id === currentTodoId) { idx = i; break; }
+      }
+      if (idx === -1) return [];
+      // Collect next undone tasks
+      var results = [];
+      for (var i = idx + 1; i < ordered.length; i++) {
+        if (!ordered[i].done) {
+          results.push({ id: ordered[i].id, title: ordered[i].title });
+          if (results.length >= count) break;
+        }
+      }
+      return results;
+    });
+  }
+
   // Render the Up Next task queue
   function updateUpNext() {
     if (!focusUpNextListEl || !focusUpNextStripEl) return;
-    if (!activeTodoId || !window.dmTodoList || !window.dmTodoList.getNextTasks) {
+    if (!activeTodoId) {
       focusUpNextStripEl.style.display = 'none';
       focusUpNextListEl.innerHTML = '';
       return;
     }
 
-    var tasks;
-    // If working on a project task, show next tasks from the same project
-    if (activeProjectId && window.dmTodoList.getNextProjectTasks) {
-      tasks = window.dmTodoList.getNextProjectTasks(activeTodoId, activeProjectId, 5);
-      // If no more project tasks, hide the strip (project is done)
-      if (!tasks || !tasks.length) {
-        focusUpNextStripEl.style.display = 'none';
-        focusUpNextListEl.innerHTML = '';
-        return;
-      }
-    } else {
-      // No project — fall back to same-day-group tasks
-      tasks = window.dmTodoList.getNextTasks(activeTodoId, 5);
-      if (!tasks || !tasks.length) {
-        focusUpNextStripEl.style.display = 'none';
-        focusUpNextListEl.innerHTML = '';
-        return;
-      }
+    // If working on a project task, use self-contained lookup (works on any page)
+    if (activeProjectId) {
+      _findNextProjectTasks(activeTodoId, activeProjectId, 5).then(function(tasks) {
+        if (!tasks || !tasks.length) {
+          focusUpNextStripEl.style.display = 'none';
+          focusUpNextListEl.innerHTML = '';
+          return;
+        }
+        _renderUpNextTasks(tasks);
+      });
+      return;
     }
 
+    // No project — use dmTodoList day-group lookup (inbox page only)
+    if (!window.dmTodoList || !window.dmTodoList.getNextTasks) {
+      focusUpNextStripEl.style.display = 'none';
+      focusUpNextListEl.innerHTML = '';
+      return;
+    }
+    var tasks = window.dmTodoList.getNextTasks(activeTodoId, 5);
+    if (!tasks || !tasks.length) {
+      focusUpNextStripEl.style.display = 'none';
+      focusUpNextListEl.innerHTML = '';
+      return;
+    }
+    _renderUpNextTasks(tasks);
+  }
+
+  function _renderUpNextTasks(tasks) {
     var html = '';
     tasks.forEach(function(t) {
       var escaped = t.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
