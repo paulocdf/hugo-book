@@ -931,6 +931,10 @@
 .pomodoro-focus-body.notes-collapsed .pomodoro-focus-notes-toggle-icon svg {
   transform: rotate(180deg);
 }
+/* When collapsed, push toggle icon flush to right edge */
+.pomodoro-focus-body.notes-collapsed .pomodoro-focus-notes-toggle-icon {
+  margin-left: auto;
+}
 /* Collapsed state — hide right column */
 .pomodoro-focus-body.notes-collapsed .pomodoro-focus-right {
   display: none;
@@ -1853,6 +1857,13 @@
     // Update focus-mode panels
     if (isFocusMode) {
       renderSessionTimeline();
+    }
+
+    // Always sync play/pause icon to actual timer state
+    if (isRunning) {
+      showPauseIcon();
+    } else {
+      showPlayIcon();
     }
   }
 
