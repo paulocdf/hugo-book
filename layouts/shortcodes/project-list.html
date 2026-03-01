@@ -319,6 +319,20 @@
   font-size: 0.95rem;
   font-weight: 600;
 }
+.project-done-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: var(--body-background);
+  color: var(--gray-500);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.project-done-toggle:hover { background: var(--gray-100); }
 .project-task-item {
   display: flex;
   align-items: center;
@@ -1151,6 +1165,7 @@
     </div>
     <div class="project-tasks-header">
       <h3>Tasks</h3>
+      <button class="project-done-toggle" id="project-done-toggle" type="button"></button>
     </div>
     <!-- Add task form (mirrors Inbox pattern, projectId set automatically) -->
     <div class="pj-add-form" id="pj-add-form">
@@ -1329,6 +1344,7 @@
   var _selectedColor = COLORS[0].light;
   var _todoCounts = {}; // projectId -> { total, done }
   var _projectSortable = null; // SortableJS instance for project task list
+  var _hideDone = localStorage.getItem('dm-project-hide-done') !== 'false'; // default: true (hidden)
 
   // ─── DOM refs ───
   var authEl = document.getElementById('project-auth');
@@ -1388,6 +1404,11 @@
     // Button handlers
     document.getElementById('project-add-btn').addEventListener('click', function() { openModal(null); });
     document.getElementById('project-archive-toggle').addEventListener('click', toggleArchived);
+    document.getElementById('project-done-toggle').addEventListener('click', function() {
+      _hideDone = !_hideDone;
+      localStorage.setItem('dm-project-hide-done', _hideDone ? 'true' : 'false');
+      if (_currentProjectId) renderDetail(_currentProjectId);
+    });
     document.getElementById('project-detail-back').addEventListener('click', showList);
     document.getElementById('project-edit-btn').addEventListener('click', function() { openModal(_currentProjectId); });
     document.getElementById('project-archive-btn').addEventListener('click', handleArchiveToggle);
@@ -1553,11 +1574,23 @@
       document.getElementById('project-progress-label').textContent = done + ' of ' + total + ' tasks done (' + pct + '%)';
       document.getElementById('project-progress').style.display = total > 0 ? '' : 'none';
 
+      // Toggle button label
+      var toggleBtn = document.getElementById('project-done-toggle');
+      if (done > 0) {
+        toggleBtn.style.display = '';
+        toggleBtn.textContent = _hideDone ? 'Show completed (' + done + ')' : 'Hide completed';
+      } else {
+        toggleBtn.style.display = 'none';
+      }
+
+      // Filter done tasks if hidden
+      var visibleTodos = _hideDone ? todos.filter(function(t) { return !t.done; }) : todos;
+
       // Task list
       var taskListEl = document.getElementById('project-task-list');
       var tasksEmpty = document.getElementById('project-tasks-empty');
 
-      if (!todos.length) {
+      if (!visibleTodos.length) {
         taskListEl.innerHTML = '';
         tasksEmpty.style.display = '';
         return;
@@ -1565,7 +1598,7 @@
       tasksEmpty.style.display = 'none';
 
       var html = '';
-      todos.forEach(function(t) {
+      visibleTodos.forEach(function(t) {
         var doneClass = t.done ? ' checked' : '';
         var titleClass = t.done ? ' done' : '';
         var bujoType = (t.bujoType || 'task');
@@ -3011,7 +3044,8 @@
   window._pjTest = {
     setProjects: function(projects) { _projects = projects; },
     showDetail: showDetail,
-    renderDetail: renderDetail
+    renderDetail: renderDetail,
+    setHideDone: function(val) { _hideDone = val; }
   };
 
   // ─── Bootstrap ───
