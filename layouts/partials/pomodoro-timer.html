@@ -3186,8 +3186,13 @@
 
     // Find the next task BEFORE closing (dmTodoList needs the current task context)
     var nextTodo = null;
-    if (window.dmTodoList && window.dmTodoList.getNextTask) {
-      nextTodo = window.dmTodoList.getNextTask(todoId);
+    if (window.dmTodoList) {
+      // If working on a project task, advance within the project
+      if (todoProjectId && window.dmTodoList.getNextProjectTask) {
+        nextTodo = window.dmTodoList.getNextProjectTask(todoId, todoProjectId);
+      } else if (window.dmTodoList.getNextTask) {
+        nextTodo = window.dmTodoList.getNextTask(todoId);
+      }
     }
 
     // Close the timer (records time via dm-pomodoro-stopped)

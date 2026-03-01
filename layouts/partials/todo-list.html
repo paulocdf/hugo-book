@@ -6701,6 +6701,17 @@
     },
 
     /**
+     * getNextProjectTask(currentTodoId, projectId)
+     * Returns the next undone task in the same project, after the given task.
+     * Sorted by order field only (ignores scheduledDate).
+     * Returns { id: string, title: string } or null if no next task.
+     */
+    getNextProjectTask: function(currentTodoId, projectId) {
+      var tasks = _getOrderedNextProjectTasks(currentTodoId, projectId, 1);
+      return tasks.length ? tasks[0] : null;
+    },
+
+    /**
      * getNextProjectTasks(currentTodoId, projectId, count)
      * Returns up to `count` next undone tasks in the same project, after the given task.
      * Sorted by order field only (ignores scheduledDate). Returns array of { id, title }.
