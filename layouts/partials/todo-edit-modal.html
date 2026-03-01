@@ -1818,7 +1818,13 @@
   // ─── Open panel ───
 
   function openPanel(todo, onSave, anchorEl) {
-    // Close any existing panel first
+    // Toggle: if same task is already open, just close
+    if (_panelEl && _currentTodo && _currentTodo.id === todo.id) {
+      closePanel();
+      return;
+    }
+
+    // Close any existing panel first (different task)
     if (_panelEl) {
       closePanel();
     }
