@@ -4930,6 +4930,9 @@
 
       if (window.dmSync && window.dmSync.getTodo) {
         window.dmSync.getTodo(todoId).then(function(todo) {
+          // Resolve project fields BEFORE starting timer so activeProjectId
+          // is set when enterFocusMode() → updateUpNext() runs.
+          var projectReady = Promise.resolve();
           if (todo && activeTodoId === todoId) {
             if (todo.category) {
               categoryEl.textContent = todo.category;
@@ -4938,9 +4941,8 @@
               focusCategoryEl.style.display = '';
               activeTodoCategory = todo.category;
             }
-            // Populate project fields from task's projectId
             if (todo.projectId && window.dmSync && window.dmSync.getProject) {
-              window.dmSync.getProject(todo.projectId).then(function(proj) {
+              projectReady = window.dmSync.getProject(todo.projectId).then(function(proj) {
                 if (proj && activeTodoId === todoId) {
                   activeProjectId = proj.id;
                   activeProjectName = proj.name;
@@ -4971,9 +4973,12 @@
           } else {
             activeParentId = todoId;
           }
-          initAndStart();
-          // Load subtasks AFTER timer is visible so user sees them appear
-          loadSubtasks(activeParentId);
+          // Wait for project lookup to complete, then start timer
+          projectReady.then(function() {
+            initAndStart();
+            // Load subtasks AFTER timer is visible so user sees them appear
+            loadSubtasks(activeParentId);
+          });
         }).catch(function(err) {
           console.error('[pomo] getTodo error:', err);
           activeParentId = todoId;
