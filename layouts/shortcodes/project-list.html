@@ -1519,6 +1519,88 @@
           }
         });
       });
+
+      // Click on task row to open edit modal
+      taskListEl.querySelectorAll('.project-task-item[data-todo-id]').forEach(function(row) {
+        row.style.cursor = 'pointer';
+        row.addEventListener('click', function(e) {
+          // Don't trigger if clicking checkbox or buttons
+          if (e.target.closest('input, button, .project-task-checkbox')) return;
+          var todoId = row.getAttribute('data-todo-id');
+          openEditForTodo(todoId);
+        });
+      });
+    });
+  }
+
+  // ─── Edit Task via Modal ───
+  function openEditForTodo(todoId) {
+    window.dmSync.getTodo(todoId).then(function(todo) {
+      if (!todo || !window.dmTodoEdit) return;
+      window.dmTodoEdit.open(todo, function(result) {
+        if (!result) return;
+
+        // Apply all changed fields
+        var changed = false;
+        var origBujoState = todo.bujoState || 'open';
+        var fields = ['title', 'scheduledDate', 'estimatedMin', 'pomodoroCount',
+          'pomodoroLength', 'breakLength', 'category', 'projectId', 'bujoType', 'notes'];
+        fields.forEach(function(f) {
+          var newVal = result[f] !== undefined ? (result[f] || null) : undefined;
+          if (newVal === undefined) return;
+          var oldVal = todo[f] || null;
+          if (newVal !== oldVal) {
+            todo[f] = newVal;
+            changed = true;
+          }
+        });
+
+        // BuJo state — sync with done/status/kanban
+        var bujoChanged = result.bujoState && result.bujoState !== origBujoState;
+        if (bujoChanged) {
+          todo.bujoState = result.bujoState;
+          changed = true;
+          if (result.bujoState === 'done') {
+            todo.done = true;
+            todo.status = 'done';
+            todo.kanbanStatus = 'done';
+            todo.completedAt = Date.now();
+          } else if (result.bujoState === 'open') {
+            todo.done = false;
+            todo.status = 'active';
+            todo.kanbanStatus = 'todo';
+            todo.completedAt = null;
+          } else {
+            todo.done = false;
+            todo.status = 'active';
+            todo.kanbanStatus = 'todo';
+          }
+        }
+
+        // Kanban status (only if bujoState didn't already handle it)
+        if (!bujoChanged && result.kanbanStatus && result.kanbanStatus !== (todo.kanbanStatus || 'todo')) {
+          todo.kanbanStatus = result.kanbanStatus;
+          changed = true;
+          if (result.kanbanStatus === 'done') {
+            todo.done = true;
+            todo.status = 'done';
+            todo.bujoState = 'done';
+            todo.completedAt = Date.now();
+          } else if ((todo.kanbanStatus || 'todo') === 'done') {
+            todo.done = false;
+            todo.status = 'active';
+            todo.bujoState = 'open';
+            todo.completedAt = null;
+          }
+        }
+
+        if (!changed) return;
+        todo.updatedAt = Date.now();
+        window.dmSync.putTodo(todo).then(function() {
+          renderDetail(_currentProjectId);
+          loadTodoCounts().then(function() { renderList(); });
+        });
+      });
     });
   }
 
