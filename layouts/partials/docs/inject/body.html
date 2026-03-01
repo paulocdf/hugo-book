@@ -62,6 +62,24 @@
 })();
 </script>
 
+<!-- Sidebar collapse toggle -->
+<script>
+(function() {
+  var toggle = document.getElementById('sidebar-toggle');
+  if (!toggle) return;
+  // Restore collapsed state from localStorage on page load
+  try {
+    if (localStorage.getItem('dm-sidebar-collapsed') === '1') {
+      document.documentElement.classList.add('sidebar-collapsed');
+    }
+  } catch(e) {}
+  toggle.addEventListener('click', function() {
+    var collapsed = document.documentElement.classList.toggle('sidebar-collapsed');
+    localStorage.setItem('dm-sidebar-collapsed', collapsed ? '1' : '0');
+  });
+})();
+</script>
+
 <!-- ─── Pending Share Invitations UI ─── -->
 <div class="dm-invitations-banner" id="dm-invitations-banner"></div>
 
