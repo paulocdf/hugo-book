@@ -87,29 +87,13 @@
         </div>
 
         <div class="pomodoro-focus-subtasks" id="focus-subtasks" style="display:none;"></div>
-        <div class="pomodoro-focus-info" id="focus-info" style="display:none;">
-          <span id="focus-started-at"></span>
-          <span id="focus-remaining"></span>
-          <span id="focus-est-finish"></span>
-        </div>
+        <div class="pomodoro-focus-inline-stats" id="focus-inline-stats"></div>
       </div>
 
-      <!-- Right column: contextual panels -->
+      <!-- Right column: notes -->
       <div class="pomodoro-focus-right">
-        <!-- Task details panel -->
-        <div class="pomodoro-focus-panel" id="focus-panel-details">
-          <div class="pomodoro-focus-panel-label">Task Details</div>
-          <div class="pomodoro-focus-details-grid" id="focus-details-grid"></div>
-        </div>
-
-        <!-- Today's stats panel -->
-        <div class="pomodoro-focus-panel" id="focus-panel-stats">
-          <div class="pomodoro-focus-panel-label">Today</div>
-          <div class="pomodoro-focus-stats-grid" id="focus-stats-grid"></div>
-        </div>
-
         <!-- Notes panel -->
-        <div class="pomodoro-focus-panel pomodoro-focus-notes-panel" id="focus-panel-notes">
+        <div class="pomodoro-focus-notes-panel" id="focus-panel-notes">
           <div class="pomodoro-focus-panel-label">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
             Notes
@@ -775,33 +759,21 @@
 .pomodoro-focus-subtasks .pomo-subtask-est {
   font-size: 0.64rem;
 }
-/* Focus info section */
-.pomodoro-focus-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  margin-top: 12px;
-  padding-top: 12px;
-  border-top: 1px solid var(--gray-200);
-  font-size: 0.74rem;
+/* Inline stats (left column) */
+.pomodoro-focus-inline-stats {
+  text-align: center;
+  font-size: 0.76rem;
   color: var(--text-faint);
-  line-height: 1.4;
+  margin-top: 10px;
+  line-height: 1.6;
   width: 100%;
-  max-width: 360px;
+  max-width: 450px;
 }
-.pomodoro-focus-info span::before {
-  display: inline-block;
-  width: 56px;
-  font-weight: 600;
-  color: var(--gray-400);
+.pomodoro-focus-inline-stats .stat-sep {
+  margin: 0 5px;
+  color: var(--gray-300);
 }
-#focus-started-at::before { content: 'Started'; }
-#focus-remaining::before { content: 'Left'; }
-#focus-est-finish::before { content: 'Finish'; }
 /* Right-column panels */
-.pomodoro-focus-panel {
-  padding: 0;
-}
 .pomodoro-focus-panel-label {
   font-size: 0.68rem;
   font-weight: 700;
@@ -809,58 +781,6 @@
   letter-spacing: 0.06em;
   color: var(--gray-400);
   margin-bottom: 8px;
-}
-/* Task details grid */
-.pomodoro-focus-details-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.pomodoro-focus-detail-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.76rem;
-  line-height: 1.4;
-}
-.pomodoro-focus-detail-label {
-  color: var(--gray-400);
-  font-weight: 500;
-}
-.pomodoro-focus-detail-value {
-  color: var(--body-font-color);
-  font-weight: 600;
-  text-align: right;
-  max-width: 140px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-/* Today's stats grid */
-.pomodoro-focus-stats-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
-}
-.pomodoro-focus-stat-card {
-  background: var(--gray-100);
-  border-radius: 8px;
-  padding: 10px;
-  text-align: center;
-}
-.pomodoro-focus-stat-value {
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--body-font-color);
-  line-height: 1.2;
-}
-.pomodoro-focus-stat-label {
-  font-size: 0.62rem;
-  color: var(--gray-400);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin-top: 2px;
 }
 /* Up Next footer strip */
 .pomodoro-focus-upnext-strip {
@@ -935,19 +855,7 @@
     padding-left: 0;
     border-top: 1px solid var(--gray-200);
     padding-top: 14px;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 12px;
     overflow-y: visible;
-  }
-  .pomodoro-focus-right .pomodoro-focus-panel {
-    flex: 1;
-    min-width: 140px;
-  }
-  .pomodoro-focus-notes-panel {
-    width: 100%;
-    flex: none;
-    min-height: 100px;
   }
   .pomodoro-focus-notes-textarea {
     min-height: 80px;
@@ -997,9 +905,6 @@
   }
   .pomodoro-focus-display {
     font-size: 4.2rem;
-  }
-  .pomodoro-focus-stats-grid {
-    grid-template-columns: 1fr 1fr;
   }
   .pomodoro-focus-notes-panel {
     flex: none;
@@ -1129,17 +1034,12 @@
   var focusResetBtn = document.getElementById('focus-reset');
   var focusNextBtn = document.getElementById('focus-next');
   var focusSessionEl = document.getElementById('focus-session');
-  var focusInfoEl = document.getElementById('focus-info');
-  var focusStartedAtEl = document.getElementById('focus-started-at');
-  var focusRemainingEl = document.getElementById('focus-remaining');
-  var focusEstFinishEl = document.getElementById('focus-est-finish');
   var focusSubtasksEl = document.getElementById('focus-subtasks');
+  var focusInlineStatsEl = document.getElementById('focus-inline-stats');
 
-  // Focus overlay — new panels
+  // Focus overlay — panels
   var focusTimelineEl = document.getElementById('focus-timeline');
   var focusTimelineBlocksEl = document.getElementById('focus-timeline-blocks');
-  var focusDetailsGridEl = document.getElementById('focus-details-grid');
-  var focusStatsGridEl = document.getElementById('focus-stats-grid');
   var focusUpNextListEl = document.getElementById('focus-upnext-list');
   var focusUpNextStripEl = document.getElementById('focus-panel-upnext');
   var focusNotesTextarea = document.getElementById('focus-notes-textarea');
@@ -1391,11 +1291,9 @@
     // Update info section
     if (startedAt) {
       infoEl.style.display = '';
-      focusInfoEl.style.display = '';
       var startDate = new Date(startedAt);
       var startedText = padTime(startDate.getHours()) + ':' + padTime(startDate.getMinutes());
       startedAtEl.textContent = startedText;
-      focusStartedAtEl.textContent = startedText;
 
       // Calculate total remaining seconds across all sessions
       var remainingSec = secondsLeft;
@@ -1420,14 +1318,12 @@
         remText = remMin + 'm';
       }
       remainingEl.textContent = remText;
-      focusRemainingEl.textContent = remText;
 
       var finishMs = Date.now() + remainingSec * 1000;
       var finishDate = new Date(finishMs);
       var finishHrs = (remainingSec / 3600).toFixed(1);
       var finishText = '~' + padTime(finishDate.getHours()) + ':' + padTime(finishDate.getMinutes()) + ' (' + finishHrs + 'h)';
       estFinishEl.textContent = finishText;
-      focusEstFinishEl.textContent = finishText;
     }
 
     // Update document title while running
@@ -2266,9 +2162,9 @@
     updateDisplay();
     // Persist every 5 seconds to avoid excessive writes
     if (secondsLeft % 5 === 0) saveState();
-    // Refresh today's stats and up next queue every 60 seconds in focus mode
+    // Refresh inline stats and up next queue every 60 seconds in focus mode
     if (isFocusMode && secondsLeft % 60 === 0) {
-      renderTodayStats();
+      updateInlineStats();
       updateUpNext();
     }
   }
@@ -2802,136 +2698,69 @@
     focusTimelineBlocksEl.innerHTML = html;
   }
 
-  // Render task details panel from todo object
-  function renderTaskDetails(todo) {
-    if (!todo) {
-      focusDetailsGridEl.innerHTML = '<div style="font-size:0.72rem;color:var(--gray-400);">No details available</div>';
-      return;
-    }
-    var rows = [];
-    // Estimated duration
-    if (todo.estimatedMin && todo.estimatedMin > 0) {
-      var estText = todo.estimatedMin >= 60
-        ? Math.floor(todo.estimatedMin / 60) + 'h ' + (todo.estimatedMin % 60) + 'm'
-        : todo.estimatedMin + 'm';
-      rows.push({ label: 'Estimated', value: estText });
-    }
-    // Actual tracked
-    if (todo.actualMin && todo.actualMin > 0) {
-      var actText = todo.actualMin >= 60
-        ? Math.floor(todo.actualMin / 60) + 'h ' + (todo.actualMin % 60) + 'm'
-        : todo.actualMin + 'm';
-      rows.push({ label: 'Tracked', value: actText });
-    }
-    // Pomodoro config
-    var pomoLen = todo.pomodoroLength || Math.round(WORK_SECONDS / 60);
-    var breakLen = todo.breakLength || Math.round(BREAK_SECONDS / 60);
-    rows.push({ label: 'Work / Break', value: pomoLen + 'm / ' + breakLen + 'm' });
-    if (totalSessions > 1) {
-      rows.push({ label: 'Sessions', value: sessionCount + ' / ' + totalSessions });
-    }
-    // Scheduled date
-    if (todo.scheduledDate) {
-      var d = todo.scheduledDate;
-      var today = new Date();
-      var todayStr = today.getFullYear() + '-' + padTime(today.getMonth() + 1) + '-' + padTime(today.getDate());
-      rows.push({ label: 'Scheduled', value: d === todayStr ? 'Today' : d });
-    }
-    // Category
-    if (todo.category) {
-      rows.push({ label: 'Category', value: todo.category });
-    }
-    // BuJo type
-    if (todo.bujoType && todo.bujoType !== 'task') {
-      rows.push({ label: 'Type', value: todo.bujoType.charAt(0).toUpperCase() + todo.bujoType.slice(1) });
+  // Render inline stats row in left column
+  var _inlineStatsTodo = null;
+  function updateInlineStats(todo) {
+    if (!focusInlineStatsEl) return;
+    if (todo !== undefined) _inlineStatsTodo = todo;
+    var sep = '<span class="stat-sep">\u00b7</span>';
+    var parts = [];
+
+    // Tracked time for current task
+    var trackedMin = (_inlineStatsTodo && _inlineStatsTodo.actualMin) || 0;
+    // Add current session's accumulated work
+    var currentSec = accumulatedWorkSeconds;
+    if (phase === 'work') currentSec += (totalPhaseSeconds - secondsLeft);
+    if (currentSec > 0) trackedMin += Math.round(currentSec / 60);
+    if (trackedMin > 0) {
+      var tText = trackedMin >= 60
+        ? Math.floor(trackedMin / 60) + 'h ' + (trackedMin % 60) + 'm'
+        : trackedMin + 'm';
+      parts.push(tText + ' tracked');
     }
 
-    var html = '';
-    rows.forEach(function(r) {
-      html += '<div class="pomodoro-focus-detail-row">'
-        + '<span class="pomodoro-focus-detail-label">' + r.label + '</span>'
-        + '<span class="pomodoro-focus-detail-value">' + r.value + '</span>'
-        + '</div>';
-    });
-    focusDetailsGridEl.innerHTML = html || '<div style="font-size:0.72rem;color:var(--gray-400);">No details</div>';
-  }
-
-  // Compute and render today's stats
-  function renderTodayStats() {
-    if (!window.dmSync || !window.dmSync.getAllTodos) {
-      focusStatsGridEl.innerHTML = '';
-      return;
+    // Estimated time
+    if (_inlineStatsTodo && _inlineStatsTodo.estimatedMin && _inlineStatsTodo.estimatedMin > 0) {
+      var eText = _inlineStatsTodo.estimatedMin >= 60
+        ? Math.floor(_inlineStatsTodo.estimatedMin / 60) + 'h ' + (_inlineStatsTodo.estimatedMin % 60) + 'm'
+        : _inlineStatsTodo.estimatedMin + 'm';
+      parts.push(eText + ' est.');
     }
-    window.dmSync.getAllTodos().then(function(todos) {
-      var today = new Date();
-      var todayStr = today.getFullYear() + '-' + padTime(today.getMonth() + 1) + '-' + padTime(today.getDate());
-      var todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
 
-      var completedToday = 0;
-      var totalTrackedMin = 0;
-      var totalEstMin = 0;
-      var activeCount = 0;
+    // Started at
+    if (startedAt) {
+      var sd = new Date(startedAt);
+      parts.push('Started ' + padTime(sd.getHours()) + ':' + padTime(sd.getMinutes()));
 
-      todos.forEach(function(t) {
-        // Only top-level tasks (not subtasks)
-        if (t.parentId) return;
-        // Completed today
-        if (t.done && t.completedAt && t.completedAt >= todayStart) {
-          completedToday++;
-        }
-        // Active tasks scheduled today or with no date
-        if (t.status === 'active' && (t.scheduledDate === todayStr || !t.scheduledDate)) {
-          activeCount++;
-        }
-        // Tracked time from actual minutes — completed today
-        if (t.actualMin && t.actualMin > 0 && t.completedAt && t.completedAt >= todayStart) {
-          totalTrackedMin += t.actualMin;
-        }
-        // Estimated minutes for today's active tasks
-        if (t.status === 'active' && t.scheduledDate === todayStr && t.estimatedMin) {
-          totalEstMin += t.estimatedMin;
-        }
+      // Est. finish
+      var remainingSec = secondsLeft;
+      var sessionsLeft = totalSessions - sessionCount;
+      remainingSec += sessionsLeft * (WORK_SECONDS + BREAK_SECONDS);
+      remainingSec += subtaskRemainingMin * 60;
+      var finishMs = Date.now() + remainingSec * 1000;
+      var fd = new Date(finishMs);
+      parts.push('~' + padTime(fd.getHours()) + ':' + padTime(fd.getMinutes()));
+    }
+
+    // Done today count (async)
+    if (window.dmSync && window.dmSync.getAllTodos) {
+      var staticParts = parts.slice();
+      window.dmSync.getAllTodos().then(function(todos) {
+        var todayStart = new Date();
+        todayStart = new Date(todayStart.getFullYear(), todayStart.getMonth(), todayStart.getDate()).getTime();
+        var doneCount = 0;
+        todos.forEach(function(t) {
+          if (t.parentId) return;
+          if (t.done && t.completedAt && t.completedAt >= todayStart) doneCount++;
+        });
+        if (doneCount > 0) staticParts.push(doneCount + ' done today');
+        focusInlineStatsEl.innerHTML = staticParts.join(sep);
+      }).catch(function() {
+        focusInlineStatsEl.innerHTML = parts.join(sep);
       });
-
-      // Add current session tracked time
-      if (accumulatedWorkSeconds > 0 || (phase === 'work' && totalPhaseSeconds > secondsLeft)) {
-        var currentSec = accumulatedWorkSeconds;
-        if (phase === 'work') currentSec += (totalPhaseSeconds - secondsLeft);
-        totalTrackedMin += Math.round(currentSec / 60);
-      }
-
-      // Also check localStorage tracked data
-      try {
-        var tracked = JSON.parse(localStorage.getItem(TRACKED_KEY) || '{}');
-        for (var tid in tracked) {
-          if (tracked.hasOwnProperty(tid)) {
-            // Only add if we haven't already counted via actualMin
-            // (tracked data is for current/recent sessions not yet saved to actualMin)
-          }
-        }
-      } catch(e) {}
-
-      var formatMin = function(m) {
-        if (m >= 60) return Math.floor(m / 60) + 'h ' + (m % 60) + 'm';
-        return m + 'm';
-      };
-
-      var html = '<div class="pomodoro-focus-stat-card">'
-        + '<div class="pomodoro-focus-stat-value">' + completedToday + '</div>'
-        + '<div class="pomodoro-focus-stat-label">Done</div></div>'
-        + '<div class="pomodoro-focus-stat-card">'
-        + '<div class="pomodoro-focus-stat-value">' + activeCount + '</div>'
-        + '<div class="pomodoro-focus-stat-label">Active</div></div>'
-        + '<div class="pomodoro-focus-stat-card">'
-        + '<div class="pomodoro-focus-stat-value">' + formatMin(totalTrackedMin) + '</div>'
-        + '<div class="pomodoro-focus-stat-label">Tracked</div></div>'
-        + '<div class="pomodoro-focus-stat-card">'
-        + '<div class="pomodoro-focus-stat-value">' + formatMin(totalEstMin) + '</div>'
-        + '<div class="pomodoro-focus-stat-label">Planned</div></div>';
-      focusStatsGridEl.innerHTML = html;
-    }).catch(function() {
-      focusStatsGridEl.innerHTML = '';
-    });
+    } else {
+      focusInlineStatsEl.innerHTML = parts.join(sep);
+    }
   }
 
   // Render the Up Next task queue
@@ -3209,26 +3038,23 @@
     // Start visualizer
     vizStart();
 
-    // Load task details and notes from IDB
+    // Load notes and inline stats from IDB
     if (window.dmSync && window.dmSync.getTodo && activeTodoId) {
       window.dmSync.getTodo(activeTodoId).then(function(todo) {
-        renderTaskDetails(todo);
+        updateInlineStats(todo);
         // Populate notes
         _focusNotesOriginal = (todo && todo.notes) || '';
         focusNotesTextarea.value = _focusNotesOriginal;
       }).catch(function() {
-        renderTaskDetails(null);
+        updateInlineStats(null);
         _focusNotesOriginal = '';
         focusNotesTextarea.value = '';
       });
     } else {
-      renderTaskDetails(null);
+      updateInlineStats(null);
       _focusNotesOriginal = '';
       focusNotesTextarea.value = '';
     }
-
-    // Load today's stats
-    renderTodayStats();
 
     // Load up next queue
     updateUpNext();
@@ -3306,21 +3132,21 @@
       _focusNotesTimer = null;
     }
     saveFocusNotes();
-    // Load notes and task details for the new task
+    // Load notes and inline stats for the new task
     if (window.dmSync && window.dmSync.getTodo && newTodoId) {
       window.dmSync.getTodo(newTodoId).then(function(todo) {
         _focusNotesOriginal = (todo && todo.notes) || '';
         focusNotesTextarea.value = _focusNotesOriginal;
-        renderTaskDetails(todo);
+        updateInlineStats(todo);
       }).catch(function() {
         _focusNotesOriginal = '';
         focusNotesTextarea.value = '';
-        renderTaskDetails(null);
+        updateInlineStats(null);
       });
     } else {
       _focusNotesOriginal = '';
       focusNotesTextarea.value = '';
-      renderTaskDetails(null);
+      updateInlineStats(null);
     }
   }
 
@@ -3530,14 +3356,13 @@
     infoEl.style.display = 'none';
     subtasksEl.innerHTML = '';
     subtasksEl.style.display = 'none';
-    focusInfoEl.style.display = 'none';
     focusSubtasksEl.innerHTML = '';
     focusSubtasksEl.style.display = 'none';
     // Clear focus panels
     focusTimelineEl.style.display = 'none';
     focusTimelineBlocksEl.innerHTML = '';
-    focusDetailsGridEl.innerHTML = '';
-    focusStatsGridEl.innerHTML = '';
+    focusInlineStatsEl.innerHTML = '';
+    _inlineStatsTodo = null;
     focusUpNextListEl.innerHTML = '';
     focusUpNextStripEl.style.display = 'none';
   }
@@ -4091,8 +3916,8 @@
       // Clear focus panels from previous run
       focusTimelineEl.style.display = 'none';
       focusTimelineBlocksEl.innerHTML = '';
-      focusDetailsGridEl.innerHTML = '';
-      focusStatsGridEl.innerHTML = '';
+      focusInlineStatsEl.innerHTML = '';
+      _inlineStatsTodo = null;
       focusUpNextListEl.innerHTML = '';
       focusUpNextStripEl.style.display = 'none';
       focusNotesTextarea.value = '';
