@@ -679,22 +679,73 @@
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.12);
   padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   animation: pj-popover-in 0.15s ease-out;
 }
-.pj-add-popover input[type="date"],
-.pj-add-popover input[type="datetime-local"] {
+.pj-add-popover-title {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 2px;
+}
+.pj-add-popover-shortcut {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
   border: 1px solid var(--gray-200);
   border-radius: 6px;
-  padding: 6px 8px;
-  font-size: 0.82rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pj-add-popover-shortcut:hover {
+  background: var(--gray-100);
+  border-color: var(--color-link);
+}
+.pj-add-popover-custom {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.pj-add-popover-input {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 0.75rem;
   background: var(--body-background);
   color: var(--body-font-color);
   font-family: inherit;
   outline: none;
 }
-.pj-add-popover input:focus {
+.pj-add-popover-input:focus {
   border-color: var(--color-link);
   box-shadow: 0 0 0 2px rgba(25,118,210,0.15);
+}
+.pj-add-popover-set {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-link);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--color-link);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.pj-add-popover-set:hover {
+  background: var(--color-link);
+  color: #fff;
 }
 
 /* ─── Modal ─── */
@@ -1445,11 +1496,38 @@
   var _pjCatChipText = document.getElementById('pj-add-category-chip-text');
   var _pjCatChipClear = document.getElementById('pj-add-category-chip-clear');
 
+  // ─── Date/Reminder helpers (mirrors inbox) ───
+  function pjGetTodayStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function pjGetDateOffset(offset) {
+    var d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function pjGetReminderMs(type) {
+    var now = new Date();
+    if (type === '30') return now.getTime() + 30 * 60 * 1000;
+    if (type === '60') return now.getTime() + 60 * 60 * 1000;
+    if (type === 'tomorrow9') {
+      var tmrw = new Date(now);
+      tmrw.setDate(tmrw.getDate() + 1);
+      tmrw.setHours(9, 0, 0, 0);
+      return tmrw.getTime();
+    }
+    return null;
+  }
+  var pjFormatDateChip = window.dmFormat ? window.dmFormat.dateChip : function(s) { return s; };
+
   // Add form state
   var _pjPomoCount = 1;
   var _pjPomoMode = 'short'; // 'short' | 'long'
   var _pjBujoType = 'task';
-  var _pjFormDate = null;
+  // Auto-schedule today (same setting as inbox)
+  var _pjAutoScheduleToday = true;
+  try { var _pjAst = localStorage.getItem('dm-auto-schedule-today'); if (_pjAst === 'false') _pjAutoScheduleToday = false; } catch(e) {}
+  var _pjFormDate = _pjAutoScheduleToday ? pjGetTodayStr() : null;
   var _pjReminderMs = null;
   var _pjCategory = null;
   var _pjCatPrompted = false;
@@ -1476,6 +1554,15 @@
     if (d.key === 'dm-pomo-long-work' && d.value > 0) _pjPomoLongWork = d.value;
     if (d.key === 'dm-pomo-long-break' && d.value > 0) _pjPomoLongBreak = d.value;
     if (d.key === 'dm-default-pomo-count') { _pjDefaultPomoCount = d.value; _pjPomoCount = d.value; pjUpdatePomoDisplay(); }
+    if (d.key === 'dm-auto-schedule-today') {
+      _pjAutoScheduleToday = !!d.value;
+      if (d.value) {
+        if (!_pjFormDate) { _pjFormDate = pjGetTodayStr(); pjUpdateDateChip(); }
+      } else {
+        _pjFormDate = null;
+        pjUpdateDateChip();
+      }
+    }
   });
 
   function pjUpdatePomoDisplay() {
@@ -1519,31 +1606,54 @@
     btn.classList.add('active');
   });
 
-  // Date popover
+  // Date popover (mirrors inbox: Today/Tomorrow shortcuts + custom date picker)
   var _pjDatePopover = null;
   function pjShowDatePopover() {
     pjCloseDatePopover();
     pjCloseReminderPopover();
     _pjDatePopover = document.createElement('div');
     _pjDatePopover.className = 'pj-add-popover';
-    _pjDatePopover.style.position = 'absolute';
-    _pjDatePopover.style.top = '100%';
-    _pjDatePopover.style.left = '0';
-    var inp = document.createElement('input');
-    inp.type = 'date';
-    inp.value = _pjFormDate || '';
-    _pjDatePopover.appendChild(inp);
+
+    var html = '<div class="pj-add-popover-title">Schedule</div>';
+    html += '<button type="button" class="pj-add-popover-shortcut" data-date-offset="0">Today</button>';
+    html += '<button type="button" class="pj-add-popover-shortcut" data-date-offset="1">Tomorrow</button>';
+    html += '<div class="pj-add-popover-custom">';
+    html += '<input type="date" class="pj-add-popover-input" value="' + (_pjFormDate || '') + '">';
+    html += '<button type="button" class="pj-add-popover-set" title="Set date">';
+    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    html += '</button>';
+    html += '</div>';
+
+    _pjDatePopover.innerHTML = html;
     _pjDateIcon.parentNode.style.position = 'relative';
     _pjDateIcon.parentNode.insertBefore(_pjDatePopover, _pjDateIcon.nextSibling);
-    inp.focus();
-    inp.addEventListener('change', function() {
-      _pjFormDate = inp.value || null;
+
+    // Shortcut buttons
+    _pjDatePopover.querySelectorAll('[data-date-offset]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var offset = parseInt(btn.getAttribute('data-date-offset'), 10);
+        _pjFormDate = pjGetDateOffset(offset);
+        pjUpdateDateChip();
+        pjCloseDatePopover();
+      });
+    });
+
+    // Custom date set
+    var customInput = _pjDatePopover.querySelector('.pj-add-popover-input');
+    var setBtn = _pjDatePopover.querySelector('.pj-add-popover-set');
+    setBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!customInput.value) return;
+      _pjFormDate = customInput.value;
       pjUpdateDateChip();
       pjCloseDatePopover();
     });
-    inp.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') pjCloseDatePopover();
+    customInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); setBtn.click(); }
     });
+
+    pjSetupPopoverDismiss(_pjDatePopover, 'date');
   }
   function pjCloseDatePopover() {
     if (_pjDatePopover && _pjDatePopover.parentNode) _pjDatePopover.parentNode.removeChild(_pjDatePopover);
@@ -1551,8 +1661,7 @@
   }
   function pjUpdateDateChip() {
     if (_pjFormDate) {
-      var d = new Date(_pjFormDate + 'T00:00:00');
-      _pjDateChipText.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      _pjDateChipText.textContent = pjFormatDateChip(_pjFormDate);
       _pjDateChip.style.display = '';
       _pjDateIcon.style.display = 'none';
     } else {
@@ -1570,39 +1679,68 @@
     _pjFormDate = null;
     pjUpdateDateChip();
   });
+  // Show initial date chip (auto-schedule today)
+  pjUpdateDateChip();
 
-  // Reminder popover
+  // Reminder popover (mirrors inbox: 30min/1hr/Tomorrow 9AM shortcuts + custom datetime picker)
   var _pjReminderPopover = null;
   function pjShowReminderPopover() {
     pjCloseReminderPopover();
     pjCloseDatePopover();
     _pjReminderPopover = document.createElement('div');
     _pjReminderPopover.className = 'pj-add-popover';
-    _pjReminderPopover.style.position = 'absolute';
-    _pjReminderPopover.style.top = '100%';
-    _pjReminderPopover.style.left = '0';
-    var inp = document.createElement('input');
-    inp.type = 'datetime-local';
+
+    var currentVal = '';
     if (_pjReminderMs) {
       var rd = new Date(_pjReminderMs);
-      inp.value = rd.getFullYear() + '-' + String(rd.getMonth()+1).padStart(2,'0') + '-' + String(rd.getDate()).padStart(2,'0') + 'T' + String(rd.getHours()).padStart(2,'0') + ':' + String(rd.getMinutes()).padStart(2,'0');
+      var pad = function(n) { return String(n).padStart(2, '0'); };
+      currentVal = rd.getFullYear() + '-' + pad(rd.getMonth()+1) + '-' + pad(rd.getDate()) + 'T' + pad(rd.getHours()) + ':' + pad(rd.getMinutes());
     }
-    _pjReminderPopover.appendChild(inp);
+
+    var html = '<div class="pj-add-popover-title">Remind me</div>';
+    html += '<button type="button" class="pj-add-popover-shortcut" data-rtype="30">In 30 minutes</button>';
+    html += '<button type="button" class="pj-add-popover-shortcut" data-rtype="60">In 1 hour</button>';
+    html += '<button type="button" class="pj-add-popover-shortcut" data-rtype="tomorrow9">Tomorrow 9 AM</button>';
+    html += '<div class="pj-add-popover-custom">';
+    html += '<input type="datetime-local" class="pj-add-popover-input" value="' + currentVal + '">';
+    html += '<button type="button" class="pj-add-popover-set" title="Set reminder">';
+    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+    html += '</button>';
+    html += '</div>';
+
+    _pjReminderPopover.innerHTML = html;
     _pjReminderIcon.parentNode.style.position = 'relative';
     _pjReminderIcon.parentNode.insertBefore(_pjReminderPopover, _pjReminderIcon.nextSibling);
-    inp.focus();
-    inp.addEventListener('change', function() {
-      if (inp.value) {
-        _pjReminderMs = new Date(inp.value).getTime();
-      } else {
-        _pjReminderMs = null;
-      }
+
+    // Shortcut buttons
+    _pjReminderPopover.querySelectorAll('[data-rtype]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var type = btn.getAttribute('data-rtype');
+        var ms = pjGetReminderMs(type);
+        if (ms) {
+          _pjReminderMs = ms;
+          pjUpdateReminderChip();
+          pjCloseReminderPopover();
+        }
+      });
+    });
+
+    // Custom datetime set
+    var customInput = _pjReminderPopover.querySelector('.pj-add-popover-input');
+    var setBtn = _pjReminderPopover.querySelector('.pj-add-popover-set');
+    setBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (!customInput.value) return;
+      _pjReminderMs = new Date(customInput.value).getTime();
       pjUpdateReminderChip();
       pjCloseReminderPopover();
     });
-    inp.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') pjCloseReminderPopover();
+    customInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); setBtn.click(); }
     });
+
+    pjSetupPopoverDismiss(_pjReminderPopover, 'reminder');
   }
   function pjCloseReminderPopover() {
     if (_pjReminderPopover && _pjReminderPopover.parentNode) _pjReminderPopover.parentNode.removeChild(_pjReminderPopover);
@@ -1618,6 +1756,30 @@
       _pjReminderChip.style.display = 'none';
       _pjReminderIcon.style.display = '';
     }
+  }
+  // Popover dismiss on click-outside or Escape (mirrors inbox)
+  function pjSetupPopoverDismiss(pop, type) {
+    var openedAt = Date.now();
+    function onDocClick(e) {
+      // Ignore clicks that happen within 100ms of popover creation (prevents
+      // the triggering click itself from immediately dismissing the popover,
+      // which happens with Playwright's real-mouse simulation)
+      if (Date.now() - openedAt < 100) return;
+      if (pop && !pop.contains(e.target) && !e.target.closest('#pj-add-date-icon') && !e.target.closest('#pj-add-reminder-icon')) {
+        if (type === 'date') pjCloseDatePopover();
+        else pjCloseReminderPopover();
+        document.removeEventListener('click', onDocClick, true);
+      }
+    }
+    document.addEventListener('click', onDocClick, true);
+    function onKey(e) {
+      if (e.key === 'Escape') {
+        if (type === 'date') pjCloseDatePopover();
+        else pjCloseReminderPopover();
+        document.removeEventListener('keydown', onKey);
+      }
+    }
+    document.addEventListener('keydown', onKey);
   }
   if (_pjReminderIcon) _pjReminderIcon.addEventListener('click', function(e) { e.preventDefault(); pjShowReminderPopover(); });
   if (_pjReminderChip) _pjReminderChip.addEventListener('click', function(e) {
@@ -1739,16 +1901,10 @@
     pjUpdateCatChip();
   });
 
-  // Close popovers on outside click
+  // Close category popover on outside click (date/reminder dismiss is handled by pjSetupPopoverDismiss)
   document.addEventListener('click', function(e) {
     if (_pjCatPopover && _pjCatPopover.style.display !== 'none' && !_pjCatIconWrap.contains(e.target) && !_pjCatChip.contains(e.target)) {
       pjHideCatPopover();
-    }
-    if (_pjDatePopover && !_pjDatePopover.contains(e.target) && e.target !== _pjDateIcon) {
-      pjCloseDatePopover();
-    }
-    if (_pjReminderPopover && !_pjReminderPopover.contains(e.target) && e.target !== _pjReminderIcon) {
-      pjCloseReminderPopover();
     }
   });
 
