@@ -387,6 +387,17 @@
   color: var(--gray-500);
   font-size: 0.85rem;
 }
+/* Show pomo start button on project task row hover (mirrors inbox pattern) */
+.project-task-item:hover .todo-item-pomo-inline.pomodoro-start:not(.active) {
+  opacity: 1;
+}
+.project-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
 
 /* ─── Project Add-Task Form (mirrors Inbox pattern) ─── */
 .pj-add-form {
@@ -1408,12 +1419,66 @@
       todos.forEach(function(t) {
         var doneClass = t.done ? ' checked' : '';
         var titleClass = t.done ? ' done' : '';
-        var catHtml = t.category ? '<span class="project-task-category">' + escapeHtml(t.category) + '</span>' : '';
+        var bujoType = (t.bujoType || 'task');
         html += '<div class="project-task-item" data-todo-id="' + t.id + '">' +
           '<div class="project-task-checkbox' + doneClass + '" data-todo-id="' + t.id + '"></div>' +
           '<span class="project-task-title' + titleClass + '">' + escapeHtml(t.title) + '</span>' +
-          catHtml +
-        '</div>';
+          '<div class="project-task-meta">';
+
+        // Timer status indicators (active / prior progress)
+        if (!t.done && bujoType === 'task' && window.dmPomodoro) {
+          if (window.dmPomodoro.isActive(t.id)) {
+            var timerRunning = window.dmPomodoro.isTimerRunning();
+            var sessionInfo = window.dmPomodoro.getSessionInfo ? window.dmPomodoro.getSessionInfo() : null;
+            var timerLabel = timerRunning ? 'timing' : 'paused';
+            if (sessionInfo && sessionInfo.total > 1) {
+              timerLabel = (timerRunning ? '' : 'paused ') + sessionInfo.current + '/' + sessionInfo.total;
+            }
+            html += '<span class="todo-item-timer-active' + (timerRunning ? '' : ' paused') + '"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg> ' + timerLabel + '</span>';
+          } else if (window.dmPomodoro.getTaskProgress) {
+            var priorProgress = window.dmPomodoro.getTaskProgress(t.id);
+            if (priorProgress && (priorProgress.accWorkSeconds > 0 || priorProgress.sessionsCompleted > 0)) {
+              var progressLabel;
+              if (priorProgress.sessionsCompleted > 0 && priorProgress.totalSessions > 1) {
+                progressLabel = priorProgress.sessionsCompleted + '/' + priorProgress.totalSessions + ' done';
+              } else {
+                var workedMin = Math.round((priorProgress.accWorkSeconds || 0) / 60);
+                progressLabel = 'started' + (workedMin > 0 ? ' \u00b7 ' + workedMin + 'min' : '');
+              }
+              html += '<span class="todo-item-timer-progress">' + progressLabel + '</span>';
+            }
+          }
+        }
+
+        // Inline pomodoro start/pause/stop buttons (only for undone tasks)
+        if (!t.done && bujoType === 'task') {
+          var isTimerActive = window.dmPomodoro && window.dmPomodoro.isActive(t.id);
+          var isTimerRunning = isTimerActive && window.dmPomodoro.isTimerRunning();
+          if (isTimerActive) {
+            var pomoBtnTitle = isTimerRunning ? 'Pause timer' : 'Resume timer';
+            html += '<button type="button" class="todo-item-pomo-inline pomodoro-start active" data-pomodoro-id="' + t.id + '" title="' + pomoBtnTitle + '" aria-label="' + pomoBtnTitle + '">';
+            if (isTimerRunning) {
+              html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="3" width="5" height="18" rx="1"></rect><rect x="14" y="3" width="5" height="18" rx="1"></rect></svg>';
+            } else {
+              html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+            }
+            html += '</button>';
+            html += '<button type="button" class="todo-item-pomo-inline pomo-stop" data-pomodoro-stop-id="' + t.id + '" title="Discard &amp; close" aria-label="Discard timer">';
+            html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>';
+            html += '</button>';
+          } else {
+            html += '<button type="button" class="todo-item-pomo-inline pomodoro-start" data-pomodoro-id="' + t.id + '" title="Start Pomodoro" aria-label="Start Pomodoro">';
+            html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+            html += '</button>';
+          }
+        }
+
+        // Category tag
+        if (t.category) {
+          html += '<span class="project-task-category">' + escapeHtml(t.category) + '</span>';
+        }
+
+        html += '</div></div>';
       });
       taskListEl.innerHTML = html;
 
@@ -1423,6 +1488,35 @@
           e.stopPropagation();
           var todoId = cb.getAttribute('data-todo-id');
           toggleTodoDone(todoId);
+        });
+      });
+
+      // Bind pomodoro start/pause buttons
+      taskListEl.querySelectorAll('.pomodoro-start[data-pomodoro-id]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var todoId = btn.getAttribute('data-pomodoro-id');
+          var todo = todos.find(function(t) { return t.id === todoId; });
+          if (!todo || !window.dmPomodoro) return;
+          if (window.dmPomodoro.isActive(todoId)) {
+            window.dmPomodoro.togglePause();
+            renderDetail(_currentProjectId);
+            return;
+          }
+          window.dmPomodoro.start(todoId, todo.title);
+          renderDetail(_currentProjectId);
+        });
+      });
+
+      // Bind pomodoro stop buttons
+      taskListEl.querySelectorAll('[data-pomodoro-stop-id]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          if (window.dmPomodoro) {
+            window.dmPomodoro.reset();
+            window.dmPomodoro.stop();
+            renderDetail(_currentProjectId);
+          }
         });
       });
     });
@@ -1436,6 +1530,27 @@
       todo.bujoState = todo.done ? 'done' : 'open';
       if (todo.done) {
         todo.completedAt = Date.now();
+        // If pomodoro timer is active for this task, stop it and capture tracked time
+        if (window.dmPomodoro && window.dmPomodoro.isActive(todoId)) {
+          window.dmPomodoro.stop();
+          // Check if tracked time was stored by the timer
+          try {
+            var tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
+            if (tracked[todoId]) {
+              todo.actualMin = tracked[todoId];
+              delete tracked[todoId];
+              if (Object.keys(tracked).length === 0) {
+                localStorage.removeItem('dm-pomodoro-tracked');
+              } else {
+                localStorage.setItem('dm-pomodoro-tracked', JSON.stringify(tracked));
+              }
+            }
+          } catch(e) {}
+          // Clean up per-task session progress
+          if (window.dmPomodoro.clearTaskProgress) {
+            window.dmPomodoro.clearTaskProgress(todoId);
+          }
+        }
       } else {
         todo.completedAt = null;
       }
@@ -2235,6 +2350,50 @@
       loadData();
     });
   }
+
+  // ─── Pomodoro Event Listeners ───
+  // Re-render project detail when timer stops (to update indicators)
+  window.addEventListener('dm-pomodoro-stopped', function(e) {
+    if (_currentProjectId && detailView.classList.contains('active')) {
+      renderDetail(_currentProjectId);
+    }
+  });
+
+  // Re-render project detail when timer state changes (pause/resume)
+  window.addEventListener('dm-pomodoro-state-changed', function() {
+    if (_currentProjectId && detailView.classList.contains('active')) {
+      renderDetail(_currentProjectId);
+    }
+  });
+
+  // When "Done" is pressed in pomodoro widget — mark the task complete
+  window.addEventListener('dm-pomodoro-completed', function(e) {
+    var detail = e.detail || {};
+    if (!detail.todoId || !_currentProjectId || !detailView.classList.contains('active')) return;
+
+    window.dmSync.getTodo(detail.todoId).then(function(todo) {
+      if (!todo || todo.projectId !== _currentProjectId) return;
+
+      // Use tracked minutes from the event
+      var actualMin = detail.trackedMinutes || todo.estimatedMin || null;
+
+      todo.done = true;
+      todo.status = 'done';
+      todo.bujoState = 'done';
+      todo.completedAt = Date.now();
+      if (actualMin) todo.actualMin = actualMin;
+      if (detail.category) todo.category = detail.category;
+      todo.updatedAt = Date.now();
+      return window.dmSync.putTodo(todo);
+    }).then(function() {
+      // Clean up per-task session progress
+      if (window.dmPomodoro && window.dmPomodoro.clearTaskProgress) {
+        window.dmPomodoro.clearTaskProgress(detail.todoId);
+      }
+      renderDetail(_currentProjectId);
+      loadTodoCounts().then(function() { renderList(); });
+    });
+  });
 
   // ─── Bootstrap ───
   if (document.readyState === 'loading') {
