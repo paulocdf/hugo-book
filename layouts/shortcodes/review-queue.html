@@ -491,6 +491,12 @@
 }
 .review-form-cancel:hover { background: var(--gray-100); }
 
+/* Validation error */
+.review-field-error {
+  border-color: #e53935 !important;
+  box-shadow: 0 0 0 1px #e53935;
+}
+
 /* Tag filter */
 .review-tag-filter {
   display: flex;
@@ -631,6 +637,21 @@
   box-sizing: border-box;
 }
 .review-edit-form textarea:focus {
+  border-color: var(--color-link);
+  outline: none;
+}
+.review-edit-tags {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-size: 0.82rem;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.review-edit-tags:focus {
   border-color: var(--color-link);
   outline: none;
 }
@@ -852,6 +873,9 @@
       if (typeof hljs !== 'undefined') hljs.highlightElement(block);
     });
 
+    // Diagrams on front
+    if (window.dmRenderDiagrams) window.dmRenderDiagrams(cardFrontContentEl);
+
     // Tags
     cardTagsEl.innerHTML = '';
     if (card.tags && card.tags.length) {
@@ -968,6 +992,8 @@
     formFrontEl.value = '';
     formBackEl.value = '';
     formTagsEl.value = '';
+    formFrontEl.classList.remove('review-field-error');
+    formBackEl.classList.remove('review-field-error');
     formFrontEl.focus();
   });
 
@@ -979,7 +1005,13 @@
   formSaveBtn.addEventListener('click', function() {
     var front = formFrontEl.value.trim();
     var back = formBackEl.value.trim();
-    if (!front || !back) return;
+    if (!front || !back) {
+      if (!front) formFrontEl.classList.add('review-field-error');
+      if (!back) formBackEl.classList.add('review-field-error');
+      return;
+    }
+    formFrontEl.classList.remove('review-field-error');
+    formBackEl.classList.remove('review-field-error');
 
     var tags = parseTags(formTagsEl.value);
     formSaveBtn.disabled = true;
@@ -998,6 +1030,11 @@
   // Ctrl+Enter to save from either textarea
   formFrontEl.addEventListener('keydown', handleFormKeydown);
   formBackEl.addEventListener('keydown', handleFormKeydown);
+  formTagsEl.addEventListener('keydown', handleFormKeydown);
+
+  // Clear validation error on input
+  formFrontEl.addEventListener('input', function() { formFrontEl.classList.remove('review-field-error'); });
+  formBackEl.addEventListener('input', function() { formBackEl.classList.remove('review-field-error'); });
   function handleFormKeydown(e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       e.preventDefault();
@@ -1130,6 +1167,7 @@
         item.innerHTML = '<div class="review-edit-form">'
           + '<textarea class="review-edit-front" rows="2" placeholder="Front">' + escapeHtml(card.front) + '</textarea>'
           + '<textarea class="review-edit-back" rows="3" placeholder="Back">' + escapeHtml(card.back) + '</textarea>'
+          + '<input type="text" class="review-edit-tags" placeholder="Tags (comma-separated)" value="' + escapeHtml((card.tags || []).join(', ')) + '">'
           + '<div class="review-edit-form-actions">'
           + '<button type="button" class="review-edit-save">Save</button>'
           + '<button type="button" class="review-edit-cancel">Cancel</button>'
@@ -1149,7 +1187,8 @@
           var newBack = item.querySelector('.review-edit-back').value.trim();
           if (!newFront || !newBack) return;
 
-          window.dmSync.updateReviewCardContent(cardId, { front: newFront, back: newBack }).then(function() {
+          var newTags = parseTags(item.querySelector('.review-edit-tags').value);
+          window.dmSync.updateReviewCardContent(cardId, { front: newFront, back: newBack, tags: newTags }).then(function() {
             loadQueue();
           }).catch(function(err) {
             console.error('Error updating card:', err);
@@ -1157,7 +1196,7 @@
         });
 
         // Ctrl+Enter to save from edit form
-        item.querySelectorAll('.review-edit-front, .review-edit-back').forEach(function(ta) {
+        item.querySelectorAll('.review-edit-front, .review-edit-back, .review-edit-tags').forEach(function(ta) {
           ta.addEventListener('keydown', function(ev) {
             if ((ev.ctrlKey || ev.metaKey) && ev.key === 'Enter') {
               ev.preventDefault();
@@ -1200,7 +1239,10 @@
   // Listen for sync/review updates
   window.addEventListener('dm-sync-complete', function() {
     if (window.dmAuth && window.dmAuth.currentUser && document.getElementById('review-queue')) {
-      loadQueue();
+      // Don't reload queue while user is mid-review
+      if (cardContainerEl.style.display === 'none') {
+        loadQueue();
+      }
     }
   });
   window.addEventListener('dm-review-updated', function() {
@@ -1224,5 +1266,14 @@
       if (window.dmExport) window.dmExport.open('cards');
     });
   }
+
+  // ─── Test API (mirrors _pjTest pattern) ───
+  window._rvTest = {
+    loadQueue: loadQueue,
+    getDueCards: function() { return dueCards; },
+    getAllCards: function() { return allCards; },
+    getCurrentIndex: function() { return currentIndex; },
+    getReviewedToday: function() { return reviewedToday; }
+  };
 })();
 </script>
