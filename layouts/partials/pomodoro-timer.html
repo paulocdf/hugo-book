@@ -3328,12 +3328,27 @@
       focusUpNextListEl.innerHTML = '';
       return;
     }
-    var tasks = window.dmTodoList.getNextTasks(activeTodoId, 5);
-    if (!tasks || !tasks.length) {
-      focusUpNextStripEl.style.display = 'none';
-      focusUpNextListEl.innerHTML = '';
-      return;
+
+    var tasks;
+    // If working on a project task, show next tasks from the same project
+    if (activeProjectId && window.dmTodoList.getNextProjectTasks) {
+      tasks = window.dmTodoList.getNextProjectTasks(activeTodoId, activeProjectId, 5);
+      // If no more project tasks, hide the strip (project is done)
+      if (!tasks || !tasks.length) {
+        focusUpNextStripEl.style.display = 'none';
+        focusUpNextListEl.innerHTML = '';
+        return;
+      }
+    } else {
+      // No project — fall back to same-day-group tasks
+      tasks = window.dmTodoList.getNextTasks(activeTodoId, 5);
+      if (!tasks || !tasks.length) {
+        focusUpNextStripEl.style.display = 'none';
+        focusUpNextListEl.innerHTML = '';
+        return;
+      }
     }
+
     var html = '';
     tasks.forEach(function(t) {
       var escaped = t.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
