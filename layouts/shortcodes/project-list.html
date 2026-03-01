@@ -398,6 +398,116 @@
   flex-shrink: 0;
   margin-left: auto;
 }
+/* Delete button on project task rows (hover-reveal, mirrors inbox) */
+.project-task-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  line-height: 0;
+  opacity: 0;
+  flex-shrink: 0;
+}
+.project-task-item:hover .project-task-delete {
+  opacity: 1;
+}
+.project-task-delete:hover {
+  color: var(--color-danger, #c62828);
+  background: var(--color-danger-bg, rgba(198,40,40,0.08));
+}
+/* ─── Project Action Toasts ─── */
+.pj-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.3s;
+  z-index: 9999;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.pj-toast-undo {
+  background: var(--sidebar-bg, #f7f7f7);
+  color: var(--body-font-color, #333);
+  border: 1px solid var(--border-medium, #ddd);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+  padding: 8px 10px 8px 16px;
+}
+.pj-toast-done {
+  background: var(--sidebar-bg, #f7f7f7);
+  color: var(--body-font-color, #333);
+  border: 1px solid var(--color-success, #2e7d32);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+  padding: 8px 10px 8px 14px;
+}
+.pj-toast-done .pj-toast-icon {
+  color: var(--color-success, #2e7d32);
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.pj-toast-label {
+  font-size: 0.8rem;
+  opacity: 0.85;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pj-toast-btn {
+  background: none;
+  border: none;
+  color: var(--accent-blue, #1976d2);
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pj-toast-btn:hover {
+  background: rgba(25, 118, 210, 0.08);
+}
+.pj-toast-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  background: var(--accent-blue, #1976d2);
+  border-radius: 0 0 8px 8px;
+  width: 100%;
+  transform-origin: left;
+}
+.pj-toast-done .pj-toast-progress {
+  background: var(--color-success, #2e7d32);
+}
+@keyframes pj-toast-shrink {
+  from { transform: scaleX(1); }
+  to   { transform: scaleX(0); }
+}
 
 /* ─── Project Add-Task Form (mirrors Inbox pattern) ─── */
 .pj-add-form {
@@ -1478,7 +1588,12 @@
           html += '<span class="project-task-category">' + escapeHtml(t.category) + '</span>';
         }
 
-        html += '</div></div>';
+        html += '</div>';
+        // Delete button (hover-reveal, mirrors inbox pattern)
+        html += '<button type="button" class="project-task-delete" data-delete-id="' + t.id + '" title="Delete task" aria-label="Delete task">';
+        html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+        html += '</button>';
+        html += '</div>';
       });
       taskListEl.innerHTML = html;
 
@@ -1487,7 +1602,7 @@
         cb.addEventListener('click', function(e) {
           e.stopPropagation();
           var todoId = cb.getAttribute('data-todo-id');
-          toggleTodoDone(todoId);
+          toggleTodoDone(todoId, todos);
         });
       });
 
@@ -1528,6 +1643,15 @@
           if (e.target.closest('input, button, .project-task-checkbox')) return;
           var todoId = row.getAttribute('data-todo-id');
           openEditForTodo(todoId);
+        });
+      });
+
+      // Delete button — instant delete with undo toast
+      taskListEl.querySelectorAll('.project-task-delete[data-delete-id]').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.stopPropagation();
+          var todoId = btn.getAttribute('data-delete-id');
+          pjDeleteTodoWithUndo(todoId, todos);
         });
       });
     });
@@ -1611,38 +1735,21 @@
     });
   }
 
-  function toggleTodoDone(todoId) {
+  function toggleTodoDone(todoId, projectTodos) {
     window.dmSync.getTodo(todoId).then(function(todo) {
       if (!todo) return;
       var newDone = !todo.done;
 
-      // Build Firestore update
-      var fsData = {
-        done: newDone,
-        status: newDone ? 'done' : 'active',
-        bujoState: newDone ? 'done' : 'open',
-        kanbanStatus: newDone ? 'done' : (todo.kanbanStatus === 'done' ? 'todo' : (todo.kanbanStatus || 'todo')),
-        completedAt: newDone ? firebase.firestore.FieldValue.serverTimestamp() : null,
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-
-      // Optimistic local update
-      todo.done = newDone;
-      todo.status = newDone ? 'done' : 'active';
-      todo.bujoState = newDone ? 'done' : 'open';
-      todo.kanbanStatus = fsData.kanbanStatus;
-      todo.completedAt = newDone ? Date.now() : null;
-      todo.updatedAt = Date.now();
-
       if (newDone) {
-        // If pomodoro timer is active for this task, stop it and capture tracked time
+        // ─── Complete task ───
+        // Capture tracked pomodoro time
+        var actualMin = todo.estimatedMin || null;
         if (window.dmPomodoro && window.dmPomodoro.isActive(todoId)) {
           window.dmPomodoro.stop();
           try {
             var tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
             if (tracked[todoId]) {
-              todo.actualMin = tracked[todoId];
-              fsData.actualMin = tracked[todoId];
+              actualMin = tracked[todoId];
               delete tracked[todoId];
               if (Object.keys(tracked).length === 0) {
                 localStorage.removeItem('dm-pomodoro-tracked');
@@ -1655,19 +1762,279 @@
             window.dmPomodoro.clearTaskProgress(todoId);
           }
         }
-      }
 
-      return window.dmSync.firestoreWrite({
-        collection: 'todos',
-        docId: todoId,
-        op: 'update',
-        data: fsData,
-        localOp: function() { return window.dmSync.putTodo(todo); }
-      });
+        // Snapshot for undo
+        var snapshot = {
+          done: todo.done, status: todo.status, bujoState: todo.bujoState,
+          kanbanStatus: todo.kanbanStatus, actualMin: todo.actualMin,
+          completedAt: todo.completedAt, updatedAt: todo.updatedAt
+        };
+
+        // Build Firestore update
+        var fsData = {
+          done: true, status: 'done', bujoState: 'done', kanbanStatus: 'done',
+          actualMin: actualMin,
+          completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        // Optimistic local update
+        todo.done = true; todo.status = 'done'; todo.bujoState = 'done';
+        todo.kanbanStatus = 'done'; todo.actualMin = actualMin;
+        todo.completedAt = Date.now(); todo.updatedAt = Date.now();
+
+        window.dmSync.firestoreWrite({
+          collection: 'todos', docId: todoId, op: 'update', data: fsData,
+          localOp: function() { return window.dmSync.putTodo(todo); }
+        }).then(function() {
+          // Parent auto-complete
+          if (todo.parentId && projectTodos) {
+            pjCheckParentAutoComplete(todo.parentId, projectTodos);
+          }
+          renderDetail(_currentProjectId);
+          loadTodoCounts().then(function() { renderList(); });
+        });
+
+        // Show undo toast
+        var taskTitle = (todo.title || 'Task');
+        if (taskTitle.length > 30) taskTitle = taskTitle.substring(0, 30) + '...';
+        pjShowActionToast({
+          message: 'Completed \u201c' + taskTitle + '\u201d',
+          icon: '\u2714',
+          cssClass: 'pj-toast-done',
+          duration: 3000,
+          onUndo: function() {
+            todo.done = snapshot.done; todo.status = snapshot.status;
+            todo.bujoState = snapshot.bujoState; todo.kanbanStatus = snapshot.kanbanStatus;
+            todo.actualMin = snapshot.actualMin; todo.completedAt = snapshot.completedAt;
+            todo.updatedAt = Date.now();
+            window.dmSync.firestoreWrite({
+              collection: 'todos', docId: todoId, op: 'update',
+              data: {
+                done: snapshot.done, status: snapshot.status, bujoState: snapshot.bujoState,
+                kanbanStatus: snapshot.kanbanStatus, actualMin: snapshot.actualMin,
+                completedAt: snapshot.completedAt,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              },
+              localOp: function() { return window.dmSync.putTodo(todo); }
+            }).then(function() {
+              renderDetail(_currentProjectId);
+              loadTodoCounts().then(function() { renderList(); });
+            });
+          }
+        });
+      } else {
+        // ─── Reopen task ───
+        var fsData = {
+          done: false, status: 'active', bujoState: 'open',
+          kanbanStatus: 'todo', actualMin: null, completedAt: null,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        todo.done = false; todo.status = 'active'; todo.bujoState = 'open';
+        todo.kanbanStatus = 'todo'; todo.actualMin = null;
+        todo.completedAt = null; todo.updatedAt = Date.now();
+
+        window.dmSync.firestoreWrite({
+          collection: 'todos', docId: todoId, op: 'update', data: fsData,
+          localOp: function() { return window.dmSync.putTodo(todo); }
+        }).then(function() {
+          renderDetail(_currentProjectId);
+          loadTodoCounts().then(function() { renderList(); });
+        });
+      }
+    });
+  }
+
+  // ─── Parent Auto-Complete ───
+  function pjCheckParentAutoComplete(parentId, projectTodos) {
+    if (!parentId) return;
+    var parent = projectTodos.find(function(t) { return t.id === parentId; });
+    if (!parent || parent.done) return;
+
+    var children = projectTodos.filter(function(t) { return t.parentId === parentId; });
+    if (children.length === 0) return;
+    var allDone = children.every(function(t) { return t.done; });
+    if (!allDone) return;
+
+    var totalActual = 0;
+    children.forEach(function(c) {
+      if (c.actualMin != null) totalActual += c.actualMin;
+    });
+
+    var fsData = {
+      done: true, status: 'done', bujoState: 'done', kanbanStatus: 'done',
+      actualMin: totalActual,
+      completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    parent.done = true; parent.status = 'done'; parent.bujoState = 'done';
+    parent.kanbanStatus = 'done'; parent.actualMin = totalActual;
+    parent.completedAt = Date.now(); parent.updatedAt = Date.now();
+
+    window.dmSync.firestoreWrite({
+      collection: 'todos', docId: parent.id, op: 'update', data: fsData,
+      localOp: function() { return window.dmSync.putTodo(parent); }
     }).then(function() {
       renderDetail(_currentProjectId);
       loadTodoCounts().then(function() { renderList(); });
     });
+  }
+
+  // ─── Delete Task with Undo ───
+  function pjDeleteTodo(todoId, projectTodos) {
+    // Soft-delete task + any children
+    var toDelete = [todoId];
+    if (projectTodos) {
+      projectTodos.forEach(function(t) {
+        if (t.parentId === todoId) toDelete.push(t.id);
+      });
+    }
+
+    var chain = Promise.resolve();
+    toDelete.forEach(function(id) {
+      chain = chain.then(function() {
+        return window.dmSync.getTodoIncludingTrashed(id).then(function(todo) {
+          if (!todo) return;
+          var updateData = {
+            status: 'deleted',
+            deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          todo.status = 'deleted';
+          todo.deletedAt = Date.now();
+          todo.updatedAt = Date.now();
+          return window.dmSync.firestoreWrite({
+            collection: 'todos', docId: id, op: 'update', data: updateData,
+            localOp: function() { return window.dmSync.putTodo(todo); }
+          });
+        });
+      });
+    });
+
+    return chain.then(function() {
+      renderDetail(_currentProjectId);
+      loadTodoCounts().then(function() { renderList(); });
+    });
+  }
+
+  function pjDeleteTodoWithUndo(todoId, projectTodos) {
+    // Snapshot affected todos for undo
+    var affectedIds = [todoId];
+    if (projectTodos) {
+      projectTodos.forEach(function(t) {
+        if (t.parentId === todoId) affectedIds.push(t.id);
+      });
+    }
+
+    var snapshots = [];
+    affectedIds.forEach(function(id) {
+      var todo = projectTodos && projectTodos.find(function(t) { return t.id === id; });
+      if (todo) {
+        snapshots.push({
+          id: id, done: todo.done, status: todo.status,
+          bujoState: todo.bujoState, deletedAt: todo.deletedAt || null
+        });
+      }
+    });
+
+    var taskTitle = '';
+    var mainTodo = projectTodos && projectTodos.find(function(t) { return t.id === todoId; });
+    if (mainTodo) {
+      taskTitle = mainTodo.title || '';
+      if (taskTitle.length > 32) taskTitle = taskTitle.substring(0, 32) + '...';
+    }
+
+    // Delete immediately
+    pjDeleteTodo(todoId, projectTodos);
+
+    // Show undo toast
+    pjShowActionToast({
+      message: taskTitle ? 'Deleted \u201c' + taskTitle + '\u201d' : 'Task deleted',
+      cssClass: 'pj-toast-undo',
+      duration: 3000,
+      onUndo: function() {
+        pjUndoDelete(snapshots);
+      }
+    });
+  }
+
+  function pjUndoDelete(snapshots) {
+    if (!window.dmSync || !snapshots || !snapshots.length) return;
+    var chain = Promise.resolve();
+    snapshots.forEach(function(snap) {
+      chain = chain.then(function() {
+        return window.dmSync.getTodoIncludingTrashed(snap.id).then(function(todo) {
+          if (!todo) return;
+          var updateData = {
+            done: snap.done, status: snap.status, bujoState: snap.bujoState,
+            deletedAt: firebase.firestore.FieldValue.delete(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          todo.done = snap.done; todo.status = snap.status;
+          todo.bujoState = snap.bujoState; delete todo.deletedAt;
+          todo.updatedAt = Date.now();
+          return window.dmSync.firestoreWrite({
+            collection: 'todos', docId: snap.id, op: 'update', data: updateData,
+            localOp: function() { return window.dmSync.putTodo(todo); }
+          });
+        });
+      });
+    });
+    chain.then(function() {
+      renderDetail(_currentProjectId);
+      loadTodoCounts().then(function() { renderList(); });
+    });
+  }
+
+  // ─── Action Toast ───
+  var _pjToastTimer = null;
+  var _pjToast = null;
+
+  function pjShowActionToast(opts) {
+    pjDismissToast();
+    var msg = opts.message || 'Done';
+    var icon = opts.icon || '';
+    var cls = opts.cssClass || 'pj-toast-undo';
+    var onUndo = opts.onUndo || null;
+    var duration = opts.duration != null ? opts.duration : 3000;
+
+    var toast = document.createElement('div');
+    toast.className = 'pj-toast ' + cls;
+
+    var html = '';
+    if (icon) html += '<span class="pj-toast-icon">' + icon + '</span>';
+    html += '<span class="pj-toast-label">' + msg + '</span>';
+    if (onUndo) html += '<button type="button" class="pj-toast-btn">Undo</button>';
+    html += '<span class="pj-toast-progress"></span>';
+    toast.innerHTML = html;
+
+    var progressBar = toast.querySelector('.pj-toast-progress');
+    if (progressBar) {
+      progressBar.style.animation = 'pj-toast-shrink ' + duration + 'ms linear forwards';
+    }
+    document.body.appendChild(toast);
+    _pjToast = toast;
+
+    if (onUndo) {
+      toast.querySelector('.pj-toast-btn').addEventListener('click', function(e) {
+        e.stopPropagation();
+        pjDismissToast();
+        onUndo();
+      });
+    }
+
+    setTimeout(function() { toast.style.opacity = '1'; }, 10);
+    _pjToastTimer = setTimeout(function() { pjDismissToast(); }, duration);
+  }
+
+  function pjDismissToast() {
+    if (_pjToastTimer) { clearTimeout(_pjToastTimer); _pjToastTimer = null; }
+    if (_pjToast) {
+      _pjToast.style.opacity = '0';
+      var t = _pjToast;
+      setTimeout(function() { t.remove(); }, 300);
+      _pjToast = null;
+    }
   }
 
   // ─── Archived Toggle ───
@@ -2523,6 +2890,13 @@
       loadTodoCounts().then(function() { renderList(); });
     });
   });
+
+  // ─── Test API (test-only access to internal state) ───
+  window._pjTest = {
+    setProjects: function(projects) { _projects = projects; },
+    showDetail: showDetail,
+    renderDetail: renderDetail
+  };
 
   // ─── Bootstrap ───
   if (document.readyState === 'loading') {
