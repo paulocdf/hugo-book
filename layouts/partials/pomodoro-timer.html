@@ -129,15 +129,15 @@
 
         <div class="pomodoro-focus-subtasks" id="focus-subtasks" style="display:none;"></div>
         <div class="pomodoro-focus-inline-stats" id="focus-inline-stats"></div>
-        <!-- Collapsed notes toggle (visible when notes panel is collapsed) -->
-        <div class="pomodoro-focus-notes-toggle" id="focus-notes-toggle" style="display:none;">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-          Notes <span class="pomodoro-focus-notes-chevron">&#x25B8;</span>
-        </div>
       </div>
 
       <!-- Resize handle between columns -->
       <div class="pomodoro-focus-resize-handle" id="focus-resize-handle" title="Drag to resize"></div>
+
+      <!-- Notes collapse/expand toggle icon (vertically centered on divider) -->
+      <button type="button" class="pomodoro-focus-notes-toggle-icon" id="focus-notes-toggle-icon" aria-label="Toggle notes panel" title="Toggle notes panel">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
 
       <!-- Right column: notes -->
       <div class="pomodoro-focus-right">
@@ -891,26 +891,36 @@
   font-size: 0.7rem;
   transition: transform 0.2s;
 }
-/* Collapsed notes toggle bar (shown in left column when notes are collapsed) */
-.pomodoro-focus-notes-toggle {
+/* Notes collapse/expand toggle icon — sits between resize handle and right column */
+.pomodoro-focus-notes-toggle-icon {
   display: flex;
   align-items: center;
-  gap: 5px;
-  margin-top: 12px;
-  padding: 6px 14px;
+  justify-content: center;
+  width: 20px;
+  height: 28px;
+  flex-shrink: 0;
   border: 1px solid var(--gray-200);
-  border-radius: 6px;
+  border-radius: 5px;
+  background: var(--body-background);
   cursor: pointer;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
   color: var(--gray-400);
-  transition: background 0.15s, color 0.15s;
+  padding: 0;
+  margin: 0 -2px;
+  align-self: center;
+  z-index: 3;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.pomodoro-focus-notes-toggle:hover {
+.pomodoro-focus-notes-toggle-icon:hover {
   background: var(--gray-100);
   color: var(--gray-600);
+  border-color: var(--gray-300);
+}
+.pomodoro-focus-notes-toggle-icon svg {
+  transition: transform 0.2s;
+}
+/* When collapsed, flip the chevron to point right (expand) */
+.pomodoro-focus-body.notes-collapsed .pomodoro-focus-notes-toggle-icon svg {
+  transform: rotate(180deg);
 }
 /* Collapsed state — hide right column and resize handle */
 .pomodoro-focus-body.notes-collapsed .pomodoro-focus-right,
@@ -1261,6 +1271,9 @@
   .pomodoro-focus-resize-handle {
     display: none;
   }
+  .pomodoro-focus-notes-toggle-icon {
+    display: none;
+  }
   .pomodoro-focus-notes-textarea {
     min-height: 80px;
   }
@@ -1490,7 +1503,7 @@
   var focusShowProgressCheckbox = document.getElementById('focus-show-progress');
   // Focus overlay — collapsible notes
   var focusNotesLabel = document.getElementById('focus-notes-label');
-  var focusNotesToggle = document.getElementById('focus-notes-toggle');
+  var focusNotesToggleIcon = document.getElementById('focus-notes-toggle-icon');
   var focusBodyEl = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-body') : null;
   var focusRightCol = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-right') : null;
   var focusResizeHandle = document.getElementById('focus-resize-handle');
@@ -3485,10 +3498,8 @@
     if (!focusBodyEl) return;
     if (collapsed) {
       focusBodyEl.classList.add('notes-collapsed');
-      if (focusNotesToggle) focusNotesToggle.style.display = '';
     } else {
       focusBodyEl.classList.remove('notes-collapsed');
-      if (focusNotesToggle) focusNotesToggle.style.display = 'none';
     }
   }
   function toggleNotesCollapsed() {
@@ -3502,12 +3513,9 @@
       toggleNotesCollapsed();
     });
   }
-  if (focusNotesToggle) {
-    focusNotesToggle.addEventListener('click', function() {
-      setNotesCollapsed(false);
-      applyNotesCollapsed(false);
-      // Focus the textarea after expanding
-      if (focusNotesTextarea) focusNotesTextarea.focus();
+  if (focusNotesToggleIcon) {
+    focusNotesToggleIcon.addEventListener('click', function() {
+      toggleNotesCollapsed();
     });
   }
 
