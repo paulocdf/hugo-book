@@ -1540,8 +1540,8 @@
       window.dmTodoEdit.open(todo, function(result) {
         if (!result) return;
 
-        // Apply all changed fields
-        var changed = false;
+        // Build diff of changed fields for both Firestore and local
+        var fsData = {};
         var origBujoState = todo.bujoState || 'open';
         var fields = ['title', 'scheduledDate', 'estimatedMin', 'pomodoroCount',
           'pomodoroLength', 'breakLength', 'category', 'projectId', 'bujoType', 'notes'];
@@ -1551,7 +1551,7 @@
           var oldVal = todo[f] || null;
           if (newVal !== oldVal) {
             todo[f] = newVal;
-            changed = true;
+            fsData[f] = newVal;
           }
         });
 
@@ -1559,44 +1559,51 @@
         var bujoChanged = result.bujoState && result.bujoState !== origBujoState;
         if (bujoChanged) {
           todo.bujoState = result.bujoState;
-          changed = true;
+          fsData.bujoState = result.bujoState;
           if (result.bujoState === 'done') {
-            todo.done = true;
-            todo.status = 'done';
-            todo.kanbanStatus = 'done';
+            todo.done = true; todo.status = 'done'; todo.kanbanStatus = 'done';
             todo.completedAt = Date.now();
+            fsData.done = true; fsData.status = 'done'; fsData.kanbanStatus = 'done';
+            fsData.completedAt = firebase.firestore.FieldValue.serverTimestamp();
           } else if (result.bujoState === 'open') {
-            todo.done = false;
-            todo.status = 'active';
-            todo.kanbanStatus = 'todo';
+            todo.done = false; todo.status = 'active'; todo.kanbanStatus = 'todo';
             todo.completedAt = null;
+            fsData.done = false; fsData.status = 'active'; fsData.kanbanStatus = 'todo';
+            fsData.completedAt = null;
           } else {
-            todo.done = false;
-            todo.status = 'active';
-            todo.kanbanStatus = 'todo';
+            todo.done = false; todo.status = 'active'; todo.kanbanStatus = 'todo';
+            fsData.done = false; fsData.status = 'active'; fsData.kanbanStatus = 'todo';
           }
         }
 
         // Kanban status (only if bujoState didn't already handle it)
         if (!bujoChanged && result.kanbanStatus && result.kanbanStatus !== (todo.kanbanStatus || 'todo')) {
           todo.kanbanStatus = result.kanbanStatus;
-          changed = true;
+          fsData.kanbanStatus = result.kanbanStatus;
           if (result.kanbanStatus === 'done') {
-            todo.done = true;
-            todo.status = 'done';
-            todo.bujoState = 'done';
+            todo.done = true; todo.status = 'done'; todo.bujoState = 'done';
             todo.completedAt = Date.now();
+            fsData.done = true; fsData.status = 'done'; fsData.bujoState = 'done';
+            fsData.completedAt = firebase.firestore.FieldValue.serverTimestamp();
           } else if ((todo.kanbanStatus || 'todo') === 'done') {
-            todo.done = false;
-            todo.status = 'active';
-            todo.bujoState = 'open';
+            todo.done = false; todo.status = 'active'; todo.bujoState = 'open';
             todo.completedAt = null;
+            fsData.done = false; fsData.status = 'active'; fsData.bujoState = 'open';
+            fsData.completedAt = null;
           }
         }
 
-        if (!changed) return;
+        if (Object.keys(fsData).length === 0) return;
+        fsData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
         todo.updatedAt = Date.now();
-        window.dmSync.putTodo(todo).then(function() {
+
+        window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: todoId,
+          op: 'update',
+          data: fsData,
+          localOp: function() { return window.dmSync.putTodo(todo); }
+        }).then(function() {
           renderDetail(_currentProjectId);
           loadTodoCounts().then(function() { renderList(); });
         });
@@ -1607,19 +1614,35 @@
   function toggleTodoDone(todoId) {
     window.dmSync.getTodo(todoId).then(function(todo) {
       if (!todo) return;
-      todo.done = !todo.done;
-      todo.status = todo.done ? 'done' : 'active';
-      todo.bujoState = todo.done ? 'done' : 'open';
-      if (todo.done) {
-        todo.completedAt = Date.now();
+      var newDone = !todo.done;
+
+      // Build Firestore update
+      var fsData = {
+        done: newDone,
+        status: newDone ? 'done' : 'active',
+        bujoState: newDone ? 'done' : 'open',
+        kanbanStatus: newDone ? 'done' : (todo.kanbanStatus === 'done' ? 'todo' : (todo.kanbanStatus || 'todo')),
+        completedAt: newDone ? firebase.firestore.FieldValue.serverTimestamp() : null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+
+      // Optimistic local update
+      todo.done = newDone;
+      todo.status = newDone ? 'done' : 'active';
+      todo.bujoState = newDone ? 'done' : 'open';
+      todo.kanbanStatus = fsData.kanbanStatus;
+      todo.completedAt = newDone ? Date.now() : null;
+      todo.updatedAt = Date.now();
+
+      if (newDone) {
         // If pomodoro timer is active for this task, stop it and capture tracked time
         if (window.dmPomodoro && window.dmPomodoro.isActive(todoId)) {
           window.dmPomodoro.stop();
-          // Check if tracked time was stored by the timer
           try {
             var tracked = JSON.parse(localStorage.getItem('dm-pomodoro-tracked') || '{}');
             if (tracked[todoId]) {
               todo.actualMin = tracked[todoId];
+              fsData.actualMin = tracked[todoId];
               delete tracked[todoId];
               if (Object.keys(tracked).length === 0) {
                 localStorage.removeItem('dm-pomodoro-tracked');
@@ -1628,16 +1651,19 @@
               }
             }
           } catch(e) {}
-          // Clean up per-task session progress
           if (window.dmPomodoro.clearTaskProgress) {
             window.dmPomodoro.clearTaskProgress(todoId);
           }
         }
-      } else {
-        todo.completedAt = null;
       }
-      todo.updatedAt = Date.now();
-      return window.dmSync.putTodo(todo);
+
+      return window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: todoId,
+        op: 'update',
+        data: fsData,
+        localOp: function() { return window.dmSync.putTodo(todo); }
+      });
     }).then(function() {
       renderDetail(_currentProjectId);
       loadTodoCounts().then(function() { renderList(); });
@@ -2459,14 +2485,35 @@
       // Use tracked minutes from the event
       var actualMin = detail.trackedMinutes || todo.estimatedMin || null;
 
+      // Build Firestore update
+      var fsData = {
+        done: true,
+        status: 'done',
+        bujoState: 'done',
+        kanbanStatus: 'done',
+        completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (actualMin) fsData.actualMin = actualMin;
+      if (detail.category) fsData.category = detail.category;
+
+      // Optimistic local update
       todo.done = true;
       todo.status = 'done';
       todo.bujoState = 'done';
+      todo.kanbanStatus = 'done';
       todo.completedAt = Date.now();
+      todo.updatedAt = Date.now();
       if (actualMin) todo.actualMin = actualMin;
       if (detail.category) todo.category = detail.category;
-      todo.updatedAt = Date.now();
-      return window.dmSync.putTodo(todo);
+
+      return window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: detail.todoId,
+        op: 'update',
+        data: fsData,
+        localOp: function() { return window.dmSync.putTodo(todo); }
+      });
     }).then(function() {
       // Clean up per-task session progress
       if (window.dmPomodoro && window.dmPomodoro.clearTaskProgress) {
