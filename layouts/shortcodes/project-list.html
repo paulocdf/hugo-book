@@ -388,6 +388,315 @@
   font-size: 0.85rem;
 }
 
+/* ─── Project Add-Task Form (mirrors Inbox pattern) ─── */
+.pj-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 0.75rem;
+}
+.pj-add-row-main {
+  display: flex;
+  gap: 0;
+  align-items: center;
+  position: relative;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  cursor: text;
+}
+.pj-add-row-main:focus-within {
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 2px rgba(0, 105, 255, 0.08);
+}
+.pj-add-row-main > :first-child { border-radius: 9px 0 0 9px; }
+.pj-add-row-main > :last-child { border-radius: 0 9px 9px 0; }
+
+.pj-add-title {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.88rem;
+  color: var(--body-font-color);
+  padding: 10px 12px;
+  font-family: inherit;
+}
+.pj-add-title::placeholder { color: var(--gray-400); }
+
+.pj-add-row-icons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 2px;
+  position: relative;
+}
+.pj-add-bujo-type-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--body-background);
+  margin-right: 2px;
+}
+.pj-add-bujo-type-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+  line-height: 0;
+  padding: 0;
+}
+.pj-add-bujo-type-btn:hover {
+  color: var(--body-font-color);
+  background: var(--gray-100);
+}
+.pj-add-bujo-type-btn.active {
+  color: var(--body-font-color);
+  background: var(--gray-200);
+}
+.pj-add-bujo-type-btn[data-bujo-type="task"].active { color: #3d3d3d; }
+.pj-add-bujo-type-btn[data-bujo-type="event"].active { color: #4a7a9b; }
+.pj-add-bujo-type-btn[data-bujo-type="note"].active { color: #888888; }
+.pj-add-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  line-height: 0;
+  flex-shrink: 0;
+  position: relative;
+}
+.pj-add-icon-btn:hover {
+  color: var(--color-link);
+  border-color: var(--color-link);
+}
+.pj-add-icon-btn.active {
+  color: var(--color-link);
+  border-color: var(--color-link);
+  background: rgba(0, 105, 255, 0.06);
+}
+.pj-add-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  background: rgba(0, 105, 255, 0.08);
+  color: var(--color-link);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.pj-add-chip-text { pointer-events: none; }
+.pj-add-chip-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: none;
+  color: var(--color-link);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.15s;
+}
+.pj-add-chip-clear:hover { background: rgba(0, 105, 255, 0.15); }
+
+/* Category popover */
+.pj-add-category-icon-wrap { position: relative; }
+.pj-add-category-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  width: 240px;
+  margin-top: 4px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  animation: pj-popover-in 0.15s ease-out;
+}
+@keyframes pj-popover-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.pj-add-category-search {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--gray-200);
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  background: transparent;
+  color: var(--body-font-color);
+  outline: none;
+  border-radius: 10px 10px 0 0;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.pj-add-category-dropdown {
+  max-height: 160px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.pj-add-category-dropdown .pj-cat-option {
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.pj-add-category-dropdown .pj-cat-option:hover,
+.pj-add-category-dropdown .pj-cat-option.active {
+  background: var(--gray-100);
+}
+
+/* Pomodoro group */
+.pj-add-pomodoro-group {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+.pj-add-pomo-minus,
+.pj-add-pomo-plus {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s;
+  padding: 0;
+}
+.pj-add-pomo-minus:hover,
+.pj-add-pomo-plus:hover { color: var(--body-font-color); }
+.pj-add-pomo-btn {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 4px 2px;
+  border-radius: 6px;
+  transition: background 0.15s;
+  user-select: none;
+  position: relative;
+}
+.pj-add-pomo-btn:hover { background: var(--gray-100); }
+.pj-add-pomo-count {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+  min-width: 14px;
+  text-align: center;
+}
+.pj-add-custom-min {
+  width: 42px;
+  border: none;
+  border-left: 1px solid var(--gray-200);
+  background: transparent;
+  color: var(--body-font-color);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 8px 4px;
+  outline: none;
+  flex-shrink: 0;
+  font-family: inherit;
+  -moz-appearance: textfield;
+}
+.pj-add-custom-min::-webkit-inner-spin-button,
+.pj-add-custom-min::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.pj-add-custom-min::placeholder { color: var(--gray-400); }
+.pj-add-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: none;
+  background: var(--color-link);
+  color: #fff;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.pj-add-btn:hover { opacity: 0.85; }
+.pj-add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.pj-add-hints {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: var(--gray-400);
+  padding-left: 4px;
+}
+.pj-add-hints kbd {
+  display: inline-block;
+  padding: 1px 4px;
+  border: 1px solid var(--gray-200);
+  border-radius: 3px;
+  font-size: 0.68rem;
+  font-family: inherit;
+  background: var(--gray-100);
+}
+.pj-add-hints-sep { color: var(--gray-300); }
+
+/* Date/Reminder popover */
+.pj-add-popover {
+  position: absolute;
+  z-index: 30;
+  margin-top: 4px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+  padding: 8px;
+  animation: pj-popover-in 0.15s ease-out;
+}
+.pj-add-popover input[type="date"],
+.pj-add-popover input[type="datetime-local"] {
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.82rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  font-family: inherit;
+  outline: none;
+}
+.pj-add-popover input:focus {
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 2px rgba(25,118,210,0.15);
+}
+
 /* ─── Modal ─── */
 .project-modal-overlay {
   display: none;
@@ -633,10 +942,79 @@
     <div class="project-tasks-header">
       <h3>Tasks</h3>
     </div>
+    <!-- Add task form (mirrors Inbox pattern, projectId set automatically) -->
+    <div class="pj-add-form" id="pj-add-form">
+      <div class="pj-add-row-main">
+        <input type="text" id="pj-add-title" class="pj-add-title" placeholder="Add a task to this project..." autocomplete="off">
+        <div class="pj-add-pomodoro-group" id="pj-add-pomodoro-group">
+          <button type="button" class="pj-add-pomo-minus" id="pj-add-pomo-minus" title="Remove pomodoro" aria-label="Decrease pomodoro count">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+          </button>
+          <button type="button" class="pj-add-pomo-btn" id="pj-add-pomo-btn" title="Short session (click to switch)" aria-label="Pomodoro count">
+            <span class="pj-add-pomo-icon pj-pomo-icon-short" style="font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;position:relative;top:3px;">&#x1F345;</span>
+            <img class="pj-add-pomo-icon pj-pomo-icon-long" src="{{ "oxheart_tomato.png" | relURL }}" width="22" height="22" alt="Long pomodoro" style="display:none;">
+            <span class="pj-add-pomo-count" id="pj-add-pomo-count">1</span>
+          </button>
+          <button type="button" class="pj-add-pomo-plus" id="pj-add-pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"></line><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+          </button>
+        </div>
+        <input type="number" id="pj-add-custom-min" class="pj-add-custom-min" placeholder="min" min="0" max="999" title="Custom time override (minutes)" aria-label="Custom time in minutes">
+        <button type="button" id="pj-add-btn" class="pj-add-btn" title="Add task">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+        </button>
+      </div>
+      <div class="pj-add-row-icons" id="pj-add-row-icons">
+        <div class="pj-add-bujo-type-toggle" id="pj-add-bujo-type-toggle">
+          <button type="button" class="pj-add-bujo-type-btn active" data-bujo-type="task" title="Task">
+            <svg width="12" height="12" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg>
+          </button>
+          <button type="button" class="pj-add-bujo-type-btn" data-bujo-type="event" title="Event">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg>
+          </button>
+          <button type="button" class="pj-add-bujo-type-btn" data-bujo-type="note" title="Note">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg>
+          </button>
+        </div>
+        <button type="button" class="pj-add-icon-btn" id="pj-add-date-icon" title="Schedule date" aria-label="Schedule date">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </button>
+        <span class="pj-add-chip" id="pj-add-date-chip" style="display:none;">
+          <span class="pj-add-chip-text" id="pj-add-date-chip-text"></span>
+          <button type="button" class="pj-add-chip-clear" id="pj-add-date-chip-clear" aria-label="Clear date">&times;</button>
+        </span>
+        <button type="button" class="pj-add-icon-btn" id="pj-add-reminder-icon" title="Set reminder" aria-label="Set reminder">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        </button>
+        <span class="pj-add-chip" id="pj-add-reminder-chip" style="display:none;">
+          <span class="pj-add-chip-text" id="pj-add-reminder-chip-text"></span>
+          <button type="button" class="pj-add-chip-clear" id="pj-add-reminder-chip-clear" aria-label="Clear reminder">&times;</button>
+        </span>
+        <div class="pj-add-category-icon-wrap" id="pj-add-category-icon-wrap">
+          <button type="button" class="pj-add-icon-btn" id="pj-add-category-icon" title="Set category" aria-label="Set category">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+          </button>
+          <div class="pj-add-category-popover" id="pj-add-category-popover" style="display:none;">
+            <input type="text" id="pj-add-category-input" class="pj-add-category-search" placeholder="Search or add category..." autocomplete="off">
+            <div class="pj-add-category-dropdown" id="pj-add-category-dropdown"></div>
+          </div>
+        </div>
+        <span class="pj-add-chip" id="pj-add-category-chip" style="display:none;">
+          <span class="pj-add-chip-text" id="pj-add-category-chip-text"></span>
+          <button type="button" class="pj-add-chip-clear" id="pj-add-category-chip-clear" aria-label="Clear category">&times;</button>
+        </span>
+      </div>
+      <div class="pj-add-hints" id="pj-add-hints" style="display:none;">
+        <span><kbd>Enter</kbd> add</span>
+        <span class="pj-add-hints-sep">&middot;</span>
+        <span><kbd>&#x21E7;Enter</kbd> add another</span>
+        <span class="pj-add-hints-sep">&middot;</span>
+        <span><kbd>Esc</kbd> close</span>
+      </div>
+    </div>
     <div id="project-task-list"></div>
     <div class="project-tasks-empty" id="project-tasks-empty" style="display:none;">
-      No tasks assigned to this project yet.<br>
-      Assign tasks from the Inbox or Board.
+      No tasks in this project yet. Add one above!
     </div>
   </div>
 </div>
@@ -1038,6 +1416,524 @@
 
     loadData();
   }
+
+  // ─── Add Task Form (mirrors Inbox pattern) ───
+  var _pjAddTitle = document.getElementById('pj-add-title');
+  var _pjAddBtn = document.getElementById('pj-add-btn');
+  var _pjAddCustomMin = document.getElementById('pj-add-custom-min');
+  var _pjAddPomoGroup = document.getElementById('pj-add-pomodoro-group');
+  var _pjAddPomoCountEl = document.getElementById('pj-add-pomo-count');
+  var _pjAddPomoBtn = document.getElementById('pj-add-pomo-btn');
+  var _pjAddPomoMinus = document.getElementById('pj-add-pomo-minus');
+  var _pjAddPomoPlus = document.getElementById('pj-add-pomo-plus');
+  var _pjAddHints = document.getElementById('pj-add-hints');
+  var _pjBujoToggle = document.getElementById('pj-add-bujo-type-toggle');
+  var _pjDateIcon = document.getElementById('pj-add-date-icon');
+  var _pjDateChip = document.getElementById('pj-add-date-chip');
+  var _pjDateChipText = document.getElementById('pj-add-date-chip-text');
+  var _pjDateChipClear = document.getElementById('pj-add-date-chip-clear');
+  var _pjReminderIcon = document.getElementById('pj-add-reminder-icon');
+  var _pjReminderChip = document.getElementById('pj-add-reminder-chip');
+  var _pjReminderChipText = document.getElementById('pj-add-reminder-chip-text');
+  var _pjReminderChipClear = document.getElementById('pj-add-reminder-chip-clear');
+  var _pjCatIcon = document.getElementById('pj-add-category-icon');
+  var _pjCatIconWrap = document.getElementById('pj-add-category-icon-wrap');
+  var _pjCatPopover = document.getElementById('pj-add-category-popover');
+  var _pjCatInput = document.getElementById('pj-add-category-input');
+  var _pjCatDropdown = document.getElementById('pj-add-category-dropdown');
+  var _pjCatChip = document.getElementById('pj-add-category-chip');
+  var _pjCatChipText = document.getElementById('pj-add-category-chip-text');
+  var _pjCatChipClear = document.getElementById('pj-add-category-chip-clear');
+
+  // Add form state
+  var _pjPomoCount = 1;
+  var _pjPomoMode = 'short'; // 'short' | 'long'
+  var _pjBujoType = 'task';
+  var _pjFormDate = null;
+  var _pjReminderMs = null;
+  var _pjCategory = null;
+  var _pjCatPrompted = false;
+  var _pjAllCategories = [];
+
+  // Read pomo settings from localStorage (same keys as inbox)
+  var _pjPomoShortWork = 25;
+  try { var _v = parseInt(localStorage.getItem('dm-pomo-short-work'), 10); if (_v > 0) _pjPomoShortWork = _v; } catch(e) {}
+  var _pjPomoShortBreak = 5;
+  try { var _v = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (_v > 0) _pjPomoShortBreak = _v; } catch(e) {}
+  var _pjPomoLongWork = 50;
+  try { var _v = parseInt(localStorage.getItem('dm-pomo-long-work'), 10); if (_v > 0) _pjPomoLongWork = _v; } catch(e) {}
+  var _pjPomoLongBreak = 10;
+  try { var _v = parseInt(localStorage.getItem('dm-pomo-long-break'), 10); if (_v > 0) _pjPomoLongBreak = _v; } catch(e) {}
+  var _pjDefaultPomoCount = 1;
+  try { var _v = parseInt(localStorage.getItem('dm-default-pomo-count'), 10); if (_v >= 0) _pjDefaultPomoCount = _v; } catch(e) {}
+  _pjPomoCount = _pjDefaultPomoCount;
+
+  // Listen for settings changes
+  document.addEventListener('dm-settings-changed', function(e) {
+    var d = e.detail || {};
+    if (d.key === 'dm-pomo-short-work' && d.value > 0) _pjPomoShortWork = d.value;
+    if (d.key === 'dm-pomo-short-break' && d.value > 0) _pjPomoShortBreak = d.value;
+    if (d.key === 'dm-pomo-long-work' && d.value > 0) _pjPomoLongWork = d.value;
+    if (d.key === 'dm-pomo-long-break' && d.value > 0) _pjPomoLongBreak = d.value;
+    if (d.key === 'dm-default-pomo-count') { _pjDefaultPomoCount = d.value; _pjPomoCount = d.value; pjUpdatePomoDisplay(); }
+  });
+
+  function pjUpdatePomoDisplay() {
+    if (_pjAddPomoCountEl) _pjAddPomoCountEl.textContent = _pjPomoCount;
+  }
+
+  // Pomodoro +/- buttons
+  if (_pjAddPomoMinus) _pjAddPomoMinus.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (_pjPomoCount > 0) { _pjPomoCount--; pjUpdatePomoDisplay(); }
+  });
+  if (_pjAddPomoPlus) _pjAddPomoPlus.addEventListener('click', function(e) {
+    e.preventDefault();
+    _pjPomoCount++;
+    pjUpdatePomoDisplay();
+  });
+
+  // Pomodoro mode toggle (short/long)
+  if (_pjAddPomoBtn) _pjAddPomoBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    _pjPomoMode = _pjPomoMode === 'short' ? 'long' : 'short';
+    var shortIcon = _pjAddPomoBtn.querySelector('.pj-pomo-icon-short');
+    var longIcon = _pjAddPomoBtn.querySelector('.pj-pomo-icon-long');
+    if (_pjPomoMode === 'long') {
+      if (shortIcon) shortIcon.style.display = 'none';
+      if (longIcon) longIcon.style.display = '';
+      _pjAddPomoBtn.title = 'Long session (click to switch)';
+    } else {
+      if (shortIcon) shortIcon.style.display = '';
+      if (longIcon) longIcon.style.display = 'none';
+      _pjAddPomoBtn.title = 'Short session (click to switch)';
+    }
+  });
+
+  // Bujo type toggle
+  if (_pjBujoToggle) _pjBujoToggle.addEventListener('click', function(e) {
+    var btn = e.target.closest('.pj-add-bujo-type-btn');
+    if (!btn) return;
+    _pjBujoType = btn.getAttribute('data-bujo-type');
+    _pjBujoToggle.querySelectorAll('.pj-add-bujo-type-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+  });
+
+  // Date popover
+  var _pjDatePopover = null;
+  function pjShowDatePopover() {
+    pjCloseDatePopover();
+    pjCloseReminderPopover();
+    _pjDatePopover = document.createElement('div');
+    _pjDatePopover.className = 'pj-add-popover';
+    _pjDatePopover.style.position = 'absolute';
+    _pjDatePopover.style.top = '100%';
+    _pjDatePopover.style.left = '0';
+    var inp = document.createElement('input');
+    inp.type = 'date';
+    inp.value = _pjFormDate || '';
+    _pjDatePopover.appendChild(inp);
+    _pjDateIcon.parentNode.style.position = 'relative';
+    _pjDateIcon.parentNode.insertBefore(_pjDatePopover, _pjDateIcon.nextSibling);
+    inp.focus();
+    inp.addEventListener('change', function() {
+      _pjFormDate = inp.value || null;
+      pjUpdateDateChip();
+      pjCloseDatePopover();
+    });
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') pjCloseDatePopover();
+    });
+  }
+  function pjCloseDatePopover() {
+    if (_pjDatePopover && _pjDatePopover.parentNode) _pjDatePopover.parentNode.removeChild(_pjDatePopover);
+    _pjDatePopover = null;
+  }
+  function pjUpdateDateChip() {
+    if (_pjFormDate) {
+      var d = new Date(_pjFormDate + 'T00:00:00');
+      _pjDateChipText.textContent = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+      _pjDateChip.style.display = '';
+      _pjDateIcon.style.display = 'none';
+    } else {
+      _pjDateChip.style.display = 'none';
+      _pjDateIcon.style.display = '';
+    }
+  }
+  if (_pjDateIcon) _pjDateIcon.addEventListener('click', function(e) { e.preventDefault(); pjShowDatePopover(); });
+  if (_pjDateChip) _pjDateChip.addEventListener('click', function(e) {
+    if (e.target.closest('.pj-add-chip-clear')) return;
+    pjShowDatePopover();
+  });
+  if (_pjDateChipClear) _pjDateChipClear.addEventListener('click', function(e) {
+    e.preventDefault();
+    _pjFormDate = null;
+    pjUpdateDateChip();
+  });
+
+  // Reminder popover
+  var _pjReminderPopover = null;
+  function pjShowReminderPopover() {
+    pjCloseReminderPopover();
+    pjCloseDatePopover();
+    _pjReminderPopover = document.createElement('div');
+    _pjReminderPopover.className = 'pj-add-popover';
+    _pjReminderPopover.style.position = 'absolute';
+    _pjReminderPopover.style.top = '100%';
+    _pjReminderPopover.style.left = '0';
+    var inp = document.createElement('input');
+    inp.type = 'datetime-local';
+    if (_pjReminderMs) {
+      var rd = new Date(_pjReminderMs);
+      inp.value = rd.getFullYear() + '-' + String(rd.getMonth()+1).padStart(2,'0') + '-' + String(rd.getDate()).padStart(2,'0') + 'T' + String(rd.getHours()).padStart(2,'0') + ':' + String(rd.getMinutes()).padStart(2,'0');
+    }
+    _pjReminderPopover.appendChild(inp);
+    _pjReminderIcon.parentNode.style.position = 'relative';
+    _pjReminderIcon.parentNode.insertBefore(_pjReminderPopover, _pjReminderIcon.nextSibling);
+    inp.focus();
+    inp.addEventListener('change', function() {
+      if (inp.value) {
+        _pjReminderMs = new Date(inp.value).getTime();
+      } else {
+        _pjReminderMs = null;
+      }
+      pjUpdateReminderChip();
+      pjCloseReminderPopover();
+    });
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') pjCloseReminderPopover();
+    });
+  }
+  function pjCloseReminderPopover() {
+    if (_pjReminderPopover && _pjReminderPopover.parentNode) _pjReminderPopover.parentNode.removeChild(_pjReminderPopover);
+    _pjReminderPopover = null;
+  }
+  function pjUpdateReminderChip() {
+    if (_pjReminderMs) {
+      var rd = new Date(_pjReminderMs);
+      _pjReminderChipText.textContent = rd.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      _pjReminderChip.style.display = '';
+      _pjReminderIcon.style.display = 'none';
+    } else {
+      _pjReminderChip.style.display = 'none';
+      _pjReminderIcon.style.display = '';
+    }
+  }
+  if (_pjReminderIcon) _pjReminderIcon.addEventListener('click', function(e) { e.preventDefault(); pjShowReminderPopover(); });
+  if (_pjReminderChip) _pjReminderChip.addEventListener('click', function(e) {
+    if (e.target.closest('.pj-add-chip-clear')) return;
+    pjShowReminderPopover();
+  });
+  if (_pjReminderChipClear) _pjReminderChipClear.addEventListener('click', function(e) {
+    e.preventDefault();
+    _pjReminderMs = null;
+    pjUpdateReminderChip();
+  });
+
+  // Category popover
+  function pjLoadCategories() {
+    if (!window.dmSync) return;
+    window.dmSync.getAllTodos().then(function(todos) {
+      var cats = {};
+      todos.forEach(function(t) { if (t.category) cats[t.category] = true; });
+      _pjAllCategories = Object.keys(cats).sort();
+    });
+  }
+
+  function pjShowCatPopover() {
+    pjLoadCategories();
+    _pjCatPopover.style.display = '';
+    _pjCatInput.value = '';
+    pjRenderCatDropdown('');
+    setTimeout(function() { _pjCatInput.focus(); }, 30);
+  }
+  function pjHideCatPopover() {
+    _pjCatPopover.style.display = 'none';
+  }
+
+  function pjRenderCatDropdown(query) {
+    var q = (query || '').toLowerCase();
+    var matches = _pjAllCategories.filter(function(c) { return !q || c.toLowerCase().indexOf(q) !== -1; });
+    var html = '';
+    matches.forEach(function(c) {
+      html += '<div class="pj-cat-option">' + escapeHtml(c) + '</div>';
+    });
+    if (!matches.length && q) {
+      html = '<div class="pj-cat-option" style="color:var(--color-link);">Create "' + escapeHtml(query) + '"</div>';
+    }
+    _pjCatDropdown.innerHTML = html;
+    _pjCatDropdown.querySelectorAll('.pj-cat-option').forEach(function(opt, i) {
+      opt.addEventListener('click', function() {
+        var val = matches[i] || query;
+        pjSelectCat(val);
+      });
+    });
+  }
+
+  function pjSelectCat(cat) {
+    _pjCategory = cat || null;
+    pjUpdateCatChip();
+    pjHideCatPopover();
+    if (_pjCatPrompted) {
+      _pjCatPrompted = false;
+      pjAddFromForm(false);
+    }
+  }
+
+  function pjUpdateCatChip() {
+    if (_pjCategory) {
+      _pjCatChipText.textContent = _pjCategory;
+      _pjCatChip.style.display = '';
+      _pjCatIcon.style.display = 'none';
+    } else {
+      _pjCatChip.style.display = 'none';
+      _pjCatIcon.style.display = '';
+    }
+  }
+
+  if (_pjCatInput) _pjCatInput.addEventListener('input', function() { pjRenderCatDropdown(_pjCatInput.value.trim()); });
+  if (_pjCatInput) _pjCatInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var val = _pjCatInput.value.trim();
+      // If there's an active (highlighted) option, select it; else use typed value
+      var activeOpt = _pjCatDropdown.querySelector('.pj-cat-option.active');
+      if (activeOpt) {
+        pjSelectCat(activeOpt.textContent.replace(/^Create "/, '').replace(/"$/, ''));
+      } else if (val) {
+        pjSelectCat(val);
+      } else {
+        // Empty enter = skip category
+        pjSelectCat(null);
+      }
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      pjHideCatPopover();
+      _pjAddTitle.focus();
+    }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      var opts = _pjCatDropdown.querySelectorAll('.pj-cat-option');
+      if (!opts.length) return;
+      var idx = -1;
+      opts.forEach(function(o, i) { if (o.classList.contains('active')) idx = i; });
+      opts.forEach(function(o) { o.classList.remove('active'); });
+      if (e.key === 'ArrowDown') idx = (idx + 1) % opts.length;
+      else idx = idx <= 0 ? opts.length - 1 : idx - 1;
+      opts[idx].classList.add('active');
+    }
+  });
+  if (_pjCatIcon) _pjCatIcon.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (_pjCatPopover.style.display === 'none') pjShowCatPopover();
+    else pjHideCatPopover();
+  });
+  if (_pjCatChip) _pjCatChip.addEventListener('click', function(e) {
+    if (e.target.closest('.pj-add-chip-clear')) return;
+    pjShowCatPopover();
+  });
+  if (_pjCatChipClear) _pjCatChipClear.addEventListener('click', function(e) {
+    e.preventDefault();
+    _pjCategory = null;
+    pjUpdateCatChip();
+  });
+
+  // Close popovers on outside click
+  document.addEventListener('click', function(e) {
+    if (_pjCatPopover && _pjCatPopover.style.display !== 'none' && !_pjCatIconWrap.contains(e.target) && !_pjCatChip.contains(e.target)) {
+      pjHideCatPopover();
+    }
+    if (_pjDatePopover && !_pjDatePopover.contains(e.target) && e.target !== _pjDateIcon) {
+      pjCloseDatePopover();
+    }
+    if (_pjReminderPopover && !_pjReminderPopover.contains(e.target) && e.target !== _pjReminderIcon) {
+      pjCloseReminderPopover();
+    }
+  });
+
+  // Show/hide hints on focus
+  if (_pjAddTitle) _pjAddTitle.addEventListener('focus', function() { _pjAddHints.style.display = ''; });
+  if (_pjAddTitle) _pjAddTitle.addEventListener('blur', function() {
+    setTimeout(function() { _pjAddHints.style.display = 'none'; }, 200);
+  });
+
+  // ─── Task creation ───
+  function pjAddFromForm(keepOpen) {
+    if (!_currentProjectId) return;
+    var title = _pjAddTitle.value.trim();
+    if (!title) { _pjAddTitle.focus(); return; }
+
+    // Category prompt on first Enter (same as inbox)
+    // Skipped here — handled by caller
+
+    var customMin = _pjAddCustomMin.value ? parseInt(_pjAddCustomMin.value, 10) : null;
+    var pomLen = _pjPomoMode === 'long' ? _pjPomoLongWork : _pjPomoShortWork;
+    var pomBreakLen = _pjPomoMode === 'long' ? _pjPomoLongBreak : _pjPomoShortBreak;
+    var est;
+    if (customMin != null && customMin >= 0) {
+      pomLen = customMin;
+      est = _pjPomoCount > 0 ? _pjPomoCount * customMin : customMin;
+    } else if (_pjPomoCount > 0) {
+      est = _pjPomoCount * pomLen;
+    } else {
+      est = 0;
+    }
+
+    var scheduledDate = _pjFormDate || null;
+    var reminderAtMs = _pjReminderMs && _pjReminderMs > Date.now() ? _pjReminderMs : null;
+    var category = _pjCategory || null;
+
+    _pjAddBtn.disabled = true;
+
+    // Get userId
+    var userIdPromise;
+    if (window.dmAuth && window.dmAuth.currentUser) {
+      userIdPromise = Promise.resolve(window.dmAuth.currentUser.uid);
+    } else {
+      userIdPromise = window.dmSync.getCachedUserId();
+    }
+
+    userIdPromise.then(function(userId) {
+      if (!userId) { _pjAddBtn.disabled = false; return; }
+
+      // Generate order (place at bottom of project tasks)
+      return window.dmSync.getProjectTodos(_currentProjectId).then(function(todos) {
+        var maxOrder = 0;
+        todos.forEach(function(t) { if ((t.order || 0) > maxOrder) maxOrder = t.order || 0; });
+        return { userId: userId, order: maxOrder + 1 };
+      });
+    }).then(function(ctx) {
+      if (!ctx) return;
+
+      var newDocId = window.dmDb ? window.dmDb.collection('todos').doc().id : ('local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+
+      var todoData = {
+        userId: ctx.userId,
+        title: title,
+        estimatedMin: est || ((_pjPomoCount || 1) * pomLen),
+        actualMin: null,
+        category: category,
+        projectId: _currentProjectId,
+        pomodoroCount: _pjPomoCount || 1,
+        pomodoroLength: pomLen,
+        breakLength: pomBreakLen,
+        done: false,
+        status: 'active',
+        parentId: null,
+        order: ctx.order,
+        kanbanOrder: ctx.order,
+        scheduledDate: scheduledDate,
+        reminderAt: reminderAtMs && typeof firebase !== 'undefined' ? firebase.firestore.Timestamp.fromMillis(reminderAtMs) : null,
+        reminderFired: false,
+        reminderAcked: false,
+        source: null,
+        bujoType: _pjBujoType,
+        bujoState: 'open',
+        kanbanStatus: 'todo',
+        collaborators: [],
+        createdAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
+        updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
+        completedAt: null
+      };
+
+      var localTodo = {
+        id: newDocId,
+        userId: ctx.userId,
+        title: title,
+        estimatedMin: todoData.estimatedMin,
+        actualMin: null,
+        category: category,
+        projectId: _currentProjectId,
+        pomodoroCount: todoData.pomodoroCount,
+        pomodoroLength: pomLen,
+        breakLength: pomBreakLen,
+        done: false,
+        status: 'active',
+        parentId: null,
+        order: ctx.order,
+        kanbanOrder: ctx.order,
+        scheduledDate: scheduledDate,
+        reminderAt: reminderAtMs || null,
+        reminderFired: false,
+        reminderAcked: false,
+        source: null,
+        bujoType: _pjBujoType,
+        bujoState: 'open',
+        kanbanStatus: 'todo',
+        collaborators: [],
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        completedAt: null
+      };
+
+      return window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: newDocId,
+        op: 'set',
+        data: todoData,
+        localOp: function() { return window.dmSync.putTodo(localTodo); }
+      });
+    }).then(function() {
+      _pjAddBtn.disabled = false;
+      // Reset form fields
+      _pjAddTitle.value = '';
+      _pjAddCustomMin.value = '';
+      _pjPomoCount = _pjDefaultPomoCount;
+      pjUpdatePomoDisplay();
+      // Clear reminder but keep date and category sticky
+      _pjReminderMs = null;
+      pjUpdateReminderChip();
+      // Reset bujo type
+      _pjBujoType = 'task';
+      if (_pjBujoToggle) {
+        _pjBujoToggle.querySelectorAll('.pj-add-bujo-type-btn').forEach(function(b) { b.classList.remove('active'); });
+        var taskBtn = _pjBujoToggle.querySelector('[data-bujo-type="task"]');
+        if (taskBtn) taskBtn.classList.add('active');
+      }
+      pjHideCatPopover();
+      pjCloseDatePopover();
+      pjCloseReminderPopover();
+      // Re-render detail
+      renderDetail(_currentProjectId);
+      loadTodoCounts().then(function() { renderList(); });
+      if (keepOpen) {
+        _pjAddTitle.focus();
+      }
+    }).catch(function(err) {
+      console.error('Error creating task in project:', err);
+      _pjAddBtn.disabled = false;
+    });
+  }
+
+  // Submit button
+  if (_pjAddBtn) _pjAddBtn.addEventListener('click', function() { pjAddFromForm(false); });
+
+  // Enter on title
+  if (_pjAddTitle) _pjAddTitle.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      var title = _pjAddTitle.value.trim();
+      if (!title) { _pjAddTitle.focus(); return; }
+      // Category prompt on first Enter without category (same as inbox)
+      if (!_pjCategory) {
+        _pjCatPrompted = true;
+        pjShowCatPopover();
+        return;
+      }
+      var keepOpen = e.metaKey || e.shiftKey;
+      pjAddFromForm(keepOpen);
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      _pjAddTitle.blur();
+    }
+  });
+
+  // Enter on custom min moves focus to title
+  if (_pjAddCustomMin) _pjAddCustomMin.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); _pjAddTitle.focus(); }
+  });
 
   // ─── Modal ───
   function buildColorPicker() {
