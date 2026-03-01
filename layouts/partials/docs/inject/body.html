@@ -2471,6 +2471,18 @@
   // Only run on pages that have the landing page auth elements
   if (!gardenSignin) return;
 
+  // Pre-apply cached auth state to prevent sign-out flash
+  try {
+    var cachedUser = JSON.parse(localStorage.getItem('dm-cached-user') || 'null');
+    if (cachedUser) {
+      gardenSignin.style.display = 'none';
+      gardenAuthUser.style.display = '';
+      gardenAvatar.src = cachedUser.photoURL || '';
+      gardenAvatar.alt = cachedUser.displayName || '';
+      gardenName.textContent = cachedUser.displayName || cachedUser.email || '';
+    }
+  } catch(e) {}
+
   function subscribeGardenAuth() {
     window.dmAuth.onAuthStateChanged(function(user) {
       if (user) {

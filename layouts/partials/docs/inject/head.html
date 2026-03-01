@@ -89,6 +89,19 @@
       return new Promise(function(resolve) {
         var unsub = window.dmAuth.onAuthStateChanged(function(user) {
           unsub();
+          // Cache auth state in localStorage so subsequent page loads can
+          // pre-render the signed-in UI before Firebase resolves from IDB
+          try {
+            if (user) {
+              localStorage.setItem('dm-cached-user', JSON.stringify({
+                displayName: user.displayName || '',
+                email: user.email || '',
+                photoURL: user.photoURL || ''
+              }));
+            } else {
+              localStorage.removeItem('dm-cached-user');
+            }
+          } catch(e) {}
           resolve(user);
         });
       });

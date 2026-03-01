@@ -3288,6 +3288,19 @@
 
   if (window.dmAuth) {
     function handleSyncAuth(user) {
+      // Keep localStorage auth cache in sync for instant UI on page load
+      try {
+        if (user) {
+          localStorage.setItem('dm-cached-user', JSON.stringify({
+            displayName: user.displayName || '',
+            email: user.email || '',
+            photoURL: user.photoURL || ''
+          }));
+        } else {
+          localStorage.removeItem('dm-cached-user');
+        }
+      } catch(e) {}
+
       if (user) {
         // Register/update user profile for task sharing lookups
         if (window.dmRegisterUser) window.dmRegisterUser(user);
