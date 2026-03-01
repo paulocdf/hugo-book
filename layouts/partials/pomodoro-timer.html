@@ -41,7 +41,7 @@
   <div class="pomodoro-focus-backdrop"></div>
   <div class="pomodoro-focus-card">
     <!-- Top header strip with ambient visualizer canvas behind -->
-    <div class="pomodoro-focus-header-strip">
+    <div class="pomodoro-focus-header-strip" role="button" aria-label="Toggle visualizer mode" tabindex="0">
       <canvas id="focus-viz-canvas" class="pomodoro-focus-viz-canvas"></canvas>
       <div class="pomodoro-focus-header">
         <div class="pomodoro-focus-header-left">
@@ -49,7 +49,7 @@
           <div class="pomodoro-focus-category" id="focus-category" style="display:none;"></div>
         </div>
         <div class="pomodoro-focus-header-actions">
-          <button type="button" class="pomodoro-focus-settings-btn" id="focus-settings-btn" title="Focus settings" aria-label="Focus settings">
+          <button type="button" class="pomodoro-focus-settings-btn" id="focus-settings-btn" title="Focus settings" aria-label="Focus settings" aria-haspopup="true" aria-expanded="false">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
           </button>
           <button type="button" class="pomodoro-focus-collapse" id="focus-collapse" title="Exit focus mode" aria-label="Exit focus mode">
@@ -92,9 +92,9 @@
     </div>
 
     <!-- Auto-advance countdown overlay -->
-    <div class="pomodoro-focus-countdown-overlay" id="focus-countdown-overlay">
+    <div class="pomodoro-focus-countdown-overlay" id="focus-countdown-overlay" role="alertdialog" aria-label="Auto-advance countdown">
       <div class="pomodoro-focus-countdown-text" id="focus-countdown-text">Break starts in</div>
-      <div class="pomodoro-focus-countdown-number" id="focus-countdown-number">10</div>
+      <div class="pomodoro-focus-countdown-number" id="focus-countdown-number" aria-live="assertive">10</div>
       <button type="button" class="pomodoro-focus-countdown-cancel" id="focus-countdown-cancel">Pause</button>
     </div>
 
@@ -129,16 +129,24 @@
 
         <div class="pomodoro-focus-subtasks" id="focus-subtasks" style="display:none;"></div>
         <div class="pomodoro-focus-inline-stats" id="focus-inline-stats"></div>
+        <!-- Collapsed notes toggle (visible when notes panel is collapsed) -->
+        <div class="pomodoro-focus-notes-toggle" id="focus-notes-toggle" style="display:none;">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+          Notes <span class="pomodoro-focus-notes-chevron">&#x25B8;</span>
+        </div>
       </div>
+
+      <!-- Resize handle between columns -->
+      <div class="pomodoro-focus-resize-handle" id="focus-resize-handle" title="Drag to resize"></div>
 
       <!-- Right column: notes -->
       <div class="pomodoro-focus-right">
         <!-- Notes panel -->
         <div class="pomodoro-focus-notes-panel" id="focus-panel-notes">
-          <div class="pomodoro-focus-panel-label">
+          <label for="focus-notes-textarea" class="pomodoro-focus-panel-label pomodoro-focus-notes-label" id="focus-notes-label">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-            Notes
-          </div>
+            Notes <span class="pomodoro-focus-notes-chevron">&#x25BE;</span>
+          </label>
           <textarea id="focus-notes-textarea" class="pomodoro-focus-notes-textarea" placeholder="Jot down thoughts while you work..."></textarea>
           <div class="pomodoro-focus-notes-status" id="focus-notes-status"></div>
         </div>
@@ -694,6 +702,7 @@
   margin-bottom: 16px;
   max-width: 100%;
   text-align: center;
+  user-select: text;
 }
 .pomodoro-focus-display {
   font-size: 7rem;
@@ -853,6 +862,7 @@
   line-height: 1.6;
   width: 100%;
   max-width: 450px;
+  user-select: text;
 }
 .pomodoro-focus-inline-stats .stat-sep {
   margin: 0 5px;
@@ -866,6 +876,74 @@
   letter-spacing: 0.06em;
   color: var(--gray-400);
   margin-bottom: 8px;
+}
+/* Notes panel label — clickable to collapse */
+.pomodoro-focus-notes-label {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pomodoro-focus-notes-label:hover {
+  color: var(--gray-600);
+}
+.pomodoro-focus-notes-chevron {
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+/* Collapsed notes toggle bar (shown in left column when notes are collapsed) */
+.pomodoro-focus-notes-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 6px 14px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-400);
+  transition: background 0.15s, color 0.15s;
+}
+.pomodoro-focus-notes-toggle:hover {
+  background: var(--gray-100);
+  color: var(--gray-600);
+}
+/* Collapsed state — hide right column and resize handle */
+.pomodoro-focus-body.notes-collapsed .pomodoro-focus-right,
+.pomodoro-focus-body.notes-collapsed .pomodoro-focus-resize-handle {
+  display: none;
+}
+/* Resize handle between columns */
+.pomodoro-focus-resize-handle {
+  width: 6px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  position: relative;
+  margin: 0 -3px;
+  z-index: 2;
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+.pomodoro-focus-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 32px;
+  border-radius: 1px;
+  background: var(--gray-300);
+  transition: background 0.15s, height 0.15s;
+}
+.pomodoro-focus-resize-handle:hover::after,
+.pomodoro-focus-resize-handle.dragging::after {
+  background: var(--color-link);
+  height: 48px;
 }
 /* Up Next footer strip */
 .pomodoro-focus-upnext-strip {
@@ -1173,12 +1251,15 @@
     flex: none;
   }
   .pomodoro-focus-right {
-    width: 100%;
+    width: 100% !important;
     border-left: none;
     padding-left: 0;
     border-top: 1px solid var(--gray-200);
     padding-top: 14px;
     overflow-y: visible;
+  }
+  .pomodoro-focus-resize-handle {
+    display: none;
   }
   .pomodoro-focus-notes-textarea {
     min-height: 80px;
@@ -1407,6 +1488,12 @@
   var focusProgressStripFill = document.getElementById('focus-progress-strip-fill');
   var focusProgressStripText = document.getElementById('focus-progress-strip-text');
   var focusShowProgressCheckbox = document.getElementById('focus-show-progress');
+  // Focus overlay — collapsible notes
+  var focusNotesLabel = document.getElementById('focus-notes-label');
+  var focusNotesToggle = document.getElementById('focus-notes-toggle');
+  var focusBodyEl = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-body') : null;
+  var focusRightCol = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-right') : null;
+  var focusResizeHandle = document.getElementById('focus-resize-handle');
 
   // ── Focus theme definitions ──
   var FOCUS_THEMES = [
@@ -1455,6 +1542,22 @@
   }
   function setShowProgress(val) {
     try { localStorage.setItem(SHOW_PROGRESS_KEY, val ? 'true' : 'false'); } catch(e) {}
+  }
+  var NOTES_COLLAPSED_KEY = 'dm-pomo-notes-collapsed';
+  function isNotesCollapsed() {
+    try { return localStorage.getItem(NOTES_COLLAPSED_KEY) === 'true'; } catch(e) {}
+    return false; // default expanded
+  }
+  function setNotesCollapsed(val) {
+    try { localStorage.setItem(NOTES_COLLAPSED_KEY, val ? 'true' : 'false'); } catch(e) {}
+  }
+  var RIGHT_COL_WIDTH_KEY = 'dm-pomo-right-col-width';
+  function getSavedRightColWidth() {
+    try { var v = localStorage.getItem(RIGHT_COL_WIDTH_KEY); if (v) return parseInt(v, 10); } catch(e) {}
+    return 260; // default
+  }
+  function setSavedRightColWidth(w) {
+    try { localStorage.setItem(RIGHT_COL_WIDTH_KEY, String(w)); } catch(e) {}
   }
 
   // Apply custom color CSS variables to the backdrop element
@@ -3110,10 +3213,6 @@
 
   // Render session timeline blocks
   function renderSessionTimeline() {
-    if (totalSessions <= 1) {
-      focusTimelineEl.style.display = 'none';
-      return;
-    }
     focusTimelineEl.style.display = '';
     var html = '';
     for (var i = 1; i <= totalSessions; i++) {
@@ -3288,7 +3387,7 @@
         workColor = cc.work;
         breakColor = cc.break;
       }
-      html += '<button type="button" class="pomodoro-focus-theme-swatch' + activeCls + '" data-theme="' + t.id + '">'
+      html += '<button type="button" class="pomodoro-focus-theme-swatch' + activeCls + '" data-theme="' + t.id + '" aria-pressed="' + (t.id === current) + '">'
         + '<div class="pomodoro-focus-theme-swatch-colors">'
         + '<span style="background:' + workColor + '"></span>'
         + '<span style="background:' + breakColor + '"></span>'
@@ -3363,11 +3462,13 @@
       var isVisible = focusSettingsPopover.classList.contains('visible');
       if (isVisible) {
         focusSettingsPopover.classList.remove('visible');
+        focusSettingsBtn.setAttribute('aria-expanded', 'false');
       } else {
         renderThemeGrid();
         focusAutoAdvanceCheckbox.checked = isAutoAdvance();
         if (focusShowProgressCheckbox) focusShowProgressCheckbox.checked = isShowProgress();
         focusSettingsPopover.classList.add('visible');
+        focusSettingsBtn.setAttribute('aria-expanded', 'true');
       }
     });
     // Close popover when clicking outside
@@ -3375,7 +3476,86 @@
       if (!focusSettingsPopover.classList.contains('visible')) return;
       if (focusSettingsPopover.contains(e.target) || focusSettingsBtn.contains(e.target)) return;
       focusSettingsPopover.classList.remove('visible');
+      focusSettingsBtn.setAttribute('aria-expanded', 'false');
     });
+  }
+
+  // ── Collapsible notes panel ──
+  function applyNotesCollapsed(collapsed) {
+    if (!focusBodyEl) return;
+    if (collapsed) {
+      focusBodyEl.classList.add('notes-collapsed');
+      if (focusNotesToggle) focusNotesToggle.style.display = '';
+    } else {
+      focusBodyEl.classList.remove('notes-collapsed');
+      if (focusNotesToggle) focusNotesToggle.style.display = 'none';
+    }
+  }
+  function toggleNotesCollapsed() {
+    var collapsed = !isNotesCollapsed();
+    setNotesCollapsed(collapsed);
+    applyNotesCollapsed(collapsed);
+  }
+  if (focusNotesLabel) {
+    focusNotesLabel.addEventListener('click', function(e) {
+      e.preventDefault();
+      toggleNotesCollapsed();
+    });
+  }
+  if (focusNotesToggle) {
+    focusNotesToggle.addEventListener('click', function() {
+      setNotesCollapsed(false);
+      applyNotesCollapsed(false);
+      // Focus the textarea after expanding
+      if (focusNotesTextarea) focusNotesTextarea.focus();
+    });
+  }
+
+  // ── Resizable column split ──
+  function applyRightColWidth(w) {
+    if (focusRightCol) focusRightCol.style.width = w + 'px';
+  }
+  if (focusResizeHandle && focusRightCol && focusBodyEl) {
+    var _resizing = false;
+    var _resizeStartX = 0;
+    var _resizeStartW = 260;
+
+    function onResizeMove(e) {
+      if (!_resizing) return;
+      var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      var delta = _resizeStartX - clientX; // moving left = wider right col
+      var newW = Math.max(180, Math.min(500, _resizeStartW + delta));
+      applyRightColWidth(newW);
+    }
+    function onResizeEnd() {
+      if (!_resizing) return;
+      _resizing = false;
+      focusResizeHandle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      // Save the final width
+      var finalW = parseInt(focusRightCol.style.width, 10) || 260;
+      setSavedRightColWidth(finalW);
+      document.removeEventListener('mousemove', onResizeMove);
+      document.removeEventListener('mouseup', onResizeEnd);
+      document.removeEventListener('touchmove', onResizeMove);
+      document.removeEventListener('touchend', onResizeEnd);
+    }
+    function onResizeStart(e) {
+      e.preventDefault();
+      _resizing = true;
+      _resizeStartX = e.touches ? e.touches[0].clientX : e.clientX;
+      _resizeStartW = parseInt(focusRightCol.style.width, 10) || focusRightCol.offsetWidth || 260;
+      focusResizeHandle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onResizeMove);
+      document.addEventListener('mouseup', onResizeEnd);
+      document.addEventListener('touchmove', onResizeMove, { passive: false });
+      document.addEventListener('touchend', onResizeEnd);
+    }
+    focusResizeHandle.addEventListener('mousedown', onResizeStart);
+    focusResizeHandle.addEventListener('touchstart', onResizeStart, { passive: false });
   }
 
   // ── Auto-advance countdown ──
@@ -3690,6 +3870,11 @@
     timerEl.style.display = 'none';
     focusOverlay.style.display = '';
 
+    // Apply notes collapsed state
+    applyNotesCollapsed(isNotesCollapsed());
+    // Apply saved right column width
+    applyRightColWidth(getSavedRightColWidth());
+
     // Render new panels
     renderSessionTimeline();
 
@@ -3729,6 +3914,7 @@
     cancelAutoAdvanceCountdown();
     // Close settings popover
     if (focusSettingsPopover) focusSettingsPopover.classList.remove('visible');
+    if (focusSettingsBtn) focusSettingsBtn.setAttribute('aria-expanded', 'false');
     // Flush any pending notes save
     if (_focusNotesTimer) {
       clearTimeout(_focusNotesTimer);
@@ -3831,11 +4017,30 @@
   });
 
   // Escape key → collapse focus mode
+  // Focus mode keyboard shortcuts: Space=play/pause, R=reset, N=next
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && isFocusMode) {
+    if (!isFocusMode) return;
+    if (e.key === 'Escape') {
       e.preventDefault();
       e.stopPropagation();
       exitFocusMode();
+      return;
+    }
+    // Don't intercept shortcuts when typing in the notes textarea
+    var active = document.activeElement;
+    if (active && (active.tagName === 'TEXTAREA' || active.tagName === 'INPUT' || active.isContentEditable)) return;
+    if (e.key === ' ') {
+      e.preventDefault();
+      cancelAutoAdvanceCountdown();
+      if (isRunning) pauseTimer(); else startTimer();
+    } else if (e.key === 'r' || e.key === 'R') {
+      e.preventDefault();
+      cancelAutoAdvanceCountdown();
+      focusResetBtn.click();
+    } else if (e.key === 'n' || e.key === 'N') {
+      e.preventDefault();
+      cancelAutoAdvanceCountdown();
+      focusNextBtn.click();
     }
   });
 
@@ -3926,17 +4131,25 @@
       var row = document.createElement('div');
       var isActive = sub.id === activeTodoId;
       row.className = 'pomodoro-subtask-item' + (sub.done ? ' done' : '') + (isActive ? ' active' : '');
+      row.setAttribute('role', 'checkbox');
+      row.setAttribute('aria-checked', sub.done ? 'true' : 'false');
+      row.setAttribute('aria-label', sub.title);
+      row.setAttribute('tabindex', '0');
       var checkSvg = '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>';
       var estPill = sub.estimatedMin ? '<span class="pomo-subtask-est">' + sub.estimatedMin + 'm</span>' : '';
-      row.innerHTML = '<span class="pomo-subtask-checkbox">' + checkSvg + '</span>'
+      row.innerHTML = '<span class="pomo-subtask-checkbox" aria-hidden="true">' + checkSvg + '</span>'
         + '<label>' + escapeHtmlPomo(sub.title) + '</label>'
         + estPill;
-      row.addEventListener('click', function() {
+      var toggleFn = function() {
         var newDone = !sub.done;
         sub.done = newDone;
         toggleSubtaskDone(sub, newDone);
         // Recompute subtask remaining time
         loadSubtasks(parentId);
+      };
+      row.addEventListener('click', toggleFn);
+      row.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleFn(); }
       });
       container.appendChild(row);
     });
