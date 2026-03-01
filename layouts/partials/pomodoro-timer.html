@@ -49,12 +49,44 @@
           <div class="pomodoro-focus-category" id="focus-category" style="display:none;"></div>
         </div>
         <div class="pomodoro-focus-header-actions">
+          <button type="button" class="pomodoro-focus-settings-btn" id="focus-settings-btn" title="Focus settings" aria-label="Focus settings">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+          </button>
           <button type="button" class="pomodoro-focus-collapse" id="focus-collapse" title="Exit focus mode" aria-label="Exit focus mode">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 14 10 14 10 20"></polyline><polyline points="20 10 14 10 14 4"></polyline><line x1="14" y1="10" x2="21" y2="3"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
           </button>
           <button type="button" class="pomodoro-focus-close-btn" id="focus-close" title="Save &amp; close" aria-label="Save and close timer">&times;</button>
         </div>
       </div>
+    </div>
+
+    <!-- Focus settings popover -->
+    <div class="pomodoro-focus-settings-popover" id="focus-settings-popover">
+      <div class="pomodoro-focus-settings-title">Focus Settings</div>
+      <div class="pomodoro-focus-settings-group">
+        <span class="pomodoro-focus-settings-label">Color Theme</span>
+        <div class="pomodoro-focus-theme-grid" id="focus-theme-grid"></div>
+        <div class="pomodoro-focus-custom-colors" id="focus-custom-colors" style="display:none;">
+          <label>Work <input type="color" id="focus-custom-work" value="#b41e1e"></label>
+          <label>Break <input type="color" id="focus-custom-break" value="#1e7832"></label>
+        </div>
+      </div>
+      <div class="pomodoro-focus-settings-group">
+        <div class="pomodoro-focus-toggle-row">
+          <span class="pomodoro-focus-settings-label" style="margin-bottom:0;">Auto-advance</span>
+          <label class="pomodoro-focus-toggle-switch">
+            <input type="checkbox" id="focus-auto-advance" checked>
+            <span class="pomodoro-focus-toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Auto-advance countdown overlay -->
+    <div class="pomodoro-focus-countdown-overlay" id="focus-countdown-overlay">
+      <div class="pomodoro-focus-countdown-text" id="focus-countdown-text">Break starts in</div>
+      <div class="pomodoro-focus-countdown-number" id="focus-countdown-number">10</div>
+      <button type="button" class="pomodoro-focus-countdown-cancel" id="focus-countdown-cancel">Pause</button>
     </div>
 
     <!-- Two-column body -->
@@ -463,11 +495,47 @@
   -webkit-backdrop-filter: blur(6px);
   transition: background 0.6s ease;
 }
-.pomodoro-focus-backdrop.work {
+/* Theme: Alert (red work / green break — classic Pomodoro alertness) */
+.pomodoro-focus-backdrop.theme-alert.work {
   background: rgba(180, 30, 30, 0.55);
 }
-.pomodoro-focus-backdrop.break {
+.pomodoro-focus-backdrop.theme-alert.break {
   background: rgba(30, 120, 50, 0.50);
+}
+/* Theme: Deep Focus (blue work / amber break — research-backed default) */
+.pomodoro-focus-backdrop.theme-deep-focus.work {
+  background: rgba(25, 45, 155, 0.55);
+}
+.pomodoro-focus-backdrop.theme-deep-focus.break {
+  background: rgba(175, 130, 30, 0.48);
+}
+/* Theme: Ocean (deep teal work / soft cyan break) */
+.pomodoro-focus-backdrop.theme-ocean.work {
+  background: rgba(15, 80, 100, 0.55);
+}
+.pomodoro-focus-backdrop.theme-ocean.break {
+  background: rgba(40, 160, 180, 0.42);
+}
+/* Theme: Monochrome (dark charcoal work / medium gray break) */
+.pomodoro-focus-backdrop.theme-monochrome.work {
+  background: rgba(35, 35, 40, 0.60);
+}
+.pomodoro-focus-backdrop.theme-monochrome.break {
+  background: rgba(90, 90, 95, 0.50);
+}
+/* Theme: Forest (deep green work / warm earth break) */
+.pomodoro-focus-backdrop.theme-forest.work {
+  background: rgba(20, 75, 35, 0.55);
+}
+.pomodoro-focus-backdrop.theme-forest.break {
+  background: rgba(160, 120, 60, 0.45);
+}
+/* Theme: Custom (colors set via CSS variables) */
+.pomodoro-focus-backdrop.theme-custom.work {
+  background: var(--focus-custom-work, rgba(180, 30, 30, 0.55));
+}
+.pomodoro-focus-backdrop.theme-custom.break {
+  background: var(--focus-custom-break, rgba(30, 120, 50, 0.50));
 }
 .pomodoro-focus-card {
   position: relative;
@@ -834,6 +902,214 @@
 .pomodoro-focus-upnext-item:first-child::before {
   display: none;
 }
+/* Focus settings gear button (in header actions) */
+.pomodoro-focus-settings-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 3px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.pomodoro-focus-settings-btn:hover {
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.1);
+}
+/* Focus settings popover */
+.pomodoro-focus-settings-popover {
+  position: absolute;
+  top: 60px;
+  right: 16px;
+  width: 260px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 16px;
+  z-index: 20;
+  display: none;
+}
+.pomodoro-focus-settings-popover.visible {
+  display: block;
+}
+.pomodoro-focus-settings-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-400);
+  margin-bottom: 12px;
+}
+.pomodoro-focus-settings-group {
+  margin-bottom: 14px;
+}
+.pomodoro-focus-settings-group:last-child {
+  margin-bottom: 0;
+}
+.pomodoro-focus-settings-label {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+  margin-bottom: 6px;
+  display: block;
+}
+/* Theme swatches grid */
+.pomodoro-focus-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.pomodoro-focus-theme-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  background: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pomodoro-focus-theme-swatch:hover {
+  background: var(--gray-100, rgba(0,0,0,0.04));
+}
+.pomodoro-focus-theme-swatch.active {
+  border-color: var(--accent-blue, #4285f4);
+  background: var(--gray-100, rgba(0,0,0,0.04));
+}
+.pomodoro-focus-theme-swatch-colors {
+  display: flex;
+  gap: 2px;
+  height: 18px;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+}
+.pomodoro-focus-theme-swatch-colors span {
+  flex: 1;
+}
+.pomodoro-focus-theme-swatch-name {
+  font-size: 0.6rem;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+/* Custom color pickers row */
+.pomodoro-focus-custom-colors {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+.pomodoro-focus-custom-colors label {
+  font-size: 0.68rem;
+  color: var(--text-faint);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pomodoro-focus-custom-colors input[type="color"] {
+  width: 28px;
+  height: 22px;
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  padding: 1px;
+  cursor: pointer;
+  background: none;
+}
+/* Auto-advance toggle */
+.pomodoro-focus-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pomodoro-focus-toggle-switch {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.pomodoro-focus-toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.pomodoro-focus-toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--gray-300, #ccc);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.pomodoro-focus-toggle-slider::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+}
+.pomodoro-focus-toggle-switch input:checked + .pomodoro-focus-toggle-slider {
+  background: var(--accent-blue, #4285f4);
+}
+.pomodoro-focus-toggle-switch input:checked + .pomodoro-focus-toggle-slider::after {
+  transform: translateX(16px);
+}
+/* Auto-advance countdown overlay */
+.pomodoro-focus-countdown-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 15;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 20px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.pomodoro-focus-countdown-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+.pomodoro-focus-countdown-text {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  text-align: center;
+  margin-bottom: 12px;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+}
+.pomodoro-focus-countdown-number {
+  font-size: 4rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+.pomodoro-focus-countdown-cancel {
+  margin-top: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 8px 24px;
+  border-radius: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pomodoro-focus-countdown-cancel:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
 /* Responsive: tablets / smaller desktops */
 @media (max-width: 800px) {
   .pomodoro-focus-card {
@@ -922,6 +1198,13 @@
   }
   .pomodoro-focus-upnext-item:first-child {
     max-width: 200px;
+  }
+  .pomodoro-focus-countdown-overlay {
+    border-radius: 0;
+  }
+  .pomodoro-focus-settings-popover {
+    right: 8px;
+    width: 240px;
   }
 }
 /* Focus mode notes panel */
@@ -1049,6 +1332,78 @@
   var focusVizCanvas = document.getElementById('focus-viz-canvas');
   var focusHeaderStrip = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-header-strip') : null;
   var focusVizContainer = focusVizCanvas ? focusVizCanvas.parentElement : null;
+
+  // Focus overlay — settings popover
+  var focusSettingsBtn = document.getElementById('focus-settings-btn');
+  var focusSettingsPopover = document.getElementById('focus-settings-popover');
+  var focusThemeGrid = document.getElementById('focus-theme-grid');
+  var focusCustomColorsRow = document.getElementById('focus-custom-colors');
+  var focusCustomWorkInput = document.getElementById('focus-custom-work');
+  var focusCustomBreakInput = document.getElementById('focus-custom-break');
+  var focusAutoAdvanceCheckbox = document.getElementById('focus-auto-advance');
+  // Focus overlay — auto-advance countdown
+  var focusCountdownOverlay = document.getElementById('focus-countdown-overlay');
+  var focusCountdownText = document.getElementById('focus-countdown-text');
+  var focusCountdownNumber = document.getElementById('focus-countdown-number');
+  var focusCountdownCancel = document.getElementById('focus-countdown-cancel');
+  var _countdownTimer = null;
+  var _countdownSeconds = 0;
+
+  // ── Focus theme definitions ──
+  var FOCUS_THEMES = [
+    { id: 'deep-focus', name: 'Deep Focus', work: '#192d9b', break: '#af821e' },
+    { id: 'alert', name: 'Alert', work: '#b41e1e', break: '#1e7832' },
+    { id: 'ocean', name: 'Ocean', work: '#0f5064', break: '#28a0b4' },
+    { id: 'monochrome', name: 'Mono', work: '#232328', break: '#5a5a5f' },
+    { id: 'forest', name: 'Forest', work: '#144b23', break: '#a0783c' },
+    { id: 'custom', name: 'Custom', work: '#b41e1e', break: '#1e7832' }
+  ];
+
+  // ── Focus settings (persisted to localStorage) ──
+  var THEME_KEY = 'dm-pomo-focus-theme';
+  var CUSTOM_WORK_KEY = 'dm-pomo-focus-custom-work';
+  var CUSTOM_BREAK_KEY = 'dm-pomo-focus-custom-break';
+  var AUTO_ADVANCE_KEY = 'dm-pomo-auto-advance';
+
+  function getFocusTheme() {
+    try { var v = localStorage.getItem(THEME_KEY); if (v) return v; } catch(e) {}
+    return 'deep-focus';
+  }
+  function setFocusTheme(themeId) {
+    try { localStorage.setItem(THEME_KEY, themeId); } catch(e) {}
+  }
+  function getCustomColors() {
+    var work = '#b41e1e', brk = '#1e7832';
+    try { var w = localStorage.getItem(CUSTOM_WORK_KEY); if (w) work = w; } catch(e) {}
+    try { var b = localStorage.getItem(CUSTOM_BREAK_KEY); if (b) brk = b; } catch(e) {}
+    return { work: work, break: brk };
+  }
+  function setCustomColors(work, brk) {
+    try { localStorage.setItem(CUSTOM_WORK_KEY, work); } catch(e) {}
+    try { localStorage.setItem(CUSTOM_BREAK_KEY, brk); } catch(e) {}
+  }
+  function isAutoAdvance() {
+    try { var v = localStorage.getItem(AUTO_ADVANCE_KEY); if (v === 'false') return false; } catch(e) {}
+    return true; // default on
+  }
+  function setAutoAdvance(val) {
+    try { localStorage.setItem(AUTO_ADVANCE_KEY, val ? 'true' : 'false'); } catch(e) {}
+  }
+
+  // Apply custom color CSS variables to the backdrop element
+  function applyCustomColors() {
+    var colors = getCustomColors();
+    if (focusBackdropEl) {
+      focusBackdropEl.style.setProperty('--focus-custom-work', hexToRgba(colors.work, 0.55));
+      focusBackdropEl.style.setProperty('--focus-custom-break', hexToRgba(colors.break, 0.50));
+    }
+  }
+  function hexToRgba(hex, alpha) {
+    var r = parseInt(hex.slice(1, 3), 16);
+    var g = parseInt(hex.slice(3, 5), 16);
+    var b = parseInt(hex.slice(5, 7), 16);
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+  }
 
   var activeTodoId = null;
   var activeTodoTitle = '';
@@ -1277,7 +1632,8 @@
     progressEl.className = 'pomodoro-timer-progress-bar' + (phase === 'break' ? ' break' : '');
     focusProgressEl.className = 'pomodoro-focus-progress-bar' + (phase === 'break' ? ' break' : '');
     if (focusBackdropEl) {
-      focusBackdropEl.className = 'pomodoro-focus-backdrop ' + (phase === 'break' ? 'break' : 'work');
+      var themeId = getFocusTheme();
+      focusBackdropEl.className = 'pomodoro-focus-backdrop theme-' + themeId + ' ' + (phase === 'break' ? 'break' : 'work');
     }
 
     var sessionText = 'Session ' + sessionCount;
@@ -2122,34 +2478,48 @@
         }
 
         // Switch to break
-        phase = 'break';
-        secondsLeft = BREAK_SECONDS;
-        totalPhaseSeconds = BREAK_SECONDS;
-        updateDisplay();
-        persistProgressSnapshot();
-        saveStateImmediate();
-        // Auto-start break (if enabled in settings)
-        var _autoBreak = true;
-        try { var v = localStorage.getItem('dm-pomo-auto-break'); if (v === 'false') _autoBreak = false; } catch(e) {}
-        if (_autoBreak) {
-          startTimer();
+        // Auto-advance: show countdown in focus mode, immediate transition otherwise
+        if (isAutoAdvance() && isFocusMode) {
+          updateDisplay();
+          persistProgressSnapshot();
+          saveStateImmediate();
+          startAutoAdvanceCountdown('break');
+        } else {
+          phase = 'break';
+          secondsLeft = BREAK_SECONDS;
+          totalPhaseSeconds = BREAK_SECONDS;
+          updateDisplay();
+          persistProgressSnapshot();
+          saveStateImmediate();
+          var _autoBreak = true;
+          try { var v = localStorage.getItem('dm-pomo-auto-break'); if (v === 'false') _autoBreak = false; } catch(e) {}
+          if (_autoBreak) {
+            startTimer();
+          }
         }
       } else {
         playBreakEndSound();
         stopAmbientSound();
         // Break finished, start next work session
-        sessionCount++;
-        phase = 'work';
-        secondsLeft = WORK_SECONDS;
-        totalPhaseSeconds = WORK_SECONDS;
-        updateDisplay();
-        persistProgressSnapshot();
-        saveStateImmediate();
-        // Auto-start work (if enabled in settings)
-        var _autoWork = false;
-        try { var v = localStorage.getItem('dm-pomo-auto-work'); if (v === 'true') _autoWork = true; } catch(e) {}
-        if (_autoWork) {
-          startTimer();
+        // Auto-advance: show countdown in focus mode, immediate transition otherwise
+        if (isAutoAdvance() && isFocusMode) {
+          updateDisplay();
+          persistProgressSnapshot();
+          saveStateImmediate();
+          startAutoAdvanceCountdown('work');
+        } else {
+          sessionCount++;
+          phase = 'work';
+          secondsLeft = WORK_SECONDS;
+          totalPhaseSeconds = WORK_SECONDS;
+          updateDisplay();
+          persistProgressSnapshot();
+          saveStateImmediate();
+          var _autoWork = false;
+          try { var v = localStorage.getItem('dm-pomo-auto-work'); if (v === 'true') _autoWork = true; } catch(e) {}
+          if (_autoWork) {
+            startTimer();
+          }
         }
       }
       return;
@@ -2786,6 +3156,164 @@
     focusUpNextStripEl.style.display = 'flex';
   }
 
+  // ── Focus Settings Popover ──
+  function renderThemeGrid() {
+    if (!focusThemeGrid) return;
+    var current = getFocusTheme();
+    var html = '';
+    FOCUS_THEMES.forEach(function(t) {
+      var activeCls = t.id === current ? ' active' : '';
+      var workColor = t.work;
+      var breakColor = t.break;
+      if (t.id === 'custom') {
+        var cc = getCustomColors();
+        workColor = cc.work;
+        breakColor = cc.break;
+      }
+      html += '<button type="button" class="pomodoro-focus-theme-swatch' + activeCls + '" data-theme="' + t.id + '">'
+        + '<div class="pomodoro-focus-theme-swatch-colors">'
+        + '<span style="background:' + workColor + '"></span>'
+        + '<span style="background:' + breakColor + '"></span>'
+        + '</div>'
+        + '<span class="pomodoro-focus-theme-swatch-name">' + t.name + '</span>'
+        + '</button>';
+    });
+    focusThemeGrid.innerHTML = html;
+    // Show/hide custom color pickers
+    focusCustomColorsRow.style.display = current === 'custom' ? 'flex' : 'none';
+    // Sync color inputs
+    if (current === 'custom') {
+      var cc = getCustomColors();
+      focusCustomWorkInput.value = cc.work;
+      focusCustomBreakInput.value = cc.break;
+    }
+  }
+
+  // Theme swatch click handler
+  if (focusThemeGrid) {
+    focusThemeGrid.addEventListener('click', function(e) {
+      var swatch = e.target.closest('.pomodoro-focus-theme-swatch');
+      if (!swatch) return;
+      var themeId = swatch.getAttribute('data-theme');
+      if (!themeId) return;
+      setFocusTheme(themeId);
+      if (themeId === 'custom') applyCustomColors();
+      renderThemeGrid();
+      updateDisplay();
+    });
+  }
+
+  // Custom color change handlers
+  if (focusCustomWorkInput) {
+    focusCustomWorkInput.addEventListener('input', function() {
+      setCustomColors(focusCustomWorkInput.value, focusCustomBreakInput.value);
+      applyCustomColors();
+      renderThemeGrid();
+      updateDisplay();
+    });
+  }
+  if (focusCustomBreakInput) {
+    focusCustomBreakInput.addEventListener('input', function() {
+      setCustomColors(focusCustomWorkInput.value, focusCustomBreakInput.value);
+      applyCustomColors();
+      renderThemeGrid();
+      updateDisplay();
+    });
+  }
+
+  // Auto-advance checkbox
+  if (focusAutoAdvanceCheckbox) {
+    focusAutoAdvanceCheckbox.checked = isAutoAdvance();
+    focusAutoAdvanceCheckbox.addEventListener('change', function() {
+      setAutoAdvance(focusAutoAdvanceCheckbox.checked);
+    });
+  }
+
+  // Settings popover toggle
+  if (focusSettingsBtn && focusSettingsPopover) {
+    focusSettingsBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var isVisible = focusSettingsPopover.classList.contains('visible');
+      if (isVisible) {
+        focusSettingsPopover.classList.remove('visible');
+      } else {
+        renderThemeGrid();
+        focusAutoAdvanceCheckbox.checked = isAutoAdvance();
+        focusSettingsPopover.classList.add('visible');
+      }
+    });
+    // Close popover when clicking outside
+    document.addEventListener('click', function(e) {
+      if (!focusSettingsPopover.classList.contains('visible')) return;
+      if (focusSettingsPopover.contains(e.target) || focusSettingsBtn.contains(e.target)) return;
+      focusSettingsPopover.classList.remove('visible');
+    });
+  }
+
+  // ── Auto-advance countdown ──
+  function startAutoAdvanceCountdown(nextPhase) {
+    if (_countdownTimer) {
+      clearInterval(_countdownTimer);
+      _countdownTimer = null;
+    }
+    _countdownSeconds = 10;
+    var label = nextPhase === 'break' ? 'Break starts in' : 'Work starts in';
+    focusCountdownText.textContent = label;
+    focusCountdownNumber.textContent = _countdownSeconds;
+    focusCountdownOverlay.classList.add('visible');
+
+    _countdownTimer = setInterval(function() {
+      _countdownSeconds--;
+      focusCountdownNumber.textContent = _countdownSeconds;
+      if (_countdownSeconds <= 0) {
+        clearInterval(_countdownTimer);
+        _countdownTimer = null;
+        focusCountdownOverlay.classList.remove('visible');
+        // Execute the phase transition
+        executeAutoAdvance(nextPhase);
+      }
+    }, 1000);
+  }
+
+  function cancelAutoAdvanceCountdown() {
+    if (_countdownTimer) {
+      clearInterval(_countdownTimer);
+      _countdownTimer = null;
+    }
+    focusCountdownOverlay.classList.remove('visible');
+  }
+
+  function executeAutoAdvance(nextPhase) {
+    if (nextPhase === 'break') {
+      phase = 'break';
+      secondsLeft = BREAK_SECONDS;
+      totalPhaseSeconds = BREAK_SECONDS;
+      updateDisplay();
+      persistProgressSnapshot();
+      saveStateImmediate();
+      startTimer();
+    } else {
+      stopAmbientSound();
+      sessionCount++;
+      phase = 'work';
+      secondsLeft = WORK_SECONDS;
+      totalPhaseSeconds = WORK_SECONDS;
+      updateDisplay();
+      persistProgressSnapshot();
+      saveStateImmediate();
+      startTimer();
+    }
+  }
+
+  // Countdown cancel button
+  if (focusCountdownCancel) {
+    focusCountdownCancel.addEventListener('click', function() {
+      cancelAutoAdvanceCountdown();
+      // Leave in paused state — user can manually start
+      showPlayIcon();
+    });
+  }
+
   // ── Ambient Visualizer ──
   var vizMode = 'aurora'; // 'aurora' | 'wave'
   var vizAnimId = null;
@@ -3021,6 +3549,8 @@
 
   function enterFocusMode() {
     isFocusMode = true;
+    // Apply custom colors if custom theme selected
+    if (getFocusTheme() === 'custom') applyCustomColors();
     // Sync current title/category to focus elements
     focusTitleEl.textContent = activeTodoTitle;
     if (activeTodoCategory) {
@@ -3064,6 +3594,10 @@
 
   function exitFocusMode() {
     isFocusMode = false;
+    // Cancel any pending auto-advance countdown
+    cancelAutoAdvanceCountdown();
+    // Close settings popover
+    if (focusSettingsPopover) focusSettingsPopover.classList.remove('visible');
     // Flush any pending notes save
     if (_focusNotesTimer) {
       clearTimeout(_focusNotesTimer);
@@ -3085,6 +3619,7 @@
 
   // Focus overlay controls delegate to existing handlers
   focusToggleBtn.addEventListener('click', function() {
+    cancelAutoAdvanceCountdown();
     if (isRunning) {
       pauseTimer();
     } else {
@@ -3092,8 +3627,14 @@
     }
   });
 
-  focusResetBtn.addEventListener('click', resetTimer);
-  focusNextBtn.addEventListener('click', nextTask);
+  focusResetBtn.addEventListener('click', function() {
+    cancelAutoAdvanceCountdown();
+    resetTimer();
+  });
+  focusNextBtn.addEventListener('click', function() {
+    cancelAutoAdvanceCountdown();
+    nextTask();
+  });
 
   // Focus close (x) button: save progress and close timer
   focusCloseBtn.addEventListener('click', function() {
