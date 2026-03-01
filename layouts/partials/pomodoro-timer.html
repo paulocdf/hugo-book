@@ -667,7 +667,6 @@
 /* Two-column body */
 .pomodoro-focus-body {
   display: flex;
-  gap: 28px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
@@ -681,6 +680,7 @@
   justify-content: center;
   min-width: 0;
   overflow-y: auto;
+  margin-right: 28px;
 }
 .pomodoro-focus-right {
   width: 260px;
@@ -905,7 +905,7 @@
   cursor: pointer;
   color: var(--gray-400);
   padding: 0;
-  margin: 0 -2px;
+  margin: 0;
   align-self: center;
   z-index: 3;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
@@ -1259,6 +1259,7 @@
   }
   .pomodoro-focus-left {
     flex: none;
+    margin-right: 0;
   }
   .pomodoro-focus-right {
     width: 100% !important;
