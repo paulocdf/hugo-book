@@ -131,12 +131,9 @@
         <div class="pomodoro-focus-inline-stats" id="focus-inline-stats"></div>
       </div>
 
-      <!-- Resize handle between columns -->
-      <div class="pomodoro-focus-resize-handle" id="focus-resize-handle" title="Drag to resize"></div>
-
-      <!-- Notes collapse/expand toggle icon (vertically centered on divider) -->
+      <!-- Notes collapse/expand toggle icon (vertically centered next to notes) -->
       <button type="button" class="pomodoro-focus-notes-toggle-icon" id="focus-notes-toggle-icon" aria-label="Toggle notes panel" title="Toggle notes panel">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </button>
 
       <!-- Right column: notes -->
@@ -691,6 +688,18 @@
   overflow-y: auto;
   padding-left: 24px;
   border-left: 1px solid var(--gray-200);
+  position: relative;
+}
+/* Invisible drag zone on the left border for resizing */
+.pomodoro-focus-right::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 8px;
+  bottom: 0;
+  cursor: col-resize;
+  z-index: 4;
 }
 .pomodoro-focus-title {
   font-size: 1.4rem;
@@ -922,38 +931,9 @@
 .pomodoro-focus-body.notes-collapsed .pomodoro-focus-notes-toggle-icon svg {
   transform: rotate(180deg);
 }
-/* Collapsed state — hide right column and resize handle */
-.pomodoro-focus-body.notes-collapsed .pomodoro-focus-right,
-.pomodoro-focus-body.notes-collapsed .pomodoro-focus-resize-handle {
+/* Collapsed state — hide right column */
+.pomodoro-focus-body.notes-collapsed .pomodoro-focus-right {
   display: none;
-}
-/* Resize handle between columns */
-.pomodoro-focus-resize-handle {
-  width: 6px;
-  flex-shrink: 0;
-  cursor: col-resize;
-  position: relative;
-  margin: 0 -3px;
-  z-index: 2;
-  border-radius: 3px;
-  transition: background 0.15s;
-}
-.pomodoro-focus-resize-handle::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 2px;
-  height: 32px;
-  border-radius: 1px;
-  background: var(--gray-300);
-  transition: background 0.15s, height 0.15s;
-}
-.pomodoro-focus-resize-handle:hover::after,
-.pomodoro-focus-resize-handle.dragging::after {
-  background: var(--color-link);
-  height: 48px;
 }
 /* Up Next footer strip */
 .pomodoro-focus-upnext-strip {
@@ -1269,7 +1249,7 @@
     padding-top: 14px;
     overflow-y: visible;
   }
-  .pomodoro-focus-resize-handle {
+  .pomodoro-focus-right::before {
     display: none;
   }
   .pomodoro-focus-notes-toggle-icon {
@@ -1507,7 +1487,6 @@
   var focusNotesToggleIcon = document.getElementById('focus-notes-toggle-icon');
   var focusBodyEl = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-body') : null;
   var focusRightCol = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-right') : null;
-  var focusResizeHandle = document.getElementById('focus-resize-handle');
 
   // ── Focus theme definitions ──
   var FOCUS_THEMES = [
@@ -3520,14 +3499,15 @@
     });
   }
 
-  // ── Resizable column split ──
+  // ── Resizable column split (drag on right column border) ──
   function applyRightColWidth(w) {
     if (focusRightCol) focusRightCol.style.width = w + 'px';
   }
-  if (focusResizeHandle && focusRightCol && focusBodyEl) {
+  if (focusRightCol && focusBodyEl) {
     var _resizing = false;
     var _resizeStartX = 0;
     var _resizeStartW = 260;
+    var RESIZE_EDGE_PX = 8; // drag zone width near the left border
 
     function onResizeMove(e) {
       if (!_resizing) return;
@@ -3539,10 +3519,9 @@
     function onResizeEnd() {
       if (!_resizing) return;
       _resizing = false;
-      focusResizeHandle.classList.remove('dragging');
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
-      // Save the final width
+      focusRightCol.style.borderLeftColor = '';
       var finalW = parseInt(focusRightCol.style.width, 10) || 260;
       setSavedRightColWidth(finalW);
       document.removeEventListener('mousemove', onResizeMove);
@@ -3550,21 +3529,27 @@
       document.removeEventListener('touchmove', onResizeMove);
       document.removeEventListener('touchend', onResizeEnd);
     }
+    function isNearLeftEdge(e) {
+      var rect = focusRightCol.getBoundingClientRect();
+      var clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      return clientX - rect.left < RESIZE_EDGE_PX;
+    }
     function onResizeStart(e) {
+      if (!isNearLeftEdge(e)) return;
       e.preventDefault();
       _resizing = true;
       _resizeStartX = e.touches ? e.touches[0].clientX : e.clientX;
       _resizeStartW = parseInt(focusRightCol.style.width, 10) || focusRightCol.offsetWidth || 260;
-      focusResizeHandle.classList.add('dragging');
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
+      focusRightCol.style.borderLeftColor = 'var(--color-link)';
       document.addEventListener('mousemove', onResizeMove);
       document.addEventListener('mouseup', onResizeEnd);
       document.addEventListener('touchmove', onResizeMove, { passive: false });
       document.addEventListener('touchend', onResizeEnd);
     }
-    focusResizeHandle.addEventListener('mousedown', onResizeStart);
-    focusResizeHandle.addEventListener('touchstart', onResizeStart, { passive: false });
+    focusRightCol.addEventListener('mousedown', onResizeStart);
+    focusRightCol.addEventListener('touchstart', onResizeStart, { passive: false });
   }
 
   // ── Auto-advance countdown ──
