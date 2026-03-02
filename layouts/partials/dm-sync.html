@@ -512,6 +512,17 @@
     });
   }
 
+  function updateQueued(entry) {
+    return openDB().then(function(db) {
+      return new Promise(function(resolve, reject) {
+        var tx = db.transaction(STORE_WRITE_QUEUE, 'readwrite');
+        tx.objectStore(STORE_WRITE_QUEUE).put(entry);
+        tx.oncomplete = function() { resolve(); };
+        tx.onerror = function(e) { reject(e.target.error); };
+      });
+    });
+  }
+
   function clearQueue() {
     return openDB().then(function(db) {
       return new Promise(function(resolve, reject) {
@@ -634,10 +645,26 @@
             processed++;
             return removeQueued(entry.queueId);
           }).catch(function(err) {
-            // Remove permanently broken entries instead of retrying forever
-            if (err.code === 'not-found' || err.code === 'invalid-argument' || err.code === 'permission-denied') {
+            // not-found / invalid-argument are truly unrecoverable — remove immediately
+            if (err.code === 'not-found' || err.code === 'invalid-argument') {
               console.warn('[dm-sync] Removing unrecoverable queued op (' + err.code + '):', entry.collection, entry.docId);
               return removeQueued(entry.queueId);
+            }
+            // permission-denied — retry up to 5 times before giving up
+            // This prevents data loss when Firestore rules haven't been deployed yet
+            if (err.code === 'permission-denied') {
+              var retries = (entry.retryCount || 0) + 1;
+              var maxRetries = 5;
+              if (retries >= maxRetries) {
+                console.error('[dm-sync] Removing queued op after ' + maxRetries + ' permission-denied retries:', entry.collection, entry.docId);
+                return removeQueued(entry.queueId);
+              }
+              console.warn('[dm-sync] permission-denied for ' + entry.collection + '/' + entry.docId + ' (retry ' + retries + '/' + maxRetries + '), keeping in queue');
+              entry.retryCount = retries;
+              entry.lastError = 'permission-denied';
+              entry.lastRetryAt = Date.now();
+              failed = true;
+              return updateQueued(entry);
             }
             // Quota exhausted — enter cooldown, stop draining, preserve queue
             if (isQuotaError(err)) {
