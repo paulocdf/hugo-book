@@ -1381,9 +1381,18 @@
     return m + 'm';
   }
 
+  function parseDateLocal(dateStr) {
+    // Parse YYYY-MM-DD as local midnight to avoid UTC-offset display bugs
+    var parts = String(dateStr).split('-');
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    }
+    return new Date(dateStr);
+  }
+
   function formatDate(dateStr) {
     if (!dateStr) return '';
-    var d = new Date(dateStr);
+    var d = parseDateLocal(dateStr);
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   }
 
@@ -1391,7 +1400,7 @@
     if (!deadline) return false;
     var today = new Date();
     today.setHours(0, 0, 0, 0);
-    return new Date(deadline) < today;
+    return parseDateLocal(deadline) < today;
   }
 
   // ─── State ───

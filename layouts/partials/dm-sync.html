@@ -810,7 +810,9 @@
     var data = doc.data();
     var createdAt = data.createdAt ? data.createdAt.toMillis() : 0;
     var updatedAt = data.updatedAt ? data.updatedAt.toMillis() : 0;
-    var deadline = data.deadline || null;
+    var deadline = data.deadline
+      ? (data.deadline.toMillis ? data.deadline.toMillis() : data.deadline)
+      : null;
     return {
       id: doc.id,
       userId: data.userId || '',
