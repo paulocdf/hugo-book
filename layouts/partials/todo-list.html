@@ -154,6 +154,46 @@
   padding: 0.75rem 1rem;
 }
 
+/* Project filter bar */
+.todo-project-filter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 0.75rem;
+}
+.todo-project-filter-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray-400);
+  flex-shrink: 0;
+  line-height: 0;
+}
+.todo-project-filter-select {
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 4px 24px 4px 8px;
+  font-size: 0.78rem;
+  font-family: inherit;
+  background: var(--body-background) url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 8px center;
+  color: var(--body-font-color);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  line-height: 1.4;
+  max-width: 180px;
+  text-overflow: ellipsis;
+}
+.todo-project-filter-select:hover {
+  border-color: var(--gray-300);
+}
+.todo-project-filter-select:focus {
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 2px rgba(0, 105, 255, 0.08);
+  outline: none;
+}
+
 /* Add form — two-row layout */
 .todo-add-form {
   display: flex;

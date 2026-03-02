@@ -407,9 +407,51 @@
   color: var(--gray-500);
   font-size: 0.85rem;
 }
-/* Show pomo start button on project task row hover (mirrors inbox pattern) */
+/* Inline pomodoro start/pause/stop — mirrors inbox (.todo-item-pomo-inline) */
+.todo-item-pomo-inline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 105, 255, 0.06);
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, transform 0.1s, opacity 0.15s;
+  line-height: 0;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+.todo-item-pomo-inline:hover {
+  background: rgba(0, 105, 255, 0.14);
+  color: var(--accent-blue, var(--color-link));
+  transform: scale(1.1);
+}
+.todo-item-pomo-inline.active {
+  color: var(--accent-blue, var(--color-link));
+  background: rgba(0, 105, 255, 0.1);
+  animation: pomo-btn-pulse 2s ease-in-out infinite;
+}
+.todo-item-pomo-inline.pomo-stop {
+  color: var(--color-danger, #ea4335);
+  background: rgba(234, 67, 53, 0.06);
+}
+.todo-item-pomo-inline.pomo-stop:hover {
+  background: rgba(234, 67, 53, 0.14);
+  color: var(--color-danger, #ea4335);
+}
+.todo-item-pomo-inline.pomodoro-start:not(.active) {
+  opacity: 0;
+}
 .project-task-item:hover .todo-item-pomo-inline.pomodoro-start:not(.active) {
   opacity: 1;
+}
+@keyframes pomo-btn-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 .project-task-meta {
   display: flex;
