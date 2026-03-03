@@ -108,6 +108,40 @@
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Column drag handle */
+.kanban-col-drag-handle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  color: var(--gray-400);
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+  padding: 2px;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+.kanban-column:hover .kanban-col-drag-handle {
+  opacity: 1;
+}
+.kanban-col-drag-handle:hover {
+  color: var(--body-font-color);
+}
+.kanban-col-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Column drag states */
+.kanban-column--col-ghost {
+  opacity: 0.4;
+  border: 2px dashed var(--color-link);
+}
+.kanban-column--col-chosen {
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
 }
 
 .kanban-column-header-left {
@@ -386,10 +420,8 @@
 
 /* Column context menu */
 .kanban-col-menu {
-  position: absolute;
-  top: calc(100% + 2px);
-  right: 0;
-  z-index: 300;
+  position: fixed;
+  z-index: 9000;
   min-width: 160px;
   background: var(--body-background);
   border: 1px solid var(--gray-200);
@@ -1259,6 +1291,8 @@
       colDiv.setAttribute('data-kanban-col-id', colDef.id);
 
       var headerHtml = '<div class="kanban-column-header" style="position:relative;">';
+      // Drag handle for column reordering
+      headerHtml += '<span class="kanban-col-drag-handle" title="Drag to reorder"><svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><circle cx="8" cy="4" r="2"/><circle cx="16" cy="4" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="20" r="2"/><circle cx="16" cy="20" r="2"/></svg></span>';
       headerHtml += '<div class="kanban-column-header-left">';
       headerHtml += '<span class="kanban-column-dot" style="background:' + escapeHtml(colDef.color) + ';"></span>';
       headerHtml += '<h3 class="kanban-col-name" data-col-id="' + colDef.id + '">' + escapeHtml(colDef.name) + '</h3>';
@@ -1373,9 +1407,12 @@
     // Delete
     menu.innerHTML += '<button type="button" class="kanban-col-menu-item kanban-col-menu-item--danger" data-action="delete">Delete column</button>';
 
-    // Position relative to header
+    // Position relative to anchor button, appended to body to avoid overflow clipping
+    document.body.appendChild(menu);
+    var rect = anchorBtn.getBoundingClientRect();
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.left = Math.max(0, rect.right - menu.offsetWidth) + 'px';
     var header = anchorBtn.closest('.kanban-column-header');
-    header.appendChild(menu);
 
     // Event delegation
     menu.addEventListener('click', function(e) {
@@ -1411,14 +1448,14 @@
 
   function closeColMenu() {
     _openColMenuId = null;
-    var existing = boardEl.querySelector('.kanban-col-menu');
+    var existing = document.querySelector('.kanban-col-menu');
     if (existing) existing.remove();
     document.removeEventListener('mousedown', _handleColMenuOutside);
     document.removeEventListener('keydown', _handleColMenuEscape);
   }
 
   function _handleColMenuOutside(e) {
-    var menu = boardEl.querySelector('.kanban-col-menu');
+    var menu = document.querySelector('.kanban-col-menu');
     if (menu && !menu.contains(e.target) && !e.target.closest('.kanban-col-settings-btn')) {
       closeColMenu();
     }
@@ -2109,6 +2146,42 @@
       });
       _sortableInstances.push(sortable);
     });
+
+    // Board-level sortable for column reordering
+    if (boardEl) {
+      var boardSortable = Sortable.create(boardEl, {
+        animation: 200,
+        handle: '.kanban-col-drag-handle',
+        draggable: '.kanban-column',
+        ghostClass: 'kanban-column--col-ghost',
+        chosenClass: 'kanban-column--col-chosen',
+        filter: '.kanban-add-column',
+        onEnd: function(evt) {
+          // Collect new column order from DOM
+          var colEls = boardEl.querySelectorAll('.kanban-column');
+          var orderedIds = [];
+          colEls.forEach(function(el) {
+            var cid = el.getAttribute('data-kanban-col-id');
+            if (cid) orderedIds.push(cid);
+          });
+          // Update local _kanbanColumns order
+          var colMap = {};
+          _kanbanColumns.forEach(function(c) { colMap[c.id] = c; });
+          _kanbanColumns = orderedIds.map(function(id, idx) {
+            var c = colMap[id];
+            if (c) c.order = idx;
+            return c;
+          }).filter(Boolean);
+          // Rebuild _columnOrder
+          _columnOrder = _kanbanColumns.map(function(c) { return c.status; });
+          // Persist to dmSync
+          window.dmSync.reorderKanbanColumns(orderedIds).catch(function(err) {
+            console.error('[kanban] Error reordering columns:', err);
+          });
+        }
+      });
+      _sortableInstances.push(boardSortable);
+    }
   }
 
   function calculateOrderForPosition(columnEl, newIndex, todoId) {
