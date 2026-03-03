@@ -214,6 +214,16 @@ body {
   }
 }
 
+// ======================================
+// Project list: full-width layout
+// ======================================
+.book-page:has(.project-list) {
+  .markdown {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 // TOC sidebar — padding handled in main ToC section below
 
 // ======================================
