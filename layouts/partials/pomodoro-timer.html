@@ -105,9 +105,10 @@
         </div>
       </div>
       <div class="pomodoro-focus-settings-group">
-        <span class="pomodoro-focus-settings-label" style="margin-bottom:4px;">Wallpaper URL</span>
-        <div class="pomodoro-focus-wallpaper-row">
-          <input type="url" class="pomodoro-focus-wallpaper-input" id="focus-wallpaper-input" placeholder="https://example.com/image.jpg" autocomplete="off" spellcheck="false">
+        <span class="pomodoro-focus-settings-label" style="margin-bottom:4px;">Wallpaper</span>
+        <div class="pomodoro-focus-wallpaper-gallery" id="focus-wallpaper-gallery"></div>
+        <div class="pomodoro-focus-wallpaper-row" style="margin-top:6px;">
+          <input type="url" class="pomodoro-focus-wallpaper-input" id="focus-wallpaper-input" placeholder="Or paste a custom URL..." autocomplete="off" spellcheck="false">
           <button type="button" class="pomodoro-focus-wallpaper-clear" id="focus-wallpaper-clear" title="Clear wallpaper">&times;</button>
         </div>
       </div>
@@ -544,6 +545,68 @@
   background-position: center;
   background-repeat: no-repeat;
   transition: background-image 0.3s ease;
+}
+/* ── Wallpaper gallery ── */
+.pomodoro-focus-wallpaper-gallery {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+.pomodoro-focus-wallpaper-thumb {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s, box-shadow 0.15s;
+  overflow: hidden;
+}
+.pomodoro-focus-wallpaper-thumb:hover {
+  transform: scale(1.08);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.pomodoro-focus-wallpaper-thumb.active {
+  border-color: #fff;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.5), 0 2px 8px rgba(0,0,0,0.4);
+}
+.pomodoro-focus-wallpaper-thumb .wp-label {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 2px 4px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.7));
+  color: #fff;
+  font-size: 0.55rem;
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.pomodoro-focus-wallpaper-thumb:hover .wp-label {
+  opacity: 1;
+}
+.pomodoro-focus-wallpaper-none {
+  aspect-ratio: 16 / 10;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.5);
+  font-size: 0.6rem;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pomodoro-focus-wallpaper-none:hover {
+  background: rgba(255,255,255,0.15);
+}
+.pomodoro-focus-wallpaper-none.active {
+  border-color: #fff;
+  color: #fff;
 }
 /* ── Wallpaper input ── */
 .pomodoro-focus-wallpaper-row {
@@ -1686,6 +1749,58 @@
         focusOverlay.style.backgroundImage = '';
       }
     }
+  }
+
+  // ── Preset wallpaper gallery ──
+  var PRESET_WALLPAPERS = [
+    { id: 'mountains',  label: 'Mountains',  url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80' },
+    { id: 'forest',     label: 'Forest',     url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=80' },
+    { id: 'ocean',      label: 'Ocean',      url: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1920&q=80' },
+    { id: 'night-sky',  label: 'Night Sky',  url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1920&q=80' },
+    { id: 'aurora',     label: 'Aurora',     url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=1920&q=80' },
+    { id: 'desert',     label: 'Desert',     url: 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1920&q=80' },
+    { id: 'rain',       label: 'Rain',       url: 'https://images.unsplash.com/photo-1515694346937-94d85e39e29a?w=1920&q=80' },
+    { id: 'lake',       label: 'Lake',       url: 'https://images.unsplash.com/photo-1439853949127-fa647821eba0?w=1920&q=80' },
+    { id: 'cityscape',  label: 'City',       url: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=1920&q=80' },
+    { id: 'cosmos',     label: 'Cosmos',     url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1920&q=80' }
+  ];
+  var wallpaperGalleryEl = document.getElementById('focus-wallpaper-gallery');
+
+  function getThumbUrl(fullUrl) {
+    return fullUrl.replace('w=1920&q=80', 'w=200&q=60');
+  }
+
+  function renderWallpaperGallery() {
+    if (!wallpaperGalleryEl) return;
+    var currentUrl = getWallpaperUrl();
+    var html = '';
+    // "None" option
+    html += '<div class="pomodoro-focus-wallpaper-none' + (!currentUrl ? ' active' : '') + '" data-wp-url="" title="No wallpaper">None</div>';
+    for (var i = 0; i < PRESET_WALLPAPERS.length; i++) {
+      var wp = PRESET_WALLPAPERS[i];
+      var isActive = currentUrl === wp.url;
+      html += '<div class="pomodoro-focus-wallpaper-thumb' + (isActive ? ' active' : '') + '"'
+            + ' data-wp-url="' + wp.url.replace(/"/g, '&quot;') + '"'
+            + ' style="background-image:url(\'' + getThumbUrl(wp.url) + '\')"'
+            + ' title="' + wp.label + '">'
+            + '<span class="wp-label">' + wp.label + '</span>'
+            + '</div>';
+    }
+    wallpaperGalleryEl.innerHTML = html;
+  }
+
+  function handleGalleryClick(e) {
+    var thumb = e.target.closest('[data-wp-url]');
+    if (!thumb) return;
+    var url = thumb.getAttribute('data-wp-url');
+    setWallpaperUrl(url);
+    applyWallpaper();
+    if (focusWallpaperInput) focusWallpaperInput.value = url;
+    renderWallpaperGallery();
+  }
+
+  if (wallpaperGalleryEl) {
+    wallpaperGalleryEl.addEventListener('click', handleGalleryClick);
   }
 
   function getFocusTheme() {
@@ -3890,6 +4005,7 @@
       _wallpaperDebounce = setTimeout(function() {
         setWallpaperUrl(focusWallpaperInput.value.trim());
         applyWallpaper();
+        renderWallpaperGallery();
       }, 500);
     });
   }
@@ -3898,6 +4014,7 @@
       setWallpaperUrl('');
       if (focusWallpaperInput) focusWallpaperInput.value = '';
       applyWallpaper();
+      renderWallpaperGallery();
     });
   }
 
@@ -3911,6 +4028,7 @@
         focusSettingsBtn.setAttribute('aria-expanded', 'false');
       } else {
         renderThemeGrid();
+        renderWallpaperGallery();
         focusAutoAdvanceCheckbox.checked = isAutoAdvance();
         if (focusShowProgressCheckbox) focusShowProgressCheckbox.checked = isShowProgress();
         if (focusDailyGoalSelect) focusDailyGoalSelect.value = String(getDailyGoal());
