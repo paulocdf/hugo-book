@@ -329,6 +329,7 @@
   align-items: center;
   gap: 6px;
   position: relative;
+  margin-left: auto;
 }
 .todo-pf-chips {
   display: flex;
@@ -7034,6 +7035,12 @@
   var shortcutsOverlay = document.getElementById('todo-shortcuts-overlay');
   var shortcutsBtn = document.getElementById('todo-shortcuts-btn');
   var shortcutsClose = document.getElementById('todo-shortcuts-close');
+
+  // Move overlay to document.body so position:fixed works
+  // (will-change:transform on ancestor .book-page creates a containing block)
+  if (shortcutsOverlay && shortcutsOverlay.parentNode !== document.body) {
+    document.body.appendChild(shortcutsOverlay);
+  }
 
   // Set modifier key label based on platform
   var skModEl = document.getElementById('todo-sk-mod');
