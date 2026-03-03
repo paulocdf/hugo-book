@@ -345,21 +345,224 @@
   flex-shrink: 0;
 }
 
-/* Column status dots */
+/* Column status dots — color set inline via style="background:..." */
 .kanban-column-dot {
   width: 10px;
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
 }
-.kanban-column-dot--todo {
-  background: var(--accent-blue);
+
+/* Column header actions (settings gear, etc.) */
+.kanban-column-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
 }
-.kanban-column-dot--in-progress {
-  background: var(--accent-orange);
+.kanban-col-settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
 }
-.kanban-column-dot--done {
-  background: var(--color-success);
+.kanban-column:hover .kanban-col-settings-btn,
+.kanban-col-settings-btn:focus {
+  opacity: 1;
+}
+.kanban-col-settings-btn:hover {
+  background: var(--surface-3);
+  color: var(--body-font-color);
+}
+
+/* Column context menu */
+.kanban-col-menu {
+  position: absolute;
+  top: calc(100% + 2px);
+  right: 0;
+  z-index: 300;
+  min-width: 160px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px 0;
+}
+.kanban-col-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-family: inherit;
+  color: var(--body-font-color);
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s;
+}
+.kanban-col-menu-item:hover {
+  background: var(--gray-100);
+}
+.kanban-col-menu-item--danger {
+  color: var(--color-danger, #e53935);
+}
+.kanban-col-menu-item--danger:hover {
+  background: color-mix(in srgb, var(--color-danger, #e53935) 8%, transparent);
+}
+.kanban-col-menu-sep {
+  height: 1px;
+  background: var(--gray-200);
+  margin: 4px 0;
+}
+
+/* Inline rename input */
+.kanban-col-rename-input {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--body-font-color);
+  background: var(--surface-1);
+  border: 1px solid var(--color-link);
+  border-radius: 4px;
+  padding: 1px 4px;
+  outline: none;
+  font-family: inherit;
+  width: 100%;
+  max-width: 160px;
+}
+
+/* Color picker in menu */
+.kanban-col-color-row {
+  display: flex;
+  gap: 4px;
+  padding: 6px 12px;
+  flex-wrap: wrap;
+}
+.kanban-col-color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  padding: 0;
+  background: none;
+}
+.kanban-col-color-swatch:hover {
+  transform: scale(1.15);
+}
+.kanban-col-color-swatch.active {
+  border-color: var(--body-font-color);
+}
+
+/* Add column button */
+.kanban-add-column {
+  min-width: 44px;
+  max-width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed var(--gray-300);
+  border-radius: 12px;
+  background: none;
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  align-self: flex-start;
+  margin-top: 0;
+  padding: 0;
+  font-size: 1.2rem;
+  font-weight: 300;
+}
+.kanban-add-column:hover {
+  border-color: var(--color-link);
+  color: var(--color-link);
+  background: color-mix(in srgb, var(--color-link) 5%, transparent);
+}
+
+/* Delete column confirmation dialog */
+.kanban-col-delete-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.kanban-col-delete-dialog {
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  padding: 24px;
+  max-width: 380px;
+  width: 100%;
+}
+.kanban-col-delete-dialog h4 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+.kanban-col-delete-dialog p {
+  margin: 0 0 16px;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+.kanban-col-delete-dialog label {
+  display: block;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.kanban-col-delete-dialog select {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--body-font-color);
+  font-size: 0.85rem;
+  font-family: inherit;
+  margin-bottom: 16px;
+}
+.kanban-col-delete-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.kanban-col-delete-actions button {
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid var(--gray-300);
+  background: var(--surface-1);
+  color: var(--body-font-color);
+}
+.kanban-col-delete-actions .kanban-col-delete-confirm {
+  background: var(--color-danger, #e53935);
+  color: #fff;
+  border-color: var(--color-danger, #e53935);
+}
+.kanban-col-delete-actions .kanban-col-delete-confirm:hover {
+  opacity: 0.9;
 }
 
 /* Column items area */
@@ -731,11 +934,11 @@
     flex: 1 1 calc(50% - 8px);
     min-width: 280px;
   }
-  .kanban-column:last-child {
-    flex: 1 1 100%;
-  }
   .kanban-column-items {
     max-height: 50vh;
+  }
+  .kanban-add-column {
+    flex: 0;
   }
 }
 @media (max-width: 768px) {
@@ -808,46 +1011,7 @@
       </button>
     </div>
     <div class="kanban-board" id="kanban-board">
-      <div class="kanban-column" data-kanban-status="todo">
-        <div class="kanban-column-header">
-          <div class="kanban-column-header-left">
-            <span class="kanban-column-dot kanban-column-dot--todo"></span>
-            <h3>To Do</h3>
-            <span class="kanban-column-count" id="kanban-count-todo">0</span>
-          </div>
-        </div>
-        <div class="kanban-column-items" id="kanban-items-todo"></div>
-        <button type="button" class="kanban-quick-add-btn" data-kanban-add="todo">+ Add task</button>
-      </div>
-
-      <div class="kanban-column" data-kanban-status="in_progress">
-        <div class="kanban-column-header">
-          <div class="kanban-column-header-left">
-            <span class="kanban-column-dot kanban-column-dot--in-progress"></span>
-            <h3>In Progress</h3>
-            <span class="kanban-column-count" id="kanban-count-in_progress">0</span>
-          </div>
-        </div>
-        <div class="kanban-column-items" id="kanban-items-in_progress"></div>
-        <button type="button" class="kanban-quick-add-btn" data-kanban-add="in_progress">+ Add task</button>
-      </div>
-
-      <div class="kanban-column" data-kanban-status="done">
-        <div class="kanban-column-header">
-          <div class="kanban-column-header-left">
-            <span class="kanban-column-dot kanban-column-dot--done"></span>
-            <h3>Done</h3>
-            <span class="kanban-column-count" id="kanban-count-done">0</span>
-            <select class="kanban-done-filter" id="kanban-done-filter">
-              <option value="today">Today</option>
-              <option value="7days">7 days</option>
-              <option value="all">All</option>
-            </select>
-          </div>
-        </div>
-        <div class="kanban-column-items" id="kanban-items-done"></div>
-        <button type="button" class="kanban-quick-add-btn" data-kanban-add="done">+ Add task</button>
-      </div>
+      <!-- Columns rendered dynamically by JS from kanbanColumns store -->
     </div>
   </div>
 </div>
@@ -865,24 +1029,19 @@
   var contentEl = document.getElementById('kanban-content');
   var signinBtn = document.getElementById('kanban-signin-btn');
 
-  var columns = {
-    todo: document.getElementById('kanban-items-todo'),
-    in_progress: document.getElementById('kanban-items-in_progress'),
-    done: document.getElementById('kanban-items-done')
-  };
+  var boardEl = document.getElementById('kanban-board');
 
-  var counts = {
-    todo: document.getElementById('kanban-count-todo'),
-    in_progress: document.getElementById('kanban-count-in_progress'),
-    done: document.getElementById('kanban-count-done')
-  };
+  // Dynamic column data — populated from dmSync kanbanColumns store
+  var _kanbanColumns = [];  // Array of column objects from dmSync, sorted by order
+  var columns = {};         // { statusSlug: DOM element } — built dynamically
+  var counts = {};          // { statusSlug: DOM element } — built dynamically
+  var _columnOrder = [];    // ['todo', 'in_progress', 'done', ...] — built dynamically
 
   var allTodos = [];
   var _sortableInstances = [];
   var _doneFilter = 'today'; // 'today' | '7days' | 'all'
   var _kanbanProjectMap = {}; // { projectId: { name, color } }
   var _kanbanFilterProjectIds = new Set(['__none__']); // Active project filters — default to "No project"
-  var doneFilterEl = document.getElementById('kanban-done-filter');
   var kanbanProjectFilterBar = document.getElementById('kanban-project-filter');
   var kanbanFilterChips = document.getElementById('kanban-pf-chips');
   var kanbanFilterTrigger = document.getElementById('kanban-pf-trigger');
@@ -1057,6 +1216,368 @@
     return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
   }
 
+  // ─── Dynamic column helpers ───
+  function isColumnDone(statusSlug) {
+    return _kanbanColumns.some(function(c) { return c.status === statusSlug && c.isDoneColumn; });
+  }
+
+  function getFirstDoneColumnStatus() {
+    var col = _kanbanColumns.find(function(c) { return c.isDoneColumn; });
+    return col ? col.status : null;
+  }
+
+  function getFirstColumnStatus() {
+    return _kanbanColumns.length > 0 ? _kanbanColumns[0].status : 'todo';
+  }
+
+  // Available colors for column dots
+  var COLUMN_COLORS = [
+    '#42a5f5', '#ffa726', '#66bb6a', '#ef5350', '#ab47bc',
+    '#26c6da', '#ff7043', '#9ccc65', '#5c6bc0', '#ec407a',
+    '#78909c', '#8d6e63'
+  ];
+
+  // ─── Render columns from _kanbanColumns data ───
+  function renderColumns() {
+    if (!boardEl) return;
+    // Destroy existing sortable instances before clearing DOM
+    _sortableInstances.forEach(function(s) { s.destroy(); });
+    _sortableInstances = [];
+
+    boardEl.innerHTML = '';
+    columns = {};
+    counts = {};
+    _columnOrder = [];
+
+    _kanbanColumns.forEach(function(colDef) {
+      var slug = colDef.status;
+      _columnOrder.push(slug);
+
+      var colDiv = document.createElement('div');
+      colDiv.className = 'kanban-column';
+      colDiv.setAttribute('data-kanban-status', slug);
+      colDiv.setAttribute('data-kanban-col-id', colDef.id);
+
+      var headerHtml = '<div class="kanban-column-header" style="position:relative;">';
+      headerHtml += '<div class="kanban-column-header-left">';
+      headerHtml += '<span class="kanban-column-dot" style="background:' + escapeHtml(colDef.color) + ';"></span>';
+      headerHtml += '<h3 class="kanban-col-name" data-col-id="' + colDef.id + '">' + escapeHtml(colDef.name) + '</h3>';
+      headerHtml += '<span class="kanban-column-count" data-col-count="' + slug + '">0</span>';
+      // Done filter for done columns
+      if (colDef.isDoneColumn) {
+        headerHtml += '<select class="kanban-done-filter" data-done-filter="' + slug + '">';
+        headerHtml += '<option value="today"' + (_doneFilter === 'today' ? ' selected' : '') + '>Today</option>';
+        headerHtml += '<option value="7days"' + (_doneFilter === '7days' ? ' selected' : '') + '>7 days</option>';
+        headerHtml += '<option value="all"' + (_doneFilter === 'all' ? ' selected' : '') + '>All</option>';
+        headerHtml += '</select>';
+      }
+      headerHtml += '</div>';
+      // Settings button
+      headerHtml += '<div class="kanban-column-header-actions">';
+      headerHtml += '<button type="button" class="kanban-col-settings-btn" data-col-settings="' + colDef.id + '" title="Column settings">';
+      headerHtml += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>';
+      headerHtml += '</button>';
+      headerHtml += '</div>';
+      headerHtml += '</div>';
+
+      colDiv.innerHTML = headerHtml;
+
+      var itemsDiv = document.createElement('div');
+      itemsDiv.className = 'kanban-column-items';
+      itemsDiv.setAttribute('data-col-items', slug);
+      colDiv.appendChild(itemsDiv);
+
+      var addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'kanban-quick-add-btn';
+      addBtn.setAttribute('data-kanban-add', slug);
+      addBtn.textContent = '+ Add task';
+      colDiv.appendChild(addBtn);
+
+      boardEl.appendChild(colDiv);
+
+      columns[slug] = itemsDiv;
+      counts[slug] = colDiv.querySelector('[data-col-count="' + slug + '"]');
+    });
+
+    // Add the "+ Add Column" button at the end
+    var addColBtn = document.createElement('button');
+    addColBtn.type = 'button';
+    addColBtn.className = 'kanban-add-column';
+    addColBtn.title = 'Add column';
+    addColBtn.innerHTML = '+';
+    addColBtn.addEventListener('click', handleAddColumn);
+    boardEl.appendChild(addColBtn);
+
+    // Wire up event listeners
+    initColumnEvents();
+    initQuickAdd();
+  }
+
+  // ─── Column management event listeners ───
+  var _openColMenuId = null;
+
+  function initColumnEvents() {
+    // Settings buttons
+    boardEl.querySelectorAll('.kanban-col-settings-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var colId = btn.getAttribute('data-col-settings');
+        if (_openColMenuId === colId) {
+          closeColMenu();
+        } else {
+          openColMenu(colId, btn);
+        }
+      });
+    });
+
+    // Done filter selects
+    boardEl.querySelectorAll('.kanban-done-filter').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        _doneFilter = sel.value;
+        renderBoard();
+      });
+    });
+
+    // Double-click column name to rename
+    boardEl.querySelectorAll('.kanban-col-name').forEach(function(nameEl) {
+      nameEl.addEventListener('dblclick', function() {
+        var colId = nameEl.getAttribute('data-col-id');
+        startRename(colId, nameEl);
+      });
+    });
+  }
+
+  function openColMenu(colId, anchorBtn) {
+    closeColMenu();
+    _openColMenuId = colId;
+    var colDef = _kanbanColumns.find(function(c) { return c.id === colId; });
+    if (!colDef) return;
+
+    var menu = document.createElement('div');
+    menu.className = 'kanban-col-menu';
+    menu.setAttribute('data-col-menu', colId);
+
+    // Rename
+    menu.innerHTML = '<button type="button" class="kanban-col-menu-item" data-action="rename">Rename</button>';
+    // Color picker
+    menu.innerHTML += '<div class="kanban-col-menu-item" style="flex-direction:column;align-items:flex-start;gap:4px;cursor:default;"><span style="font-size:0.72rem;color:var(--text-muted);">Color</span><div class="kanban-col-color-row">' +
+      COLUMN_COLORS.map(function(c) {
+        return '<button type="button" class="kanban-col-color-swatch' + (c === colDef.color ? ' active' : '') + '" style="background:' + c + ';" data-action="color" data-color="' + c + '"></button>';
+      }).join('') +
+      '</div></div>';
+    // Toggle isDoneColumn
+    menu.innerHTML += '<button type="button" class="kanban-col-menu-item" data-action="toggle-done">' +
+      (colDef.isDoneColumn ? 'Unmark as Done column' : 'Mark as Done column') + '</button>';
+    menu.innerHTML += '<div class="kanban-col-menu-sep"></div>';
+    // Delete
+    menu.innerHTML += '<button type="button" class="kanban-col-menu-item kanban-col-menu-item--danger" data-action="delete">Delete column</button>';
+
+    // Position relative to header
+    var header = anchorBtn.closest('.kanban-column-header');
+    header.appendChild(menu);
+
+    // Event delegation
+    menu.addEventListener('click', function(e) {
+      var item = e.target.closest('[data-action]');
+      if (!item) return;
+      var action = item.getAttribute('data-action');
+      if (action === 'rename') {
+        closeColMenu();
+        var nameEl = header.querySelector('.kanban-col-name');
+        startRename(colId, nameEl);
+      } else if (action === 'color') {
+        var newColor = item.getAttribute('data-color');
+        changeColumnColor(colId, newColor);
+        // Update active state
+        menu.querySelectorAll('.kanban-col-color-swatch').forEach(function(s) {
+          s.classList.toggle('active', s.getAttribute('data-color') === newColor);
+        });
+      } else if (action === 'toggle-done') {
+        toggleDoneColumn(colId);
+        closeColMenu();
+      } else if (action === 'delete') {
+        closeColMenu();
+        showDeleteColumnDialog(colId);
+      }
+    });
+
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('mousedown', _handleColMenuOutside);
+      document.addEventListener('keydown', _handleColMenuEscape);
+    }, 0);
+  }
+
+  function closeColMenu() {
+    _openColMenuId = null;
+    var existing = boardEl.querySelector('.kanban-col-menu');
+    if (existing) existing.remove();
+    document.removeEventListener('mousedown', _handleColMenuOutside);
+    document.removeEventListener('keydown', _handleColMenuEscape);
+  }
+
+  function _handleColMenuOutside(e) {
+    var menu = boardEl.querySelector('.kanban-col-menu');
+    if (menu && !menu.contains(e.target) && !e.target.closest('.kanban-col-settings-btn')) {
+      closeColMenu();
+    }
+  }
+  function _handleColMenuEscape(e) {
+    if (e.key === 'Escape') { closeColMenu(); e.stopPropagation(); }
+  }
+
+  // ─── Rename column ───
+  function startRename(colId, nameEl) {
+    var colDef = _kanbanColumns.find(function(c) { return c.id === colId; });
+    if (!colDef) return;
+
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'kanban-col-rename-input';
+    input.value = colDef.name;
+    nameEl.replaceWith(input);
+    input.focus();
+    input.select();
+
+    function commit() {
+      var newName = input.value.trim();
+      if (!newName) newName = colDef.name; // revert if empty
+      if (newName !== colDef.name) {
+        window.dmSync.updateKanbanColumn(colId, { name: newName }).then(function() {
+          return window.dmSync.getAllKanbanColumns();
+        }).then(function(cols) {
+          _kanbanColumns = cols;
+          renderColumns();
+          renderBoard();
+        });
+      } else {
+        // Restore name element
+        var span = document.createElement('h3');
+        span.className = 'kanban-col-name';
+        span.setAttribute('data-col-id', colId);
+        span.textContent = colDef.name;
+        input.replaceWith(span);
+        span.addEventListener('dblclick', function() { startRename(colId, span); });
+      }
+    }
+
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      if (e.key === 'Escape') { input.value = colDef.name; input.blur(); }
+    });
+  }
+
+  // ─── Change column color ───
+  function changeColumnColor(colId, newColor) {
+    var colDef = _kanbanColumns.find(function(c) { return c.id === colId; });
+    if (!colDef || colDef.color === newColor) return;
+    window.dmSync.updateKanbanColumn(colId, { color: newColor }).then(function() {
+      colDef.color = newColor;
+      // Update dot inline
+      var colEl = boardEl.querySelector('[data-kanban-col-id="' + colId + '"]');
+      if (colEl) {
+        var dot = colEl.querySelector('.kanban-column-dot');
+        if (dot) dot.style.background = newColor;
+      }
+    });
+  }
+
+  // ─── Toggle isDoneColumn ───
+  function toggleDoneColumn(colId) {
+    var colDef = _kanbanColumns.find(function(c) { return c.id === colId; });
+    if (!colDef) return;
+    var newVal = !colDef.isDoneColumn;
+    window.dmSync.updateKanbanColumn(colId, { isDoneColumn: newVal }).then(function() {
+      return window.dmSync.getAllKanbanColumns();
+    }).then(function(cols) {
+      _kanbanColumns = cols;
+      renderColumns();
+      renderBoard();
+    });
+  }
+
+  // ─── Add column ───
+  function handleAddColumn() {
+    var order = _kanbanColumns.length;
+    // Pick a color not already used
+    var usedColors = _kanbanColumns.map(function(c) { return c.color; });
+    var color = COLUMN_COLORS.find(function(c) { return usedColors.indexOf(c) === -1; }) || COLUMN_COLORS[order % COLUMN_COLORS.length];
+
+    window.dmSync.createKanbanColumn({
+      name: 'New Column',
+      color: color,
+      order: order,
+      isDoneColumn: false
+    }).then(function() {
+      return window.dmSync.getAllKanbanColumns();
+    }).then(function(cols) {
+      _kanbanColumns = cols;
+      renderColumns();
+      renderBoard();
+      // Auto-start rename on the new column
+      var lastCol = _kanbanColumns[_kanbanColumns.length - 1];
+      if (lastCol) {
+        var nameEl = boardEl.querySelector('.kanban-col-name[data-col-id="' + lastCol.id + '"]');
+        if (nameEl) startRename(lastCol.id, nameEl);
+      }
+    });
+  }
+
+  // ─── Delete column ───
+  function showDeleteColumnDialog(colId) {
+    var colDef = _kanbanColumns.find(function(c) { return c.id === colId; });
+    if (!colDef) return;
+    if (_kanbanColumns.length <= 1) {
+      alert('Cannot delete the last column.');
+      return;
+    }
+
+    var otherCols = _kanbanColumns.filter(function(c) { return c.id !== colId; });
+    var overlay = document.createElement('div');
+    overlay.className = 'kanban-col-delete-overlay';
+
+    var optionsHtml = otherCols.map(function(c) {
+      return '<option value="' + c.status + '">' + escapeHtml(c.name) + '</option>';
+    }).join('');
+
+    overlay.innerHTML = '<div class="kanban-col-delete-dialog">' +
+      '<h4>Delete "' + escapeHtml(colDef.name) + '"?</h4>' +
+      '<p>Tasks in this column will be moved to another column.</p>' +
+      '<label>Move tasks to:</label>' +
+      '<select class="kanban-col-delete-target">' + optionsHtml + '</select>' +
+      '<div class="kanban-col-delete-actions">' +
+        '<button type="button" class="kanban-col-delete-cancel">Cancel</button>' +
+        '<button type="button" class="kanban-col-delete-confirm">Delete</button>' +
+      '</div>' +
+    '</div>';
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelector('.kanban-col-delete-cancel').addEventListener('click', function() {
+      overlay.remove();
+    });
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) overlay.remove();
+    });
+    overlay.querySelector('.kanban-col-delete-confirm').addEventListener('click', function() {
+      var targetStatus = overlay.querySelector('.kanban-col-delete-target').value;
+      overlay.remove();
+      window.dmSync.deleteKanbanColumn(colId, targetStatus).then(function() {
+        return window.dmSync.getAllKanbanColumns();
+      }).then(function(cols) {
+        _kanbanColumns = cols;
+        // Refresh todos since tasks were migrated
+        return window.dmSync.getAllTodos();
+      }).then(function(todos) {
+        allTodos = todos || [];
+        renderColumns();
+        renderBoard();
+      });
+    });
+  }
+
   function filterDoneTodos(doneTodos) {
     if (_doneFilter === 'all') return doneTodos;
     var now = new Date();
@@ -1155,7 +1676,7 @@
   function renderCard(todo) {
     var bujoIcon = BUJO_ICONS[todo.bujoType] || BUJO_ICONS.task;
     var title = escapeHtml(todo.title || 'Untitled');
-    var isDone = todo.kanbanStatus === 'done';
+    var isDone = isColumnDone(todo.kanbanStatus);
 
     var metaParts = [];
     if (todo.category) {
@@ -1180,7 +1701,7 @@
     var childCount = allTodos.filter(function(t) { return t.parentId === todo.id && !t.deletedAt; }).length;
     if (childCount > 0) {
       var doneChildren = allTodos.filter(function(t) {
-        return t.parentId === todo.id && !t.deletedAt && (t.kanbanStatus === 'done');
+        return t.parentId === todo.id && !t.deletedAt && isColumnDone(t.kanbanStatus);
       }).length;
       var pct = Math.round((doneChildren / childCount) * 100);
       metaParts.push('<span class="kanban-subtask-bar">' +
@@ -1230,32 +1751,39 @@
     }
 
     // Backfill kanbanStatus for legacy tasks
+    var firstDone = getFirstDoneColumnStatus();
+    var firstCol = getFirstColumnStatus();
     visibleTodos.forEach(function(t) {
       if (!t.kanbanStatus) {
-        t.kanbanStatus = t.done ? 'done' : 'todo';
+        t.kanbanStatus = t.done ? (firstDone || firstCol) : firstCol;
       }
     });
 
-    // Group by kanbanStatus
-    var groups = { todo: [], in_progress: [], done: [] };
+    // Group by kanbanStatus into dynamic columns
+    var groups = {};
+    _columnOrder.forEach(function(slug) { groups[slug] = []; });
     visibleTodos.forEach(function(t) {
-      var col = t.kanbanStatus || 'todo';
-      if (!groups[col]) col = 'todo';
+      var col = t.kanbanStatus || firstCol;
+      if (!groups[col]) col = firstCol; // fallback for unknown status
       groups[col].push(t);
     });
 
-    // Filter Done column by time range
-    groups.done = filterDoneTodos(groups.done);
+    // Filter done columns by time range
+    _columnOrder.forEach(function(slug) {
+      if (isColumnDone(slug)) {
+        groups[slug] = filterDoneTodos(groups[slug]);
+      }
+    });
 
     // Sort: within each column, sort by kanbanOrder (ascending)
-    Object.keys(groups).forEach(function(col) {
+    _columnOrder.forEach(function(col) {
       groups[col].sort(function(a, b) {
         return (a.kanbanOrder || 0) - (b.kanbanOrder || 0);
       });
     });
 
     // Render each column
-    Object.keys(columns).forEach(function(col) {
+    _columnOrder.forEach(function(col) {
       var items = groups[col] || [];
       var html = '';
       if (items.length === 0) {
@@ -1265,8 +1793,8 @@
           html += renderCard(t);
         });
       }
-      columns[col].innerHTML = html;
-      counts[col].textContent = items.length;
+      if (columns[col]) columns[col].innerHTML = html;
+      if (counts[col]) counts[col].textContent = items.length;
     });
 
     // Set up click handlers on cards
@@ -1334,35 +1862,38 @@
       firestoreUpdates.bujoState = result.bujoState;
       localUpdates.bujoState = result.bujoState;
       if (result.bujoState === 'done') {
+        var doneStatus = getFirstDoneColumnStatus() || 'done';
         firestoreUpdates.done = true;
         firestoreUpdates.status = 'done';
-        firestoreUpdates.kanbanStatus = 'done';
+        firestoreUpdates.kanbanStatus = doneStatus;
         localUpdates.done = true;
         localUpdates.status = 'done';
-        localUpdates.kanbanStatus = 'done';
+        localUpdates.kanbanStatus = doneStatus;
       } else if (result.bujoState === 'open') {
+        var openStatus = getFirstColumnStatus();
         firestoreUpdates.done = false;
         firestoreUpdates.status = 'active';
-        firestoreUpdates.kanbanStatus = 'todo';
+        firestoreUpdates.kanbanStatus = openStatus;
         localUpdates.done = false;
         localUpdates.status = 'active';
-        localUpdates.kanbanStatus = 'todo';
+        localUpdates.kanbanStatus = openStatus;
       } else {
-        // migrated / scheduled — keep active, reset kanban to 'todo'
+        // migrated / scheduled — keep active, reset kanban to first column
+        var fallbackStatus = getFirstColumnStatus();
         firestoreUpdates.done = false;
         firestoreUpdates.status = 'active';
-        firestoreUpdates.kanbanStatus = 'todo';
+        firestoreUpdates.kanbanStatus = fallbackStatus;
         localUpdates.done = false;
         localUpdates.status = 'active';
-        localUpdates.kanbanStatus = 'todo';
+        localUpdates.kanbanStatus = fallbackStatus;
       }
     }
     // Kanban status — only apply if BuJo state didn't already handle it
     var bujoChanged = result.bujoState && result.bujoState !== (todo.bujoState || 'open');
-    if (!bujoChanged && result.kanbanStatus && result.kanbanStatus !== (todo.kanbanStatus || 'todo')) {
+    if (!bujoChanged && result.kanbanStatus && result.kanbanStatus !== (todo.kanbanStatus || getFirstColumnStatus())) {
       firestoreUpdates.kanbanStatus = result.kanbanStatus;
       localUpdates.kanbanStatus = result.kanbanStatus;
-      if (result.kanbanStatus === 'done') {
+      if (isColumnDone(result.kanbanStatus)) {
         firestoreUpdates.done = true;
         firestoreUpdates.status = 'done';
         firestoreUpdates.bujoState = 'done';
@@ -1371,7 +1902,7 @@
         localUpdates.status = 'done';
         localUpdates.bujoState = 'done';
         localUpdates.completedAt = Date.now();
-      } else if ((todo.kanbanStatus || 'todo') === 'done') {
+      } else if (isColumnDone(todo.kanbanStatus || getFirstColumnStatus())) {
         // Moving out of Done — reopen
         firestoreUpdates.done = false;
         firestoreUpdates.status = 'active';
@@ -1419,8 +1950,9 @@
 
     if (typeof Sortable === 'undefined') return;
 
-    Object.keys(columns).forEach(function(col) {
+    _columnOrder.forEach(function(col) {
       var el = columns[col];
+      if (!el) return;
       var sortable = Sortable.create(el, {
         group: 'kanban',
         animation: 150,
@@ -1433,8 +1965,7 @@
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
         onStart: function() {
-          var board = document.getElementById('kanban-board');
-          if (board) board.classList.add('kanban-board--dragging');
+          if (boardEl) boardEl.classList.add('kanban-board--dragging');
         },
         onMove: function(moveEvt) {
           // Highlight the column being dragged over
@@ -1445,8 +1976,7 @@
         },
         onEnd: function(evt) {
           // Clean up drag state classes
-          var board = document.getElementById('kanban-board');
-          if (board) board.classList.remove('kanban-board--dragging');
+          if (boardEl) boardEl.classList.remove('kanban-board--dragging');
           var allCols = container.querySelectorAll('.kanban-column');
           allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
 
@@ -1455,12 +1985,14 @@
           var todo = allTodos.find(function(t) { return t.id === todoId; });
           if (!todo) return;
 
-          var oldKanbanStatus = todo.kanbanStatus || 'todo';
+          var oldKanbanStatus = todo.kanbanStatus || getFirstColumnStatus();
           var oldKanbanOrder = todo.kanbanOrder || 0;
+          var movingToDone = isColumnDone(newColumn) && !isColumnDone(oldKanbanStatus);
+          var movingFromDone = !isColumnDone(newColumn) && isColumnDone(oldKanbanStatus);
 
           // Snapshot for undo (before modifying)
           var snapshot = null;
-          if (newColumn === 'done' && oldKanbanStatus !== 'done') {
+          if (movingToDone) {
             snapshot = {
               kanbanStatus: oldKanbanStatus,
               kanbanOrder: oldKanbanOrder,
@@ -1487,7 +2019,7 @@
           };
 
           // Sync done/status/bujoState when moving between columns
-          if (newColumn === 'done' && oldKanbanStatus !== 'done') {
+          if (movingToDone) {
             firestoreUpdates.done = true;
             firestoreUpdates.status = 'done';
             firestoreUpdates.bujoState = 'done';
@@ -1496,7 +2028,7 @@
             localUpdates.status = 'done';
             localUpdates.bujoState = 'done';
             localUpdates.completedAt = Date.now();
-          } else if (newColumn !== 'done' && oldKanbanStatus === 'done') {
+          } else if (movingFromDone) {
             // Moving out of Done -> reopen
             firestoreUpdates.done = false;
             firestoreUpdates.status = 'active';
@@ -1601,26 +2133,41 @@
       var s = t.status || 'active';
       return s === 'active' || s === 'done';
     });
-    var doneTodos = [];
-    var c = { todo: 0, in_progress: 0, done: 0 };
+    // Apply project filter
+    if (_kanbanFilterProjectIds.size > 0) {
+      visible = visible.filter(function(t) {
+        if (_kanbanFilterProjectIds.has('__none__') && !t.projectId) return true;
+        return t.projectId && _kanbanFilterProjectIds.has(t.projectId);
+      });
+    }
+    var doneLists = {}; // slug -> [todos] for done columns
+    var c = {};
+    _columnOrder.forEach(function(slug) {
+      c[slug] = 0;
+      if (isColumnDone(slug)) doneLists[slug] = [];
+    });
     visible.forEach(function(t) {
-      var col = t.kanbanStatus || 'todo';
-      if (col === 'done') {
-        doneTodos.push(t);
-      } else if (c[col] !== undefined) {
+      var col = t.kanbanStatus || getFirstColumnStatus();
+      if (c[col] === undefined) col = getFirstColumnStatus();
+      if (doneLists[col]) {
+        doneLists[col].push(t);
+      } else {
         c[col]++;
       }
     });
-    c.done = filterDoneTodos(doneTodos).length;
-    Object.keys(counts).forEach(function(col) {
-      counts[col].textContent = c[col];
+    // Apply done filter to done columns
+    Object.keys(doneLists).forEach(function(slug) {
+      c[slug] = filterDoneTodos(doneLists[slug]).length;
+    });
+    _columnOrder.forEach(function(col) {
+      if (counts[col]) counts[col].textContent = c[col] || 0;
     });
 
     // Update card done styling
     container.querySelectorAll('.kanban-card').forEach(function(card) {
       var todoId = card.getAttribute('data-todo-id');
       var todo = allTodos.find(function(t) { return t.id === todoId; });
-      if (todo && todo.kanbanStatus === 'done') {
+      if (todo && isColumnDone(todo.kanbanStatus)) {
         card.classList.add('kanban-card--done');
       } else {
         card.classList.remove('kanban-card--done');
@@ -1731,7 +2278,7 @@
       });
       var order = maxOrder + 1;
 
-      var isDone = kanbanStatus === 'done';
+      var isDone = isColumnDone(kanbanStatus);
       var newDocId = window.dmDb.collection('todos').doc().id;
 
       var todoData = {
@@ -1833,8 +2380,12 @@
       });
       updateKanbanProjectFilter();
     }).catch(function() { /* keep existing */ });
+    // Seed default columns if none exist, then load them
+    var columnsPromise = window.dmSync.seedDefaultKanbanColumns().then(function(cols) {
+      _kanbanColumns = cols;
+    });
 
-    Promise.all([todosPromise, projectsPromise]).then(function(results) {
+    Promise.all([todosPromise, projectsPromise, columnsPromise]).then(function(results) {
       allTodos = results[0] || [];
 
       // Filter to active + done (not archived/deleted)
@@ -1844,6 +2395,9 @@
         var s = t.status || 'active';
         return s === 'active' || s === 'done';
       });
+
+      // Always render columns first (even if no tasks)
+      renderColumns();
 
       if (visible.length === 0) {
         showState('empty');
@@ -1873,11 +2427,11 @@
 
   // ─── Keyboard navigation ───
   var _focusedCardId = null;
-  var _columnOrder = ['todo', 'in_progress', 'done'];
 
   function getVisibleCards() {
     var cards = [];
     _columnOrder.forEach(function(col) {
+      if (!columns[col]) return;
       var colCards = columns[col].querySelectorAll('.kanban-card');
       colCards.forEach(function(c) { cards.push({ el: c, col: col }); });
     });
@@ -2000,7 +2554,7 @@
     } else if (e.key === 'n') {
       e.preventDefault();
       // Quick-add in the focused column, or default to 'todo'
-      var targetCol = getFocusedColumn() || 'todo';
+      var targetCol = getFocusedColumn() || getFirstColumnStatus();
       var btn = container.querySelector('.kanban-quick-add-btn[data-kanban-add="' + targetCol + '"]');
       if (btn && btn.style.display !== 'none') {
         showQuickAddForm(btn, targetCol);
@@ -2009,14 +2563,6 @@
       setFocusedCard(null);
     }
   });
-
-  // ─── Done filter ───
-  if (doneFilterEl) {
-    doneFilterEl.addEventListener('change', function() {
-      _doneFilter = doneFilterEl.value;
-      renderBoard();
-    });
-  }
 
   // ─── Events ───
   window.addEventListener('dm-todos-updated', function() {
@@ -2050,8 +2596,18 @@
     }
   });
 
+  // Re-render columns when column definitions change (e.g. from another tab)
+  window.addEventListener('dm-kanban-columns-updated', function() {
+    if (contentEl.style.display !== 'none' && window.dmSync) {
+      window.dmSync.getAllKanbanColumns().then(function(cols) {
+        _kanbanColumns = cols;
+        renderColumns();
+        renderBoard();
+      });
+    }
+  });
+
   // ─── Init ───
-  initQuickAdd();
 
   if (window.dmAuth) {
     function subscribeKanbanAuth() {

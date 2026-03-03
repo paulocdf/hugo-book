@@ -161,7 +161,7 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-   var DB_VERSION = 13;
+   var DB_VERSION = 14;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -171,6 +171,7 @@
   var STORE_REVIEW_CARDS = 'reviewCards';
   var STORE_TASK_SHARES = 'taskShares';
   var STORE_PROJECTS = 'projects';
+  var STORE_KANBAN_COLUMNS = 'kanbanColumns';
   var MAX_VERSIONS_PER_NOTE = 50;
   var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
   var SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -305,15 +306,21 @@
           projectStore.createIndex('archived', 'archived', { unique: false });
           projectStore.createIndex('order', 'order', { unique: false });
         }
+        // Kanban columns store (v14) — fully configurable board columns
+        if (!db.objectStoreNames.contains(STORE_KANBAN_COLUMNS)) {
+          var colStore = db.createObjectStore(STORE_KANBAN_COLUMNS, { keyPath: 'id' });
+          colStore.createIndex('userId', 'userId', { unique: false });
+          colStore.createIndex('order', 'order', { unique: false });
+        }
       };
       req.onblocked = function() {
         console.warn('[dm-sync] IndexedDB upgrade blocked — close other tabs and reload');
       };
       req.onsuccess = function(e) {
         _db = e.target.result;
-        // Safety: if the taskShares store is still missing after upgrade, delete and re-open
-        if (!_db.objectStoreNames.contains(STORE_TASK_SHARES)) {
-          console.warn('[dm-sync] taskShares store missing after open — deleting DB and re-creating');
+        // Safety: if required stores are still missing after upgrade, delete and re-open
+        if (!_db.objectStoreNames.contains(STORE_TASK_SHARES) || !_db.objectStoreNames.contains(STORE_KANBAN_COLUMNS)) {
+          console.warn('[dm-sync] Required store missing after open — deleting DB and re-creating');
           _db.close();
           _db = null;
           var delReq = indexedDB.deleteDatabase(DB_NAME);
@@ -854,6 +861,23 @@
     };
   }
 
+  function serializeKanbanColumn(doc) {
+    var data = doc.data();
+    var createdAt = data.createdAt ? data.createdAt.toMillis() : 0;
+    var updatedAt = data.updatedAt ? data.updatedAt.toMillis() : 0;
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      name: data.name || '',
+      status: data.status || '',
+      color: data.color || '#64b5f6',
+      order: typeof data.order === 'number' ? data.order : 0,
+      isDoneColumn: !!data.isDoneColumn,
+      createdAt: createdAt,
+      updatedAt: updatedAt
+    };
+  }
+
   // ─── Sync Engine ───
 
   function syncNotes(userId) {
@@ -1049,6 +1073,67 @@
       });
   }
 
+  function syncKanbanColumns(userId) {
+    if (!window.dmDb) return Promise.reject(new Error('Firestore not available'));
+
+    console.log('[dm-sync] Syncing kanban columns...');
+    var startTime = Date.now();
+
+    return window.dmDb.collection('kanbanColumns')
+      .where('userId', '==', userId)
+      .get()
+      .then(function(snapshot) {
+        var remoteCols = [];
+        snapshot.forEach(function(doc) {
+          remoteCols.push(serializeKanbanColumn(doc));
+        });
+
+        return idbGetAll(STORE_KANBAN_COLUMNS).then(function(localCols) {
+          return getAllQueued().then(function(queueEntries) {
+          var pendingIds = {};
+          queueEntries.forEach(function(q) {
+            if (q.op === 'set' && q.collection === 'kanbanColumns') pendingIds[q.docId] = true;
+          });
+
+          var localMap = {};
+          localCols.forEach(function(c) { localMap[c.id] = c; });
+
+          var remoteMap = {};
+          remoteCols.forEach(function(c) { remoteMap[c.id] = c; });
+
+          var toUpsert = [];
+          remoteCols.forEach(function(rc) {
+            var lc = localMap[rc.id];
+            if (!lc || lc.updatedAt !== rc.updatedAt) {
+              toUpsert.push(rc);
+            }
+          });
+
+          var toDelete = [];
+          localCols.forEach(function(lc) {
+            if (!remoteMap[lc.id] && !pendingIds[lc.id]) {
+              toDelete.push(lc.id);
+            }
+          });
+
+          var promises = [];
+          if (toUpsert.length > 0) {
+            promises.push(idbPutBatch(STORE_KANBAN_COLUMNS, toUpsert));
+          }
+          toDelete.forEach(function(id) {
+            promises.push(idbDelete(STORE_KANBAN_COLUMNS, id));
+          });
+
+          return Promise.all(promises).then(function() {
+            var elapsed = Date.now() - startTime;
+            console.log('[dm-sync] Kanban columns sync complete in ' + elapsed + 'ms. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
+            return { upserted: toUpsert.length, deleted: toDelete.length };
+          });
+          });
+        });
+      });
+  }
+
   // ─── Auto-purge expired trash ───
 
   function purgeExpiredTrash() {
@@ -1099,6 +1184,7 @@
     return syncNotes(userId)
       .then(function() { return syncTodos(userId); })
       .then(function() { return syncProjects(userId); })
+      .then(function() { return syncKanbanColumns(userId); })
       .then(function() { return syncVersions(userId); })
       .then(function() { return syncAttachments(userId); })
       .then(function() { return syncReviewCards(userId); })
@@ -3037,6 +3123,151 @@
       });
     },
 
+    // IndexedDB operations — Kanban Columns
+    getAllKanbanColumns: function() {
+      return idbGetAll(STORE_KANBAN_COLUMNS).then(function(cols) {
+        return cols.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      });
+    },
+    getKanbanColumn: function(id) {
+      return idbGet(STORE_KANBAN_COLUMNS, id);
+    },
+    createKanbanColumn: function(colData) {
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      if (!user) return Promise.reject(new Error('Not authenticated'));
+      var id = colData.id || (user.uid + '_col_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
+      var now = Date.now();
+      var col = {
+        id: id,
+        userId: user.uid,
+        name: colData.name || '',
+        status: colData.status || colData.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, ''),
+        color: colData.color || '#64b5f6',
+        order: typeof colData.order === 'number' ? colData.order : 0,
+        isDoneColumn: !!colData.isDoneColumn,
+        createdAt: now,
+        updatedAt: now
+      };
+      var firestoreData = {
+        userId: user.uid,
+        name: col.name,
+        status: col.status,
+        color: col.color,
+        order: col.order,
+        isDoneColumn: col.isDoneColumn,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'kanbanColumns',
+        docId: id,
+        op: 'set',
+        data: firestoreData,
+        localOp: function() { return idbPut(STORE_KANBAN_COLUMNS, col); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-kanban-columns-updated'));
+        return col;
+      });
+    },
+    updateKanbanColumn: function(id, updates) {
+      return idbGet(STORE_KANBAN_COLUMNS, id).then(function(col) {
+        if (!col) return Promise.reject(new Error('Column not found: ' + id));
+        var firestoreUpdates = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        if (updates.name !== undefined) { col.name = updates.name; firestoreUpdates.name = updates.name; }
+        if (updates.status !== undefined) { col.status = updates.status; firestoreUpdates.status = updates.status; }
+        if (updates.color !== undefined) { col.color = updates.color; firestoreUpdates.color = updates.color; }
+        if (updates.order !== undefined) { col.order = updates.order; firestoreUpdates.order = updates.order; }
+        if (updates.isDoneColumn !== undefined) { col.isDoneColumn = updates.isDoneColumn; firestoreUpdates.isDoneColumn = updates.isDoneColumn; }
+        col.updatedAt = Date.now();
+        return firestoreWrite({
+          collection: 'kanbanColumns',
+          docId: id,
+          op: 'update',
+          data: firestoreUpdates,
+          localOp: function() { return idbPut(STORE_KANBAN_COLUMNS, col); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-kanban-columns-updated'));
+          return col;
+        });
+      });
+    },
+    deleteKanbanColumn: function(id, migrateToColumnStatus) {
+      // Migrate tasks from deleted column to the target column
+      return idbGetAll(STORE_TODOS).then(function(todos) {
+        var affected = todos.filter(function(t) { return t.kanbanStatus === id && !t.deletedAt; });
+        // Also match by column status slug
+        return idbGet(STORE_KANBAN_COLUMNS, id).then(function(col) {
+          var statusSlug = col ? col.status : id;
+          var allAffected = todos.filter(function(t) {
+            return (t.kanbanStatus === statusSlug) && !t.deletedAt;
+          });
+          var migratePromises = allAffected.map(function(t) {
+            t.kanbanStatus = migrateToColumnStatus || 'todo';
+            t.updatedAt = Date.now();
+            return firestoreWrite({
+              collection: 'todos',
+              docId: t.id,
+              op: 'update',
+              data: {
+                kanbanStatus: t.kanbanStatus,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              },
+              localOp: function() { return idbPut(STORE_TODOS, t); }
+            });
+          });
+          return Promise.all(migratePromises);
+        });
+      }).then(function() {
+        return firestoreWrite({
+          collection: 'kanbanColumns',
+          docId: id,
+          op: 'delete',
+          data: null,
+          localOp: function() { return idbDelete(STORE_KANBAN_COLUMNS, id); }
+        });
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-kanban-columns-updated'));
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+      });
+    },
+    reorderKanbanColumns: function(orderedIds) {
+      var promises = orderedIds.map(function(id, index) {
+        return idbGet(STORE_KANBAN_COLUMNS, id).then(function(col) {
+          if (!col) return;
+          col.order = index;
+          col.updatedAt = Date.now();
+          return firestoreWrite({
+            collection: 'kanbanColumns',
+            docId: id,
+            op: 'update',
+            data: {
+              order: index,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            localOp: function() { return idbPut(STORE_KANBAN_COLUMNS, col); }
+          });
+        });
+      });
+      return Promise.all(promises).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-kanban-columns-updated'));
+      });
+    },
+    seedDefaultKanbanColumns: function() {
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      if (!user) return Promise.resolve([]);
+      return idbGetAll(STORE_KANBAN_COLUMNS).then(function(existing) {
+        if (existing.length > 0) return existing;
+        var defaults = [
+          { name: 'To Do', status: 'todo', color: '#42a5f5', order: 0, isDoneColumn: false },
+          { name: 'In Progress', status: 'in_progress', color: '#ffa726', order: 1, isDoneColumn: false },
+          { name: 'Done', status: 'done', color: '#66bb6a', order: 2, isDoneColumn: true }
+        ];
+        return Promise.all(defaults.map(function(d) {
+          return window.dmSync.createKanbanColumn(d);
+        }));
+      });
+    },
+
     setReminder: function(todoId, reminderAtMs) {
       return idbGet(STORE_TODOS, todoId).then(function(todo) {
         if (!todo) return;
@@ -3194,6 +3425,7 @@
     syncNotes: function(userId) { return syncNotes(userId); },
     syncTodos: function(userId) { return syncTodos(userId); },
     syncProjects: function(userId) { return syncProjects(userId); },
+    syncKanbanColumns: function(userId) { return syncKanbanColumns(userId); },
     startBackgroundSync: startBackgroundSync,
     stopBackgroundSync: stopBackgroundSync,
 
@@ -3216,6 +3448,7 @@
         idbClear(STORE_REVIEW_CARDS),
         idbClear(STORE_TASK_SHARES),
         idbClear(STORE_PROJECTS),
+        idbClear(STORE_KANBAN_COLUMNS),
         clearQueue()
       ]).then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -3339,7 +3572,7 @@
           var cachedUserId = meta ? meta.value : null;
           var proceed = cachedUserId === user.uid
             ? Promise.resolve()
-            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), clearQueue()]);
+            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
 
           return proceed.then(function() {
             return idbPut(STORE_META, { key: 'currentUserId', value: user.uid });
@@ -3382,7 +3615,7 @@
         stopSharedTaskListeners();
         clearAllReminderTimers();
         // Clear cache on sign-out so no data leaks to another user
-        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), clearQueue()])
+        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()])
           .then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));
