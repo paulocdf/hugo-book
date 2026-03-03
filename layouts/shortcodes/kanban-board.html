@@ -161,28 +161,173 @@
   border-color: var(--color-link);
 }
 
-/* Project filter bar */
+/* Project filter — dropdown multi-select */
 .kanban-project-filter {
   display: flex;
   align-items: center;
   gap: 6px;
+  position: relative;
   margin-bottom: 10px;
 }
-.kanban-project-filter-label {
-  color: var(--gray-500);
+.kanban-pf-chips {
   display: flex;
   align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
-.kanban-project-filter-select {
-  padding: 3px 8px;
-  border: 1px solid var(--gray-200);
+.kanban-pf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 5px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: #fff;
+  border: none;
+  cursor: default;
+  max-width: 120px;
+}
+.kanban-pf-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.6);
+}
+.kanban-pf-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kanban-pf-chip-x {
+  cursor: pointer;
+  opacity: 0.7;
+  font-size: 0.72rem;
+  line-height: 1;
+  margin-left: 1px;
+  padding: 0 1px;
+}
+.kanban-pf-chip-x:hover {
+  opacity: 1;
+}
+.kanban-pf-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--gray-300);
   border-radius: 6px;
   background: var(--body-background);
-  color: var(--body-font-color);
-  font-size: 0.82rem;
-  font-family: inherit;
+  color: var(--gray-500);
   cursor: pointer;
-  appearance: auto;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.kanban-pf-trigger:hover,
+.kanban-pf-trigger.active {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+.kanban-pf-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+.kanban-pf-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 200;
+  min-width: 180px;
+  max-width: 260px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.kanban-pf-dropdown-clear {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--color-link);
+  font-size: 0.72rem;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 2px;
+}
+.kanban-pf-dropdown-clear:hover {
+  background: var(--gray-100);
+}
+.kanban-pf-dropdown-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: background 0.1s;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: var(--body-font-color);
+}
+.kanban-pf-dropdown-row:hover {
+  background: var(--gray-100);
+}
+.kanban-pf-dropdown-check {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--gray-400);
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, border-color 0.1s;
+}
+.kanban-pf-dropdown-check.checked {
+  background: var(--color-link);
+  border-color: var(--color-link);
+}
+.kanban-pf-dropdown-check.checked::after {
+  content: '';
+  width: 4px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+  margin-top: -1px;
+}
+.kanban-pf-dropdown-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
 /* Project badge on cards */
@@ -656,13 +801,11 @@
 
   <div class="kanban-content" id="kanban-content" style="display: none;">
     <div class="kanban-project-filter" id="kanban-project-filter" style="display:none;">
-      <label class="kanban-project-filter-label">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-      </label>
-      <select id="kanban-project-filter-select" class="kanban-project-filter-select">
-        <option value="">All projects</option>
-        <option value="__none__">No project</option>
-      </select>
+      <div class="kanban-pf-chips" id="kanban-pf-chips"></div>
+      <button type="button" class="kanban-pf-trigger" id="kanban-pf-trigger" title="Filter by project">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        <span class="kanban-pf-badge" id="kanban-pf-badge" style="display:none;"></span>
+      </button>
     </div>
     <div class="kanban-board" id="kanban-board">
       <div class="kanban-column" data-kanban-status="todo">
@@ -738,39 +881,175 @@
   var _sortableInstances = [];
   var _doneFilter = 'today'; // 'today' | '7days' | 'all'
   var _kanbanProjectMap = {}; // { projectId: { name, color } }
-  var _kanbanFilterProjectId = null; // null = all, '__none__' = no project, else projectId
+  var _kanbanFilterProjectIds = new Set(['__none__']); // Active project filters — default to "No project"
   var doneFilterEl = document.getElementById('kanban-done-filter');
   var kanbanProjectFilterBar = document.getElementById('kanban-project-filter');
-  var kanbanProjectFilterSelect = document.getElementById('kanban-project-filter-select');
+  var kanbanFilterChips = document.getElementById('kanban-pf-chips');
+  var kanbanFilterTrigger = document.getElementById('kanban-pf-trigger');
+  var kanbanFilterBadge = document.getElementById('kanban-pf-badge');
+
+  var KANBAN_PROJECT_DARK_COLORS = {
+    '#1976d2': '#64b5f6', '#388e3c': '#81c784', '#e65100': '#ffb74d',
+    '#7b1fa2': '#ce93d8', '#00897b': '#4db6ac', '#c62828': '#ef5350',
+    '#f9a825': '#fff176', '#ad1457': '#f06292', '#283593': '#7986cb',
+    '#546e7a': '#90a4ae'
+  };
+  function getKanbanProjectDisplayColor(color) {
+    if (!color) return 'var(--gray-400)';
+    var isDark = document.documentElement.classList.contains('dark') ||
+                 (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
+                  !document.documentElement.classList.contains('light'));
+    return isDark ? (KANBAN_PROJECT_DARK_COLORS[color.toLowerCase()] || color) : color;
+  }
+
+  var _kanbanDropdownOpen = false;
 
   function updateKanbanProjectFilter() {
-    if (!kanbanProjectFilterBar || !kanbanProjectFilterSelect) return;
+    if (!kanbanProjectFilterBar) return;
     var projectIds = Object.keys(_kanbanProjectMap);
     if (projectIds.length === 0) {
       kanbanProjectFilterBar.style.display = 'none';
       return;
     }
     kanbanProjectFilterBar.style.display = '';
-    var currentVal = kanbanProjectFilterSelect.value;
-    var html = '<option value="">All projects</option>';
-    html += '<option value="__none__">No project</option>';
-    projectIds.forEach(function(pid) {
-      var p = _kanbanProjectMap[pid];
-      html += '<option value="' + pid + '">' + escapeHtml(p.name) + '</option>';
+    // Remove stale selections
+    _kanbanFilterProjectIds.forEach(function(id) {
+      if (id !== '__none__' && !_kanbanProjectMap[id]) _kanbanFilterProjectIds.delete(id);
     });
-    kanbanProjectFilterSelect.innerHTML = html;
-    if (currentVal && kanbanProjectFilterSelect.querySelector('option[value="' + currentVal + '"]')) {
-      kanbanProjectFilterSelect.value = currentVal;
+    // Update badge
+    var count = _kanbanFilterProjectIds.size;
+    if (count > 0) {
+      kanbanFilterBadge.textContent = count;
+      kanbanFilterBadge.style.display = '';
     } else {
-      kanbanProjectFilterSelect.value = '';
-      _kanbanFilterProjectId = null;
+      kanbanFilterBadge.style.display = 'none';
+    }
+    // Render selected chips
+    var html = '';
+    _kanbanFilterProjectIds.forEach(function(id) {
+      var name, color;
+      if (id === '__none__') {
+        name = 'No project';
+        color = 'var(--gray-500)';
+      } else {
+        var p = _kanbanProjectMap[id];
+        if (!p) return;
+        name = p.name;
+        color = getKanbanProjectDisplayColor(p.color);
+      }
+      html += '<span class="kanban-pf-chip" style="background:' + color + ';">';
+      html += '<span class="kanban-pf-chip-dot"></span>';
+      html += '<span class="kanban-pf-chip-name">' + escapeHtml(name) + '</span>';
+      html += '<span class="kanban-pf-chip-x" data-pf-remove="' + id + '">&times;</span>';
+      html += '</span>';
+    });
+    kanbanFilterChips.innerHTML = html;
+    // Update dropdown checkboxes if open
+    if (_kanbanDropdownOpen) {
+      var dropdown = kanbanProjectFilterBar.querySelector('.kanban-pf-dropdown');
+      if (dropdown) {
+        dropdown.querySelectorAll('.kanban-pf-dropdown-row').forEach(function(row) {
+          var pid = row.getAttribute('data-pf-id');
+          var check = row.querySelector('.kanban-pf-dropdown-check');
+          if (check) {
+            if (_kanbanFilterProjectIds.has(pid)) {
+              check.classList.add('checked');
+            } else {
+              check.classList.remove('checked');
+            }
+          }
+        });
+      }
     }
   }
 
-  if (kanbanProjectFilterSelect) {
-    kanbanProjectFilterSelect.addEventListener('change', function() {
-      _kanbanFilterProjectId = kanbanProjectFilterSelect.value || null;
-      renderBoard();
+  function openKanbanProjectDropdown() {
+    if (_kanbanDropdownOpen) { closeKanbanProjectDropdown(); return; }
+    _kanbanDropdownOpen = true;
+    kanbanFilterTrigger.classList.add('active');
+    var projectIds = Object.keys(_kanbanProjectMap);
+    var html = '<div class="kanban-pf-dropdown">';
+    html += '<button type="button" class="kanban-pf-dropdown-clear" data-pf-clear>Clear all</button>';
+    // "No project" row
+    var noChecked = _kanbanFilterProjectIds.has('__none__');
+    html += '<button type="button" class="kanban-pf-dropdown-row" data-pf-id="__none__">';
+    html += '<span class="kanban-pf-dropdown-check' + (noChecked ? ' checked' : '') + '"></span>';
+    html += '<span class="kanban-pf-dropdown-dot" style="background:var(--gray-400);"></span>';
+    html += '<span class="kanban-pf-dropdown-name">No project</span>';
+    html += '</button>';
+    // Project rows
+    projectIds.forEach(function(pid) {
+      var p = _kanbanProjectMap[pid];
+      var displayColor = getKanbanProjectDisplayColor(p.color);
+      var isChecked = _kanbanFilterProjectIds.has(pid);
+      html += '<button type="button" class="kanban-pf-dropdown-row" data-pf-id="' + pid + '">';
+      html += '<span class="kanban-pf-dropdown-check' + (isChecked ? ' checked' : '') + '"></span>';
+      html += '<span class="kanban-pf-dropdown-dot" style="background:' + displayColor + ';"></span>';
+      html += '<span class="kanban-pf-dropdown-name">' + escapeHtml(p.name) + '</span>';
+      html += '</button>';
+    });
+    html += '</div>';
+    kanbanProjectFilterBar.insertAdjacentHTML('beforeend', html);
+    // Close on outside click (next tick)
+    setTimeout(function() {
+      document.addEventListener('mousedown', _handleKanbanDropdownOutside);
+      document.addEventListener('keydown', _handleKanbanDropdownEscape);
+    }, 0);
+  }
+
+  function closeKanbanProjectDropdown() {
+    _kanbanDropdownOpen = false;
+    kanbanFilterTrigger.classList.remove('active');
+    var dropdown = kanbanProjectFilterBar.querySelector('.kanban-pf-dropdown');
+    if (dropdown) dropdown.remove();
+    document.removeEventListener('mousedown', _handleKanbanDropdownOutside);
+    document.removeEventListener('keydown', _handleKanbanDropdownEscape);
+  }
+
+  function _handleKanbanDropdownOutside(e) {
+    if (!kanbanProjectFilterBar.contains(e.target)) closeKanbanProjectDropdown();
+  }
+  function _handleKanbanDropdownEscape(e) {
+    if (e.key === 'Escape') { closeKanbanProjectDropdown(); e.stopPropagation(); }
+  }
+
+  // Event delegation for trigger, dropdown rows, chip remove, clear all
+  if (kanbanProjectFilterBar) {
+    kanbanProjectFilterBar.addEventListener('click', function(e) {
+      // Trigger button
+      if (e.target.closest('.kanban-pf-trigger')) {
+        openKanbanProjectDropdown();
+        return;
+      }
+      // Clear all
+      if (e.target.closest('[data-pf-clear]')) {
+        _kanbanFilterProjectIds.clear();
+        updateKanbanProjectFilter();
+        renderBoard();
+        return;
+      }
+      // Dropdown row toggle
+      var row = e.target.closest('.kanban-pf-dropdown-row');
+      if (row) {
+        var pid = row.getAttribute('data-pf-id');
+        if (_kanbanFilterProjectIds.has(pid)) {
+          _kanbanFilterProjectIds.delete(pid);
+        } else {
+          _kanbanFilterProjectIds.add(pid);
+        }
+        updateKanbanProjectFilter();
+        renderBoard();
+        return;
+      }
+      // Chip remove
+      var removeBtn = e.target.closest('[data-pf-remove]');
+      if (removeBtn) {
+        var rid = removeBtn.getAttribute('data-pf-remove');
+        _kanbanFilterProjectIds.delete(rid);
+        updateKanbanProjectFilter();
+        renderBoard();
+        return;
+      }
     });
   }
 
@@ -942,13 +1221,12 @@
       return s === 'active' || s === 'done';
     });
 
-    // Apply project filter
-    if (_kanbanFilterProjectId) {
-      if (_kanbanFilterProjectId === '__none__') {
-        visibleTodos = visibleTodos.filter(function(t) { return !t.projectId; });
-      } else {
-        visibleTodos = visibleTodos.filter(function(t) { return t.projectId === _kanbanFilterProjectId; });
-      }
+    // Apply project filter (multi-select)
+    if (_kanbanFilterProjectIds.size > 0) {
+      visibleTodos = visibleTodos.filter(function(t) {
+        if (_kanbanFilterProjectIds.has('__none__') && !t.projectId) return true;
+        return t.projectId && _kanbanFilterProjectIds.has(t.projectId);
+      });
     }
 
     // Backfill kanbanStatus for legacy tasks
@@ -1462,7 +1740,7 @@
         estimatedMin: estimatedMin,
         actualMin: null,
         category: null,
-        projectId: _kanbanFilterProjectId && _kanbanFilterProjectId !== '__none__' ? _kanbanFilterProjectId : null,
+        projectId: (function() { var ids = Array.from(_kanbanFilterProjectIds).filter(function(id) { return id !== '__none__'; }); return ids.length === 1 ? ids[0] : null; })(),
         pomodoroCount: 1,
         pomodoroLength: null,
         breakLength: null,
@@ -1491,7 +1769,7 @@
         estimatedMin: estimatedMin,
         actualMin: null,
         category: null,
-        projectId: _kanbanFilterProjectId && _kanbanFilterProjectId !== '__none__' ? _kanbanFilterProjectId : null,
+        projectId: (function() { var ids = Array.from(_kanbanFilterProjectIds).filter(function(id) { return id !== '__none__'; }); return ids.length === 1 ? ids[0] : null; })(),
         pomodoroCount: 1,
         pomodoroLength: null,
         breakLength: null,

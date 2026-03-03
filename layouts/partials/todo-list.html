@@ -7,13 +7,11 @@
       Tasks
     </h3>
     <div class="todo-project-filter" id="todo-project-filter" style="display:none;">
-      <label class="todo-project-filter-label">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
-      </label>
-      <select id="todo-project-filter-select" class="todo-project-filter-select">
-        <option value="">All projects</option>
-        <option value="__none__">No project</option>
-      </select>
+      <div class="todo-pf-chips" id="todo-pf-chips"></div>
+      <button type="button" class="todo-pf-trigger" id="todo-pf-trigger" title="Filter by project">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        <span class="todo-pf-badge" id="todo-pf-badge" style="display:none;"></span>
+      </button>
     </div>
   </div>
 
@@ -152,43 +150,179 @@
   padding: 0.75rem 1rem;
 }
 
-/* Project filter (inside header bar) */
+/* Project filter — dropdown multi-select */
 .todo-project-filter {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  position: relative;
 }
-.todo-project-filter-label {
+.todo-pf-chips {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.todo-pf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 6px 1px 5px;
+  border-radius: 10px;
+  font-size: 0.68rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  color: #fff;
+  border: none;
+  cursor: default;
+  max-width: 120px;
+}
+.todo-pf-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.6);
+}
+.todo-pf-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.todo-pf-chip-x {
+  cursor: pointer;
+  opacity: 0.7;
+  font-size: 0.72rem;
+  line-height: 1;
+  margin-left: 1px;
+  padding: 0 1px;
+}
+.todo-pf-chip-x:hover {
+  opacity: 1;
+}
+.todo-pf-trigger {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--gray-400);
-  flex-shrink: 0;
-  line-height: 0;
-}
-.todo-project-filter-select {
-  appearance: none;
-  -webkit-appearance: none;
+  position: relative;
+  width: 26px;
+  height: 26px;
   border: 1px solid var(--gray-300);
-  border-radius: 5px;
-  padding: 3px 22px 3px 7px;
-  font-size: 0.75rem;
-  font-family: inherit;
-  background: var(--body-background) url("data:image/svg+xml,%3Csvg width='8' height='5' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23999' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 6px center;
-  color: var(--body-font-color);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--gray-500);
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  line-height: 1.3;
-  max-width: 160px;
+  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  flex-shrink: 0;
+  padding: 0;
+}
+.todo-pf-trigger:hover,
+.todo-pf-trigger.active {
+  border-color: var(--color-link);
+  color: var(--color-link);
+}
+.todo-pf-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
+}
+.todo-pf-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 200;
+  min-width: 180px;
+  max-width: 260px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  padding: 4px 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.todo-pf-dropdown-clear {
+  display: block;
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--color-link);
+  font-size: 0.72rem;
+  padding: 5px 10px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  border-bottom: 1px solid var(--gray-200);
+  margin-bottom: 2px;
+}
+.todo-pf-dropdown-clear:hover {
+  background: var(--gray-100);
+}
+.todo-pf-dropdown-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: background 0.1s;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: var(--body-font-color);
+}
+.todo-pf-dropdown-row:hover {
+  background: var(--gray-100);
+}
+.todo-pf-dropdown-check {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--gray-400);
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, border-color 0.1s;
+}
+.todo-pf-dropdown-check.checked {
+  background: var(--color-link);
+  border-color: var(--color-link);
+}
+.todo-pf-dropdown-check.checked::after {
+  content: '';
+  width: 4px;
+  height: 7px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+  margin-top: -1px;
+}
+.todo-pf-dropdown-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.todo-pf-dropdown-name {
+  flex: 1;
+  overflow: hidden;
   text-overflow: ellipsis;
-}
-.todo-project-filter-select:hover {
-  border-color: var(--color-link);
-}
-.todo-project-filter-select:focus {
-  border-color: var(--color-link);
-  box-shadow: 0 0 0 2px rgba(0, 105, 255, 0.1);
-  outline: none;
+  white-space: nowrap;
 }
 
 /* Add form — two-row layout */
@@ -2172,7 +2306,9 @@
   var addProjectChipClear = document.getElementById('todo-add-project-chip-clear');
   var addMicBtn = document.getElementById('todo-add-mic-btn');
   var projectFilterBar = document.getElementById('todo-project-filter');
-  var projectFilterSelect = document.getElementById('todo-project-filter-select');
+  var projectFilterChips = document.getElementById('todo-pf-chips');
+  var projectFilterTrigger = document.getElementById('todo-pf-trigger');
+  var projectFilterBadge = document.getElementById('todo-pf-badge');
 
   if (!container || !itemsEl) return;
 
@@ -2194,7 +2330,7 @@
   var _addFormProjectName = ''; // Display name for selected project
   var _addFormProjectColor = ''; // Color of selected project
   var _projectMap = {}; // { projectId: { name, color } } — populated in render() for display
-  var _filterProjectId = null; // Active project filter (null = all projects)
+  var _filterProjectIds = new Set(['__none__']); // Active project filters — default to "No project"
   var _existingCategories = []; // Cached list of existing categories for autocomplete
   var _catDropdownActiveIdx = -1; // Active index in category dropdown
   var _defaultPomodoroCount = 1;
@@ -3128,39 +3264,169 @@
     });
   }
 
-  // ─── Project filter bar ───
+  // ─── Project filter bar (dropdown multi-select) ───
+  var PROJECT_DARK_COLORS = {
+    '#1976d2': '#64b5f6', '#388e3c': '#81c784', '#e65100': '#ffb74d',
+    '#7b1fa2': '#ce93d8', '#00897b': '#4db6ac', '#c62828': '#ef5350',
+    '#f9a825': '#fff176', '#ad1457': '#f06292', '#283593': '#7986cb',
+    '#546e7a': '#90a4ae'
+  };
+  function getProjectDisplayColor(color) {
+    if (!color) return 'var(--gray-400)';
+    var isDark = document.documentElement.classList.contains('dark') ||
+                 (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
+                  !document.documentElement.classList.contains('light'));
+    return isDark ? (PROJECT_DARK_COLORS[color.toLowerCase()] || color) : color;
+  }
+
+  var _projectDropdownOpen = false;
+
   function updateProjectFilterBar() {
-    if (!projectFilterBar || !projectFilterSelect) return;
+    if (!projectFilterBar) return;
     var projectIds = Object.keys(_projectMap);
     if (projectIds.length === 0) {
       projectFilterBar.style.display = 'none';
       return;
     }
     projectFilterBar.style.display = '';
-    // Preserve current selection
-    var currentVal = projectFilterSelect.value;
-    var isDark = document.documentElement.classList.contains('dark');
-    var html = '<option value="">All projects</option>';
-    html += '<option value="__none__">No project</option>';
-    projectIds.forEach(function(pid) {
-      var p = _projectMap[pid];
-      html += '<option value="' + pid + '">' + escapeHtml(p.name) + '</option>';
+    // Remove stale selections
+    _filterProjectIds.forEach(function(id) {
+      if (id !== '__none__' && !_projectMap[id]) _filterProjectIds.delete(id);
     });
-    projectFilterSelect.innerHTML = html;
-    // Restore selection if still valid
-    if (currentVal && projectFilterSelect.querySelector('option[value="' + currentVal + '"]')) {
-      projectFilterSelect.value = currentVal;
+    // Update badge
+    var count = _filterProjectIds.size;
+    if (count > 0) {
+      projectFilterBadge.textContent = count;
+      projectFilterBadge.style.display = '';
     } else {
-      projectFilterSelect.value = '';
-      _filterProjectId = null;
+      projectFilterBadge.style.display = 'none';
+    }
+    // Render selected chips
+    var html = '';
+    _filterProjectIds.forEach(function(id) {
+      var name, color;
+      if (id === '__none__') {
+        name = 'No project';
+        color = 'var(--gray-500)';
+      } else {
+        var p = _projectMap[id];
+        if (!p) return;
+        name = p.name;
+        color = getProjectDisplayColor(p.color);
+      }
+      html += '<span class="todo-pf-chip" style="background:' + color + ';">';
+      html += '<span class="todo-pf-chip-dot"></span>';
+      html += '<span class="todo-pf-chip-name">' + escapeHtml(name) + '</span>';
+      html += '<span class="todo-pf-chip-x" data-pf-remove="' + id + '">&times;</span>';
+      html += '</span>';
+    });
+    projectFilterChips.innerHTML = html;
+    // Update dropdown checkboxes if open
+    if (_projectDropdownOpen) {
+      var dropdown = projectFilterBar.querySelector('.todo-pf-dropdown');
+      if (dropdown) {
+        dropdown.querySelectorAll('.todo-pf-dropdown-row').forEach(function(row) {
+          var pid = row.getAttribute('data-pf-id');
+          var check = row.querySelector('.todo-pf-dropdown-check');
+          if (check) {
+            if (_filterProjectIds.has(pid)) {
+              check.classList.add('checked');
+            } else {
+              check.classList.remove('checked');
+            }
+          }
+        });
+      }
     }
   }
 
-  if (projectFilterSelect) {
-    projectFilterSelect.addEventListener('change', function() {
-      var val = projectFilterSelect.value;
-      _filterProjectId = val || null;
-      render();
+  function openProjectDropdown() {
+    if (_projectDropdownOpen) { closeProjectDropdown(); return; }
+    _projectDropdownOpen = true;
+    projectFilterTrigger.classList.add('active');
+    var projectIds = Object.keys(_projectMap);
+    var html = '<div class="todo-pf-dropdown">';
+    html += '<button type="button" class="todo-pf-dropdown-clear" data-pf-clear>Clear all</button>';
+    // "No project" row
+    var noChecked = _filterProjectIds.has('__none__');
+    html += '<button type="button" class="todo-pf-dropdown-row" data-pf-id="__none__">';
+    html += '<span class="todo-pf-dropdown-check' + (noChecked ? ' checked' : '') + '"></span>';
+    html += '<span class="todo-pf-dropdown-dot" style="background:var(--gray-400);"></span>';
+    html += '<span class="todo-pf-dropdown-name">No project</span>';
+    html += '</button>';
+    // Project rows
+    projectIds.forEach(function(pid) {
+      var p = _projectMap[pid];
+      var displayColor = getProjectDisplayColor(p.color);
+      var isChecked = _filterProjectIds.has(pid);
+      html += '<button type="button" class="todo-pf-dropdown-row" data-pf-id="' + pid + '">';
+      html += '<span class="todo-pf-dropdown-check' + (isChecked ? ' checked' : '') + '"></span>';
+      html += '<span class="todo-pf-dropdown-dot" style="background:' + displayColor + ';"></span>';
+      html += '<span class="todo-pf-dropdown-name">' + escapeHtml(p.name) + '</span>';
+      html += '</button>';
+    });
+    html += '</div>';
+    projectFilterBar.insertAdjacentHTML('beforeend', html);
+    // Close on outside click (next tick)
+    setTimeout(function() {
+      document.addEventListener('mousedown', _handleProjectDropdownOutside);
+      document.addEventListener('keydown', _handleProjectDropdownEscape);
+    }, 0);
+  }
+
+  function closeProjectDropdown() {
+    _projectDropdownOpen = false;
+    projectFilterTrigger.classList.remove('active');
+    var dropdown = projectFilterBar.querySelector('.todo-pf-dropdown');
+    if (dropdown) dropdown.remove();
+    document.removeEventListener('mousedown', _handleProjectDropdownOutside);
+    document.removeEventListener('keydown', _handleProjectDropdownEscape);
+  }
+
+  function _handleProjectDropdownOutside(e) {
+    if (!projectFilterBar.contains(e.target)) closeProjectDropdown();
+  }
+  function _handleProjectDropdownEscape(e) {
+    if (e.key === 'Escape') { closeProjectDropdown(); e.stopPropagation(); }
+  }
+
+  // Event delegation for trigger, dropdown rows, chip remove, clear all
+  if (projectFilterBar) {
+    projectFilterBar.addEventListener('click', function(e) {
+      // Trigger button
+      if (e.target.closest('.todo-pf-trigger')) {
+        openProjectDropdown();
+        return;
+      }
+      // Clear all
+      if (e.target.closest('[data-pf-clear]')) {
+        _filterProjectIds.clear();
+        updateProjectFilterBar();
+        render();
+        return;
+      }
+      // Dropdown row toggle
+      var row = e.target.closest('.todo-pf-dropdown-row');
+      if (row) {
+        var pid = row.getAttribute('data-pf-id');
+        if (_filterProjectIds.has(pid)) {
+          _filterProjectIds.delete(pid);
+        } else {
+          _filterProjectIds.add(pid);
+        }
+        updateProjectFilterBar();
+        render();
+        return;
+      }
+      // Chip remove
+      var removeBtn = e.target.closest('[data-pf-remove]');
+      if (removeBtn) {
+        var rid = removeBtn.getAttribute('data-pf-remove');
+        _filterProjectIds.delete(rid);
+        updateProjectFilterBar();
+        render();
+        return;
+      }
     });
   }
 
@@ -3499,13 +3765,12 @@
       return s === 'active' || s === 'done';
     });
 
-    // Apply project filter
-    if (_filterProjectId) {
-      if (_filterProjectId === '__none__') {
-        visibleTodos = visibleTodos.filter(function(t) { return !t.projectId; });
-      } else {
-        visibleTodos = visibleTodos.filter(function(t) { return t.projectId === _filterProjectId; });
-      }
+    // Apply project filter (multi-select)
+    if (_filterProjectIds.size > 0) {
+      visibleTodos = visibleTodos.filter(function(t) {
+        if (_filterProjectIds.has('__none__') && !t.projectId) return true;
+        return t.projectId && _filterProjectIds.has(t.projectId);
+      });
     }
 
     // Separate parents and children
