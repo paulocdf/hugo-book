@@ -2,9 +2,16 @@
 <!-- Renders above inbox note content. Requires dm-sync and dm-todo-complete-modal. -->
 <div class="todo-list" id="todo-list" style="display: none;">
   <div class="todo-list-header">
-    <h3 class="todo-list-title">
+     <h3 class="todo-list-title">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
       Tasks
+      <span class="todo-progress-ring" id="todo-progress-ring" title="Today's progress" style="display:none;">
+        <svg width="22" height="22" viewBox="0 0 36 36">
+          <circle class="todo-ring-bg" cx="18" cy="18" r="15.9" fill="none" stroke-width="3"></circle>
+          <circle class="todo-ring-fg" id="todo-ring-fg" cx="18" cy="18" r="15.9" fill="none" stroke-width="3" stroke-dasharray="100 100" stroke-dashoffset="100" stroke-linecap="round" transform="rotate(-90 18 18)"></circle>
+          <text class="todo-ring-text" id="todo-ring-text" x="18" y="18" text-anchor="middle" dominant-baseline="central"></text>
+        </svg>
+      </span>
     </h3>
     <div class="todo-project-filter" id="todo-project-filter" style="display:none;">
       <div class="todo-pf-chips" id="todo-pf-chips"></div>
@@ -13,6 +20,9 @@
         <span class="todo-pf-badge" id="todo-pf-badge" style="display:none;"></span>
       </button>
     </div>
+    <button type="button" class="todo-shortcuts-btn" id="todo-shortcuts-btn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </button>
   </div>
 
   <div class="todo-list-body" id="todo-list-body">
@@ -115,6 +125,41 @@
 <!-- Backdrop for elevated add-form focus mode (outside .todo-list to avoid overflow:hidden clipping) -->
 <div class="todo-add-backdrop" id="todo-add-backdrop"></div>
 
+<!-- Keyboard shortcuts overlay -->
+<div class="todo-shortcuts-overlay" id="todo-shortcuts-overlay" style="display:none;" role="dialog" aria-label="Keyboard shortcuts">
+  <div class="todo-shortcuts-modal">
+    <div class="todo-shortcuts-header">
+      <h4>Keyboard Shortcuts</h4>
+      <button type="button" class="todo-shortcuts-close" id="todo-shortcuts-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="todo-shortcuts-body">
+      <div class="todo-shortcuts-section">
+        <h5>Global</h5>
+        <div class="todo-shortcut-row"><kbd>t</kbd><span>Focus task input</span></div>
+        <div class="todo-shortcut-row"><kbd>?</kbd><span>Show this help</span></div>
+        <div class="todo-shortcut-row"><kbd>Esc</kbd><span>Close overlay / form</span></div>
+      </div>
+      <div class="todo-shortcuts-section">
+        <h5>Adding Tasks</h5>
+        <div class="todo-shortcut-row"><kbd>Enter</kbd><span>Add task</span></div>
+        <div class="todo-shortcut-row"><kbd>Shift+Enter</kbd><span>Add task &amp; keep adding</span></div>
+        <div class="todo-shortcut-row"><kbd>Esc</kbd><span>Close add form</span></div>
+      </div>
+      <div class="todo-shortcuts-section">
+        <h5>Subtasks</h5>
+        <div class="todo-shortcut-row"><kbd>Enter</kbd><span>Add subtask</span></div>
+        <div class="todo-shortcut-row"><kbd id="todo-sk-mod">Ctrl+Enter</kbd><span>Add subtask &amp; keep adding</span></div>
+        <div class="todo-shortcut-row"><kbd>Esc</kbd><span>Cancel subtask input</span></div>
+      </div>
+      <div class="todo-shortcuts-section">
+        <h5>Category</h5>
+        <div class="todo-shortcut-row"><kbd>&uarr;</kbd> <kbd>&darr;</kbd><span>Navigate categories</span></div>
+        <div class="todo-shortcut-row"><kbd>Enter</kbd><span>Select category</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Delete modal is created dynamically via JS and appended to document.body -->
 
 <style>
@@ -144,6 +189,134 @@
 }
 .todo-list-title svg {
   color: var(--color-link);
+}
+
+/* Daily progress ring */
+.todo-progress-ring {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
+  cursor: default;
+}
+.todo-ring-bg {
+  stroke: var(--gray-200, #e5e5e5);
+}
+.todo-ring-fg {
+  stroke: var(--color-link, #1a73e8);
+  transition: stroke-dashoffset 0.6s ease-out, stroke 0.3s;
+}
+.todo-ring-fg.ring-complete {
+  stroke: var(--color-success, #2e7d32);
+}
+.todo-ring-text {
+  font-size: 10px;
+  font-weight: 700;
+  fill: var(--body-font-color);
+}
+
+/* Shortcuts help button */
+.todo-shortcuts-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+.todo-shortcuts-btn:hover {
+  color: var(--body-font-color);
+  border-color: var(--gray-300);
+}
+/* Shortcuts overlay */
+.todo-shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: todo-shortcuts-fadein 0.15s ease-out;
+}
+@keyframes todo-shortcuts-fadein {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.todo-shortcuts-modal {
+  background: var(--body-background, #fff);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  width: 380px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: todo-delete-in 0.2s ease-out;
+}
+.todo-shortcuts-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 10px;
+  border-bottom: 1px solid var(--gray-200);
+}
+.todo-shortcuts-header h4 {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+.todo-shortcuts-close {
+  border: none;
+  background: none;
+  font-size: 1.3rem;
+  color: var(--gray-400);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+.todo-shortcuts-close:hover { color: var(--body-font-color); }
+.todo-shortcuts-body {
+  padding: 12px 18px 18px;
+}
+.todo-shortcuts-section {
+  margin-bottom: 14px;
+}
+.todo-shortcuts-section:last-child { margin-bottom: 0; }
+.todo-shortcuts-section h5 {
+  margin: 0 0 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-400);
+}
+.todo-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 0.82rem;
+  color: var(--body-font-color);
+}
+.todo-shortcut-row kbd {
+  display: inline-block;
+  padding: 2px 7px;
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  background: var(--gray-100);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+  min-width: 22px;
+  text-align: center;
 }
 
 .todo-list-body {
@@ -968,6 +1141,22 @@
   padding: 6px 10px;
   border-radius: 8px;
   transition: background 0.15s;
+  border-left: 3px solid transparent;
+}
+.todo-item.priority-overdue {
+  border-left-color: var(--color-danger, #c62828);
+}
+.todo-item.priority-today {
+  border-left-color: var(--accent-blue, #1a73e8);
+}
+.todo-item.priority-tomorrow {
+  border-left-color: var(--color-success, #2e7d32);
+}
+.todo-item.priority-future {
+  border-left-color: var(--gray-300);
+}
+.todo-item.done {
+  border-left-color: transparent;
 }
 .todo-item:hover {
   background: var(--gray-100);
@@ -1288,6 +1477,18 @@
   background: rgba(139, 110, 78, 0.1);
 }
 
+/* FLIP layout transition for smooth task reorder */
+.todo-item-group.todo-flip-move {
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+@keyframes todo-flip-enter {
+  from { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.todo-item-group.todo-flip-enter {
+  animation: todo-flip-enter 0.3s ease-out both;
+}
+
 /* Highlight flash on newly added tasks */
 @keyframes todo-item-flash {
   0%   { background: rgba(0, 105, 255, 0.12); }
@@ -1516,6 +1717,25 @@
 .todo-item-action-btn.edit:hover {
   color: var(--color-link);
   background: rgba(66, 133, 244, 0.1);
+}
+.todo-item-action-btn.flashcard-create:hover {
+  color: #e65100;
+  background: rgba(230, 81, 0, 0.1);
+}
+
+/* Flashcard flip animation */
+.todo-item-group {
+  perspective: 800px;
+}
+@keyframes todo-flip-to-card {
+  0%   { transform: rotateX(0);    opacity: 1; }
+  40%  { transform: rotateX(-90deg); opacity: 0.5; }
+  60%  { transform: rotateX(-90deg); opacity: 0.5; }
+  100% { transform: rotateX(0);    opacity: 1; }
+}
+.todo-item.todo-flip-active {
+  animation: todo-flip-to-card 0.6s ease-in-out;
+  transform-origin: center center;
 }
 
 /* Subtask collapse toggle */
@@ -3515,7 +3735,25 @@
     var bujoState = todo.bujoState || 'open';
     var bujoType = todo.bujoType || 'task';
     var stateClass = bujoState === 'migrated' ? ' migrated' : (bujoState === 'scheduled' ? ' scheduled' : '');
-    var html = '<div class="todo-item' + doneClass + justCompletedClass + justAddedClass + stateClass + '" data-todo-id="' + todo.id + '">';
+    // Priority color band
+    var priorityClass = '';
+    if (!todo.done) {
+      var sd = todo.scheduledDate;
+      if (sd) {
+        var todayStr = getTodayStr();
+        var tomorrowStr = getDateOffset(1);
+        if (sd < todayStr) {
+          priorityClass = ' priority-overdue';
+        } else if (sd === todayStr) {
+          priorityClass = ' priority-today';
+        } else if (sd === tomorrowStr) {
+          priorityClass = ' priority-tomorrow';
+        } else {
+          priorityClass = ' priority-future';
+        }
+      }
+    }
+    var html = '<div class="todo-item' + doneClass + justCompletedClass + justAddedClass + stateClass + priorityClass + '" data-todo-id="' + todo.id + '">';
 
     // Drag handle (all tasks are draggable)
     html += '<span class="todo-drag-handle" title="Drag to reorder"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/></svg></span>';
@@ -3740,6 +3978,10 @@
       html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
       html += '</button>';
     }
+    // Flashcard button (create a flashcard from this task)
+    html += '<button type="button" class="todo-item-action-btn flashcard-create" data-flashcard-id="' + todo.id + '" title="Create flashcard" aria-label="Create flashcard">';
+    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/></svg>';
+    html += '</button>';
     // Edit button (for all tasks, done or not)
     html += '<button type="button" class="todo-item-action-btn edit" data-edit-id="' + todo.id + '" title="Edit task" aria-label="Edit task">';
     html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>';
@@ -4094,7 +4336,55 @@
       html += '</div>';
     }
 
+    // --- FLIP animation: snapshot old positions ---
+    var flipSnapshot = {};
+    var oldGroups = itemsEl.querySelectorAll('.todo-item-group');
+    oldGroups.forEach(function(g) {
+      var item = g.querySelector('.todo-item[data-todo-id]');
+      if (item) {
+        var id = item.getAttribute('data-todo-id');
+        var rect = g.getBoundingClientRect();
+        flipSnapshot[id] = { top: rect.top, left: rect.left };
+      }
+    });
+    var hadItems = oldGroups.length > 0;
+
     itemsEl.innerHTML = html;
+
+    // --- FLIP animation: animate moved items ---
+    if (hadItems) {
+      var newGroups = itemsEl.querySelectorAll('.todo-item-group');
+      newGroups.forEach(function(g) {
+        var item = g.querySelector('.todo-item[data-todo-id]');
+        if (!item) return;
+        var id = item.getAttribute('data-todo-id');
+        var newRect = g.getBoundingClientRect();
+        if (flipSnapshot[id]) {
+          var dx = flipSnapshot[id].left - newRect.left;
+          var dy = flipSnapshot[id].top - newRect.top;
+          if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+            g.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+            g.style.transition = 'none';
+            // Force reflow then animate to final position
+            g.offsetHeight; // trigger reflow
+            g.classList.add('todo-flip-move');
+            g.style.transform = '';
+            g.style.transition = '';
+            g.addEventListener('transitionend', function handler() {
+              g.classList.remove('todo-flip-move');
+              g.removeEventListener('transitionend', handler);
+            });
+          }
+        } else {
+          // New item not in old snapshot — enter animation
+          g.classList.add('todo-flip-enter');
+          g.addEventListener('animationend', function handler() {
+            g.classList.remove('todo-flip-enter');
+            g.removeEventListener('animationend', handler);
+          });
+        }
+      });
+    }
 
     // Summary (counts visible tasks only — active + done, not archived/deleted)
     var totalEst = 0, totalActual = 0, doneCount = 0, totalCount = 0;
@@ -4121,6 +4411,39 @@
       summaryEl.style.display = '';
     } else {
       summaryEl.style.display = 'none';
+    }
+
+    // Update daily progress ring (today's tasks only)
+    var ringEl = document.getElementById('todo-progress-ring');
+    var ringFg = document.getElementById('todo-ring-fg');
+    var ringText = document.getElementById('todo-ring-text');
+    if (ringEl && ringFg && ringText) {
+      var todayKey = getTodayStr();
+      var todayTotal = 0, todayDone = 0;
+      visibleTodos.forEach(function(t) {
+        if (t.scheduledDate === todayKey) {
+          var hasKids = childrenMap[t.id] && childrenMap[t.id].length > 0;
+          if (!hasKids) {
+            todayTotal++;
+            if (t.done) todayDone++;
+          }
+        }
+      });
+      if (todayTotal > 0) {
+        var pct = Math.round((todayDone / todayTotal) * 100);
+        // stroke-dasharray is 100, offset = 100 - pct
+        ringFg.setAttribute('stroke-dashoffset', String(100 - pct));
+        if (pct >= 100) {
+          ringFg.classList.add('ring-complete');
+        } else {
+          ringFg.classList.remove('ring-complete');
+        }
+        ringText.textContent = pct + '%';
+        ringEl.setAttribute('title', 'Today: ' + todayDone + '/' + todayTotal + ' tasks done');
+        ringEl.style.display = '';
+      } else {
+        ringEl.style.display = 'none';
+      }
     }
 
     // Attach event listeners
@@ -4958,6 +5281,55 @@
         e.stopPropagation();
         var todoId = btn.getAttribute('data-share-id');
         showSharePopover(btn, todoId);
+      });
+    });
+
+    // Flashcard create button
+    itemsEl.querySelectorAll('[data-flashcard-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-flashcard-id');
+        var todo = allTodos.find(function(t) { return t.id === todoId; });
+        if (!todo) return;
+        var row = btn.closest('.todo-item');
+        // Flip animation
+        if (row) {
+          row.classList.add('todo-flip-active');
+          row.addEventListener('animationend', function() {
+            row.classList.remove('todo-flip-active');
+          }, { once: true });
+        }
+        // Create flashcard with task title as front, notes (if any) as back
+        var front = todo.title || '';
+        var back = todo.notes || '';
+        var tags = todo.category ? [todo.category] : [];
+        if (window.dmCreateFlashcard) {
+          window.dmCreateFlashcard(front, back, tags).then(function() {
+            showActionToast({
+              message: 'Flashcard created',
+              icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/></svg>',
+              cssClass: 'todo-toast-done',
+              duration: 2000
+            });
+          }).catch(function(err) {
+            console.error('Failed to create flashcard:', err);
+            showTodoError('Failed to create flashcard');
+          });
+        } else if (window.dmSync && window.dmSync.createReviewCard) {
+          window.dmSync.createReviewCard(front, back, tags).then(function() {
+            showActionToast({
+              message: 'Flashcard created',
+              icon: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="2" y1="12" x2="22" y2="12"/></svg>',
+              cssClass: 'todo-toast-done',
+              duration: 2000
+            });
+          }).catch(function(err) {
+            console.error('Failed to create flashcard:', err);
+            showTodoError('Failed to create flashcard');
+          });
+        } else {
+          showTodoError('Flashcard system not available');
+        }
       });
     });
 
@@ -6655,6 +7027,54 @@
       // Scroll the input into view if needed
       addTitleInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
       addTitleInput.focus();
+    }
+  });
+
+  // ─── Keyboard shortcuts overlay ───
+  var shortcutsOverlay = document.getElementById('todo-shortcuts-overlay');
+  var shortcutsBtn = document.getElementById('todo-shortcuts-btn');
+  var shortcutsClose = document.getElementById('todo-shortcuts-close');
+
+  // Set modifier key label based on platform
+  var skModEl = document.getElementById('todo-sk-mod');
+  if (skModEl && /Mac|iPhone|iPad/.test(navigator.platform)) {
+    skModEl.textContent = 'Cmd+Enter';
+  }
+
+  function openShortcutsOverlay() {
+    if (shortcutsOverlay) shortcutsOverlay.style.display = '';
+  }
+  function closeShortcutsOverlay() {
+    if (shortcutsOverlay) shortcutsOverlay.style.display = 'none';
+  }
+  if (shortcutsBtn) {
+    shortcutsBtn.addEventListener('click', openShortcutsOverlay);
+  }
+  if (shortcutsClose) {
+    shortcutsClose.addEventListener('click', closeShortcutsOverlay);
+  }
+  if (shortcutsOverlay) {
+    shortcutsOverlay.addEventListener('click', function(e) {
+      if (e.target === shortcutsOverlay) closeShortcutsOverlay();
+    });
+  }
+  // ? key to toggle overlay
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      var todoList = document.getElementById('todo-list');
+      if (!todoList || todoList.style.display === 'none') return;
+      e.preventDefault();
+      if (shortcutsOverlay && shortcutsOverlay.style.display !== 'none') {
+        closeShortcutsOverlay();
+      } else {
+        openShortcutsOverlay();
+      }
+    }
+    if (e.key === 'Escape' && shortcutsOverlay && shortcutsOverlay.style.display !== 'none') {
+      e.preventDefault();
+      e.stopPropagation();
+      closeShortcutsOverlay();
     }
   });
 

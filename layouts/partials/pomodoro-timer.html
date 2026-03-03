@@ -89,6 +89,28 @@
           </label>
         </div>
       </div>
+      <div class="pomodoro-focus-settings-group">
+        <div class="pomodoro-focus-toggle-row">
+          <span class="pomodoro-focus-settings-label" style="margin-bottom:0;">Daily goal</span>
+          <select class="pomodoro-focus-goal-select" id="focus-daily-goal-select">
+            <option value="0">Off</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="6">6</option>
+            <option value="8">8</option>
+            <option value="10">10</option>
+            <option value="12">12</option>
+          </select>
+        </div>
+      </div>
+      <div class="pomodoro-focus-settings-group">
+        <span class="pomodoro-focus-settings-label" style="margin-bottom:4px;">Wallpaper URL</span>
+        <div class="pomodoro-focus-wallpaper-row">
+          <input type="url" class="pomodoro-focus-wallpaper-input" id="focus-wallpaper-input" placeholder="https://example.com/image.jpg" autocomplete="off" spellcheck="false">
+          <button type="button" class="pomodoro-focus-wallpaper-clear" id="focus-wallpaper-clear" title="Clear wallpaper">&times;</button>
+        </div>
+      </div>
     </div>
 
     <!-- Auto-advance countdown overlay -->
@@ -152,10 +174,20 @@
 
     <!-- Today's progress strip -->
     <div class="pomodoro-focus-progress-strip" id="focus-progress-strip" style="display:none;">
+      <div class="pomodoro-focus-daily-goal-ring" id="focus-daily-goal-ring" style="display:none;">
+        <svg viewBox="0 0 36 36" width="32" height="32">
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="var(--gray-200)" stroke-width="2.5"></circle>
+          <circle class="pomodoro-goal-ring-fg" id="focus-goal-ring-fg" cx="18" cy="18" r="15.9" fill="none" stroke="var(--accent-blue, #4285f4)" stroke-width="2.5" stroke-dasharray="100" stroke-dashoffset="100" stroke-linecap="round" transform="rotate(-90 18 18)"></circle>
+          <text x="18" y="20.5" text-anchor="middle" class="pomodoro-goal-ring-text" id="focus-goal-ring-text">0/4</text>
+        </svg>
+      </div>
       <div class="pomodoro-focus-progress-strip-bar">
         <div class="pomodoro-focus-progress-strip-fill" id="focus-progress-strip-fill"></div>
       </div>
       <span class="pomodoro-focus-progress-strip-text" id="focus-progress-strip-text"></span>
+      <div class="pomodoro-focus-history-chart" id="focus-history-chart" title="Pomodoros — last 7 days">
+        <svg id="focus-history-svg" viewBox="0 0 84 24" width="84" height="24" preserveAspectRatio="none"></svg>
+      </div>
     </div>
 
     <!-- Up Next footer strip -->
@@ -508,6 +540,56 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: background-image 0.3s ease;
+}
+/* ── Wallpaper input ── */
+.pomodoro-focus-wallpaper-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.pomodoro-focus-wallpaper-input {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+  min-width: 0;
+}
+.pomodoro-focus-wallpaper-input:focus {
+  border-color: rgba(255, 255, 255, 0.45);
+}
+.pomodoro-focus-wallpaper-input::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.65rem;
+}
+.pomodoro-focus-wallpaper-clear {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 6px;
+  width: 26px;
+  height: 26px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.pomodoro-focus-wallpaper-clear:hover {
+  background: rgba(255, 60, 60, 0.3);
+  color: #fff;
 }
 .pomodoro-focus-backdrop {
   position: absolute;
@@ -1392,9 +1474,80 @@
   opacity: 0;
   transition: opacity 0.2s;
 }
-.pomodoro-focus-notes-status.visible {
+  .pomodoro-focus-notes-status.visible {
   opacity: 1;
 }
+
+/* ── Daily Goal Select ── */
+.pomodoro-focus-goal-select {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pomodoro-focus-goal-select:focus {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.22);
+}
+.pomodoro-focus-goal-select option {
+  background: #333;
+  color: #fff;
+}
+
+/* ── Daily Goal Ring ── */
+.pomodoro-focus-daily-goal-ring {
+  display: flex;
+  align-items: center;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+.pomodoro-goal-ring-fg {
+  transition: stroke-dashoffset 0.6s ease;
+}
+.pomodoro-goal-ring-text {
+  font-size: 7px;
+  fill: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+  font-family: inherit;
+}
+.pomodoro-focus-daily-goal-ring.goal-complete .pomodoro-goal-ring-fg {
+  stroke: var(--color-success, #34a853);
+}
+.pomodoro-focus-daily-goal-ring.goal-complete .pomodoro-goal-ring-text {
+  fill: var(--color-success, #34a853);
+}
+
+/* ── Session History Chart ── */
+.pomodoro-focus-history-chart {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+.pomodoro-focus-history-chart:hover {
+  opacity: 1;
+}
+.pomodoro-focus-history-chart svg {
+  display: block;
+}
+.pomodoro-focus-history-bar {
+  fill: rgba(255, 255, 255, 0.45);
+  transition: fill 0.15s;
+}
+.pomodoro-focus-history-bar.today {
+  fill: rgba(255, 255, 255, 0.85);
+}
+.pomodoro-focus-history-bar:hover {
+  fill: rgba(255, 255, 255, 0.9);
+}
+
 @media (prefers-color-scheme: dark) {
   .pomodoro-focus-notes-textarea {
     background: rgba(255, 193, 7, 0.04);
@@ -1510,6 +1663,30 @@
   var CUSTOM_WORK_KEY = 'dm-pomo-focus-custom-work';
   var CUSTOM_BREAK_KEY = 'dm-pomo-focus-custom-break';
   var AUTO_ADVANCE_KEY = 'dm-pomo-auto-advance';
+  var WALLPAPER_KEY = 'dm-pomo-focus-wallpaper';
+  var focusWallpaperInput = document.getElementById('focus-wallpaper-input');
+  var focusWallpaperClear = document.getElementById('focus-wallpaper-clear');
+
+  function getWallpaperUrl() {
+    try { var v = localStorage.getItem(WALLPAPER_KEY); if (v) return v; } catch(e) {}
+    return '';
+  }
+  function setWallpaperUrl(url) {
+    try {
+      if (url) localStorage.setItem(WALLPAPER_KEY, url);
+      else localStorage.removeItem(WALLPAPER_KEY);
+    } catch(e) {}
+  }
+  function applyWallpaper() {
+    var url = getWallpaperUrl();
+    if (focusOverlay) {
+      if (url) {
+        focusOverlay.style.backgroundImage = 'url("' + url.replace(/"/g, '\\"') + '")';
+      } else {
+        focusOverlay.style.backgroundImage = '';
+      }
+    }
+  }
 
   function getFocusTheme() {
     try { var v = localStorage.getItem(THEME_KEY); if (v) return v; } catch(e) {}
@@ -1535,6 +1712,135 @@
   function setAutoAdvance(val) {
     try { localStorage.setItem(AUTO_ADVANCE_KEY, val ? 'true' : 'false'); } catch(e) {}
   }
+  // ── Daily Goal settings ──
+  var DAILY_GOAL_KEY = 'dm-pomo-daily-goal';
+  var DAILY_COMPLETED_KEY = 'dm-pomo-daily-completed';
+  var focusDailyGoalSelect = document.getElementById('focus-daily-goal-select');
+  var focusDailyGoalRing = document.getElementById('focus-daily-goal-ring');
+  var focusGoalRingFg = document.getElementById('focus-goal-ring-fg');
+  var focusGoalRingText = document.getElementById('focus-goal-ring-text');
+
+  function getDailyGoal() {
+    try { var v = localStorage.getItem(DAILY_GOAL_KEY); if (v !== null) return parseInt(v, 10) || 0; } catch(e) {}
+    return 0; // default off
+  }
+  function setDailyGoal(val) {
+    try { localStorage.setItem(DAILY_GOAL_KEY, String(val)); } catch(e) {}
+  }
+  function getDailyCompleted() {
+    try {
+      var raw = localStorage.getItem(DAILY_COMPLETED_KEY);
+      if (raw) {
+        var obj = JSON.parse(raw);
+        var todayStr = new Date().toISOString().slice(0, 10);
+        if (obj && obj.date === todayStr) return obj.count || 0;
+      }
+    } catch(e) {}
+    return 0;
+  }
+  function incrementDailyCompleted() {
+    var todayStr = new Date().toISOString().slice(0, 10);
+    var current = getDailyCompleted();
+    try { localStorage.setItem(DAILY_COMPLETED_KEY, JSON.stringify({ date: todayStr, count: current + 1 })); } catch(e) {}
+  }
+  function updateDailyGoalRing() {
+    var goal = getDailyGoal();
+    if (!focusDailyGoalRing) return;
+    if (goal <= 0) {
+      focusDailyGoalRing.style.display = 'none';
+      return;
+    }
+    var completed = getDailyCompleted();
+    var pct = Math.min(completed / goal, 1);
+    var circumference = 2 * Math.PI * 15.9; // ~99.9
+    var dashoffset = circumference * (1 - pct);
+    if (focusGoalRingFg) {
+      focusGoalRingFg.setAttribute('stroke-dasharray', String(circumference));
+      focusGoalRingFg.setAttribute('stroke-dashoffset', String(dashoffset));
+    }
+    if (focusGoalRingText) {
+      focusGoalRingText.textContent = completed + '/' + goal;
+    }
+    if (completed >= goal) {
+      focusDailyGoalRing.classList.add('goal-complete');
+    } else {
+      focusDailyGoalRing.classList.remove('goal-complete');
+    }
+    focusDailyGoalRing.style.display = 'flex';
+  }
+
+  // ── Session History (last 7 days) ──
+  var SESSION_HISTORY_KEY = 'dm-pomo-session-history';
+  var focusHistoryChart = document.getElementById('focus-history-chart');
+  var focusHistorySvg = document.getElementById('focus-history-svg');
+
+  function getSessionHistory() {
+    try {
+      var raw = localStorage.getItem(SESSION_HISTORY_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch(e) {}
+    return [];
+  }
+  function logSessionToHistory() {
+    var todayStr = new Date().toISOString().slice(0, 10);
+    var history = getSessionHistory();
+    var found = false;
+    for (var i = 0; i < history.length; i++) {
+      if (history[i].date === todayStr) {
+        history[i].count++;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      history.push({ date: todayStr, count: 1 });
+    }
+    // Keep only last 30 days
+    if (history.length > 30) history = history.slice(-30);
+    try { localStorage.setItem(SESSION_HISTORY_KEY, JSON.stringify(history)); } catch(e) {}
+  }
+  function renderHistoryChart() {
+    if (!focusHistorySvg || !focusHistoryChart) return;
+    var history = getSessionHistory();
+    var todayStr = new Date().toISOString().slice(0, 10);
+    // Build array for last 7 days
+    var days = [];
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date();
+      d.setDate(d.getDate() - i);
+      var ds = d.toISOString().slice(0, 10);
+      var count = 0;
+      for (var j = 0; j < history.length; j++) {
+        if (history[j].date === ds) { count = history[j].count; break; }
+      }
+      days.push({ date: ds, count: count });
+    }
+    var maxCount = Math.max.apply(null, days.map(function(d) { return d.count; }));
+    if (maxCount <= 0) {
+      focusHistoryChart.style.display = 'none';
+      return;
+    }
+    var barWidth = 8;
+    var gap = 4;
+    var svgHeight = 24;
+    var minBarHeight = 2;
+    var html = '';
+    for (var k = 0; k < days.length; k++) {
+      var barHeight = days[k].count > 0
+        ? Math.max(minBarHeight, Math.round((days[k].count / maxCount) * (svgHeight - 2)))
+        : 0;
+      var x = k * (barWidth + gap);
+      var y = svgHeight - barHeight;
+      var cls = 'pomodoro-focus-history-bar' + (days[k].date === todayStr ? ' today' : '');
+      if (barHeight > 0) {
+        html += '<rect class="' + cls + '" x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + barHeight + '" rx="1.5">'
+          + '<title>' + days[k].date + ': ' + days[k].count + ' pomodoro' + (days[k].count !== 1 ? 's' : '') + '</title></rect>';
+      }
+    }
+    focusHistorySvg.innerHTML = html;
+    focusHistoryChart.style.display = 'flex';
+  }
+
   var SHOW_PROGRESS_KEY = 'dm-pomo-show-progress';
   function isShowProgress() {
     try { var v = localStorage.getItem(SHOW_PROGRESS_KEY); if (v === 'false') return false; } catch(e) {}
@@ -2641,6 +2947,10 @@
       if (phase === 'work') {
         playWorkEndSound();
         accumulatedWorkSeconds += totalPhaseSeconds;
+        incrementDailyCompleted();
+        logSessionToHistory();
+        updateDailyGoalRing();
+        renderHistoryChart();
 
         // If all sessions are complete
         if (totalSessions > 1 && sessionCount >= totalSessions) {
@@ -3478,9 +3788,9 @@
     }).catch(function() {
       focusProgressStrip.style.display = 'none';
     });
-  }
-
-  // ── Focus Settings Popover ──
+    updateDailyGoalRing();
+    renderHistoryChart();
+  }  // ── Focus Settings Popover ──
   function renderThemeGrid() {
     if (!focusThemeGrid) return;
     var current = getFocusTheme();
@@ -3562,6 +3872,35 @@
     });
   }
 
+  // Daily goal select
+  if (focusDailyGoalSelect) {
+    focusDailyGoalSelect.value = String(getDailyGoal());
+    focusDailyGoalSelect.addEventListener('change', function() {
+      setDailyGoal(parseInt(focusDailyGoalSelect.value, 10) || 0);
+      updateDailyGoalRing();
+    });
+  }
+
+  // Wallpaper input
+  if (focusWallpaperInput) {
+    focusWallpaperInput.value = getWallpaperUrl();
+    var _wallpaperDebounce = null;
+    focusWallpaperInput.addEventListener('input', function() {
+      clearTimeout(_wallpaperDebounce);
+      _wallpaperDebounce = setTimeout(function() {
+        setWallpaperUrl(focusWallpaperInput.value.trim());
+        applyWallpaper();
+      }, 500);
+    });
+  }
+  if (focusWallpaperClear) {
+    focusWallpaperClear.addEventListener('click', function() {
+      setWallpaperUrl('');
+      if (focusWallpaperInput) focusWallpaperInput.value = '';
+      applyWallpaper();
+    });
+  }
+
   // Settings popover toggle
   if (focusSettingsBtn && focusSettingsPopover) {
     focusSettingsBtn.addEventListener('click', function(e) {
@@ -3574,6 +3913,8 @@
         renderThemeGrid();
         focusAutoAdvanceCheckbox.checked = isAutoAdvance();
         if (focusShowProgressCheckbox) focusShowProgressCheckbox.checked = isShowProgress();
+        if (focusDailyGoalSelect) focusDailyGoalSelect.value = String(getDailyGoal());
+        if (focusWallpaperInput) focusWallpaperInput.value = getWallpaperUrl();
         focusSettingsPopover.classList.add('visible');
         focusSettingsBtn.setAttribute('aria-expanded', 'true');
       }
@@ -3967,6 +4308,8 @@
     isFocusMode = true;
     // Apply custom colors if custom theme selected
     if (getFocusTheme() === 'custom') applyCustomColors();
+    // Apply wallpaper if set
+    applyWallpaper();
     // Sync current title/category to focus elements
     focusTitleEl.textContent = activeTodoTitle;
     if (activeTodoCategory) {

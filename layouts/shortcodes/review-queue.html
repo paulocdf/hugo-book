@@ -50,6 +50,22 @@
         <span class="review-stat-value" id="review-reviewed-count">0</span>
         <span class="review-stat-label">reviewed today</span>
       </span>
+      <span class="review-stat review-stat-streak" id="review-streak-stat" style="display: none;">
+        <span class="review-stat-value review-streak-value" id="review-streak-count">0</span>
+        <span class="review-stat-label">day streak</span>
+      </span>
+    </div>
+    <div class="review-limit-control">
+      <label class="review-limit-label" for="review-limit-select">Daily limit:</label>
+      <select class="review-limit-select" id="review-limit-select">
+        <option value="0">No limit</option>
+        <option value="5">5 cards</option>
+        <option value="10">10 cards</option>
+        <option value="15">15 cards</option>
+        <option value="20">20 cards</option>
+        <option value="30">30 cards</option>
+        <option value="50">50 cards</option>
+      </select>
     </div>
   </div>
 
@@ -58,18 +74,21 @@
     <div class="review-progress">
       <div class="review-progress-bar" id="review-progress-bar"></div>
     </div>
-    <div class="review-card" id="review-card">
-      <div class="review-card-front" id="review-card-front">
-        <div class="review-card-meta" id="review-card-meta"></div>
-        <div class="review-card-front-content markdown" id="review-card-front-content"></div>
-        <div class="review-card-tags" id="review-card-tags"></div>
-        <button type="button" class="review-reveal-btn" id="review-reveal-btn">
-          Show Answer
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-        </button>
-      </div>
-      <div class="review-card-back" id="review-card-back" style="display: none;">
-        <div class="review-card-back-content markdown" id="review-card-back-content"></div>
+    <div class="review-card-wrapper">
+      <div class="review-card" id="review-card">
+        <div class="review-card-front" id="review-card-front">
+          <div class="review-card-meta" id="review-card-meta"></div>
+          <div class="review-card-front-content markdown" id="review-card-front-content"></div>
+          <div class="review-card-tags" id="review-card-tags"></div>
+          <button type="button" class="review-reveal-btn" id="review-reveal-btn">
+            Show Answer
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+        </div>
+        <div class="review-card-back" id="review-card-back">
+          <div class="review-card-back-label">Answer</div>
+          <div class="review-card-back-content markdown" id="review-card-back-content"></div>
+        </div>
       </div>
     </div>
 
@@ -108,6 +127,30 @@
     <div class="review-result" id="review-result" style="display: none;">
       <p class="review-result-text" id="review-result-text"></p>
       <button type="button" class="review-next-btn" id="review-next-btn">Next Card</button>
+    </div>
+  </div>
+
+  <!-- Session summary -->
+  <div class="review-summary" id="review-summary" style="display: none;">
+    <div class="review-summary-card">
+      <div class="review-summary-icon">&#10003;</div>
+      <h3 class="review-summary-title">Session Complete</h3>
+      <div class="review-summary-stats">
+        <div class="review-summary-stat">
+          <span class="review-summary-stat-value" id="review-summary-count">0</span>
+          <span class="review-summary-stat-label">cards reviewed</span>
+        </div>
+        <div class="review-summary-stat">
+          <span class="review-summary-stat-value" id="review-summary-avg">0</span>
+          <span class="review-summary-stat-label">avg rating</span>
+        </div>
+        <div class="review-summary-stat">
+          <span class="review-summary-stat-value" id="review-summary-time">0:00</span>
+          <span class="review-summary-stat-label">time spent</span>
+        </div>
+      </div>
+      <div class="review-summary-breakdown" id="review-summary-breakdown"></div>
+      <button type="button" class="review-summary-done-btn" id="review-summary-done-btn">Done</button>
     </div>
   </div>
 
@@ -232,6 +275,42 @@
   color: var(--gray-500);
 }
 
+/* Streak stat */
+.review-stat-streak .review-streak-value {
+  color: #ea580c;
+}
+.review-stat-streak .review-streak-value::before {
+  content: '\1F525';
+  font-size: 0.9rem;
+  margin-right: 2px;
+  vertical-align: baseline;
+}
+
+/* Daily limit control */
+.review-limit-control {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--gray-200);
+}
+.review-limit-label {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  font-weight: 500;
+}
+.review-limit-select {
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  cursor: pointer;
+}
+
 /* Progress bar */
 .review-progress {
   height: 4px;
@@ -248,16 +327,47 @@
   width: 0%;
 }
 
-/* Flashcard */
+/* Flashcard — 3D flip */
+.review-card-wrapper {
+  perspective: 1000px;
+}
 .review-card {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.6s ease;
+  border-radius: 12px;
+  /* min-height so the card doesn't collapse when back is shorter */
+  min-height: 200px;
+}
+.review-card.flipped {
+  transform: rotateY(180deg);
+}
+.review-card-front,
+.review-card-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
   border: 1px solid var(--gray-200);
   border-radius: 12px;
   background: var(--body-background);
-  overflow: hidden;
 }
 .review-card-front {
   padding: 2rem;
   text-align: center;
+}
+.review-card-back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotateY(180deg);
+  padding: 2rem;
+  overflow-y: auto;
+  box-sizing: border-box;
+  visibility: hidden;
+}
+.review-card.flipped .review-card-back {
+  visibility: visible;
 }
 .review-card-meta {
   font-size: 0.75rem;
@@ -306,15 +416,17 @@
   color: #fff;
 }
 
-.review-card-back {
-  border-top: 1px solid var(--gray-200);
-  padding: 1.5rem 2rem;
-  max-height: 500px;
-  overflow-y: auto;
-}
 .review-card-back-content {
   font-size: 0.95rem;
   line-height: 1.6;
+}
+.review-card-back-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--gray-400);
+  margin-bottom: 0.75rem;
+  font-weight: 600;
 }
 
 /* Rating buttons */
@@ -401,6 +513,102 @@
   transition: opacity 0.15s;
 }
 .review-next-btn:hover { opacity: 0.85; }
+
+/* Session summary */
+.review-summary {
+  margin-bottom: 1.5rem;
+}
+.review-summary-card {
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  background: var(--body-background);
+  padding: 2rem;
+  text-align: center;
+}
+.review-summary-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+  font-size: 1.5rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 0.75rem;
+}
+.review-summary-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0 0 1.25rem;
+  color: var(--body-font-color);
+}
+.review-summary-stats {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  margin-bottom: 1.25rem;
+}
+.review-summary-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.review-summary-stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-link);
+}
+.review-summary-stat-label {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+.review-summary-breakdown {
+  text-align: left;
+  font-size: 0.8rem;
+  color: var(--gray-600);
+  margin-bottom: 1.25rem;
+  max-height: 150px;
+  overflow-y: auto;
+}
+.review-summary-breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.review-summary-breakdown-item:nth-child(odd) {
+  background: var(--gray-100);
+}
+.review-summary-breakdown-front {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 500;
+}
+.review-summary-breakdown-next {
+  color: var(--gray-500);
+  font-size: 0.75rem;
+  white-space: nowrap;
+  margin-left: 0.75rem;
+}
+.review-summary-done-btn {
+  padding: 8px 28px;
+  border: none;
+  border-radius: 6px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.review-summary-done-btn:hover { opacity: 0.85; }
 
 /* New card form */
 .review-form-section {
@@ -596,6 +804,61 @@
   font-size: 0.7rem;
   color: var(--gray-400);
   white-space: nowrap;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.review-ef-hard {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+.review-ef-medium {
+  background: rgba(217, 119, 6, 0.1);
+  color: #d97706;
+}
+.review-ef-easy {
+  background: rgba(22, 163, 74, 0.1);
+  color: #16a34a;
+}
+
+/* Mastery badges */
+.review-mastery-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.review-mastery-bronze {
+  background: rgba(205, 127, 50, 0.12);
+  color: #b5651d;
+}
+.review-mastery-bronze::before {
+  content: '\25CF';
+  color: #cd7f32;
+  font-size: 0.6rem;
+}
+.review-mastery-silver {
+  background: rgba(169, 169, 169, 0.15);
+  color: #6b7280;
+}
+.review-mastery-silver::before {
+  content: '\25CF';
+  color: #a9a9a9;
+  font-size: 0.6rem;
+}
+.review-mastery-gold {
+  background: rgba(255, 215, 0, 0.15);
+  color: #b8860b;
+}
+.review-mastery-gold::before {
+  content: '\2605';
+  color: #ffd700;
+  font-size: 0.6rem;
 }
 .review-schedule-item-actions {
   display: flex;
@@ -680,7 +943,7 @@
 
 @media (max-width: 600px) {
   .review-card-front { padding: 1.5rem 1rem; }
-  .review-card-back { padding: 1rem; }
+  .review-card-back { padding: 1.5rem 1rem; }
   .review-card-front-content { font-size: 1rem; }
   .review-rate-btn { min-width: 48px; padding: 0.4rem 0.5rem; }
   .review-stats-inner { gap: 1rem; }
@@ -700,6 +963,8 @@
   var dueCountEl = document.getElementById('review-due-count');
   var totalCountEl = document.getElementById('review-total-count');
   var reviewedCountEl = document.getElementById('review-reviewed-count');
+  var streakStatEl = document.getElementById('review-streak-stat');
+  var streakCountEl = document.getElementById('review-streak-count');
   var cardContainerEl = document.getElementById('review-card-container');
   var cardFrontEl = document.getElementById('review-card-front');
   var cardBackEl = document.getElementById('review-card-back');
@@ -708,6 +973,7 @@
   var cardMetaEl = document.getElementById('review-card-meta');
   var cardTagsEl = document.getElementById('review-card-tags');
   var revealBtn = document.getElementById('review-reveal-btn');
+  var reviewCardEl = document.getElementById('review-card');
   var ratingEl = document.getElementById('review-rating');
   var resultEl = document.getElementById('review-result');
   var resultTextEl = document.getElementById('review-result-text');
@@ -725,6 +991,13 @@
   var formCancelBtn = document.getElementById('review-form-cancel');
   var tagFilterEl = document.getElementById('review-tag-filter');
   var tagFilterChipsEl = document.getElementById('review-tag-filter-chips');
+  var summaryEl = document.getElementById('review-summary');
+  var summaryCountEl = document.getElementById('review-summary-count');
+  var summaryAvgEl = document.getElementById('review-summary-avg');
+  var summaryTimeEl = document.getElementById('review-summary-time');
+  var summaryBreakdownEl = document.getElementById('review-summary-breakdown');
+  var summaryDoneBtn = document.getElementById('review-summary-done-btn');
+  var limitSelectEl = document.getElementById('review-limit-select');
 
   if (!document.getElementById('review-queue')) return;
 
@@ -734,12 +1007,126 @@
   var allCards = [];
   var activeTagFilter = null;
 
+  // Session tracking for summary
+  var sessionRatings = [];
+  var sessionResults = []; // {front, nextReviewAt}
+  var sessionStartTime = null;
+
+  // ── Streak helpers ──
+  var STREAK_KEY = 'dm-review-streak';
+  var LIMIT_KEY = 'dm-review-limit';
+
+  function getTodayDateStr() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function getYesterdayDateStr() {
+    var d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function loadStreak() {
+    try {
+      var raw = localStorage.getItem(STREAK_KEY);
+      if (!raw) return { count: 0, lastDate: '' };
+      return JSON.parse(raw);
+    } catch (e) {
+      return { count: 0, lastDate: '' };
+    }
+  }
+
+  function saveStreak(data) {
+    try {
+      localStorage.setItem(STREAK_KEY, JSON.stringify(data));
+    } catch (e) { /* ignore */ }
+  }
+
+  function computeStreak(hasReviewedToday) {
+    var streak = loadStreak();
+    var today = getTodayDateStr();
+    var yesterday = getYesterdayDateStr();
+
+    if (streak.lastDate === today) {
+      // Already recorded today — no change
+      return streak.count;
+    }
+
+    if (hasReviewedToday) {
+      if (streak.lastDate === yesterday) {
+        // Consecutive day — increment
+        streak.count++;
+      } else {
+        // Gap — start new streak at 1
+        streak.count = 1;
+      }
+      streak.lastDate = today;
+      saveStreak(streak);
+      return streak.count;
+    }
+
+    // No reviews today yet
+    if (streak.lastDate === yesterday || streak.lastDate === today) {
+      return streak.count;
+    }
+    // Streak broken (last review was before yesterday)
+    return 0;
+  }
+
+  function updateStreakUI(count) {
+    if (count > 0) {
+      streakCountEl.textContent = count;
+      streakStatEl.style.display = '';
+    } else {
+      streakStatEl.style.display = 'none';
+    }
+  }
+
+  function getEfClass(ef) {
+    if (ef < 1.8) return 'review-ef-hard';
+    if (ef < 2.2) return 'review-ef-medium';
+    return 'review-ef-easy';
+  }
+
+  function getReviewLimit() {
+    try {
+      var val = parseInt(localStorage.getItem(LIMIT_KEY), 10);
+      return (val && val > 0) ? val : 0;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function setReviewLimit(val) {
+    try {
+      localStorage.setItem(LIMIT_KEY, String(val));
+    } catch (e) { /* ignore */ }
+  }
+
+  function getMasteryTier(card) {
+    var reps = card.repetitions || 0;
+    var ef = card.easeFactor || 2.5;
+    if (reps >= 8 && ef >= 2.5) return 'gold';
+    if (reps >= 5 && ef >= 2.0) return 'silver';
+    if (reps >= 3) return 'bronze';
+    return null;
+  }
+
+  function getMasteryBadgeHtml(card) {
+    var tier = getMasteryTier(card);
+    if (!tier) return '';
+    var labels = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold' };
+    return '<span class="review-mastery-badge review-mastery-' + tier + '">' + labels[tier] + '</span>';
+  }
+
   function showState(state) {
     authEl.style.display = state === 'auth' ? '' : 'none';
     loadingEl.style.display = state === 'loading' ? '' : 'none';
-    emptyEl.style.display = state === 'empty' ? '' : 'none';
-    statsEl.style.display = (state === 'review' || state === 'done') ? '' : 'none';
+    emptyEl.style.display = (state === 'empty' || state === 'summary') ? '' : 'none';
+    statsEl.style.display = (state === 'review' || state === 'done' || state === 'summary') ? '' : 'none';
     cardContainerEl.style.display = state === 'review' ? '' : 'none';
+    summaryEl.style.display = state === 'summary' ? '' : 'none';
     newBtn.style.display = (state !== 'auth' && state !== 'loading') ? '' : 'none';
   }
 
@@ -807,6 +1194,12 @@
       allCards = results[0];
       dueCards = results[1];
 
+      // Apply daily review limit
+      var limit = getReviewLimit();
+      if (limit > 0 && dueCards.length > limit) {
+        dueCards = dueCards.slice(0, limit);
+      }
+
       // Count reviewed today
       var todayStart = new Date();
       todayStart.setHours(0, 0, 0, 0);
@@ -821,6 +1214,7 @@
       dueCountEl.textContent = dueCards.length;
       totalCountEl.textContent = allCards.length;
       reviewedCountEl.textContent = reviewedToday;
+      updateStreakUI(computeStreak(reviewedToday > 0));
 
       if (allCards.length === 0) {
         emptyTitleEl.textContent = 'No flashcards yet';
@@ -841,6 +1235,9 @@
       }
 
       currentIndex = 0;
+      sessionRatings = [];
+      sessionResults = [];
+      sessionStartTime = Date.now();
       showState('review');
       showCard(dueCards[currentIndex]);
       renderSchedule();
@@ -863,7 +1260,9 @@
     var metaParts = [];
     if (card.repetitions > 0) metaParts.push('Review #' + (card.repetitions + 1));
     metaParts.push('EF: ' + card.easeFactor.toFixed(2));
-    cardMetaEl.textContent = metaParts.join(' \u00B7 ');
+    var metaText = escapeHtml(metaParts.join(' \u00B7 '));
+    var badgeHtml = getMasteryBadgeHtml(card);
+    cardMetaEl.innerHTML = badgeHtml ? metaText + ' ' + badgeHtml : metaText;
 
     // Front content (rendered as markdown)
     cardFrontContentEl.innerHTML = renderMarkdown(card.front);
@@ -887,19 +1286,21 @@
       });
     }
 
-    // Reset state
-    cardBackEl.style.display = 'none';
+    // Reset flip state
+    reviewCardEl.classList.remove('flipped');
+    reviewCardEl.style.minHeight = '';
     ratingEl.style.display = 'none';
     resultEl.style.display = 'none';
     revealBtn.style.display = '';
     cardBackContentEl.innerHTML = '';
   }
 
-  // Reveal answer
+  // Reveal answer with 3D flip
   revealBtn.addEventListener('click', function() {
     var card = dueCards[currentIndex];
     if (!card) return;
 
+    // Pre-render back content before flipping
     cardBackContentEl.innerHTML = renderMarkdown(card.back);
 
     // Syntax highlighting
@@ -910,7 +1311,12 @@
     // Diagrams
     if (window.dmRenderDiagrams) window.dmRenderDiagrams(cardBackContentEl);
 
-    cardBackEl.style.display = '';
+    // Match card height to front content so flip looks natural
+    var frontHeight = cardFrontEl.offsetHeight;
+    reviewCardEl.style.minHeight = frontHeight + 'px';
+
+    // Trigger the flip
+    reviewCardEl.classList.add('flipped');
     revealBtn.style.display = 'none';
     ratingEl.style.display = '';
   });
@@ -928,6 +1334,13 @@
       window.dmSync.reviewCard(card.id, quality).then(function(updatedCard) {
         ratingEl.style.display = 'none';
 
+        // Track session data
+        sessionRatings.push(quality);
+        sessionResults.push({
+          front: getFirstLine(card.front),
+          nextReviewAt: updatedCard.nextReviewAt
+        });
+
         var nextLabel = formatRelativeDate(updatedCard.nextReviewAt);
         resultTextEl.textContent = 'Next review: ' + nextLabel + ' (interval: ' + updatedCard.interval + ' day' + (updatedCard.interval !== 1 ? 's' : '') + ')';
         resultEl.style.display = '';
@@ -935,6 +1348,7 @@
         reviewedToday++;
         reviewedCountEl.textContent = reviewedToday;
         dueCountEl.textContent = Math.max(0, dueCards.length - currentIndex - 1);
+        updateStreakUI(computeStreak(true));
 
         rateButtons.forEach(function(b) { b.disabled = false; });
 
@@ -952,12 +1366,56 @@
   nextBtn.addEventListener('click', function() {
     currentIndex++;
     if (currentIndex >= dueCards.length) {
-      loadQueue();
+      showSessionSummary();
     } else {
       showCard(dueCards[currentIndex]);
       var pct = Math.round((currentIndex / dueCards.length) * 100);
       progressBar.style.width = pct + '%';
     }
+  });
+
+  // Session summary
+  function showSessionSummary() {
+    if (sessionRatings.length === 0) {
+      loadQueue();
+      return;
+    }
+
+    // Cards reviewed
+    summaryCountEl.textContent = sessionRatings.length;
+
+    // Average rating
+    var sum = sessionRatings.reduce(function(a, b) { return a + b; }, 0);
+    var avg = (sum / sessionRatings.length).toFixed(1);
+    summaryAvgEl.textContent = avg;
+
+    // Time spent
+    var elapsed = Date.now() - (sessionStartTime || Date.now());
+    var totalSecs = Math.round(elapsed / 1000);
+    var mins = Math.floor(totalSecs / 60);
+    var secs = totalSecs % 60;
+    summaryTimeEl.textContent = mins + ':' + String(secs).padStart(2, '0');
+
+    // Breakdown: card front + next review date
+    var breakdownHtml = '';
+    sessionResults.forEach(function(r) {
+      var nextText = formatRelativeDate(r.nextReviewAt);
+      breakdownHtml += '<div class="review-summary-breakdown-item">'
+        + '<span class="review-summary-breakdown-front">' + escapeHtml(r.front) + '</span>'
+        + '<span class="review-summary-breakdown-next">' + escapeHtml(nextText) + '</span>'
+        + '</div>';
+    });
+    summaryBreakdownEl.innerHTML = breakdownHtml;
+
+    // Set the empty state title for compatibility
+    emptyTitleEl.textContent = 'All caught up!';
+    emptyMsgEl.textContent = 'No reviews due right now. Check back later.';
+
+    showState('summary');
+  }
+
+  summaryDoneBtn.addEventListener('click', function() {
+    loadQueue();
   });
 
   // Keyboard shortcuts
@@ -982,6 +1440,17 @@
       e.preventDefault();
       nextBtn.click();
     }
+  });
+
+  // ---- Daily Limit ----
+
+  // Init limit select from localStorage
+  var savedLimit = getReviewLimit();
+  limitSelectEl.value = String(savedLimit);
+  limitSelectEl.addEventListener('change', function() {
+    var val = parseInt(limitSelectEl.value, 10) || 0;
+    setReviewLimit(val);
+    loadQueue();
   });
 
   // ---- New Card Form ----
@@ -1107,7 +1576,8 @@
 
       html += '<div class="review-schedule-item" data-card-id="' + card.id + '">'
         + '<span class="review-schedule-item-front">' + escapeHtml(frontPreview) + '</span>'
-        + '<span class="review-schedule-item-ef">EF ' + card.easeFactor.toFixed(1) + '</span>'
+        + getMasteryBadgeHtml(card)
+        + '<span class="review-schedule-item-ef ' + getEfClass(card.easeFactor) + '">EF ' + card.easeFactor.toFixed(1) + '</span>'
         + '<span class="review-schedule-item-due' + (isDue ? ' review-due-now' : '') + '">' + escapeHtml(dueText) + '</span>'
         + '<span class="review-schedule-item-actions">'
         + '<button type="button" class="review-schedule-item-btn review-item-edit" title="Edit card">'
