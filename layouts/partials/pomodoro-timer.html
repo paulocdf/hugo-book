@@ -1753,39 +1753,49 @@
 
   // ── Preset wallpaper gallery ──
   var PRESET_WALLPAPERS = [
-    { id: 'mountains',  label: 'Mountains',  url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1920&q=80' },
-    { id: 'forest',     label: 'Forest',     url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1920&q=80' },
-    { id: 'ocean',      label: 'Ocean',      url: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=1920&q=80' },
-    { id: 'night-sky',  label: 'Night Sky',  url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1920&q=80' },
-    { id: 'aurora',     label: 'Aurora',     url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=1920&q=80' },
-    { id: 'desert',     label: 'Desert',     url: 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=1920&q=80' },
-    { id: 'rain',       label: 'Rain',       url: 'https://images.unsplash.com/photo-1515694346937-94d85e39e29a?w=1920&q=80' },
-    { id: 'lake',       label: 'Lake',       url: 'https://images.unsplash.com/photo-1439853949127-fa647821eba0?w=1920&q=80' },
-    { id: 'cityscape',  label: 'City',       url: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=1920&q=80' },
-    { id: 'cosmos',     label: 'Cosmos',     url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=1920&q=80' }
+    { id: 'mountains',  label: 'Mountains',  url: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=3840&q=85' },
+    { id: 'forest',     label: 'Forest',     url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=3840&q=85' },
+    { id: 'ocean',      label: 'Ocean',      url: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=3840&q=85' },
+    { id: 'night-sky',  label: 'Night Sky',  url: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=3840&q=85' },
+    { id: 'aurora',     label: 'Aurora',     url: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=3840&q=85' },
+    { id: 'desert',     label: 'Desert',     url: 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=3840&q=85' },
+    { id: 'rain',       label: 'Rain',       url: 'https://images.unsplash.com/photo-1534274988757-a28bf1a57c17?w=3840&q=85' },
+    { id: 'lake',       label: 'Lake',       url: 'https://images.unsplash.com/photo-1439853949127-fa647821eba0?w=3840&q=85' },
+    { id: 'cityscape',  label: 'City',       url: 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=3840&q=85' },
+    { id: 'cosmos',     label: 'Cosmos',     url: 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=3840&q=85' }
   ];
   var wallpaperGalleryEl = document.getElementById('focus-wallpaper-gallery');
 
   function getThumbUrl(fullUrl) {
-    return fullUrl.replace('w=1920&q=80', 'w=200&q=60');
+    return fullUrl.replace('w=3840&q=85', 'w=300&q=60');
+  }
+
+  function getBaseImageUrl(url) {
+    return url ? url.split('?')[0] : '';
   }
 
   function renderWallpaperGallery() {
     if (!wallpaperGalleryEl) return;
     var currentUrl = getWallpaperUrl();
+    var currentBase = getBaseImageUrl(currentUrl);
+    var isPreset = false;
     var html = '';
-    // "None" option
-    html += '<div class="pomodoro-focus-wallpaper-none' + (!currentUrl ? ' active' : '') + '" data-wp-url="" title="No wallpaper">None</div>';
+    // Build preset thumbnails
+    var thumbs = '';
     for (var i = 0; i < PRESET_WALLPAPERS.length; i++) {
       var wp = PRESET_WALLPAPERS[i];
-      var isActive = currentUrl === wp.url;
-      html += '<div class="pomodoro-focus-wallpaper-thumb' + (isActive ? ' active' : '') + '"'
+      var isActive = currentBase && currentBase === getBaseImageUrl(wp.url);
+      if (isActive) isPreset = true;
+      thumbs += '<div class="pomodoro-focus-wallpaper-thumb' + (isActive ? ' active' : '') + '"'
             + ' data-wp-url="' + wp.url.replace(/"/g, '&quot;') + '"'
             + ' style="background-image:url(\'' + getThumbUrl(wp.url) + '\')"'
             + ' title="' + wp.label + '">'
             + '<span class="wp-label">' + wp.label + '</span>'
             + '</div>';
     }
+    // "None" option
+    html += '<div class="pomodoro-focus-wallpaper-none' + (!currentUrl ? ' active' : '') + '" data-wp-url="" title="No wallpaper">None</div>';
+    html += thumbs;
     wallpaperGalleryEl.innerHTML = html;
   }
 
