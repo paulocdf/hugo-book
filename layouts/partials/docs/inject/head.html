@@ -51,7 +51,7 @@
             err.code === 'auth/cancelled-popup-request') {
           console.warn('Popup blocked/closed, falling back to redirect:', err.code);
           // Flag so the NEXT page load knows to call getRedirectResult()
-          try { sessionStorage.setItem('dm-pending-redirect', '1'); } catch(e) {}
+          try { localStorage.setItem('dm-pending-redirect', '1'); } catch(e) {}
           window.dmAuth.signInWithRedirect(window.dmGoogleProvider);
         } else {
           console.error('Sign-in error:', err);
@@ -83,7 +83,7 @@
     // On normal page loads this skips the slow network call entirely,
     // eliminating the main source of page-load flicker.
     var hasPendingRedirect = false;
-    try { hasPendingRedirect = sessionStorage.getItem('dm-pending-redirect') === '1'; } catch(e) {}
+    try { hasPendingRedirect = localStorage.getItem('dm-pending-redirect') === '1'; } catch(e) {}
 
     function waitForAuthState() {
       return new Promise(function(resolve) {
@@ -109,7 +109,7 @@
 
     if (hasPendingRedirect) {
       // Clear the flag immediately so subsequent navigations are fast
-      try { sessionStorage.removeItem('dm-pending-redirect'); } catch(e) {}
+      try { localStorage.removeItem('dm-pending-redirect'); } catch(e) {}
       window.dmAuthReady = window.dmAuth.getRedirectResult().catch(function(err) {
         console.error('Redirect sign-in error:', err);
       }).then(waitForAuthState);
