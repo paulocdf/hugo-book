@@ -2498,7 +2498,7 @@
         // Only redirect if user was NOT already signed in when the page loaded
         // (returning users loading the front page should stay here).
         if (!wasSignedInOnLoad) {
-          var inboxUrl = ({{ "docs/inbox/" | relURL | jsonify }});
+          var inboxUrl = '{{ "docs/inbox/" | relURL }}';
           // Prefer SPA navigation to preserve Firebase Auth state in memory.
           // On mobile (especially iOS Safari), a full page reload can race
           // with Firebase session persistence to IndexedDB, causing the
