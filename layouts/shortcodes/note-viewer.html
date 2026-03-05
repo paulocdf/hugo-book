@@ -926,6 +926,12 @@
   });
 
   // Auth state change
+  // Pre-show loading state if cached user exists to prevent auth-card flash on full page reload
+  try {
+    if (JSON.parse(localStorage.getItem('dm-cached-user') || 'null')) {
+      showState('loading');
+    }
+  } catch(e) {}
   if (window.dmAuth) {
     function subscribeNoteViewerAuth() {
       window.dmAuth.onAuthStateChanged(function(user) {

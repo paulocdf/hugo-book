@@ -884,6 +884,12 @@
   window.addEventListener('dm-todos-updated', loadHistory);
   window.addEventListener('dm-sync-complete', loadHistory);
 
+  // Pre-show loading state if cached user exists to prevent auth-card flash on full page reload
+  try {
+    if (JSON.parse(localStorage.getItem('dm-cached-user') || 'null')) {
+      showState('loading');
+    }
+  } catch(e) {}
   if (window.dmAuth) {
     function subscribeHistoryAuth() {
       window.dmAuth.onAuthStateChanged(function(user) {

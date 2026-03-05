@@ -184,6 +184,7 @@
   var MAX_DRAIN_ATTEMPTS = 3; // Give up after 3 failed drain cycles
   var _quotaCooldownUntil = 0; // Timestamp: suppress Firestore until this time
   var QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown on quota errors
+  var _inFlightTodoWrites = {}; // { docId: timestamp } — tracks in-flight Firestore todo writes
 
   function isQuotaError(err) {
     if (!err) return false;
@@ -556,6 +557,12 @@
     var localPromise = opts.localOp ? opts.localOp() : Promise.resolve();
 
     return localPromise.then(function() {
+      // Track in-flight todo writes to prevent snapshot listener from reverting optimistic IDB data
+      var isTodoWrite = opts.collection === 'todos' && opts.docId;
+      if (isTodoWrite) {
+        _inFlightTodoWrites[opts.docId] = Date.now();
+      }
+
       if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser || !_isOnline || isInQuotaCooldown()) {
         // Offline, no Firestore, or quota cooldown — queue for later
         console.log('[dm-sync] Queuing offline write:', opts.op, opts.collection, opts.docId);
@@ -567,6 +574,7 @@
           merge: opts.merge || false
         }).then(function() {
           updateOfflineIndicator();
+          // Keep in-flight flag for queued writes — cleared when queue drains
         });
       }
 
@@ -580,10 +588,15 @@
       } else if (opts.op === 'delete') {
         fsPromise = ref.delete();
       } else {
+        if (isTodoWrite) delete _inFlightTodoWrites[opts.docId];
         return Promise.reject(new Error('Unknown op: ' + opts.op));
       }
 
-      return fsPromise.catch(function(err) {
+      return fsPromise.then(function(result) {
+        // Firestore confirmed — safe to clear in-flight flag
+        if (isTodoWrite) delete _inFlightTodoWrites[opts.docId];
+        return result;
+      }).catch(function(err) {
         // Detect quota exhaustion — enter cooldown to stop hammering Firestore
         if (isQuotaError(err)) {
           enterQuotaCooldown();
@@ -598,6 +611,7 @@
           merge: opts.merge || false
         }).then(function() {
           updateOfflineIndicator();
+          // Keep in-flight flag for queued writes — cleared when queue drains
         });
       });
     });
@@ -650,6 +664,10 @@
 
           return fsPromise.then(function() {
             processed++;
+            // Clear in-flight flag now that the queued write has been confirmed
+            if (entry.collection === 'todos' && entry.docId) {
+              delete _inFlightTodoWrites[entry.docId];
+            }
             return removeQueued(entry.queueId);
           }).catch(function(err) {
             // not-found / invalid-argument are truly unrecoverable — remove immediately
@@ -980,7 +998,9 @@
           var toUpsert = [];
           remoteTodos.forEach(function(rt) {
             var lt = localMap[rt.id];
-            if (!lt || lt.updatedAt !== rt.updatedAt) {
+            // Skip in-flight writes — local optimistic data is authoritative
+            if (_inFlightTodoWrites[rt.id]) return;
+            if (!lt || rt.updatedAt > lt.updatedAt) {
               toUpsert.push(rt);
             }
           });
@@ -2620,13 +2640,29 @@
           if (change.type === 'added' || change.type === 'modified') {
             // Skip local writes that haven't committed to server yet
             if (change.doc.metadata.hasPendingWrites) return;
+            // Skip docs with in-flight writes — optimistic IDB data is authoritative until confirmed
+            if (_inFlightTodoWrites[change.doc.id]) return;
             changes.push(serializeTodo(change.doc));
           }
           // Deletions of own todos are handled by syncTodos / user actions
         });
         if (changes.length > 0) {
-          idbPutBatch(STORE_TODOS, changes).then(function() {
-            window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+          // Filter out stale changes — only write if remote is newer than local IDB
+          var filterPromises = changes.map(function(change) {
+            return idbGet(STORE_TODOS, change.id).then(function(existing) {
+              if (!existing || change.updatedAt > existing.updatedAt) {
+                return change; // newer or new — keep
+              }
+              return null; // stale — skip
+            });
+          });
+          Promise.all(filterPromises).then(function(results) {
+            var filtered = results.filter(function(r) { return r !== null; });
+            if (filtered.length > 0) {
+              idbPutBatch(STORE_TODOS, filtered).then(function() {
+                window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+              });
+            }
           });
         }
       }, function(err) {

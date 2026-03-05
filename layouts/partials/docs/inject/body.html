@@ -2472,9 +2472,11 @@
   if (!gardenSignin) return;
 
   // Pre-apply cached auth state to prevent sign-out flash
+  var wasSignedInOnLoad = false;
   try {
     var cachedUser = JSON.parse(localStorage.getItem('dm-cached-user') || 'null');
     if (cachedUser) {
+      wasSignedInOnLoad = true;
       gardenSignin.style.display = 'none';
       gardenAuthUser.style.display = '';
       gardenAvatar.src = cachedUser.photoURL || '';
@@ -2491,6 +2493,22 @@
         gardenAvatar.src = user.photoURL || '';
         gardenAvatar.alt = user.displayName || '';
         gardenName.textContent = user.displayName || user.email || '';
+
+        // Auto-redirect to inbox after a fresh login on the front page.
+        // Only redirect if user was NOT already signed in when the page loaded
+        // (returning users loading the front page should stay here).
+        if (!wasSignedInOnLoad) {
+          var inboxUrl = ({{ "docs/inbox/" | relURL | jsonify }});
+          // Prefer SPA navigation to preserve Firebase Auth state in memory.
+          // On mobile (especially iOS Safari), a full page reload can race
+          // with Firebase session persistence to IndexedDB, causing the
+          // destination page to briefly appear signed out.
+          if (window.dmNavigateTo) {
+            window.dmNavigateTo(inboxUrl, true);
+          } else {
+            window.location.href = inboxUrl;
+          }
+        }
       } else {
         gardenSignin.style.display = '';
         gardenAuthUser.style.display = 'none';
@@ -3871,6 +3889,8 @@
   }
 
   // ---- Core navigation function ----
+  // Exposed globally as window.dmNavigateTo so other scripts (e.g. garden-hero
+  // auto-redirect) can use SPA navigation to preserve Firebase Auth state.
   function navigateTo(url, pushHistory) {
     // Abort any in-flight navigation
     if (currentNavController) {
@@ -3956,6 +3976,7 @@
         window.location.href = url;
       });
   }
+  window.dmNavigateTo = navigateTo;
 
   // ---- Should we intercept this click? ----
   function shouldIntercept(anchor, event) {
@@ -3999,6 +4020,25 @@
     var url = anchor.href;
 
     // Don't navigate if we're already on this page
+    if (url === window.location.href) return;
+
+    navigateTo(url, true);
+  });
+
+  // ---- Click handler on main content area ----
+  // Intercept internal links in page content (garden-sections cards, etc.)
+  // so they use SPA navigation instead of a full page reload.
+  // This preserves Firebase Auth state across navigation.
+  mainContent.addEventListener('click', function(event) {
+    var anchor = event.target.closest('a');
+    if (!anchor) return;
+    if (!mainContent.contains(anchor)) return;
+
+    if (!shouldIntercept(anchor, event)) return;
+
+    event.preventDefault();
+    var url = anchor.href;
+
     if (url === window.location.href) return;
 
     navigateTo(url, true);
