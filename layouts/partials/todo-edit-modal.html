@@ -855,6 +855,26 @@
     flex-wrap: wrap;
   }
 }
+
+/* ─── Kanban column overrides — panel is narrow regardless of viewport ─── */
+.kanban-column-items .todo-edit-panel {
+  padding: 0.75rem;
+  border-radius: 0 0 10px 10px;
+}
+.kanban-column-items .todo-edit-metadata-row {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.kanban-column-items .todo-edit-bujo-popover.show {
+  flex-direction: column;
+  gap: 6px;
+}
+.kanban-column-items .todo-edit-bujo-toggle {
+  flex-wrap: wrap;
+}
+.kanban-column-items .todo-edit-title-input {
+  font-size: 1rem;
+}
 </style>
 
 <script>

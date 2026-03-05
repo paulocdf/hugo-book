@@ -655,6 +655,55 @@
   line-height: 1.4;
   color: var(--body-font-color);
   word-break: break-word;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Inline pomodoro button on card header */
+.kanban-card-pomo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 105, 255, 0.06);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s, transform 0.1s, opacity 0.15s;
+  line-height: 0;
+  flex-shrink: 0;
+  opacity: 0;
+  margin-top: 1px;
+}
+.kanban-card:hover .kanban-card-pomo {
+  opacity: 1;
+}
+.kanban-card-pomo:hover {
+  background: rgba(0, 105, 255, 0.14);
+  color: var(--accent-blue, var(--color-link));
+  transform: scale(1.1);
+}
+.kanban-card-pomo.active {
+  opacity: 1;
+  color: var(--accent-blue, var(--color-link));
+  background: rgba(0, 105, 255, 0.1);
+  animation: kanban-pomo-pulse 2s ease-in-out infinite;
+}
+.kanban-card-pomo.pomo-stop {
+  color: var(--color-danger, #ea4335);
+  background: rgba(234, 67, 53, 0.06);
+  opacity: 1;
+}
+.kanban-card-pomo.pomo-stop:hover {
+  background: rgba(234, 67, 53, 0.14);
+  color: var(--color-danger, #ea4335);
+}
+@keyframes kanban-pomo-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 
 /* Card meta */
@@ -1762,6 +1811,28 @@
     html += '<div class="kanban-card-header">';
     html += bujoIcon;
     html += '<span class="kanban-card-title">' + title + '</span>';
+    // Inline pomodoro start/pause/stop buttons (only for undone tasks)
+    if (!isDone && (todo.bujoType === 'task' || !todo.bujoType)) {
+      var isTimerActive = window.dmPomodoro && window.dmPomodoro.isActive(todo.id);
+      var isTimerRunning = isTimerActive && window.dmPomodoro.isTimerRunning();
+      if (isTimerActive) {
+        var pomoBtnTitle = isTimerRunning ? 'Pause timer' : 'Resume timer';
+        html += '<button type="button" class="kanban-card-pomo pomodoro-start active" data-pomodoro-id="' + todo.id + '" title="' + pomoBtnTitle + '" aria-label="' + pomoBtnTitle + '">';
+        if (isTimerRunning) {
+          html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="5" y="3" width="5" height="18" rx="1"></rect><rect x="14" y="3" width="5" height="18" rx="1"></rect></svg>';
+        } else {
+          html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+        }
+        html += '</button>';
+        html += '<button type="button" class="kanban-card-pomo pomo-stop" data-pomodoro-stop-id="' + todo.id + '" title="Discard &amp; close" aria-label="Discard timer">';
+        html += '<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><rect x="4" y="4" width="16" height="16" rx="2"></rect></svg>';
+        html += '</button>';
+      } else {
+        html += '<button type="button" class="kanban-card-pomo pomodoro-start" data-pomodoro-id="' + todo.id + '" title="Start Pomodoro" aria-label="Start Pomodoro">';
+        html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>';
+        html += '</button>';
+      }
+    }
     html += '</div>';
     if (metaParts.length > 0) {
       html += '<div class="kanban-card-meta">' + metaParts.join('') + '</div>';
@@ -1846,6 +1917,34 @@
             if (!result) return;
             applyEditResult(todo, result);
           }, card);
+        }
+      });
+    });
+
+    // Pomodoro start/pause button
+    container.querySelectorAll('.kanban-card-pomo.pomodoro-start[data-pomodoro-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        var todoId = btn.getAttribute('data-pomodoro-id');
+        var todo = allTodos.find(function(t) { return t.id === todoId; });
+        if (!todo || !window.dmPomodoro) return;
+        if (window.dmPomodoro.isActive(todoId)) {
+          window.dmPomodoro.togglePause();
+        } else {
+          window.dmPomodoro.start(todoId, todo.title);
+        }
+        renderBoard();
+      });
+    });
+
+    // Pomodoro stop button
+    container.querySelectorAll('.kanban-card-pomo[data-pomodoro-stop-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if (window.dmPomodoro) {
+          window.dmPomodoro.reset();
+          window.dmPomodoro.stop();
+          renderBoard();
         }
       });
     });
@@ -2676,6 +2775,60 @@
         _kanbanColumns = cols;
         renderColumns();
         renderBoard();
+      });
+    }
+  });
+
+  // Re-render when Pomodoro timer state changes (pause/resume/reset)
+  window.addEventListener('dm-pomodoro-state-changed', function() {
+    if (contentEl.style.display !== 'none') renderBoard();
+  });
+
+  // Re-render when Pomodoro timer stops
+  window.addEventListener('dm-pomodoro-stopped', function() {
+    if (contentEl.style.display !== 'none') renderBoard();
+  });
+
+  // When Pomodoro "Done" button is pressed — mark the task complete, move to Done column
+  window.addEventListener('dm-pomodoro-completed', function(e) {
+    var detail = e.detail || {};
+    if (!detail.todoId) return;
+    var todo = allTodos.find(function(t) { return t.id === detail.todoId; });
+    if (!todo) return;
+
+    var doneStatus = getFirstDoneColumnStatus() || 'done';
+    var actualMin = detail.trackedMinutes || todo.estimatedMin || null;
+
+    var firestoreUpdates = {
+      done: true,
+      status: 'done',
+      bujoState: 'done',
+      kanbanStatus: doneStatus,
+      completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    if (actualMin) firestoreUpdates.actualMin = actualMin;
+
+    // Apply locally
+    todo.done = true;
+    todo.status = 'done';
+    todo.bujoState = 'done';
+    todo.kanbanStatus = doneStatus;
+    todo.completedAt = Date.now();
+    todo.updatedAt = Date.now();
+    if (actualMin) todo.actualMin = actualMin;
+
+    if (window.dmSync) {
+      window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: todo.id,
+        op: 'update',
+        data: firestoreUpdates,
+        localOp: function() { return window.dmSync.putTodo(todo); }
+      }).then(function() {
+        renderBoard();
+      }).catch(function(err) {
+        console.error('[kanban] Error completing todo from pomodoro:', err);
       });
     }
   });
