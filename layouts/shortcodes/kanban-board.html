@@ -71,8 +71,8 @@
   to { transform: rotate(360deg); }
 }
 @keyframes kanban-card-lift {
-  0%   { transform: scale(1); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-  100% { transform: scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+  0%   { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  100% { box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
 }
 
 /* Empty */
@@ -949,7 +949,7 @@
 
 /* Drag states */
 .kanban-card--ghost {
-  opacity: 0.4;
+  opacity: 0.35;
   background: var(--surface-3);
   border-style: dashed;
 }
@@ -974,17 +974,21 @@
   box-shadow: 0 8px 24px rgba(0,0,0,0.15);
   border-color: var(--color-link);
   z-index: 10;
-  animation: kanban-card-lift 0.15s ease-out forwards;
 }
 
-.kanban-card--ghost {
-  opacity: 0.35;
-  background: var(--surface-3);
-  border-style: dashed;
-}
-
+/* Hide original element in-place while dragging */
 .kanban-card--drag {
   opacity: 0;
+}
+
+/* SortableJS fallback clone — the element that follows the cursor.
+   IMPORTANT: Do NOT set transform here; SortableJS uses inline
+   transform: translate3d() for cursor tracking. */
+.sortable-fallback {
+  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+  border-color: var(--color-link);
+  opacity: 0.92;
+  z-index: 9999;
 }
 
 /* Board-level drag state */
@@ -1065,9 +1069,9 @@
 @media (prefers-reduced-motion: reduce) {
   .kanban-card,
   .kanban-card--chosen,
-  .kanban-card--ghost {
+  .kanban-card--ghost,
+  .sortable-fallback {
     transition: none;
-    transform: none;
     animation: none;
   }
   .kanban-column {
@@ -2119,6 +2123,7 @@
       if (!el) return;
       var sortable = Sortable.create(el, {
         group: 'kanban',
+        forceFallback: true,
         animation: 150,
         ghostClass: 'kanban-card--ghost',
         chosenClass: 'kanban-card--chosen',
