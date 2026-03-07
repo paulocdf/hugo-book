@@ -105,14 +105,18 @@
   border: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.kanban-column-items:last-of-type {
+  border-radius: 0 0 12px 12px;
 }
 
 .kanban-column-header {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--surface-2);
+  border-radius: 12px 12px 0 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -605,9 +609,9 @@
 /* Column items area */
 .kanban-column-items {
   padding: 8px;
-  flex: 1;
+  flex: 1 1 auto;
   overflow-y: auto;
-  min-height: 80px;
+  min-height: 120px;
 }
 
 /* Cards */
@@ -955,7 +959,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 80px;
+  flex: 1;
+  min-height: 120px;
   border: 2px dashed var(--border-subtle);
   border-radius: 8px;
   color: var(--text-faint);
@@ -989,6 +994,11 @@
 /* Board-level drag state */
 .kanban-board--dragging .kanban-card {
   cursor: grabbing;
+}
+.kanban-board--dragging .kanban-quick-add-btn,
+.kanban-board--dragging .kanban-column-header,
+.kanban-board--dragging .kanban-col-settings-btn {
+  pointer-events: none;
 }
 
 /* Column highlight when a card is dragged over it */
@@ -1030,25 +1040,28 @@
     flex: 1 1 calc(50% - 8px);
     min-width: 280px;
   }
-  .kanban-column-items {
-    max-height: 50vh;
-  }
   .kanban-add-column {
     flex: 0;
   }
 }
 @media (max-width: 768px) {
   .kanban-board {
-    flex-direction: column;
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scroll-snap-type: x mandatory;
     gap: 12px;
     min-height: auto;
+    padding-bottom: 1rem;
   }
   .kanban-column {
-    min-width: 100%;
-    max-width: 100%;
+    min-width: 85vw;
+    max-width: 85vw;
+    flex: 0 0 85vw;
+    scroll-snap-align: start;
   }
   .kanban-column-items {
-    max-height: 400px;
+    max-height: 60vh;
   }
 }
 
@@ -1139,6 +1152,7 @@
 
   var allTodos = [];
   var _sortableInstances = [];
+  var _dragMoveHandler = null;
   var _doneFilter = 'today'; // 'today' | '7days' | 'all'
   var _kanbanProjectMap = {}; // { projectId: { name, color } }
   var _kanbanFilterProjectIds = new Set(['__none__']); // Active project filters — default to "No project"
@@ -2114,25 +2128,51 @@
         ghostClass: 'kanban-card--ghost',
         chosenClass: 'kanban-card--chosen',
         dragClass: 'kanban-card--drag',
+        forceFallback: true,
+        fallbackClass: 'sortable-fallback',
         fallbackOnBody: true,
-        swapThreshold: 0.5,
-        emptyInsertThreshold: 20,
+        fallbackTolerance: 3,
+        swapThreshold: 0.35,
+        emptyInsertThreshold: 100,
         delay: 150,
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
         onStart: function() {
           if (boardEl) boardEl.classList.add('kanban-board--dragging');
+          // Track pointer to highlight columns even when hovering over header/button areas
+          _dragMoveHandler = function(e) {
+            var px = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+            var py = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+            var allCols = container.querySelectorAll('.kanban-column');
+            allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
+            // Find which column the pointer is over
+            var found = null;
+            allCols.forEach(function(c) {
+              var r = c.getBoundingClientRect();
+              if (px >= r.left && px <= r.right && py >= r.top && py <= r.bottom) {
+                found = c;
+              }
+            });
+            if (found) found.classList.add('kanban-column--dragover');
+          };
+          document.addEventListener('mousemove', _dragMoveHandler, { passive: true });
+          document.addEventListener('touchmove', _dragMoveHandler, { passive: true });
         },
         onMove: function(moveEvt) {
-          // Highlight the column being dragged over
+          // Also highlight via SortableJS target detection (complements pointer tracking)
           var allCols = container.querySelectorAll('.kanban-column');
           allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
           var targetCol = moveEvt.to.closest('.kanban-column');
           if (targetCol) targetCol.classList.add('kanban-column--dragover');
         },
         onEnd: function(evt) {
-          // Clean up drag state classes
+          // Clean up drag state classes and pointer tracker
           if (boardEl) boardEl.classList.remove('kanban-board--dragging');
+          if (_dragMoveHandler) {
+            document.removeEventListener('mousemove', _dragMoveHandler);
+            document.removeEventListener('touchmove', _dragMoveHandler);
+            _dragMoveHandler = null;
+          }
           var allCols = container.querySelectorAll('.kanban-column');
           allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
 
