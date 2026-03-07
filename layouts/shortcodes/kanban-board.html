@@ -71,8 +71,8 @@
   to { transform: rotate(360deg); }
 }
 @keyframes kanban-card-lift {
-  0%   { transform: rotate(0deg) scale(1); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-  100% { transform: rotate(2deg) scale(1.04); box-shadow: 0 12px 28px rgba(0,0,0,0.18); }
+  0%   { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  100% { box-shadow: 0 12px 28px rgba(0,0,0,0.18); }
 }
 
 /* Empty */
@@ -980,11 +980,12 @@
   opacity: 0;
 }
 
-/* Clone that follows cursor during drag */
+/* Clone that follows cursor during drag — 
+   IMPORTANT: do NOT set transform here; SortableJS positions the fallback
+   clone via inline transform: translate3d(). Any CSS transform would conflict. */
 .sortable-fallback.kanban-card {
   opacity: 0.92 !important;
   box-shadow: 0 12px 28px rgba(0,0,0,0.18);
-  transform: rotate(2deg) scale(1.04);
   z-index: 9999;
   cursor: grabbing;
   border-color: var(--color-link);
@@ -1068,10 +1069,14 @@
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .kanban-card,
-  .kanban-card--chosen,
-  .sortable-fallback.kanban-card {
+  .kanban-card--chosen {
     transition: none;
     transform: none;
+    animation: none;
+  }
+  .sortable-fallback.kanban-card {
+    /* Do NOT set transform: none — SortableJS uses inline transform to position the clone */
+    transition: none;
     animation: none;
   }
   .kanban-column {
