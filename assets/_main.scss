@@ -287,6 +287,20 @@ body[dir="rtl"] .book-menu {
   will-change: transform, margin, opacity;
 }
 
+// When a kanban board is present, remove will-change: transform from
+// .book-page and .markdown. will-change: transform creates a new CSS
+// containing block, which causes SortableJS's position: fixed fallback
+// clone to appear at an incorrect offset from the cursor.
+.book-page:has(.kanban-board) {
+  will-change: margin, opacity;
+  transition-property: margin, opacity, visibility;
+
+  .markdown {
+    will-change: margin, opacity;
+    transition-property: margin, opacity, visibility;
+  }
+}
+
 @media screen and (max-width: $mobile-breakpoint) {
   #menu-control,
   #toc-control {
