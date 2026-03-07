@@ -4008,13 +4008,8 @@
   function render() {
     container.style.display = '';
 
-    // Update project filter bar options
+    // Update project filter bar options (empty set = show all tasks)
     updateProjectFilterBar();
-    // If stale IDs were pruned and set became empty, fall back to default
-    if (_filterProjectIds.size === 0 && Object.keys(_projectMap).length > 0) {
-      _filterProjectIds.add('__none__');
-      updateProjectFilterBar();
-    }
 
     // Filter to only active and done tasks (exclude archived, deleted, and trashed)
     var visibleTodos = allTodos.filter(function(t) {

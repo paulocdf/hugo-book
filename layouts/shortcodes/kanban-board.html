@@ -2621,11 +2621,6 @@
           _kanbanFilterProjectIds = new Set(saved);
         }
         updateKanbanProjectFilter();
-        // If stale IDs were pruned and set became empty, fall back to default
-        if (_kanbanFilterProjectIds.size === 0) {
-          _kanbanFilterProjectIds.add('__none__');
-          updateKanbanProjectFilter();
-        }
       });
     }).catch(function() { /* keep existing */ });
     // Seed default columns if none exist, then load them
