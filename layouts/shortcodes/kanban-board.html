@@ -1152,6 +1152,8 @@
 
   var allTodos = [];
   var _sortableInstances = [];
+  var _isDragging = false;
+  var _renderPending = false;
   var _doneFilter = 'today'; // 'today' | '7days' | 'all'
   var _kanbanProjectMap = {}; // { projectId: { name, color } }
   var _kanbanFilterProjectIds = new Set(['__none__']); // Active project filters — default to "No project"
@@ -1874,6 +1876,11 @@
   }
 
   function renderBoard() {
+    // Defer re-renders while a drag is in progress to prevent SortableJS errors
+    if (_isDragging) {
+      _renderPending = true;
+      return;
+    }
     // Only show parent-level tasks (no subtasks as standalone cards)
     var visibleTodos = allTodos.filter(function(t) {
       if (t.deletedAt) return false;
@@ -2135,6 +2142,7 @@
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
         onStart: function() {
+          _isDragging = true;
           if (boardEl) boardEl.classList.add('kanban-board--dragging');
         },
         onMove: function(moveEvt) {
@@ -2144,14 +2152,23 @@
           if (targetCol) targetCol.classList.add('kanban-column--dragover');
         },
         onEnd: function(evt) {
+          _isDragging = false;
           if (boardEl) boardEl.classList.remove('kanban-board--dragging');
           var allCols = container.querySelectorAll('.kanban-column');
           allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
 
           var todoId = evt.item.getAttribute('data-todo-id');
-          var newColumn = evt.to.closest('.kanban-column').getAttribute('data-kanban-status');
+          var targetColEl = evt.to.closest('.kanban-column');
+          if (!targetColEl) {
+            if (_renderPending) { _renderPending = false; setTimeout(renderBoard, 0); }
+            return;
+          }
+          var newColumn = targetColEl.getAttribute('data-kanban-status');
           var todo = allTodos.find(function(t) { return t.id === todoId; });
-          if (!todo) return;
+          if (!todo) {
+            if (_renderPending) { _renderPending = false; setTimeout(renderBoard, 0); }
+            return;
+          }
 
           var oldKanbanStatus = todo.kanbanStatus || getFirstColumnStatus();
           var oldKanbanOrder = todo.kanbanOrder || 0;
@@ -2272,6 +2289,12 @@
               // Re-render to restore correct state
               renderBoard();
             });
+          }
+
+          // Flush any deferred renders that were blocked during drag
+          if (_renderPending) {
+            _renderPending = false;
+            setTimeout(renderBoard, 0);
           }
         }
       });

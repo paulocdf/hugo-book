@@ -5209,13 +5209,20 @@
     });
   }
 
+  // Retry logic for pomo-sync snapshot listener
+  var _pomoSyncRetryCount = 0;
+  var POMO_SYNC_MAX_RETRIES = 5;
+  var _pomoSyncRetryTimer = null;
+
   // Start real-time listener for cross-device timer updates
   function startFirestoreListener() {
     var ref = _getTimerDocRef();
     if (!ref) return;
     if (_fsUnsubscribe) { _fsUnsubscribe(); _fsUnsubscribe = null; }
+    if (_pomoSyncRetryTimer) { clearTimeout(_pomoSyncRetryTimer); _pomoSyncRetryTimer = null; }
 
     _fsUnsubscribe = ref.onSnapshot(function(doc) {
+      _pomoSyncRetryCount = 0; // reset on success
       if (!doc.exists) {
         // Skip our own deletes (e.g. when switching tasks via closeTimer → start)
         if (_localDelete) {
@@ -5272,6 +5279,17 @@
       _fsSyncing = false;
     }, function(err) {
       console.warn('[pomo-sync] Snapshot listener error:', err.message);
+      // Retry with exponential backoff (matches dm-sync pattern)
+      if (_pomoSyncRetryCount < POMO_SYNC_MAX_RETRIES) {
+        var delay = Math.min(1000 * Math.pow(2, _pomoSyncRetryCount), 30000);
+        _pomoSyncRetryCount++;
+        console.log('[pomo-sync] Retrying listener in ' + delay + 'ms (attempt ' + _pomoSyncRetryCount + '/' + POMO_SYNC_MAX_RETRIES + ')');
+        _pomoSyncRetryTimer = setTimeout(function() {
+          startFirestoreListener();
+        }, delay);
+      } else {
+        console.error('[pomo-sync] Listener failed after ' + POMO_SYNC_MAX_RETRIES + ' retries');
+      }
     });
   }
 
