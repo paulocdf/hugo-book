@@ -125,16 +125,17 @@
     function promptWithFallback() {
       google.accounts.id.prompt(function(notification) {
         // isNotDisplayed() is true when the One Tap iframe was blocked
-        // (ETP, cookie settings, etc.) or the browser lacks FedCM.
-        // isSkippedMoment() is true when the user previously dismissed.
-        // In both cases, fall back to the popup flow.
+        // (ETP, cookie settings, etc.) or the browser can't access
+        // Google session cookies due to storage partitioning.
+        // Since this function is only called from explicit user clicks
+        // (dmSignIn), always fall back — the user wants to sign in
+        // regardless of why GIS couldn't show the prompt.
         if (notification.isNotDisplayed()) {
-          var reason = notification.getNotDisplayedReason();
-          console.warn('[dm-auth] GIS prompt not displayed:', reason);
-          // opt_out_or_no_session = user signed out or no Google session — don't force popup
-          if (reason !== 'opt_out_or_no_session') {
-            fallbackPopupSignIn();
-          }
+          console.warn('[dm-auth] GIS prompt not displayed:', notification.getNotDisplayedReason());
+          fallbackPopupSignIn();
+        } else if (notification.isSkippedMoment()) {
+          console.warn('[dm-auth] GIS prompt skipped:', notification.getSkippedReason());
+          fallbackPopupSignIn();
         }
       });
     }
