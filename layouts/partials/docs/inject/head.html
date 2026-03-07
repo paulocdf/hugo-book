@@ -50,6 +50,8 @@
         console.error('[dm-auth] GIS callback: no credential received');
         return;
       }
+      // Clear the explicit-signout flag — the user is actively signing in
+      try { localStorage.removeItem('dm-gis-signed-out'); } catch(e) {}
       var credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
       window.dmAuth.signInWithCredential(credential).catch(function(err) {
         console.error('[dm-auth] signInWithCredential error:', err);
@@ -60,18 +62,52 @@
     function ensureGisInit() {
       if (gisInitialized) return true;
       if (typeof google === 'undefined' || !google.accounts || !google.accounts.id) return false;
+      // On mobile (iOS Safari/Chrome, which lack FedCM), prompt() triggers
+      // a full-page redirect to Google.  When the browser returns, the page
+      // loads fresh — all JS state is gone.  auto_select lets GIS
+      // automatically deliver the credential on that return page-load
+      // (the user already granted consent during the redirect) so
+      // handleGisCredential fires and signInWithCredential creates the
+      // Firebase session.  On desktop this enables One Tap auto-sign-in
+      // for returning users.
+      //
+      // Suppress auto_select when the user explicitly signed out (the
+      // sign-out handler sets dm-gis-signed-out in localStorage and calls
+      // google.accounts.id.disableAutoSelect) to avoid immediately
+      // signing them back in.
+      var userSignedOut = false;
+      try { userSignedOut = localStorage.getItem('dm-gis-signed-out') === '1'; } catch(e) {}
       google.accounts.id.initialize({
         client_id: GIS_CLIENT_ID,
         callback: handleGisCredential,
-        auto_select: false,
+        auto_select: !userSignedOut,
         cancel_on_tap_outside: true
       });
       gisInitialized = true;
       return true;
     }
 
+    // Global sign-out helper — clears Firebase session AND tells GIS not
+    // to auto-select on the next page load.
+    window.dmSignOut = function() {
+      // Tell GIS to suppress auto-select for this browser session
+      try {
+        if (typeof google !== 'undefined' && google.accounts && google.accounts.id) {
+          google.accounts.id.disableAutoSelect();
+        }
+      } catch(e) {}
+      // Persist flag across page reloads (GIS disableAutoSelect is
+      // session-scoped and may not survive a full navigation).
+      try { localStorage.setItem('dm-gis-signed-out', '1'); } catch(e) {}
+      if (window.dmAuth) window.dmAuth.signOut();
+    };
+
     window.dmSignIn = function() {
       if (!window.dmAuth) return;
+      // Clear the signed-out flag — user is explicitly requesting sign-in
+      try { localStorage.removeItem('dm-gis-signed-out'); } catch(e) {}
+      // Re-initialize GIS with auto_select: true now that the flag is cleared
+      gisInitialized = false;
       if (ensureGisInit()) {
         google.accounts.id.prompt();
       } else {
@@ -90,6 +126,28 @@
         }, 100);
       }
     };
+
+    // Eagerly initialize GIS on every page load so the callback is
+    // registered before GIS tries to deliver credentials.
+    //
+    // On mobile (iOS Safari/Chrome, which lack FedCM), prompt() triggers
+    // a full-page redirect to Google.  When the browser redirects back,
+    // the page loads fresh and all JS state from the previous load is
+    // gone — including the callback registered via initialize().
+    // By calling ensureGisInit() eagerly here, the callback is in place
+    // when GIS auto-delivers the credential (via auto_select) on the
+    // return page load.
+    //
+    // On desktop this is harmless: GIS is initialized slightly earlier
+    // than before, but prompt() is still only called on user interaction.
+    (function autoInitGis() {
+      if (ensureGisInit()) return;
+      var attempts = 0;
+      var poll = setInterval(function() {
+        attempts++;
+        if (ensureGisInit() || attempts > 100) clearInterval(poll);
+      }, 100);
+    })();
 
     // Register/update user profile in Firestore on sign-in (for task sharing lookups).
     // Creates a lightweight doc at users/{uid} with email, displayName, photoURL.

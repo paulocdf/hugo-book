@@ -442,7 +442,8 @@
 
   if (signoutBtn) {
     signoutBtn.addEventListener('click', function() {
-      if (window.dmAuth) window.dmAuth.signOut();
+      if (window.dmSignOut) { window.dmSignOut(); }
+      else if (window.dmAuth) { window.dmAuth.signOut(); }
     });
   }
 
@@ -2526,7 +2527,8 @@
   });
 
   gardenSignout.addEventListener('click', function() {
-    window.dmAuth.signOut();
+    if (window.dmSignOut) { window.dmSignOut(); }
+    else if (window.dmAuth) { window.dmAuth.signOut(); }
   });
 })();
 </script>
@@ -3268,7 +3270,8 @@
     if (signoutBtn) {
       signoutBtn.addEventListener('click', function() {
         closeSettingsModal();
-        if (window.dmAuth) window.dmAuth.signOut();
+        if (window.dmSignOut) { window.dmSignOut(); }
+        else if (window.dmAuth) { window.dmAuth.signOut(); }
       });
     }
 
