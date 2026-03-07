@@ -622,7 +622,7 @@
   padding: 10px 12px;
   margin-bottom: 6px;
   cursor: grab;
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  transition: border-color 0.15s, box-shadow 0.15s;
   user-select: none;
 }
 
@@ -633,7 +633,6 @@
 
 .kanban-card:active {
   cursor: grabbing;
-  transform: scale(0.98);
 }
 
 .kanban-card--done {
@@ -982,9 +981,10 @@
 }
 
 /* SortableJS fallback clone — the element that follows the cursor.
-   IMPORTANT: Do NOT set transform here; SortableJS uses inline
-   transform: translate3d() for cursor tracking. */
+   transition and transform must be none so SortableJS inline
+   translate3d() applies instantly without interference. */
 .sortable-fallback {
+  transition: none !important;
   box-shadow: 0 12px 32px rgba(0,0,0,0.18);
   border-color: var(--color-link);
   opacity: 0.92;
