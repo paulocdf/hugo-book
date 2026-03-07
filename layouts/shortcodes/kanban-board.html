@@ -1287,6 +1287,13 @@
     if (e.key === 'Escape') { closeKanbanProjectDropdown(); e.stopPropagation(); }
   }
 
+  // Persist current project filter selection to IDB + Firestore
+  function _saveKanbanFilter() {
+    if (window.dmSync && window.dmSync.setPageFilterProjectIds) {
+      window.dmSync.setPageFilterProjectIds('kanban', Array.from(_kanbanFilterProjectIds));
+    }
+  }
+
   // Event delegation for trigger, dropdown rows, chip remove, clear all
   if (kanbanProjectFilterBar) {
     kanbanProjectFilterBar.addEventListener('click', function(e) {
@@ -1299,6 +1306,7 @@
       if (e.target.closest('[data-pf-clear]')) {
         _kanbanFilterProjectIds.clear();
         updateKanbanProjectFilter();
+        _saveKanbanFilter();
         renderBoard();
         return;
       }
@@ -1312,6 +1320,7 @@
           _kanbanFilterProjectIds.add(pid);
         }
         updateKanbanProjectFilter();
+        _saveKanbanFilter();
         renderBoard();
         return;
       }
@@ -1321,6 +1330,7 @@
         var rid = removeBtn.getAttribute('data-pf-remove');
         _kanbanFilterProjectIds.delete(rid);
         updateKanbanProjectFilter();
+        _saveKanbanFilter();
         renderBoard();
         return;
       }
@@ -2605,7 +2615,18 @@
       projects.forEach(function(p) {
         _kanbanProjectMap[p.id] = { name: p.name, color: p.color || '' };
       });
-      updateKanbanProjectFilter();
+      // Restore saved filter from IDB/Firestore before rendering
+      return window.dmSync.getPageFilterProjectIds('kanban').then(function(saved) {
+        if (saved) {
+          _kanbanFilterProjectIds = new Set(saved);
+        }
+        updateKanbanProjectFilter();
+        // If stale IDs were pruned and set became empty, fall back to default
+        if (_kanbanFilterProjectIds.size === 0) {
+          _kanbanFilterProjectIds.add('__none__');
+          updateKanbanProjectFilter();
+        }
+      });
     }).catch(function() { /* keep existing */ });
     // Seed default columns if none exist, then load them
     var columnsPromise = window.dmSync.seedDefaultKanbanColumns().then(function(cols) {

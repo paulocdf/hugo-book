@@ -3611,6 +3611,13 @@
     if (e.key === 'Escape') { closeProjectDropdown(); e.stopPropagation(); }
   }
 
+  // Persist current project filter selection to IDB + Firestore
+  function _saveInboxFilter() {
+    if (window.dmSync && window.dmSync.setPageFilterProjectIds) {
+      window.dmSync.setPageFilterProjectIds('inbox', Array.from(_filterProjectIds));
+    }
+  }
+
   // Event delegation for trigger, dropdown rows, chip remove, clear all
   if (projectFilterBar) {
     projectFilterBar.addEventListener('click', function(e) {
@@ -3623,6 +3630,7 @@
       if (e.target.closest('[data-pf-clear]')) {
         _filterProjectIds.clear();
         updateProjectFilterBar();
+        _saveInboxFilter();
         render();
         return;
       }
@@ -3636,6 +3644,7 @@
           _filterProjectIds.add(pid);
         }
         updateProjectFilterBar();
+        _saveInboxFilter();
         render();
         return;
       }
@@ -3645,6 +3654,7 @@
         var rid = removeBtn.getAttribute('data-pf-remove');
         _filterProjectIds.delete(rid);
         updateProjectFilterBar();
+        _saveInboxFilter();
         render();
         return;
       }
@@ -4000,6 +4010,11 @@
 
     // Update project filter bar options
     updateProjectFilterBar();
+    // If stale IDs were pruned and set became empty, fall back to default
+    if (_filterProjectIds.size === 0 && Object.keys(_projectMap).length > 0) {
+      _filterProjectIds.add('__none__');
+      updateProjectFilterBar();
+    }
 
     // Filter to only active and done tasks (exclude archived, deleted, and trashed)
     var visibleTodos = allTodos.filter(function(t) {
@@ -7118,6 +7133,12 @@
       _projectMap = {};
       projects.forEach(function(p) {
         _projectMap[p.id] = { name: p.name, color: p.color || '' };
+      });
+      // Restore saved filter from IDB/Firestore before rendering
+      return window.dmSync.getPageFilterProjectIds('inbox').then(function(saved) {
+        if (saved) {
+          _filterProjectIds = new Set(saved);
+        }
       });
     }).catch(function() { /* keep existing _projectMap */ });
 

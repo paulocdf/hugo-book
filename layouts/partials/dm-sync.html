@@ -1209,6 +1209,7 @@
       .then(function() { return syncAttachments(userId); })
       .then(function() { return syncReviewCards(userId); })
       .then(function() { return syncClosedDays(userId); })
+      .then(function() { return syncPageFilters(userId); })
       .then(function() { return syncTaskShares(userId); })
       .then(function() { return syncSharedTodos(userId); })
       .then(function() {
@@ -2831,6 +2832,27 @@
     });
   }
 
+  // ─── Page Filter Sync ───
+  // Persists per-page project filter selections to Firestore userSettings/{uid}
+  // and caches in IDB meta store. Keys: 'kanbanFilterProjectIds', 'inboxFilterProjectIds'.
+  function syncPageFilters(userId) {
+    if (!window.dmDb) return Promise.resolve();
+    return window.dmDb.collection('userSettings').doc(userId).get().then(function(doc) {
+      if (!doc.exists) return;
+      var data = doc.data();
+      var promises = [];
+      if (Array.isArray(data.kanbanFilterProjectIds)) {
+        promises.push(idbPut(STORE_META, { key: 'kanbanFilterProjectIds', value: data.kanbanFilterProjectIds }));
+      }
+      if (Array.isArray(data.inboxFilterProjectIds)) {
+        promises.push(idbPut(STORE_META, { key: 'inboxFilterProjectIds', value: data.inboxFilterProjectIds }));
+      }
+      return Promise.all(promises);
+    }).catch(function(err) {
+      console.warn('[dm-sync] Failed to sync page filters:', err);
+    });
+  }
+
   window.dmSync = {
     // IndexedDB operations — Notes
     getNote: function(id) {
@@ -3614,6 +3636,38 @@
       return idbPromise;
     },
     syncClosedDays: syncClosedDays,
+
+    // Per-page project filter persistence
+    getPageFilterProjectIds: function(pageKey) {
+      var idbKey = pageKey + 'FilterProjectIds';
+      return idbGet(STORE_META, idbKey).then(function(meta) {
+        return (meta && Array.isArray(meta.value)) ? meta.value : null;
+      });
+    },
+    setPageFilterProjectIds: function(pageKey, ids) {
+      var idbKey = pageKey + 'FilterProjectIds';
+      var arr = ids.slice();
+      // Write to IDB
+      var idbPromise = idbPut(STORE_META, { key: idbKey, value: arr });
+      // Write to Firestore (if authenticated)
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      if (user && window.dmDb) {
+        return idbPromise.then(function() {
+          var data = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+          data[idbKey] = arr;
+          return firestoreWrite({
+            collection: 'userSettings',
+            docId: user.uid,
+            op: 'set',
+            data: data,
+            merge: true,
+            localOp: function() { return Promise.resolve(); }
+          });
+        });
+      }
+      return idbPromise;
+    },
+    syncPageFilters: syncPageFilters,
 
     // Search index cache
     getSearchIndexCache: function() { return idbGet(STORE_META, 'searchIndex'); },
