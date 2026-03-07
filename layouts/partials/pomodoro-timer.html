@@ -1624,6 +1624,30 @@
     color: #a08930;
   }
 }
+
+/* Pomodoro info toast — shown when timer finishes naturally without auto-completing */
+.pomo-info-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #1a1a2e;
+  color: #e0e0e0;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  z-index: 100001;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  max-width: 90vw;
+  text-align: center;
+  line-height: 1.4;
+}
+.pomo-info-toast-icon {
+  margin-right: 8px;
+}
 </style>
 
 <script>
@@ -3061,6 +3085,21 @@
     }
   }
 
+  // Show an informational toast when timer finishes naturally (no auto-complete)
+  function showPomodoroToast(taskTitle, trackedMinutes) {
+    var msg = trackedMinutes + ' min tracked';
+    if (taskTitle) msg += ' for \u201c' + taskTitle + '\u201d';
+    var toast = document.createElement('div');
+    toast.className = 'pomo-info-toast';
+    toast.innerHTML = '<span class="pomo-info-toast-icon">\u23F1</span>' + msg;
+    document.body.appendChild(toast);
+    setTimeout(function() { toast.style.opacity = '1'; }, 10);
+    setTimeout(function() {
+      toast.style.opacity = '0';
+      setTimeout(function() { toast.remove(); }, 300);
+    }, 4000);
+  }
+
   function tick() {
     if (secondsLeft <= 0) {
       clearInterval(intervalId);
@@ -3084,17 +3123,11 @@
           if (activeParentId && activeParentId !== activeTodoId) {
             advanceToNextSubtask();
           } else {
-            // Auto-mark task as done: capture details before closeTimer() clears them
-            var completedId = activeTodoId;
-            var completedMins = Math.round((accumulatedWorkSeconds + totalPhaseSeconds) / 60);
-            var completedCat = activeTodoCategory || null;
-            var completedProj = activeProjectId || null;
+            // All sessions finished — save tracked time but let user decide when to mark done
+            var finishedTitle = activeTodoTitle;
+            var finishedMins = Math.round((accumulatedWorkSeconds + totalPhaseSeconds) / 60);
             closeTimer();
-            if (completedId) {
-              window.dispatchEvent(new CustomEvent('dm-pomodoro-completed', {
-                detail: { todoId: completedId, trackedMinutes: completedMins > 0 ? completedMins : null, category: completedCat, projectId: completedProj }
-              }));
-            }
+            showPomodoroToast(finishedTitle, finishedMins);
           }
           return;
         }
@@ -3106,17 +3139,11 @@
             advanceToNextSubtask();
             return;
           }
-          // Non-subtask single-session: auto-mark task as done
-          var completedId = activeTodoId;
-          var completedMins = Math.round((accumulatedWorkSeconds + totalPhaseSeconds) / 60);
-          var completedCat = activeTodoCategory || null;
-          var completedProj = activeProjectId || null;
+          // Non-subtask single-session: save tracked time but let user decide when to mark done
+          var finishedTitle = activeTodoTitle;
+          var finishedMins = Math.round((accumulatedWorkSeconds + totalPhaseSeconds) / 60);
           closeTimer();
-          if (completedId) {
-            window.dispatchEvent(new CustomEvent('dm-pomodoro-completed', {
-              detail: { todoId: completedId, trackedMinutes: completedMins > 0 ? completedMins : null, category: completedCat, projectId: completedProj }
-            }));
-          }
+          showPomodoroToast(finishedTitle, finishedMins);
           return;
         }
 
