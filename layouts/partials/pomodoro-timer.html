@@ -3077,14 +3077,24 @@
         updateDailyGoalRing();
         renderHistoryChart();
 
-        // If all sessions are complete
+        // If all sessions are complete (multi-session tasks)
         if (totalSessions > 1 && sessionCount >= totalSessions) {
           updateDisplay();
           // If timing a subtask, try to advance to the next one
           if (activeParentId && activeParentId !== activeTodoId) {
             advanceToNextSubtask();
           } else {
+            // Auto-mark task as done: capture details before closeTimer() clears them
+            var completedId = activeTodoId;
+            var completedMins = Math.round((accumulatedWorkSeconds + totalPhaseSeconds) / 60);
+            var completedCat = activeTodoCategory || null;
+            var completedProj = activeProjectId || null;
             closeTimer();
+            if (completedId) {
+              window.dispatchEvent(new CustomEvent('dm-pomodoro-completed', {
+                detail: { todoId: completedId, trackedMinutes: completedMins > 0 ? completedMins : null, category: completedCat, projectId: completedProj }
+              }));
+            }
           }
           return;
         }
@@ -3096,6 +3106,18 @@
             advanceToNextSubtask();
             return;
           }
+          // Non-subtask single-session: auto-mark task as done
+          var completedId = activeTodoId;
+          var completedMins = Math.round((accumulatedWorkSeconds + totalPhaseSeconds) / 60);
+          var completedCat = activeTodoCategory || null;
+          var completedProj = activeProjectId || null;
+          closeTimer();
+          if (completedId) {
+            window.dispatchEvent(new CustomEvent('dm-pomodoro-completed', {
+              detail: { todoId: completedId, trackedMinutes: completedMins > 0 ? completedMins : null, category: completedCat, projectId: completedProj }
+            }));
+          }
+          return;
         }
 
         // Switch to break
