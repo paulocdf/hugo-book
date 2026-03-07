@@ -2463,57 +2463,70 @@
 (function() {
   if (typeof firebase === 'undefined' || !window.dmAuth) return;
 
-  var gardenSignin = document.getElementById('garden-signin');
-  var gardenSignout = document.getElementById('garden-signout');
-  var gardenAuthUser = document.getElementById('garden-auth-user');
-  var gardenAvatar = document.getElementById('garden-auth-avatar');
-  var gardenName = document.getElementById('garden-auth-name');
+  // Track the onAuthStateChanged unsubscribe so we don't leak listeners
+  // when re-initialising after SPA navigation.
+  var _gardenAuthUnsub = null;
 
-  // Only run on pages that have the landing page auth elements
-  if (!gardenSignin) return;
+  function initGardenHeroAuth() {
+    var gardenSignin = document.getElementById('garden-signin');
+    var gardenSignout = document.getElementById('garden-signout');
+    var gardenAuthUser = document.getElementById('garden-auth-user');
+    var gardenAvatar = document.getElementById('garden-auth-avatar');
+    var gardenName = document.getElementById('garden-auth-name');
 
-  // Pre-apply cached auth state to prevent sign-out flash
-  try {
-    var cachedUser = JSON.parse(localStorage.getItem('dm-cached-user') || 'null');
-    if (cachedUser) {
-      gardenSignin.style.display = 'none';
-      gardenAuthUser.style.display = '';
-      gardenAvatar.src = cachedUser.photoURL || '';
-      gardenAvatar.alt = cachedUser.displayName || '';
-      gardenName.textContent = cachedUser.displayName || cachedUser.email || '';
-    }
-  } catch(e) {}
+    // Only run on pages that have the landing page auth elements
+    if (!gardenSignin) return;
 
-  function subscribeGardenAuth() {
-    window.dmAuth.onAuthStateChanged(function(user) {
+    // Unsubscribe previous listener (if any) to avoid stale callbacks
+    if (_gardenAuthUnsub) { _gardenAuthUnsub(); _gardenAuthUnsub = null; }
+
+    // Pre-apply cached auth state to prevent sign-out flash
+    try {
+      var cachedUser = JSON.parse(localStorage.getItem('dm-cached-user') || 'null');
+      if (cachedUser) {
+        gardenSignin.style.display = 'none';
+        gardenAuthUser.style.display = '';
+        gardenAvatar.src = cachedUser.photoURL || '';
+        gardenAvatar.alt = cachedUser.displayName || '';
+        gardenName.textContent = cachedUser.displayName || cachedUser.email || '';
+      }
+    } catch(e) {}
+
+    function applyAuthState(user) {
       if (user) {
         gardenSignin.style.display = 'none';
         gardenAuthUser.style.display = '';
         gardenAvatar.src = user.photoURL || '';
         gardenAvatar.alt = user.displayName || '';
         gardenName.textContent = user.displayName || user.email || '';
-
-        // User stays on the home page after sign-in; the auth state change
-        // already updates the UI above (avatar, name, etc.).
       } else {
         gardenSignin.style.display = '';
         gardenAuthUser.style.display = 'none';
       }
+    }
+
+    _gardenAuthUnsub = window.dmAuth.onAuthStateChanged(applyAuthState);
+
+    gardenSignin.addEventListener('click', function() {
+      window.dmSignIn();
+    });
+
+    gardenSignout.addEventListener('click', function() {
+      if (window.dmSignOut) { window.dmSignOut(); }
+      else if (window.dmAuth) { window.dmAuth.signOut(); }
     });
   }
+
+  // Initial run
   if (window.dmAuthReady) {
-    window.dmAuthReady.then(subscribeGardenAuth);
+    window.dmAuthReady.then(function() { initGardenHeroAuth(); });
   } else {
-    subscribeGardenAuth();
+    initGardenHeroAuth();
   }
 
-  gardenSignin.addEventListener('click', function() {
-    window.dmSignIn();
-  });
-
-  gardenSignout.addEventListener('click', function() {
-    if (window.dmSignOut) { window.dmSignOut(); }
-    else if (window.dmAuth) { window.dmAuth.signOut(); }
+  // Re-run after SPA navigation renders the home page
+  window.addEventListener('dm-content-rendered', function() {
+    initGardenHeroAuth();
   });
 })();
 </script>
