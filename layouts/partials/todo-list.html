@@ -5116,6 +5116,10 @@
       if (!todo || !window.dmTodoEdit) return;
       function onEditSave(result) {
         if (!result) return;
+        if (result.deleted) {
+          deleteTodoWithUndo(todoId);
+          return;
+        }
         var firestoreUpdates = {};
         var localUpdates = {};
         if (result.title !== todo.title) {

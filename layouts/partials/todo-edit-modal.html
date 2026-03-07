@@ -136,6 +136,11 @@
     </div>
 
     <div class="todo-edit-actions">
+      <button type="button" class="todo-edit-btn-delete" data-ref="delete" title="Delete task">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        <span>Delete</span>
+      </button>
+      <span class="todo-edit-actions-spacer"></span>
       <button type="button" class="todo-edit-btn-cancel" data-ref="cancel">Cancel</button>
       <button type="button" class="todo-edit-btn-save" data-ref="save">Save Changes</button>
     </div>
@@ -680,8 +685,33 @@
 .todo-edit-actions {
   display: flex;
   gap: 10px;
-  justify-content: flex-end;
+  align-items: center;
   margin-top: 0.5rem;
+}
+.todo-edit-actions-spacer {
+  flex: 1;
+}
+.todo-edit-btn-delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 7px 14px;
+  background: transparent;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: var(--gray-500);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.todo-edit-btn-delete:hover {
+  color: #dc3545;
+  border-color: #dc3545;
+  background: rgba(220, 53, 69, 0.06);
+}
+.todo-edit-btn-delete svg {
+  flex-shrink: 0;
 }
 .todo-edit-btn-cancel {
   padding: 8px 18px;
@@ -1691,6 +1721,15 @@
     // Cancel button
     var cancelBtn = ref('cancel');
     if (cancelBtn) cancelBtn.addEventListener('click', closePanel);
+
+    // Delete button
+    var deleteBtn = ref('delete');
+    if (deleteBtn) deleteBtn.addEventListener('click', function() {
+      if (_onSaveCallback) {
+        _onSaveCallback({ deleted: true });
+      }
+      closePanel();
+    });
 
     // Save button
     var saveBtn = ref('save');

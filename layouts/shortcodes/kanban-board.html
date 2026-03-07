@@ -1964,6 +1964,10 @@
         if (todo && window.dmTodoEdit) {
           window.dmTodoEdit.open(todo, function(result) {
             if (!result) return;
+            if (result.deleted) {
+              deleteKanbanTodoWithUndo(todo);
+              return;
+            }
             applyEditResult(todo, result);
           }, card);
         }
@@ -2409,6 +2413,125 @@
       } else {
         card.classList.remove('kanban-card--done');
       }
+    });
+  }
+
+  // ─── Delete with undo ───
+  function deleteKanbanTodo(todoId) {
+    // Soft-delete the task (and children) via Firestore
+    var toDelete = [todoId];
+    allTodos.forEach(function(t) {
+      if (t.parentId === todoId) toDelete.push(t.id);
+    });
+
+    if (!window.dmSync) return;
+
+    var chain = Promise.resolve();
+    toDelete.forEach(function(id) {
+      chain = chain.then(function() {
+        var todo = allTodos.find(function(t) { return t.id === id; });
+        if (!todo) return Promise.resolve();
+        var updateData = {
+          status: 'deleted',
+          deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        // Optimistic local update
+        todo.status = 'deleted';
+        todo.deletedAt = Date.now();
+        todo.updatedAt = Date.now();
+        return window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: id,
+          op: 'update',
+          data: updateData,
+          localOp: function() {
+            return window.dmSync.putTodo(todo);
+          }
+        });
+      });
+    });
+
+    chain.then(function() {
+      renderBoard();
+    }).catch(function(err) {
+      console.error('[kanban] Error deleting todo:', err);
+    });
+  }
+
+  function deleteKanbanTodoWithUndo(todo) {
+    var todoId = todo.id;
+    // Snapshot state for undo
+    var affectedIds = [todoId];
+    allTodos.forEach(function(t) {
+      if (t.parentId === todoId) affectedIds.push(t.id);
+    });
+
+    var snapshots = [];
+    affectedIds.forEach(function(id) {
+      var t = allTodos.find(function(x) { return x.id === id; });
+      if (t) {
+        snapshots.push({
+          id: id,
+          done: t.done,
+          status: t.status,
+          bujoState: t.bujoState,
+          deletedAt: t.deletedAt || null
+        });
+      }
+    });
+
+    var todoTitle = todo.title || '';
+    if (todoTitle.length > 32) todoTitle = todoTitle.substring(0, 32) + '...';
+
+    // Delete immediately
+    deleteKanbanTodo(todoId);
+
+    // Show undo toast
+    showUndoToast(todoTitle ? ('"' + escapeHtml(todoTitle) + '" deleted') : 'Task deleted', function() {
+      undoKanbanDelete(snapshots);
+    });
+  }
+
+  function undoKanbanDelete(snapshots) {
+    if (!window.dmSync || !snapshots || !snapshots.length) return;
+
+    var chain = Promise.resolve();
+    snapshots.forEach(function(snap) {
+      chain = chain.then(function() {
+        var todo = allTodos.find(function(t) { return t.id === snap.id; });
+        if (!todo) return Promise.resolve();
+
+        var updateData = {
+          done: snap.done,
+          status: snap.status,
+          bujoState: snap.bujoState,
+          deletedAt: firebase.firestore.FieldValue.delete(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        // Restore local state
+        todo.done = snap.done;
+        todo.status = snap.status;
+        todo.bujoState = snap.bujoState;
+        delete todo.deletedAt;
+        todo.updatedAt = Date.now();
+
+        return window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: snap.id,
+          op: 'update',
+          data: updateData,
+          localOp: function() {
+            return window.dmSync.putTodo(todo);
+          }
+        });
+      });
+    });
+
+    chain.then(function() {
+      renderBoard();
+    }).catch(function(err) {
+      console.error('[kanban] Error undoing delete:', err);
     });
   }
 
