@@ -2473,11 +2473,9 @@
   if (!gardenSignin) return;
 
   // Pre-apply cached auth state to prevent sign-out flash
-  var wasSignedInOnLoad = false;
   try {
     var cachedUser = JSON.parse(localStorage.getItem('dm-cached-user') || 'null');
     if (cachedUser) {
-      wasSignedInOnLoad = true;
       gardenSignin.style.display = 'none';
       gardenAuthUser.style.display = '';
       gardenAvatar.src = cachedUser.photoURL || '';
@@ -2495,21 +2493,8 @@
         gardenAvatar.alt = user.displayName || '';
         gardenName.textContent = user.displayName || user.email || '';
 
-        // Auto-redirect to inbox after a fresh login on the front page.
-        // Only redirect if user was NOT already signed in when the page loaded
-        // (returning users loading the front page should stay here).
-        if (!wasSignedInOnLoad) {
-          var inboxUrl = '{{ "docs/inbox/" | relURL }}';
-          // Prefer SPA navigation to preserve Firebase Auth state in memory.
-          // On mobile (especially iOS Safari), a full page reload can race
-          // with Firebase session persistence to IndexedDB, causing the
-          // destination page to briefly appear signed out.
-          if (window.dmNavigateTo) {
-            window.dmNavigateTo(inboxUrl, true);
-          } else {
-            window.location.href = inboxUrl;
-          }
-        }
+        // User stays on the home page after sign-in; the auth state change
+        // already updates the UI above (avatar, name, etc.).
       } else {
         gardenSignin.style.display = '';
         gardenAuthUser.style.display = 'none';
