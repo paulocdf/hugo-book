@@ -70,6 +70,10 @@
 @keyframes kanban-spin {
   to { transform: rotate(360deg); }
 }
+@keyframes kanban-card-lift {
+  0%   { transform: rotate(0deg) scale(1); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  100% { transform: rotate(2deg) scale(1.04); box-shadow: 0 12px 28px rgba(0,0,0,0.18); }
+}
 
 /* Empty */
 .kanban-empty {
@@ -102,6 +106,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .kanban-column-header {
@@ -973,11 +978,12 @@
 /* Clone that follows cursor during drag */
 .sortable-fallback.kanban-card {
   opacity: 0.92 !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-  transform: rotate(3deg) scale(1.04);
+  box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+  transform: rotate(2deg) scale(1.04);
   z-index: 9999;
   cursor: grabbing;
   border-color: var(--color-link);
+  animation: kanban-card-lift 0.2s ease-out;
 }
 
 /* Board-level drag state */
@@ -986,9 +992,18 @@
 }
 
 /* Column highlight when a card is dragged over it */
+.kanban-column--dragover {
+  border-color: var(--color-link);
+  box-shadow: 0 0 0 1px var(--color-link), 0 4px 16px rgba(0,0,0,0.08);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
 .kanban-column--dragover > .kanban-column-items {
   background: color-mix(in srgb, var(--color-link) 6%, transparent);
   border-radius: 8px;
+  transition: background 0.15s ease;
+}
+.kanban-column--dragover > .kanban-column-header {
+  background: color-mix(in srgb, var(--color-link) 8%, var(--surface-2));
   transition: background 0.15s ease;
 }
 
@@ -1044,6 +1059,10 @@
   .sortable-fallback.kanban-card {
     transition: none;
     transform: none;
+    animation: none;
+  }
+  .kanban-column {
+    transition: none;
   }
   .kanban-spinner {
     animation-duration: 0.01ms;
@@ -2091,12 +2110,13 @@
       if (!el) return;
       var sortable = Sortable.create(el, {
         group: 'kanban',
-        animation: 150,
+        animation: 200,
         ghostClass: 'kanban-card--ghost',
         chosenClass: 'kanban-card--chosen',
         dragClass: 'kanban-card--drag',
         fallbackOnBody: true,
-        swapThreshold: 0.65,
+        swapThreshold: 0.5,
+        emptyInsertThreshold: 20,
         delay: 150,
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
