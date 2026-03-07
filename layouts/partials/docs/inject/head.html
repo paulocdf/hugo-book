@@ -102,13 +102,17 @@
       if (window.dmAuth) window.dmAuth.signOut();
     };
 
-    // Fallback for browsers where GIS prompt() silently fails (e.g.
-    // Firefox with Enhanced Tracking Protection blocking the One Tap
-    // iframe).  Uses Firebase signInWithPopup which still works on
-    // Firefox (it doesn't have Chrome 145+'s storage partitioning).
+    // Firefox detection — Firefox's Enhanced Tracking Protection blocks
+    // GIS cross-origin iframes, making prompt() silently fail.  Firefox
+    // doesn't have Chrome 145+'s storage partitioning issue, so
+    // signInWithPopup works fine there.
+    var isFirefox = /Firefox\//i.test(navigator.userAgent);
+
+    // Fallback for browsers where GIS prompt() can't work.  Uses
+    // Firebase signInWithPopup which still works on Firefox.
     function fallbackPopupSignIn() {
       if (!window.dmAuth || !window.dmGoogleProvider) return;
-      console.info('[dm-auth] GIS prompt unavailable, falling back to signInWithPopup');
+      console.info('[dm-auth] Using signInWithPopup');
       window.dmAuth.signInWithPopup(window.dmGoogleProvider).then(function(result) {
         // Clear the explicit-signout flag on successful sign-in
         try { localStorage.removeItem('dm-gis-signed-out'); } catch(e) {}
@@ -124,12 +128,6 @@
     // popup-based fallback instead.
     function promptWithFallback() {
       google.accounts.id.prompt(function(notification) {
-        // isNotDisplayed() is true when the One Tap iframe was blocked
-        // (ETP, cookie settings, etc.) or the browser can't access
-        // Google session cookies due to storage partitioning.
-        // Since this function is only called from explicit user clicks
-        // (dmSignIn), always fall back — the user wants to sign in
-        // regardless of why GIS couldn't show the prompt.
         if (notification.isNotDisplayed()) {
           console.warn('[dm-auth] GIS prompt not displayed:', notification.getNotDisplayedReason());
           fallbackPopupSignIn();
@@ -144,7 +142,14 @@
       if (!window.dmAuth) return;
       // Clear the signed-out flag — user is explicitly requesting sign-in
       try { localStorage.removeItem('dm-gis-signed-out'); } catch(e) {}
-      // Re-initialize GIS now that the flag is cleared
+
+      // Firefox: skip GIS entirely, go straight to signInWithPopup
+      if (isFirefox) {
+        fallbackPopupSignIn();
+        return;
+      }
+
+      // Other browsers: try GIS prompt with fallback
       gisInitialized = false;
       if (ensureGisInit()) {
         promptWithFallback();
@@ -160,7 +165,6 @@
           } else if (attempts > 50) { // ~5 seconds
             clearInterval(retry);
             console.error('[dm-auth] GIS library failed to load');
-            // Last resort: try popup directly without GIS
             fallbackPopupSignIn();
           }
         }, 100);
