@@ -2505,7 +2505,16 @@
       }
     }
 
-    _gardenAuthUnsub = window.dmAuth.onAuthStateChanged(applyAuthState);
+    // Subscribe to auth state changes after dmAuthReady resolves to avoid
+    // overwriting the cached-user display with a premature null emission.
+    function subscribeAuth() {
+      _gardenAuthUnsub = window.dmAuth.onAuthStateChanged(applyAuthState);
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeAuth);
+    } else {
+      subscribeAuth();
+    }
 
     gardenSignin.addEventListener('click', function() {
       window.dmSignIn();
@@ -2517,12 +2526,10 @@
     });
   }
 
-  // Initial run
-  if (window.dmAuthReady) {
-    window.dmAuthReady.then(function() { initGardenHeroAuth(); });
-  } else {
-    initGardenHeroAuth();
-  }
+  // Initial run — call immediately so cached-user pre-application is
+  // synchronous (prevents sign-out flash). The onAuthStateChanged call
+  // inside will work even before dmAuthReady resolves.
+  initGardenHeroAuth();
 
   // Re-run after SPA navigation renders the home page
   window.addEventListener('dm-content-rendered', function() {
