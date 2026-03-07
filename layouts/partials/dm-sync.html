@@ -3293,6 +3293,32 @@
       if (!user) return Promise.resolve([]);
       return idbGetAll(STORE_KANBAN_COLUMNS).then(function(existing) {
         if (existing.length > 0) return existing.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+        // IndexedDB is empty — check Firestore before creating defaults
+        // (handles cookie/IDB clear where columns already exist remotely)
+        if (window.dmDb) {
+          return window.dmDb.collection('kanbanColumns')
+            .where('userId', '==', user.uid)
+            .get()
+            .then(function(snapshot) {
+              if (!snapshot.empty) {
+                var remoteCols = [];
+                snapshot.forEach(function(doc) { remoteCols.push(serializeKanbanColumn(doc)); });
+                // Hydrate IndexedDB from remote
+                return idbPutBatch(STORE_KANBAN_COLUMNS, remoteCols).then(function() {
+                  return remoteCols.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+                });
+              }
+              return createDefaultColumns();
+            })
+            .catch(function(err) {
+              console.warn('[dm-sync] Firestore check failed during seed, creating defaults locally:', err);
+              return createDefaultColumns();
+            });
+        }
+        return createDefaultColumns();
+      });
+
+      function createDefaultColumns() {
         var defaults = [
           { name: 'To Do', status: 'todo', color: '#42a5f5', order: 0, isDoneColumn: false },
           { name: 'In Progress', status: 'in_progress', color: '#ffa726', order: 1, isDoneColumn: false },
@@ -3301,7 +3327,7 @@
         return Promise.all(defaults.map(function(d) {
           return window.dmSync.createKanbanColumn(d);
         }));
-      });
+      }
     },
 
     setReminder: function(todoId, reminderAtMs) {
