@@ -80,7 +80,7 @@
       google.accounts.id.initialize({
         client_id: GIS_CLIENT_ID,
         callback: handleGisCredential,
-        auto_select: !userSignedOut,
+        auto_select: window.dmIsMobile ? !userSignedOut : false,
         cancel_on_tap_outside: true
       });
       gisInitialized = true;
@@ -127,7 +127,7 @@
       }
     };
 
-    // Eagerly initialize GIS on every page load so the callback is
+    // Eagerly initialize GIS on mobile page loads so the callback is
     // registered before GIS tries to deliver credentials.
     //
     // On mobile (iOS Safari/Chrome, which lack FedCM), prompt() triggers
@@ -138,16 +138,20 @@
     // when GIS auto-delivers the credential (via auto_select) on the
     // return page load.
     //
-    // On desktop this is harmless: GIS is initialized slightly earlier
-    // than before, but prompt() is still only called on user interaction.
-    (function autoInitGis() {
-      if (ensureGisInit()) return;
-      var attempts = 0;
-      var poll = setInterval(function() {
-        attempts++;
-        if (ensureGisInit() || attempts > 100) clearInterval(poll);
-      }, 100);
-    })();
+    // On desktop we skip this — GIS is initialized lazily on user click
+    // inside dmSignIn().  Eager init on desktop causes Firefox ETP to
+    // block GIS cross-origin requests (no user gesture) which puts GIS
+    // into a failed state and breaks subsequent sign-in attempts.
+    if (window.dmIsMobile) {
+      (function autoInitGis() {
+        if (ensureGisInit()) return;
+        var attempts = 0;
+        var poll = setInterval(function() {
+          attempts++;
+          if (ensureGisInit() || attempts > 100) clearInterval(poll);
+        }, 100);
+      })();
+    }
 
     // Register/update user profile in Firestore on sign-in (for task sharing lookups).
     // Creates a lightweight doc at users/{uid} with email, displayName, photoURL.
