@@ -3291,30 +3291,45 @@
     seedDefaultKanbanColumns: function() {
       var user = window.dmAuth && window.dmAuth.currentUser;
       if (!user) return Promise.resolve([]);
-      return idbGetAll(STORE_KANBAN_COLUMNS).then(function(existing) {
-        if (existing.length > 0) return existing.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
-        // IndexedDB is empty — check Firestore before creating defaults
-        // (handles cookie/IDB clear where columns already exist remotely)
-        if (window.dmDb) {
-          return window.dmDb.collection('kanbanColumns')
-            .where('userId', '==', user.uid)
-            .get()
-            .then(function(snapshot) {
-              if (!snapshot.empty) {
-                var remoteCols = [];
-                snapshot.forEach(function(doc) { remoteCols.push(serializeKanbanColumn(doc)); });
-                // Hydrate IndexedDB from remote
-                return idbPutBatch(STORE_KANBAN_COLUMNS, remoteCols).then(function() {
-                  return remoteCols.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
-                });
-              }
-              return createDefaultColumns();
-            })
-            .catch(function(err) {
-              console.warn('[dm-sync] Firestore check failed during seed, creating defaults locally:', err);
+
+      var sortByOrder = function(arr) {
+        return arr.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      };
+
+      // Firestore is the source of truth — always try it first
+      if (window.dmDb) {
+        return window.dmDb.collection('kanbanColumns')
+          .where('userId', '==', user.uid)
+          .get()
+          .then(function(snapshot) {
+            if (!snapshot.empty) {
+              var remoteCols = [];
+              snapshot.forEach(function(doc) { remoteCols.push(serializeKanbanColumn(doc)); });
+              // Replace IndexedDB with Firestore data
+              return idbClear(STORE_KANBAN_COLUMNS).then(function() {
+                return idbPutBatch(STORE_KANBAN_COLUMNS, remoteCols);
+              }).then(function() {
+                return sortByOrder(remoteCols);
+              });
+            }
+            // Firestore has no columns — check IDB (e.g. columns created offline)
+            return idbGetAll(STORE_KANBAN_COLUMNS).then(function(local) {
+              if (local.length > 0) return sortByOrder(local);
               return createDefaultColumns();
             });
-        }
+          })
+          .catch(function(err) {
+            console.warn('[dm-sync] Firestore check failed during seed, falling back to IDB:', err);
+            return idbGetAll(STORE_KANBAN_COLUMNS).then(function(local) {
+              if (local.length > 0) return sortByOrder(local);
+              return createDefaultColumns();
+            });
+          });
+      }
+
+      // Offline / no Firestore — use IDB or create defaults
+      return idbGetAll(STORE_KANBAN_COLUMNS).then(function(local) {
+        if (local.length > 0) return sortByOrder(local);
         return createDefaultColumns();
       });
 
