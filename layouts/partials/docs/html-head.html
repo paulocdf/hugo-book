@@ -40,11 +40,6 @@
   <script defer src="{{ $swJS.RelPermalink }}" {{ template "integrity" $swJS }}></script>
 {{ end -}}
 
-{{- if in .RawContent "{{< graph >}}" -}}
-  {{- $graphJS := resources.Get "js/graph.js" | resources.ExecuteAsTemplate "js/graph.js" . | resources.Minify | resources.Fingerprint }}
-  <script defer src="{{ "js/vendor/d3.min.js" | relURL }}"></script>
-  <script defer src="{{ $graphJS.RelPermalink }}" {{ template "integrity" $graphJS }}></script>
-{{ end -}}
 
 {{- template "_internal/google_analytics.html" . -}}
 
