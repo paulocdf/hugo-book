@@ -71,8 +71,8 @@
   to { transform: rotate(360deg); }
 }
 @keyframes kanban-card-lift {
-  0%   { box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-  100% { box-shadow: 0 12px 28px rgba(0,0,0,0.18); }
+  0%   { transform: scale(1); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  100% { transform: scale(1.02); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
 }
 
 /* Empty */
@@ -971,25 +971,20 @@
 }
 
 .kanban-card--chosen {
-  box-shadow: 0 4px 16px var(--shadow-color);
-  transform: rotate(2deg) scale(1.02);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+  border-color: var(--color-link);
   z-index: 10;
+  animation: kanban-card-lift 0.15s ease-out forwards;
+}
+
+.kanban-card--ghost {
+  opacity: 0.35;
+  background: var(--surface-3);
+  border-style: dashed;
 }
 
 .kanban-card--drag {
   opacity: 0;
-}
-
-/* Clone that follows cursor during drag — 
-   IMPORTANT: do NOT set transform here; SortableJS positions the fallback
-   clone via inline transform: translate3d(). Any CSS transform would conflict. */
-.sortable-fallback.kanban-card {
-  opacity: 0.92 !important;
-  box-shadow: 0 12px 28px rgba(0,0,0,0.18);
-  z-index: 9999;
-  cursor: grabbing;
-  border-color: var(--color-link);
-  animation: kanban-card-lift 0.2s ease-out;
 }
 
 /* Board-level drag state */
@@ -1069,14 +1064,10 @@
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .kanban-card,
-  .kanban-card--chosen {
+  .kanban-card--chosen,
+  .kanban-card--ghost {
     transition: none;
     transform: none;
-    animation: none;
-  }
-  .sortable-fallback.kanban-card {
-    /* Do NOT set transform: none — SortableJS uses inline transform to position the clone */
-    transition: none;
     animation: none;
   }
   .kanban-column {
@@ -1157,7 +1148,6 @@
 
   var allTodos = [];
   var _sortableInstances = [];
-  var _dragMoveHandler = null;
   var _doneFilter = 'today'; // 'today' | '7days' | 'all'
   var _kanbanProjectMap = {}; // { projectId: { name, color } }
   var _kanbanFilterProjectIds = new Set(['__none__']); // Active project filters — default to "No project"
@@ -2129,55 +2119,27 @@
       if (!el) return;
       var sortable = Sortable.create(el, {
         group: 'kanban',
-        animation: 200,
+        animation: 150,
         ghostClass: 'kanban-card--ghost',
         chosenClass: 'kanban-card--chosen',
         dragClass: 'kanban-card--drag',
-        forceFallback: true,
-        fallbackClass: 'sortable-fallback',
         fallbackOnBody: true,
-        fallbackTolerance: 3,
-        swapThreshold: 0.35,
-        emptyInsertThreshold: 100,
+        swapThreshold: 0.65,
+        emptyInsertThreshold: 80,
         delay: 150,
         delayOnTouchOnly: true,
         touchStartThreshold: 5,
         onStart: function() {
           if (boardEl) boardEl.classList.add('kanban-board--dragging');
-          // Track pointer to highlight columns even when hovering over header/button areas
-          _dragMoveHandler = function(e) {
-            var px = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-            var py = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
-            var allCols = container.querySelectorAll('.kanban-column');
-            allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
-            // Find which column the pointer is over
-            var found = null;
-            allCols.forEach(function(c) {
-              var r = c.getBoundingClientRect();
-              if (px >= r.left && px <= r.right && py >= r.top && py <= r.bottom) {
-                found = c;
-              }
-            });
-            if (found) found.classList.add('kanban-column--dragover');
-          };
-          document.addEventListener('mousemove', _dragMoveHandler, { passive: true });
-          document.addEventListener('touchmove', _dragMoveHandler, { passive: true });
         },
         onMove: function(moveEvt) {
-          // Also highlight via SortableJS target detection (complements pointer tracking)
           var allCols = container.querySelectorAll('.kanban-column');
           allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
           var targetCol = moveEvt.to.closest('.kanban-column');
           if (targetCol) targetCol.classList.add('kanban-column--dragover');
         },
         onEnd: function(evt) {
-          // Clean up drag state classes and pointer tracker
           if (boardEl) boardEl.classList.remove('kanban-board--dragging');
-          if (_dragMoveHandler) {
-            document.removeEventListener('mousemove', _dragMoveHandler);
-            document.removeEventListener('touchmove', _dragMoveHandler);
-            _dragMoveHandler = null;
-          }
           var allCols = container.querySelectorAll('.kanban-column');
           allCols.forEach(function(c) { c.classList.remove('kanban-column--dragover'); });
 
