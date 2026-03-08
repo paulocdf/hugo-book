@@ -267,7 +267,7 @@
 /* ─── Week view — Google Calendar style day columns ─── */
 .cal-grid--week {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0 1px;
   background: var(--gray-200);
   border: 1px solid var(--gray-200);
@@ -279,6 +279,7 @@
   display: flex;
   flex-direction: column;
   background: var(--body-background);
+  min-width: 0;
   min-height: 0;
 }
 .cal-grid--week .cal-col-header {
@@ -319,21 +320,26 @@
 .cal-grid--week .cal-col-body {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 4px;
   cursor: pointer;
+  min-width: 0;
 }
 .cal-grid--week .cal-col-tasks {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 .cal-grid--week .cal-task {
   font-size: 0.8rem;
   padding: 4px 6px;
   border-radius: 4px;
-  white-space: normal;
-  word-break: break-word;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   transition: background 0.1s;
+  min-width: 0;
 }
 .cal-grid--week .cal-task:hover {
   opacity: 1;
