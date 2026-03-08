@@ -5254,10 +5254,10 @@
       });
     });
 
-    // Double-click on task item to edit
+    // Click on task item to expand/edit (single click, like project-list)
     itemsEl.querySelectorAll('.todo-item[data-todo-id]').forEach(function(item) {
-      item.addEventListener('dblclick', function(e) {
-        // Don't trigger if double-clicking on checkbox, buttons, or links
+      item.addEventListener('click', function(e) {
+        // Don't trigger if clicking on checkbox, buttons, links, or drag handle
         if (e.target.closest('input, button, a, .todo-drag-handle')) return;
         e.preventDefault();
         openEditForTodo(item.getAttribute('data-todo-id'), item);
