@@ -3764,7 +3764,13 @@
         }
       }
     }
-    var html = '<div class="todo-item' + doneClass + justCompletedClass + justAddedClass + stateClass + priorityClass + '" data-todo-id="' + todo.id + '">';
+    var html = '<div class="todo-item' + doneClass + justCompletedClass + justAddedClass + stateClass + priorityClass + '" data-todo-id="' + todo.id + '"';
+    // Task color background tint
+    if (todo.color && window.dmTaskColors) {
+      var tint = window.dmTaskColors.tint(todo.color, todo.done);
+      if (tint) html += ' style="background:' + tint + '"';
+    }
+    html += '>';
 
     // Drag handle (all tasks are draggable)
     html += '<span class="todo-drag-handle" title="Drag to reorder"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/></svg></span>';
@@ -5219,6 +5225,11 @@
             localUpdates.bujoState = 'open';
             localUpdates.completedAt = null;
           }
+        }
+        // Color
+        if (result.color !== (todo.color || null)) {
+          firestoreUpdates.color = result.color || null;
+          localUpdates.color = result.color || null;
         }
         if (Object.keys(firestoreUpdates).length > 0) {
           firestoreUpdates.updatedAt = firebase.firestore.FieldValue.serverTimestamp();

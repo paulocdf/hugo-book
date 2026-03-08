@@ -1851,7 +1851,13 @@
       }
     }
 
-    var html = '<div class="kanban-card' + (isDone ? ' kanban-card--done' : '') + '" data-todo-id="' + todo.id + '">';
+    var html = '<div class="kanban-card' + (isDone ? ' kanban-card--done' : '') + '" data-todo-id="' + todo.id + '"';
+    // Task color background tint
+    if (todo.color && window.dmTaskColors) {
+      var tint = window.dmTaskColors.tint(todo.color, isDone);
+      if (tint) html += ' style="background:' + tint + '"';
+    }
+    html += '>';
     html += '<div class="kanban-card-header">';
     html += bujoIcon;
     html += '<span class="kanban-card-title">' + title + '</span>';
@@ -2045,6 +2051,10 @@
     if (result.notes !== (todo.notes || '')) {
       firestoreUpdates.notes = result.notes || '';
       localUpdates.notes = result.notes || '';
+    }
+    if (result.color !== (todo.color || null)) {
+      firestoreUpdates.color = result.color || null;
+      localUpdates.color = result.color || null;
     }
     // BuJo state — sync with done/status/kanbanStatus
     if (result.bujoState && result.bujoState !== (todo.bujoState || 'open')) {
