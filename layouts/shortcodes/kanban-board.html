@@ -1854,7 +1854,7 @@
     var html = '<div class="kanban-card' + (isDone ? ' kanban-card--done' : '') + '" data-todo-id="' + todo.id + '"';
     // Task color background tint
     if (todo.color && window.dmTaskColors) {
-      var tint = window.dmTaskColors.tint(todo.color, isDone);
+      var tint = window.dmTaskColors.tint(todo.color, isDone, todo.color2);
       if (tint) html += ' style="background:' + tint + '"';
     }
     html += '>';
@@ -2055,6 +2055,10 @@
     if (result.color !== (todo.color || null)) {
       firestoreUpdates.color = result.color || null;
       localUpdates.color = result.color || null;
+    }
+    if (result.color2 !== (todo.color2 || null)) {
+      firestoreUpdates.color2 = result.color2 || null;
+      localUpdates.color2 = result.color2 || null;
     }
     // BuJo state — sync with done/status/kanbanStatus
     if (result.bujoState && result.bujoState !== (todo.bujoState || 'open')) {

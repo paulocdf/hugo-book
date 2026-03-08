@@ -3767,7 +3767,7 @@
     var html = '<div class="todo-item' + doneClass + justCompletedClass + justAddedClass + stateClass + priorityClass + '" data-todo-id="' + todo.id + '"';
     // Task color background tint
     if (todo.color && window.dmTaskColors) {
-      var tint = window.dmTaskColors.tint(todo.color, todo.done);
+      var tint = window.dmTaskColors.tint(todo.color, todo.done, todo.color2);
       if (tint) html += ' style="background:' + tint + '"';
     }
     html += '>';
@@ -5230,6 +5230,10 @@
         if (result.color !== (todo.color || null)) {
           firestoreUpdates.color = result.color || null;
           localUpdates.color = result.color || null;
+        }
+        if (result.color2 !== (todo.color2 || null)) {
+          firestoreUpdates.color2 = result.color2 || null;
+          localUpdates.color2 = result.color2 || null;
         }
         if (Object.keys(firestoreUpdates).length > 0) {
           firestoreUpdates.updatedAt = firebase.firestore.FieldValue.serverTimestamp();

@@ -1854,7 +1854,7 @@
         var bujoType = (t.bujoType || 'task');
         var taskBgStyle = '';
         if (t.color && window.dmTaskColors) {
-          taskBgStyle = ' style="background:' + window.dmTaskColors.tint(t.color, !!t.done) + '"';
+          taskBgStyle = ' style="background:' + window.dmTaskColors.tint(t.color, !!t.done, t.color2) + '"';
         }
         html += '<div class="project-task-item"' + taskBgStyle + ' data-todo-id="' + t.id + '">' +
           '<span class="project-task-drag-handle" title="Drag to reorder"><svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor"><circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/><circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/><circle cx="3" cy="12" r="1.2"/><circle cx="7" cy="12" r="1.2"/></svg></span>' +
@@ -2070,7 +2070,7 @@
         var fsData = {};
         var origBujoState = todo.bujoState || 'open';
         var fields = ['title', 'scheduledDate', 'estimatedMin', 'pomodoroCount',
-          'pomodoroLength', 'breakLength', 'category', 'projectId', 'bujoType', 'notes', 'color'];
+          'pomodoroLength', 'breakLength', 'category', 'projectId', 'bujoType', 'notes', 'color', 'color2'];
         fields.forEach(function(f) {
           var newVal = result[f] !== undefined ? (result[f] || null) : undefined;
           if (newVal === undefined) return;
