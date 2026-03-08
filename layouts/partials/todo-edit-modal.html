@@ -95,6 +95,11 @@
     <div class="todo-edit-field">
       <label>Color</label>
       <div class="todo-edit-color-row" data-ref="color-row"></div>
+      <div class="todo-edit-gradient-preview" data-ref="gradient-preview">
+        <div class="todo-edit-gradient-preview-swatch"></div>
+        <span class="todo-edit-gradient-preview-label">Gradient preview</span>
+      </div>
+      <div class="todo-edit-recent-row" data-ref="recent-row"></div>
     </div>
 
     <!-- Sharing / Collaborators section (visible for top-level tasks only) -->
@@ -926,6 +931,7 @@
   cursor: pointer;
   transition: transform 0.12s, border-color 0.12s;
   flex-shrink: 0;
+  position: relative;
 }
 .todo-edit-color-swatch:hover {
   transform: scale(1.15);
@@ -934,10 +940,20 @@
   border-color: var(--body-font-color);
   transform: scale(1.15);
 }
-.todo-edit-color-swatch.selected2 {
-  border-color: var(--body-font-color);
-  border-style: dashed;
-  transform: scale(1.15);
+.todo-edit-color-swatch .color-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--body-font-color);
+  color: var(--body-background);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
 }
 .todo-edit-color-none {
   width: 22px;
@@ -967,6 +983,69 @@
   background: var(--gray-400);
   transform: rotate(-45deg);
   transform-origin: center;
+}
+/* Custom color picker trigger */
+.todo-edit-color-custom {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--gray-300);
+  cursor: pointer;
+  transition: transform 0.12s, border-color 0.12s;
+  flex-shrink: 0;
+  position: relative;
+  background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red);
+  overflow: hidden;
+}
+.todo-edit-color-custom:hover {
+  transform: scale(1.15);
+}
+.todo-edit-color-custom input[type="color"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  border: none;
+  padding: 0;
+}
+/* Gradient preview */
+.todo-edit-gradient-preview {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.todo-edit-gradient-preview.visible {
+  display: flex;
+}
+.todo-edit-gradient-preview-swatch {
+  width: 60px;
+  height: 20px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-300);
+  flex-shrink: 0;
+}
+.todo-edit-gradient-preview-label {
+  font-size: 11px;
+  color: var(--gray-500);
+}
+/* Recent custom colors row */
+.todo-edit-recent-row {
+  display: none;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin-top: 4px;
+}
+.todo-edit-recent-row.visible {
+  display: flex;
+}
+.todo-edit-recent-label {
+  font-size: 11px;
+  color: var(--gray-500);
+  margin-right: 2px;
 }
 </style>
 
@@ -1856,25 +1935,105 @@
 
     // Color picker (sequential taps: 1st = solid, 2nd = gradient)
     var colorRow = ref('color-row');
+    var gradientPreview = ref('gradient-preview');
+    var recentRow = ref('recent-row');
     if (colorRow) {
       var dark = _isDarkMode();
+
+      function _isCustomColor(hex) {
+        if (!hex) return false;
+        return !TASK_COLORS.some(function(c) { return c.light === hex || c.dark === hex; });
+      }
+
+      function _getRecentCustomColors() {
+        try {
+          var raw = localStorage.getItem('dm-task-custom-colors');
+          if (!raw) return [];
+          var arr = JSON.parse(raw);
+          return Array.isArray(arr) ? arr.slice(0, 5) : [];
+        } catch(e) { return []; }
+      }
+
+      function _badgeHtml(num) {
+        return '<span class="color-badge">' + num + '</span>';
+      }
+
+      function _swatchHtml(hex, display, title, isColor1, isColor2) {
+        var cls = '';
+        var badge = '';
+        if (isColor1) { cls = ' selected'; badge = _badgeHtml('1'); }
+        else if (isColor2) { cls = ' selected'; badge = _badgeHtml('2'); }
+        return '<div class="todo-edit-color-swatch' + cls + '" data-color="' + hex + '" style="background:' + display + '" title="' + title + '">' + badge + '</div>';
+      }
+
       function renderColorSwatches() {
+        // None swatch
         var html = '<div class="todo-edit-color-none' + (!_editColor && !_editColor2 ? ' selected' : '') + '" data-color="" title="None"></div>';
+
+        // Palette swatches with numbered badges
         TASK_COLORS.forEach(function(c) {
           var display = dark ? c.dark : c.light;
-          var cls = '';
-          if (_editColor === c.light) cls = ' selected';
-          else if (_editColor2 === c.light) cls = ' selected2';
-          html += '<div class="todo-edit-color-swatch' + cls + '" data-color="' + c.light + '" style="background:' + display + '" title="' + c.name + '"></div>';
+          html += _swatchHtml(c.light, display, c.name, _editColor === c.light, _editColor2 === c.light);
         });
+
+        // Native color picker swatch (rainbow circle)
+        html += '<div class="todo-edit-color-custom" title="Custom color"><input type="color" value="#888888"></div>';
+
         colorRow.innerHTML = html;
+
+        // Wire native color picker input event
+        var customInput = colorRow.querySelector('.todo-edit-color-custom input[type="color"]');
+        if (customInput) {
+          customInput.addEventListener('input', function(e) {
+            var hex = e.target.value;
+            if (!hex) return;
+            // Normalize to lowercase
+            hex = hex.toLowerCase();
+            // Follow same sequential logic
+            if (!_editColor) {
+              _editColor = hex;
+            } else {
+              _editColor2 = hex;
+            }
+            renderColorSwatches();
+          });
+        }
+
+        // Gradient preview
+        if (gradientPreview) {
+          if (_editColor && _editColor2) {
+            var c1Display = getTaskColor(_editColor);
+            var c2Display = getTaskColor(_editColor2);
+            gradientPreview.classList.add('visible');
+            var swatch = gradientPreview.querySelector('.todo-edit-gradient-preview-swatch');
+            if (swatch) {
+              swatch.style.background = 'linear-gradient(to right, ' + c1Display + ', ' + c2Display + ')';
+            }
+          } else {
+            gradientPreview.classList.remove('visible');
+          }
+        }
+
+        // Recent custom colors row
+        if (recentRow) {
+          var recents = _getRecentCustomColors();
+          if (recents.length > 0) {
+            recentRow.classList.add('visible');
+            var rHtml = '<span class="todo-edit-recent-label">Recent</span>';
+            recents.forEach(function(hex) {
+              var display = getTaskColor(hex);
+              rHtml += _swatchHtml(hex, display, hex, _editColor === hex, _editColor2 === hex);
+            });
+            recentRow.innerHTML = rHtml;
+          } else {
+            recentRow.classList.remove('visible');
+            recentRow.innerHTML = '';
+          }
+        }
       }
       renderColorSwatches();
-      colorRow.addEventListener('click', function(e) {
-        var swatch = e.target.closest('[data-color]');
-        if (!swatch) return;
-        e.stopPropagation();
-        var val = swatch.getAttribute('data-color') || null;
+
+      function _handleSwatchClick(val) {
         if (!val) {
           // "None" — clear both
           _editColor = null;
@@ -1894,7 +2053,24 @@
           _editColor2 = val;
         }
         renderColorSwatches();
+      }
+
+      colorRow.addEventListener('click', function(e) {
+        if (e.target.closest('.todo-edit-color-custom')) return; // handled by input event
+        var swatch = e.target.closest('[data-color]');
+        if (!swatch) return;
+        e.stopPropagation();
+        _handleSwatchClick(swatch.getAttribute('data-color') || null);
       });
+
+      if (recentRow) {
+        recentRow.addEventListener('click', function(e) {
+          var swatch = e.target.closest('[data-color]');
+          if (!swatch) return;
+          e.stopPropagation();
+          _handleSwatchClick(swatch.getAttribute('data-color') || null);
+        });
+      }
     }
 
     // Cancel button
@@ -2047,6 +2223,27 @@
       color: _editColor || null,
       color2: _editColor2 || null
     };
+
+    // Persist custom (non-palette) colors to localStorage
+    try {
+      var customs = [];
+      [_editColor, _editColor2].forEach(function(hex) {
+        if (!hex) return;
+        var inPalette = TASK_COLORS.some(function(c) { return c.light === hex || c.dark === hex; });
+        if (!inPalette) customs.push(hex);
+      });
+      if (customs.length > 0) {
+        var stored = [];
+        try { var raw = localStorage.getItem('dm-task-custom-colors'); if (raw) stored = JSON.parse(raw); } catch(e) {}
+        if (!Array.isArray(stored)) stored = [];
+        customs.forEach(function(hex) {
+          stored = stored.filter(function(h) { return h !== hex; });
+          stored.unshift(hex);
+        });
+        stored = stored.slice(0, 5);
+        localStorage.setItem('dm-task-custom-colors', JSON.stringify(stored));
+      }
+    } catch(e) {}
 
     if (_onSaveCallback) {
       _onSaveCallback(result);
