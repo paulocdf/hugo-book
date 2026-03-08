@@ -2822,14 +2822,71 @@
     if (!window.dmDb) return Promise.resolve([]);
     return window.dmDb.collection('userSettings').doc(userId).get().then(function(doc) {
       var remoteDays = (doc.exists && doc.data().closedDays) ? doc.data().closedDays : [];
-      // Firestore is authoritative — overwrite local cache
-      return idbPut(STORE_META, { key: 'closedDays', value: remoteDays }).then(function() {
-        return remoteDays;
+
+      // Merge with localStorage backup (covers in-flight writes lost during sign-out)
+      var backupDays = [];
+      try {
+        var raw = localStorage.getItem('dm-closedDays-backup');
+        if (raw) backupDays = JSON.parse(raw);
+      } catch(e) {}
+
+      // Union: combine remote + backup, deduplicate
+      var merged = remoteDays.slice();
+      if (backupDays.length > 0) {
+        var set = {};
+        merged.forEach(function(d) { set[d] = true; });
+        backupDays.forEach(function(d) {
+          if (!set[d]) { merged.push(d); set[d] = true; }
+        });
+        merged.sort();
+      }
+
+      // If backup added new days, push merged set back to Firestore
+      var needsWrite = merged.length > remoteDays.length;
+
+      // Clear backup now that we've consumed it
+      try { localStorage.removeItem('dm-closedDays-backup'); } catch(e) {}
+
+      // Overwrite local cache with merged result
+      return idbPut(STORE_META, { key: 'closedDays', value: merged }).then(function() {
+        // Write merged set back to Firestore if backup had extra days
+        if (needsWrite && window.dmAuth && window.dmAuth.currentUser) {
+          return firestoreWrite({
+            collection: 'userSettings',
+            docId: userId,
+            op: 'set',
+            data: { closedDays: merged, updatedAt: firebase.firestore.FieldValue.serverTimestamp() },
+            merge: true,
+            localOp: function() { return Promise.resolve(); }
+          }).then(function() {
+            return merged;
+          });
+        }
+        return merged;
       });
     }).catch(function(err) {
       console.warn('[dm-sync] Failed to sync closed days:', err);
+      // Even on failure, try to restore from localStorage backup
+      var backupDays = [];
+      try {
+        var raw = localStorage.getItem('dm-closedDays-backup');
+        if (raw) backupDays = JSON.parse(raw);
+        localStorage.removeItem('dm-closedDays-backup');
+      } catch(e) {}
       return idbGet(STORE_META, 'closedDays').then(function(meta) {
-        return (meta && meta.value) ? meta.value : [];
+        var local = (meta && meta.value) ? meta.value : [];
+        if (backupDays.length > 0) {
+          var set = {};
+          local.forEach(function(d) { set[d] = true; });
+          backupDays.forEach(function(d) {
+            if (!set[d]) { local.push(d); set[d] = true; }
+          });
+          local.sort();
+          return idbPut(STORE_META, { key: 'closedDays', value: local }).then(function() {
+            return local;
+          });
+        }
+        return local;
       });
     });
   }
@@ -3705,7 +3762,11 @@
           var cachedUserId = meta ? meta.value : null;
           var proceed = cachedUserId === user.uid
             ? Promise.resolve()
-            : Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
+            : (function() {
+                // Different user — clear backup to prevent data leak
+                try { localStorage.removeItem('dm-closedDays-backup'); } catch(e) {}
+                return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
+              })();
 
           return proceed.then(function() {
             return idbPut(STORE_META, { key: 'currentUserId', value: user.uid });
@@ -3747,9 +3808,18 @@
         stopBackgroundSync();
         stopSharedTaskListeners();
         clearAllReminderTimers();
-        // Clear cache on sign-out so no data leaks to another user
-        Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()])
-          .then(function() {
+        // Backup closedDays to localStorage before clearing IDB.
+        // If the Firestore write from setClosedDays was still in-flight,
+        // this ensures we don't lose the user's closed days on re-login.
+        idbGet(STORE_META, 'closedDays').then(function(meta) {
+          var days = (meta && meta.value) ? meta.value : [];
+          if (days.length > 0) {
+            try { localStorage.setItem('dm-closedDays-backup', JSON.stringify(days)); } catch(e) {}
+          }
+        }).catch(function() {}).then(function() {
+          // Clear cache on sign-out so no data leaks to another user
+          return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
+        }).then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));
           })
