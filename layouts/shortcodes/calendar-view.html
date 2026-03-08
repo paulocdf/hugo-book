@@ -1,0 +1,925 @@
+<!-- Calendar View: monthly/weekly calendar showing tasks by scheduledDate -->
+<!-- Reads from IndexedDB todos store via window.dmSync -->
+<!-- Exposes: inline edit panel via window.dmTodoEdit -->
+
+<style>
+/* ─── Calendar View ─── */
+.cal {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Full-width layout for calendar page */
+.book-page:has(.cal) .markdown {
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Auth */
+.cal-auth {
+  display: flex;
+  justify-content: center;
+  padding: 2rem 0;
+}
+.cal-auth-card {
+  text-align: center;
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--gray-200);
+  max-width: 380px;
+}
+.cal-auth-card h3 { margin: 1rem 0 0.5rem; }
+.cal-auth-card p { color: var(--gray-500); margin-bottom: 1.5rem; font-size: 0.9rem; }
+.cal-signin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--body-font-color);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: box-shadow 0.15s, background 0.15s;
+}
+.cal-signin-btn:hover {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  background: var(--gray-100);
+}
+
+/* Loading */
+.cal-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2rem;
+  justify-content: center;
+  color: var(--gray-500);
+  font-size: 0.9rem;
+}
+.cal-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--color-link);
+  border-radius: 50%;
+  animation: cal-spin 0.8s linear infinite;
+}
+@keyframes cal-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Empty */
+.cal-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--gray-500);
+}
+.cal-empty svg { margin-bottom: 1rem; }
+.cal-empty p { margin: 0.25rem 0; }
+.cal-empty-hint { font-size: 0.85rem; }
+.cal-empty-hint a { color: var(--color-link); text-decoration: none; }
+.cal-empty-hint a:hover { text-decoration: underline; }
+
+/* ─── Header ─── */
+.cal-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.cal-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  color: var(--body-font-color);
+  transition: background 0.15s;
+}
+.cal-nav-btn:hover {
+  background: var(--gray-100);
+}
+.cal-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  min-width: 160px;
+  text-align: center;
+}
+.cal-today-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--body-font-color);
+  transition: background 0.15s;
+}
+.cal-today-btn:hover {
+  background: var(--gray-100);
+}
+.cal-header-spacer {
+  flex: 1;
+}
+.cal-view-toggle {
+  display: inline-flex;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.cal-view-btn {
+  padding: 4px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--body-font-color);
+  transition: background 0.15s;
+}
+.cal-view-btn:hover {
+  background: var(--gray-100);
+}
+.cal-view-btn--active {
+  background: var(--color-link);
+  color: #fff;
+}
+.cal-view-btn--active:hover {
+  background: var(--color-link);
+}
+
+/* ─── Grid ─── */
+.cal-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0;
+  margin-bottom: 2px;
+}
+.cal-weekday {
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  padding: 4px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--gray-200);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.cal-cell {
+  background: var(--body-background);
+  min-height: 90px;
+  padding: 4px;
+  cursor: pointer;
+  transition: background 0.1s;
+  position: relative;
+}
+.cal-cell:hover {
+  background: var(--gray-100);
+}
+.cal-cell--outside {
+  opacity: 0.4;
+}
+.cal-cell--today {
+  background: color-mix(in srgb, var(--color-link) 8%, var(--body-background));
+}
+.cal-cell--today:hover {
+  background: color-mix(in srgb, var(--color-link) 14%, var(--body-background));
+}
+.cal-date {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gray-500);
+  margin-bottom: 2px;
+  padding: 1px 4px;
+  display: inline-block;
+}
+.cal-cell--today .cal-date {
+  background: var(--color-link);
+  color: #fff;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.cal-cell--outside .cal-date {
+  color: var(--gray-400);
+}
+
+/* ─── Task pills ─── */
+.cal-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.cal-task {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.15s;
+  color: var(--body-font-color);
+}
+.cal-task:hover {
+  opacity: 0.8;
+}
+.cal-task--done {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+.cal-task-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cal-task-bujo {
+  flex-shrink: 0;
+}
+.cal-more-tasks {
+  font-size: 0.65rem;
+  color: var(--gray-500);
+  padding: 0 4px;
+  cursor: pointer;
+}
+.cal-more-tasks:hover {
+  color: var(--color-link);
+}
+
+/* Week view — taller cells */
+.cal-grid--week .cal-cell {
+  min-height: 200px;
+}
+.cal-grid--week .cal-task {
+  font-size: 0.8rem;
+  padding: 2px 6px;
+}
+
+/* ─── Responsive ─── */
+@media (max-width: 600px) {
+  .cal-header {
+    gap: 4px;
+  }
+  .cal-title {
+    font-size: 0.95rem;
+    min-width: 120px;
+  }
+  .cal-cell {
+    min-height: 60px;
+    padding: 2px;
+  }
+  .cal-date {
+    font-size: 0.65rem;
+  }
+  .cal-task {
+    font-size: 0.6rem;
+    padding: 1px 2px;
+  }
+  .cal-task-title {
+    max-width: 60px;
+  }
+  .cal-grid--week .cal-cell {
+    min-height: 120px;
+  }
+}
+</style>
+
+<div class="cal" id="cal">
+  <div class="cal-auth" id="cal-auth" style="display: none;">
+    <div class="cal-auth-card">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+      <h3>Sign in to view your calendar</h3>
+      <p>Your task calendar requires authentication.</p>
+      <button type="button" class="cal-signin-btn" id="cal-signin-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Sign in with Google
+      </button>
+    </div>
+  </div>
+
+  <div class="cal-loading" id="cal-loading" style="display: none;">
+    <div class="cal-spinner"></div>
+    <span>Loading calendar...</span>
+  </div>
+
+  <div class="cal-empty" id="cal-empty" style="display: none;">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+      <line x1="16" y1="2" x2="16" y2="6"></line>
+      <line x1="8" y1="2" x2="8" y2="6"></line>
+      <line x1="3" y1="10" x2="21" y2="10"></line>
+    </svg>
+    <p>No scheduled tasks.</p>
+    <p class="cal-empty-hint">Add a date to your tasks in the <a href="{{ "docs/inbox/" | relURL }}">Inbox</a> to see them here.</p>
+  </div>
+
+  <div class="cal-content" id="cal-content" style="display: none;">
+    <div class="cal-header" id="cal-header">
+      <button type="button" class="cal-nav-btn" id="cal-prev" title="Previous">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </button>
+      <span class="cal-title" id="cal-title"></span>
+      <button type="button" class="cal-nav-btn" id="cal-next" title="Next">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+      </button>
+      <button type="button" class="cal-today-btn" id="cal-today">Today</button>
+      <div class="cal-header-spacer"></div>
+      <div class="cal-view-toggle" id="cal-view-toggle">
+        <button type="button" class="cal-view-btn cal-view-btn--active" data-view="month">Month</button>
+        <button type="button" class="cal-view-btn" data-view="week">Week</button>
+      </div>
+    </div>
+    <div class="cal-weekdays" id="cal-weekdays"></div>
+    <div class="cal-grid" id="cal-grid"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var container = document.getElementById('cal');
+  if (!container) return;
+
+  var authEl = document.getElementById('cal-auth');
+  var loadingEl = document.getElementById('cal-loading');
+  var emptyEl = document.getElementById('cal-empty');
+  var contentEl = document.getElementById('cal-content');
+  var signinBtn = document.getElementById('cal-signin-btn');
+
+  var titleEl = document.getElementById('cal-title');
+  var gridEl = document.getElementById('cal-grid');
+  var weekdaysEl = document.getElementById('cal-weekdays');
+  var prevBtn = document.getElementById('cal-prev');
+  var nextBtn = document.getElementById('cal-next');
+  var todayBtn = document.getElementById('cal-today');
+  var viewToggle = document.getElementById('cal-view-toggle');
+
+  var allTodos = [];
+  var _viewMode = 'month'; // 'month' | 'week'
+  var _currentDate = new Date(); // Reference date for navigation
+  var _renderPending = false;
+
+  var MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'];
+  var SHORT_MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+  var BUJO_ICONS = {
+    task: '<svg class="cal-task-bujo" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="none"><circle cx="12" cy="12" r="4"/></svg>',
+    event: '<svg class="cal-task-bujo" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="6"/></svg>',
+    note: '<svg class="cal-task-bujo" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>'
+  };
+
+  var MAX_TASKS_MONTH = 4; // Max tasks shown per cell in month view before "+N more"
+  var MAX_TASKS_WEEK = 12;
+
+  // ─── UI state management ───
+  function showState(state) {
+    authEl.style.display = state === 'auth' ? '' : 'none';
+    loadingEl.style.display = state === 'loading' ? '' : 'none';
+    emptyEl.style.display = state === 'empty' ? '' : 'none';
+    contentEl.style.display = state === 'content' ? '' : 'none';
+  }
+
+  // ─── Helpers ───
+  function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+  }
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function dateKey(year, month, day) {
+    return year + '-' + pad(month + 1) + '-' + pad(day);
+  }
+
+  function dateKeyFromDate(d) {
+    return dateKey(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
+  function isToday(y, m, d) {
+    var now = new Date();
+    return now.getFullYear() === y && now.getMonth() === m && now.getDate() === d;
+  }
+
+  // Monday = 0, Tuesday = 1, ..., Sunday = 6
+  function mondayBasedDay(d) {
+    var day = d.getDay(); // 0=Sun, 1=Mon, ...
+    return day === 0 ? 6 : day - 1;
+  }
+
+  function getMonday(d) {
+    var dt = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    var day = dt.getDay();
+    var diff = day === 0 ? -6 : 1 - day;
+    dt.setDate(dt.getDate() + diff);
+    return dt;
+  }
+
+  // ─── Task color tints (reuse from dmTaskColors) ───
+  function getTaskTint(todo) {
+    if (!todo.color) return '';
+    if (window.dmTaskColors && window.dmTaskColors.tint) {
+      return window.dmTaskColors.tint(todo.color, todo.done || todo.status === 'done', todo.color2);
+    }
+    return '';
+  }
+
+  // ─── Group tasks by scheduledDate ───
+  function groupByDate(todos) {
+    var map = {};
+    todos.forEach(function(t) {
+      if (!t.scheduledDate) return;
+      if (!map[t.scheduledDate]) map[t.scheduledDate] = [];
+      map[t.scheduledDate].push(t);
+    });
+    // Sort tasks within each day: undone first, then by order
+    Object.keys(map).forEach(function(key) {
+      map[key].sort(function(a, b) {
+        var aDone = a.done || a.status === 'done' ? 1 : 0;
+        var bDone = b.done || b.status === 'done' ? 1 : 0;
+        if (aDone !== bDone) return aDone - bDone;
+        return (a.order || 0) - (b.order || 0);
+      });
+    });
+    return map;
+  }
+
+  // ─── Render weekday headers ───
+  function renderWeekdays() {
+    weekdaysEl.innerHTML = '';
+    WEEKDAY_LABELS.forEach(function(label) {
+      var el = document.createElement('div');
+      el.className = 'cal-weekday';
+      el.textContent = label;
+      weekdaysEl.appendChild(el);
+    });
+  }
+
+  // ─── Render a single task pill ───
+  function renderTaskPill(todo) {
+    var pill = document.createElement('div');
+    pill.className = 'cal-task' + ((todo.done || todo.status === 'done') ? ' cal-task--done' : '');
+    pill.setAttribute('data-todo-id', todo.id);
+
+    var tint = getTaskTint(todo);
+    if (tint) {
+      if (tint.indexOf('linear-gradient') !== -1) {
+        pill.style.background = tint;
+      } else {
+        pill.style.background = tint;
+      }
+    }
+
+    var bujoIcon = BUJO_ICONS[todo.bujoType] || BUJO_ICONS.task;
+    pill.innerHTML = bujoIcon + '<span class="cal-task-title">' + escapeHtml(todo.title || 'Untitled') + '</span>';
+
+    pill.addEventListener('click', function(e) {
+      e.stopPropagation();
+      openEditForTodo(todo.id, pill);
+    });
+
+    return pill;
+  }
+
+  // ─── Render a single day cell ───
+  function renderCell(year, month, day, tasks, isOutside) {
+    var cell = document.createElement('div');
+    var today = isToday(year, month, day);
+    cell.className = 'cal-cell'
+      + (isOutside ? ' cal-cell--outside' : '')
+      + (today ? ' cal-cell--today' : '');
+
+    var dateStr = dateKey(year, month, day);
+    cell.setAttribute('data-date', dateStr);
+
+    var dateLabel = document.createElement('div');
+    dateLabel.className = 'cal-date';
+    dateLabel.textContent = day;
+    cell.appendChild(dateLabel);
+
+    var tasksContainer = document.createElement('div');
+    tasksContainer.className = 'cal-tasks';
+
+    var maxTasks = _viewMode === 'week' ? MAX_TASKS_WEEK : MAX_TASKS_MONTH;
+    var visibleTasks = tasks.slice(0, maxTasks);
+    var remaining = tasks.length - maxTasks;
+
+    visibleTasks.forEach(function(todo) {
+      tasksContainer.appendChild(renderTaskPill(todo));
+    });
+
+    if (remaining > 0) {
+      var moreEl = document.createElement('div');
+      moreEl.className = 'cal-more-tasks';
+      moreEl.textContent = '+' + remaining + ' more';
+      tasksContainer.appendChild(moreEl);
+    }
+
+    cell.appendChild(tasksContainer);
+
+    // Click on empty area of cell → create new task with this date
+    cell.addEventListener('click', function(e) {
+      if (e.target.closest('.cal-task, .cal-more-tasks')) return;
+      createCalendarTodo(dateStr, cell);
+    });
+
+    return cell;
+  }
+
+  // ─── Render month view ───
+  function renderMonth() {
+    var year = _currentDate.getFullYear();
+    var month = _currentDate.getMonth();
+
+    titleEl.textContent = MONTH_NAMES[month] + ' ' + year;
+
+    gridEl.innerHTML = '';
+    gridEl.classList.remove('cal-grid--week');
+
+    var taskMap = groupByDate(allTodos);
+
+    // First day of month
+    var firstDay = new Date(year, month, 1);
+    var startOffset = mondayBasedDay(firstDay); // How many days from previous month
+
+    // Last day of month
+    var lastDay = new Date(year, month + 1, 0);
+    var totalDays = lastDay.getDate();
+
+    // Total cells needed (complete weeks)
+    var totalCells = startOffset + totalDays;
+    var rows = Math.ceil(totalCells / 7);
+    totalCells = rows * 7;
+
+    for (var i = 0; i < totalCells; i++) {
+      var cellDate = new Date(year, month, 1 - startOffset + i);
+      var cy = cellDate.getFullYear();
+      var cm = cellDate.getMonth();
+      var cd = cellDate.getDate();
+      var key = dateKey(cy, cm, cd);
+      var isOutside = cm !== month;
+      var tasks = taskMap[key] || [];
+      gridEl.appendChild(renderCell(cy, cm, cd, tasks, isOutside));
+    }
+  }
+
+  // ─── Render week view ───
+  function renderWeek() {
+    var monday = getMonday(_currentDate);
+    var sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+
+    // Title: "Mar 3 – 9, 2025" or "Feb 24 – Mar 2, 2025"
+    var startLabel = SHORT_MONTH_NAMES[monday.getMonth()] + ' ' + monday.getDate();
+    var endLabel;
+    if (monday.getMonth() === sunday.getMonth()) {
+      endLabel = sunday.getDate() + ', ' + sunday.getFullYear();
+    } else {
+      endLabel = SHORT_MONTH_NAMES[sunday.getMonth()] + ' ' + sunday.getDate() + ', ' + sunday.getFullYear();
+    }
+    titleEl.textContent = startLabel + ' – ' + endLabel;
+
+    gridEl.innerHTML = '';
+    gridEl.classList.add('cal-grid--week');
+
+    var taskMap = groupByDate(allTodos);
+
+    for (var i = 0; i < 7; i++) {
+      var cellDate = new Date(monday);
+      cellDate.setDate(monday.getDate() + i);
+      var cy = cellDate.getFullYear();
+      var cm = cellDate.getMonth();
+      var cd = cellDate.getDate();
+      var key = dateKey(cy, cm, cd);
+      var tasks = taskMap[key] || [];
+      gridEl.appendChild(renderCell(cy, cm, cd, tasks, false));
+    }
+  }
+
+  // ─── Main render ───
+  function renderCalendar() {
+    if (_renderPending) return;
+    _renderPending = true;
+    requestAnimationFrame(function() {
+      _renderPending = false;
+      if (_viewMode === 'week') {
+        renderWeek();
+      } else {
+        renderMonth();
+      }
+    });
+  }
+
+  // ─── Load data ───
+  function loadCalendar() {
+    showState('loading');
+    if (!window.dmSync) {
+      showState('auth');
+      return;
+    }
+    window.dmSync.getAllTodos().then(function(todos) {
+      allTodos = todos.filter(function(t) {
+        return !t.deletedAt && t.status !== 'deleted';
+      });
+
+      // Check if any tasks have a scheduled date
+      var hasScheduled = allTodos.some(function(t) { return !!t.scheduledDate; });
+      // Show content even if no scheduled tasks — user can still create new ones by clicking
+      showState('content');
+      renderWeekdays();
+      renderCalendar();
+    }).catch(function(err) {
+      console.error('[calendar] Error loading todos:', err);
+      showState('empty');
+    });
+  }
+
+  // ─── Navigation ───
+  function navigate(delta) {
+    if (_viewMode === 'month') {
+      _currentDate.setMonth(_currentDate.getMonth() + delta);
+    } else {
+      _currentDate.setDate(_currentDate.getDate() + (delta * 7));
+    }
+    renderCalendar();
+  }
+
+  function goToday() {
+    _currentDate = new Date();
+    renderCalendar();
+  }
+
+  function setView(mode) {
+    if (mode === _viewMode) return;
+    _viewMode = mode;
+    viewToggle.querySelectorAll('.cal-view-btn').forEach(function(btn) {
+      btn.classList.toggle('cal-view-btn--active', btn.getAttribute('data-view') === mode);
+    });
+    renderCalendar();
+  }
+
+  prevBtn.addEventListener('click', function() { navigate(-1); });
+  nextBtn.addEventListener('click', function() { navigate(1); });
+  todayBtn.addEventListener('click', goToday);
+
+  viewToggle.querySelectorAll('.cal-view-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      setView(btn.getAttribute('data-view'));
+    });
+  });
+
+  // ─── Edit task ───
+  function openEditForTodo(todoId, anchorEl) {
+    var todo = allTodos.find(function(t) { return t.id === todoId; });
+    if (!todo || !window.dmTodoEdit) return;
+
+    function onEditSave(result) {
+      if (!result) return;
+
+      if (result.deleted) {
+        // Trash the task
+        if (window.dmSync) {
+          window.dmSync.trashTodo(todoId).then(function() {
+            allTodos = allTodos.filter(function(t) { return t.id !== todoId; });
+            renderCalendar();
+          });
+        }
+        return;
+      }
+
+      // Build diff of changed fields
+      var fsData = {};
+      var origBujoState = todo.bujoState || 'open';
+      var fields = ['title', 'scheduledDate', 'estimatedMin', 'pomodoroCount',
+        'pomodoroLength', 'breakLength', 'category', 'projectId', 'bujoType', 'notes', 'color', 'color2'];
+      fields.forEach(function(f) {
+        var newVal = result[f] !== undefined ? (result[f] || null) : undefined;
+        if (newVal === undefined) return;
+        var oldVal = todo[f] || null;
+        if (newVal !== oldVal) {
+          todo[f] = newVal;
+          fsData[f] = newVal;
+        }
+      });
+
+      // BuJo state → sync with done/status/kanban
+      var bujoChanged = result.bujoState && result.bujoState !== origBujoState;
+      if (bujoChanged) {
+        todo.bujoState = result.bujoState;
+        fsData.bujoState = result.bujoState;
+        if (result.bujoState === 'done') {
+          todo.done = true; todo.status = 'done'; todo.kanbanStatus = 'done';
+          todo.completedAt = Date.now();
+          fsData.done = true; fsData.status = 'done'; fsData.kanbanStatus = 'done';
+          fsData.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+        } else if (result.bujoState === 'open') {
+          todo.done = false; todo.status = 'active'; todo.kanbanStatus = 'todo';
+          todo.completedAt = null;
+          fsData.done = false; fsData.status = 'active'; fsData.kanbanStatus = 'todo';
+          fsData.completedAt = null;
+        } else {
+          todo.done = false; todo.status = 'active'; todo.kanbanStatus = 'todo';
+          fsData.done = false; fsData.status = 'active'; fsData.kanbanStatus = 'todo';
+        }
+      }
+
+      // Kanban status (only if bujoState didn't already handle it)
+      if (!bujoChanged && result.kanbanStatus && result.kanbanStatus !== (todo.kanbanStatus || 'todo')) {
+        todo.kanbanStatus = result.kanbanStatus;
+        fsData.kanbanStatus = result.kanbanStatus;
+        if (result.kanbanStatus === 'done') {
+          todo.done = true; todo.status = 'done'; todo.bujoState = 'done';
+          todo.completedAt = Date.now();
+          fsData.done = true; fsData.status = 'done'; fsData.bujoState = 'done';
+          fsData.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+        } else if ((todo.kanbanStatus || 'todo') === 'done') {
+          todo.done = false; todo.status = 'active'; todo.bujoState = 'open';
+          todo.completedAt = null;
+          fsData.done = false; fsData.status = 'active'; fsData.bujoState = 'open';
+          fsData.completedAt = null;
+        }
+      }
+
+      if (Object.keys(fsData).length === 0) return;
+      fsData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
+      todo.updatedAt = Date.now();
+
+      if (window.dmSync) {
+        window.dmSync.firestoreWrite({
+          collection: 'todos',
+          docId: todoId,
+          op: 'update',
+          data: fsData,
+          localOp: function() { return window.dmSync.putTodo(todo); }
+        }).then(function() {
+          renderCalendar();
+        }).catch(function(err) {
+          console.error('[calendar] Error updating todo:', err);
+        });
+      }
+    }
+
+    window.dmTodoEdit.open(todo, onEditSave, anchorEl);
+  }
+
+  // ─── Create new task from calendar ───
+  function createCalendarTodo(dateStr, anchorEl) {
+    if (!window.dmSync) return;
+
+    // Get userId
+    var userIdPromise;
+    if (window.dmAuth && window.dmAuth.currentUser) {
+      userIdPromise = Promise.resolve(window.dmAuth.currentUser.uid);
+    } else {
+      userIdPromise = window.dmSync.getCachedUserId();
+    }
+
+    userIdPromise.then(function(userId) {
+      if (!userId) return;
+
+      var now = Date.now();
+      var clientId = 'local-' + now + '-' + Math.random().toString(36).slice(2, 8);
+
+      var todoData = {
+        userId: userId,
+        title: '',
+        estimatedMin: 0,
+        actualMin: null,
+        category: null,
+        projectId: null,
+        pomodoroCount: 1,
+        pomodoroLength: null,
+        breakLength: null,
+        done: false,
+        status: 'active',
+        parentId: null,
+        order: 0,
+        kanbanOrder: 0,
+        scheduledDate: dateStr,
+        reminderAt: null,
+        reminderFired: false,
+        reminderAcked: false,
+        source: null,
+        bujoType: 'task',
+        bujoState: 'open',
+        notes: '',
+        kanbanStatus: 'todo',
+        collaborators: [],
+        sharedTaskId: null,
+        color: null,
+        color2: null,
+        deletedAt: null,
+        createdAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
+        updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
+        completedAt: null
+      };
+
+      var localTodo = {};
+      Object.keys(todoData).forEach(function(k) { localTodo[k] = todoData[k]; });
+      localTodo.id = clientId;
+      localTodo.createdAt = now;
+      localTodo.updatedAt = now;
+
+      window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: clientId,
+        op: 'set',
+        data: todoData,
+        localOp: function() {
+          allTodos.push(localTodo);
+          return window.dmSync.putTodo(localTodo);
+        }
+      }).then(function() {
+        renderCalendar();
+        // Open the edit panel for the newly created task so user can fill in details
+        requestAnimationFrame(function() {
+          var pill = gridEl.querySelector('.cal-task[data-todo-id="' + clientId + '"]');
+          if (pill) {
+            openEditForTodo(clientId, pill);
+          } else {
+            // Task might be in a cell — find the cell and open there
+            var cell = gridEl.querySelector('.cal-cell[data-date="' + dateStr + '"]');
+            openEditForTodo(clientId, cell || anchorEl);
+          }
+        });
+      }).catch(function(err) {
+        console.error('[calendar] Error creating todo:', err);
+      });
+    });
+  }
+
+  // ─── Data refresh ───
+  function refreshData() {
+    if (contentEl.style.display === 'none') return;
+    if (!window.dmSync) return;
+    window.dmSync.getAllTodos().then(function(todos) {
+      allTodos = todos.filter(function(t) {
+        return !t.deletedAt && t.status !== 'deleted';
+      });
+      renderCalendar();
+    });
+  }
+
+  window.addEventListener('dm-todos-updated', refreshData);
+  window.addEventListener('dm-sync-complete', refreshData);
+
+  // ─── Sign-in button ───
+  if (signinBtn) {
+    signinBtn.addEventListener('click', function() {
+      if (window.dmAuth && window.dmAuth.signIn) {
+        window.dmAuth.signIn();
+      }
+    });
+  }
+
+  // ─── Init ───
+  // Pre-show loading state if cached user exists to prevent auth-card flash
+  try {
+    if (JSON.parse(localStorage.getItem('dm-cached-user') || 'null')) {
+      showState('loading');
+    }
+  } catch(e) {}
+
+  if (window.dmAuth) {
+    function subscribeCalendarAuth() {
+      window.dmAuth.onAuthStateChanged(function(user) {
+        if (user) {
+          loadCalendar();
+        } else {
+          showState('auth');
+        }
+      });
+    }
+    if (window.dmAuthReady) {
+      window.dmAuthReady.then(subscribeCalendarAuth);
+    } else {
+      subscribeCalendarAuth();
+    }
+  }
+})();
+</script>
