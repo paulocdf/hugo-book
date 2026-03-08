@@ -76,20 +76,21 @@
       </div>
     </div>
 
-    <div class="todo-edit-field">
-      <label>Category</label>
-      <div class="todo-edit-category-row" style="position: relative;">
-        <div class="todo-edit-category-chips" data-ref="category-chips"></div>
-        <input type="text" data-ref="category-input" class="todo-edit-category-input" placeholder="Add category + Enter" autocomplete="off">
-        <div class="todo-edit-category-dropdown" data-ref="category-dropdown"></div>
+    <div class="todo-edit-field-row">
+      <div class="todo-edit-field todo-edit-field-grow">
+        <label>Category</label>
+        <div class="todo-edit-category-row" style="position: relative;">
+          <div class="todo-edit-category-chips" data-ref="category-chips"></div>
+          <input type="text" data-ref="category-input" class="todo-edit-category-input" placeholder="Add category + Enter" autocomplete="off">
+          <div class="todo-edit-category-dropdown" data-ref="category-dropdown"></div>
+        </div>
       </div>
-    </div>
-
-    <div class="todo-edit-field">
-      <label>Project</label>
-      <select data-ref="project-select" class="todo-edit-project-select">
-        <option value="">None</option>
-      </select>
+      <div class="todo-edit-field todo-edit-field-shrink">
+        <label>Project</label>
+        <select data-ref="project-select" class="todo-edit-project-select">
+          <option value="">None</option>
+        </select>
+      </div>
     </div>
 
     <div class="todo-edit-field">
@@ -198,6 +199,23 @@
   color: var(--gray-500);
   margin-bottom: 4px;
   letter-spacing: 0.3px;
+}
+/* Side-by-side field row (Category + Project) */
+.todo-edit-field-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 0.85rem;
+}
+.todo-edit-field-row > .todo-edit-field {
+  margin-bottom: 0;
+}
+.todo-edit-field-grow {
+  flex: 2;
+  min-width: 0;
+}
+.todo-edit-field-shrink {
+  flex: 1;
+  min-width: 100px;
 }
 .todo-edit-input {
   width: 100%;
@@ -894,6 +912,13 @@
   .todo-edit-bujo-toggle {
     flex-wrap: wrap;
   }
+  .todo-edit-field-row {
+    flex-direction: column;
+    gap: 0;
+  }
+  .todo-edit-field-row > .todo-edit-field {
+    margin-bottom: 0.85rem;
+  }
 }
 
 /* ─── Kanban column overrides — panel is narrow regardless of viewport ─── */
@@ -914,6 +939,13 @@
 }
 .kanban-column-items .todo-edit-title-input {
   font-size: 1rem;
+}
+.kanban-column-items .todo-edit-field-row {
+  flex-direction: column;
+  gap: 0;
+}
+.kanban-column-items .todo-edit-field-row > .todo-edit-field {
+  margin-bottom: 0.85rem;
 }
 
 /* ─── Task color picker ─── */
