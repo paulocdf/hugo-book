@@ -103,30 +103,11 @@
       <div class="todo-edit-recent-row" data-ref="recent-row"></div>
     </div>
 
-    <!-- Sharing / Collaborators section (visible for top-level tasks only) -->
-    <div class="todo-edit-sharing-section" data-ref="sharing-section" style="display: none;">
-      <div class="todo-edit-sharing-header">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-        <span>Sharing</span>
-      </div>
-      <div class="todo-edit-sharing-owner-info" data-ref="share-owner-info" style="display: none;">
-        Shared by <strong data-ref="share-owner-name"></strong>
-      </div>
-      <div data-ref="share-controls" style="display: none;">
-        <div class="todo-edit-share-input-row">
-          <input type="email" class="todo-edit-share-email-input" data-ref="share-email" placeholder="Enter email to share..." autocomplete="off">
-          <button type="button" class="todo-edit-share-send-btn" data-ref="share-send">Share</button>
-        </div>
-        <div class="todo-edit-share-feedback" data-ref="share-feedback" style="display: none;"></div>
-      </div>
-      <div class="todo-edit-share-list" data-ref="share-list"></div>
-    </div>
-
-    <!-- Collapsible "More" section — notes + AI suggestions -->
+    <!-- Collapsible "More" section — notes, sharing, AI suggestions -->
     <div class="todo-edit-more-section" data-ref="more-section">
       <button type="button" class="todo-edit-more-toggle" data-ref="more-toggle">
         <svg class="todo-edit-more-arrow" data-ref="more-arrow" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 11,8 6,13"/></svg>
-        More (notes, AI suggestions)
+        More (notes, sharing, AI)
       </button>
       <div class="todo-edit-more-content" data-ref="more-content" style="display: none;">
         <div class="todo-edit-notes-box">
@@ -142,6 +123,23 @@
             <span>AI Suggestions</span>
           </div>
           <div class="todo-edit-ai-cards" data-ref="ai-cards"></div>
+        </div>
+        <div class="todo-edit-sharing-section" data-ref="sharing-section" style="display: none;">
+          <div class="todo-edit-sharing-header">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <span>Sharing</span>
+          </div>
+          <div class="todo-edit-sharing-owner-info" data-ref="share-owner-info" style="display: none;">
+            Shared by <strong data-ref="share-owner-name"></strong>
+          </div>
+          <div data-ref="share-controls" style="display: none;">
+            <div class="todo-edit-share-input-row">
+              <input type="email" class="todo-edit-share-email-input" data-ref="share-email" placeholder="Enter email to share..." autocomplete="off">
+              <button type="button" class="todo-edit-share-send-btn" data-ref="share-send">Share</button>
+            </div>
+            <div class="todo-edit-share-feedback" data-ref="share-feedback" style="display: none;"></div>
+          </div>
+          <div class="todo-edit-share-list" data-ref="share-list"></div>
         </div>
       </div>
     </div>
