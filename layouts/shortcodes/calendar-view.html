@@ -264,13 +264,75 @@
   color: var(--color-link);
 }
 
-/* Week view — taller cells */
-.cal-grid--week .cal-cell {
-  min-height: 200px;
+/* ─── Week view — vertical day columns ─── */
+.cal-grid--week {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--gray-200);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: calc(100vh - 200px);
+}
+.cal-grid--week .cal-col {
+  display: flex;
+  flex-direction: column;
+  background: var(--body-background);
+  min-height: 0;
+}
+.cal-grid--week .cal-col-header {
+  text-align: center;
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--gray-200);
+  flex-shrink: 0;
+}
+.cal-grid--week .cal-col-weekday {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.cal-grid--week .cal-col-date {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 2px;
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  color: var(--body-font-color);
+}
+.cal-grid--week .cal-col--today .cal-col-date {
+  background: var(--color-link);
+  color: #fff;
+}
+.cal-grid--week .cal-col--today {
+  background: color-mix(in srgb, var(--color-link) 6%, var(--body-background));
+}
+.cal-grid--week .cal-col-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px;
+  cursor: pointer;
+}
+.cal-grid--week .cal-col-body:hover {
+  background: var(--gray-100);
+}
+.cal-grid--week .cal-col--today .cal-col-body:hover {
+  background: color-mix(in srgb, var(--color-link) 10%, var(--body-background));
+}
+.cal-grid--week .cal-col-tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .cal-grid--week .cal-task {
   font-size: 0.8rem;
-  padding: 2px 6px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  white-space: normal;
+  word-break: break-word;
 }
 
 /* ─── Responsive ─── */
@@ -296,8 +358,18 @@
   .cal-task-title {
     max-width: 60px;
   }
-  .cal-grid--week .cal-cell {
-    min-height: 120px;
+  .cal-grid--week .cal-col-weekday {
+    font-size: 0.6rem;
+  }
+  .cal-grid--week .cal-col-date {
+    font-size: 0.8rem;
+  }
+  .cal-grid--week .cal-task {
+    font-size: 0.65rem;
+    padding: 2px 4px;
+  }
+  .cal-grid--week {
+    min-height: calc(100vh - 160px);
   }
 }
 </style>
@@ -560,6 +632,8 @@
 
     gridEl.innerHTML = '';
     gridEl.classList.remove('cal-grid--week');
+    // Restore weekday headers row (hidden in week view)
+    weekdaysEl.style.display = '';
 
     var taskMap = groupByDate(allTodos);
 
@@ -588,7 +662,7 @@
     }
   }
 
-  // ─── Render week view ───
+  // ─── Render week view (vertical day columns) ───
   function renderWeek() {
     var monday = getMonday(_currentDate);
     var sunday = new Date(monday);
@@ -606,6 +680,8 @@
 
     gridEl.innerHTML = '';
     gridEl.classList.add('cal-grid--week');
+    // Hide the separate weekday headers row — week view has them inline
+    weekdaysEl.style.display = 'none';
 
     var taskMap = groupByDate(allTodos);
 
@@ -617,7 +693,40 @@
       var cd = cellDate.getDate();
       var key = dateKey(cy, cm, cd);
       var tasks = taskMap[key] || [];
-      gridEl.appendChild(renderCell(cy, cm, cd, tasks, false));
+      var today = isToday(cy, cm, cd);
+
+      var col = document.createElement('div');
+      col.className = 'cal-col' + (today ? ' cal-col--today' : '');
+
+      // Column header: weekday label + date number
+      var header = document.createElement('div');
+      header.className = 'cal-col-header';
+      header.innerHTML = '<div class="cal-col-weekday">' + WEEKDAY_LABELS[i] + '</div>' +
+        '<div class="cal-col-date">' + cd + '</div>';
+      col.appendChild(header);
+
+      // Column body: scrollable task list + click-to-create
+      var body = document.createElement('div');
+      body.className = 'cal-col-body';
+      body.setAttribute('data-date', key);
+
+      var tasksContainer = document.createElement('div');
+      tasksContainer.className = 'cal-col-tasks';
+      tasks.forEach(function(todo) {
+        tasksContainer.appendChild(renderTaskPill(todo));
+      });
+      body.appendChild(tasksContainer);
+
+      // Click on empty area → create new task with this date
+      (function(dateStr, bodyEl) {
+        bodyEl.addEventListener('click', function(e) {
+          if (e.target.closest('.cal-task')) return;
+          createCalendarTodo(dateStr, bodyEl);
+        });
+      })(key, body);
+
+      col.appendChild(body);
+      gridEl.appendChild(col);
     }
   }
 
@@ -862,8 +971,9 @@
           if (pill) {
             openEditForTodo(clientId, pill);
           } else {
-            // Task might be in a cell — find the cell and open there
-            var cell = gridEl.querySelector('.cal-cell[data-date="' + dateStr + '"]');
+            // Task might be in a cell — find the cell/column and open there
+            var cell = gridEl.querySelector('.cal-cell[data-date="' + dateStr + '"]')
+              || gridEl.querySelector('.cal-col-body[data-date="' + dateStr + '"]');
             openEditForTodo(clientId, cell || anchorEl);
           }
         });
