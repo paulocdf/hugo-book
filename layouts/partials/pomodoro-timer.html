@@ -3119,8 +3119,8 @@
         // If all sessions are complete (multi-session tasks)
         if (totalSessions > 1 && sessionCount >= totalSessions) {
           updateDisplay();
-          // If timing a subtask, try to advance to the next one
-          if (activeParentId && activeParentId !== activeTodoId) {
+          // If timing a subtask, try to advance to the next one (only when auto-advance is on)
+          if (activeParentId && activeParentId !== activeTodoId && isAutoAdvance()) {
             advanceToNextSubtask();
           } else {
             // All sessions finished — save tracked time but let user decide when to mark done
@@ -3134,12 +3134,12 @@
 
         // Single-session task just completed — check for subtask auto-advance
         if (totalSessions <= 1) {
-          // If timing a subtask, try to advance to the next one
-          if (activeParentId && activeParentId !== activeTodoId) {
+          // If timing a subtask, try to advance to the next one (only when auto-advance is on)
+          if (activeParentId && activeParentId !== activeTodoId && isAutoAdvance()) {
             advanceToNextSubtask();
             return;
           }
-          // Non-subtask single-session: save tracked time but let user decide when to mark done
+          // Non-subtask single-session (or auto-advance disabled): save tracked time but let user decide when to mark done
           var finishedTitle = activeTodoTitle;
           var finishedMins = Math.round((accumulatedWorkSeconds + totalPhaseSeconds) / 60);
           closeTimer();
