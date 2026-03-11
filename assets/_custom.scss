@@ -1821,6 +1821,77 @@ aside nav ul a:hover {
   }
 }
 
+// API key input group
+.settings-modal-key-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.settings-modal-key-input {
+  width: 160px;
+  text-align: left;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.settings-modal-key-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--surface-3);
+    color: var(--body-font-color);
+  }
+}
+
+.settings-modal-validate-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-family: inherit;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover {
+    background: var(--surface-2);
+    border-color: var(--gray-300);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.settings-modal-key-status {
+  font-size: 0.7rem;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.settings-modal-key-ok {
+  color: var(--color-success);
+}
+
+.settings-modal-key-error {
+  color: var(--color-danger);
+}
+
 .settings-modal-textarea {
   width: 100%;
   padding: 8px 10px;

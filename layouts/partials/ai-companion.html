@@ -838,6 +838,9 @@
   var CDN_URL = 'https://esm.run/@mlc-ai/web-llm';
   var LS_KEY_ENABLED = 'dm-ai-enabled';
   var LS_KEY_CONTEXT = 'dm-ai-custom-context';
+  var LS_KEY_PROVIDER = 'dm-ai-provider';         // 'local' | 'openai'
+  var LS_KEY_OPENAI_KEY = 'dm-ai-openai-key';
+  var LS_KEY_OPENAI_MODEL = 'dm-ai-openai-model'; // 'gpt-4o-mini' | 'gpt-4o' | 'gpt-4-turbo'
   var SS_KEY_MESSAGES = 'dm-ai-messages';
   var SS_KEY_PANEL = 'dm-ai-panel-open';
 
@@ -993,6 +996,412 @@
     });
   }
 
+  // ─── Provider helpers ───
+  function getProvider() {
+    return localStorage.getItem(LS_KEY_PROVIDER) || 'local';
+  }
+  function getOpenAIKey() {
+    return (localStorage.getItem(LS_KEY_OPENAI_KEY) || '').trim();
+  }
+  function getOpenAIModel() {
+    return localStorage.getItem(LS_KEY_OPENAI_MODEL) || 'gpt-4o-mini';
+  }
+  function isOpenAIProvider() {
+    return getProvider() === 'openai' && !!getOpenAIKey();
+  }
+
+  // ─── Enhanced system prompt for ChatGPT (richer than Qwen's) ───
+  function buildOpenAISystemPrompt(tasks, projectMap) {
+    var now = new Date();
+    var todayStr = now.toISOString().split('T')[0];
+    var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
+    var timeStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    projectMap = projectMap || {};
+
+    var prompt = 'You are an expert productivity coach and executive task manager.\n';
+    prompt += 'Current date/time: ' + dayName + ', ' + todayStr + ' ' + timeStr + '.\n\n';
+
+    prompt += '## Your Capabilities\n';
+    prompt += '- Plan the user\'s day with time-blocked schedules\n';
+    prompt += '- Create, suggest, and organize tasks\n';
+    prompt += '- Analyze productivity patterns and suggest improvements\n';
+    prompt += '- Break vague tasks into specific actionable subtasks\n';
+    prompt += '- Flag overdue items and suggest rescheduling\n';
+    prompt += '- Estimate realistic completion times based on history\n\n';
+
+    prompt += '## Response Rules\n';
+    prompt += '- Be concise and actionable. Use bullet points with dashes.\n';
+    prompt += '- Keep replies under 300 words unless the user asks for detail.\n';
+    prompt += '- When suggesting tasks, wrap each task title in **bold**.\n';
+    prompt += '- Do not repeat the user\'s message back.\n';
+    prompt += '- Be proactive: suggest improvements, don\'t just answer passively.\n';
+    prompt += '- If tasks have no deadline, recommend when to schedule them.\n';
+    prompt += '- When planning a day, suggest time blocks (e.g., "9:00-10:30 — Deep work: PR review").\n';
+    prompt += '- Flag unrealistic plans (too many hours of work scheduled).\n';
+    prompt += '- If a task is vague, suggest breaking it into 2-4 specific subtasks.\n';
+    prompt += '- Consider energy levels: suggest demanding tasks for morning, routine tasks for afternoon.\n\n';
+
+    // Inject custom context
+    var customCtx = '';
+    try { customCtx = (localStorage.getItem(LS_KEY_CONTEXT) || '').trim(); } catch(e) {}
+    if (customCtx) {
+      prompt += '## User Context\n' + customCtx + '\n\n';
+    }
+
+    // Active projects
+    var activeProjects = Object.keys(projectMap).filter(function(pid) {
+      return !projectMap[pid].archived;
+    }).map(function(pid) { return projectMap[pid]; });
+    if (activeProjects.length > 0) {
+      prompt += '## Active Projects\n';
+      activeProjects.forEach(function(p) {
+        prompt += '- ' + p.name;
+        if (p.description) prompt += ': ' + p.description;
+        if (p.deadline) prompt += ' (deadline: ' + p.deadline + ')';
+        prompt += '\n';
+      });
+      prompt += '\n';
+    }
+
+    if (!tasks || tasks.length === 0) {
+      prompt += '## Tasks\nThe user has no tasks yet. Suggest they start by adding tasks for today.\n';
+      return prompt;
+    }
+
+    // Categorize tasks
+    var pending = [];
+    var overdue = [];
+    var completedRecent = [];
+    var completedAll = [];
+    var thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    var sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+    tasks.forEach(function(t) {
+      if ((t.status || 'active') === 'deleted') return;
+      if (t.done) {
+        if (t.completedAt && t.completedAt > thirtyDaysAgo) {
+          completedAll.push(t);
+        }
+        if (t.completedAt && t.completedAt > sevenDaysAgo) {
+          completedRecent.push(t);
+        }
+      } else {
+        pending.push(t);
+        if (t.scheduledDate && t.scheduledDate < todayStr) {
+          overdue.push(t);
+        }
+      }
+    });
+
+    // ─── Historical behavior analysis (last 30 days) ───
+    if (completedAll.length > 0) {
+      prompt += '## Productivity Insights (Last 30 Days)\n';
+
+      // Tasks completed per day
+      var daySet = {};
+      completedAll.forEach(function(t) {
+        if (t.completedAt) {
+          var d = new Date(t.completedAt).toISOString().split('T')[0];
+          daySet[d] = (daySet[d] || 0) + 1;
+        }
+      });
+      var activeDays = Object.keys(daySet).length;
+      var avgPerDay = activeDays > 0 ? (completedAll.length / activeDays).toFixed(1) : 0;
+      prompt += '- Completed ' + completedAll.length + ' tasks across ' + activeDays + ' active days (~' + avgPerDay + '/day)\n';
+
+      // Estimate accuracy
+      var withEstimate = completedAll.filter(function(t) { return t.estimatedMin && t.actualMin; });
+      if (withEstimate.length >= 3) {
+        var totalEst = 0, totalAct = 0;
+        withEstimate.forEach(function(t) { totalEst += t.estimatedMin; totalAct += t.actualMin; });
+        var ratio = (totalAct / totalEst).toFixed(2);
+        if (ratio > 1.2) {
+          prompt += '- Tasks typically take ' + Math.round((ratio - 1) * 100) + '% LONGER than estimated (suggest adding buffer)\n';
+        } else if (ratio < 0.8) {
+          prompt += '- Tasks typically finish ' + Math.round((1 - ratio) * 100) + '% FASTER than estimated\n';
+        } else {
+          prompt += '- Estimation accuracy is good (actual ~' + Math.round(ratio * 100) + '% of estimated)\n';
+        }
+      }
+
+      // Category distribution
+      var catCount = {};
+      completedAll.forEach(function(t) {
+        var cat = t.category || 'uncategorized';
+        catCount[cat] = (catCount[cat] || 0) + 1;
+      });
+      var topCats = Object.keys(catCount).sort(function(a, b) { return catCount[b] - catCount[a]; }).slice(0, 5);
+      if (topCats.length > 0) {
+        prompt += '- Top categories: ' + topCats.map(function(c) { return c + ' (' + catCount[c] + ')'; }).join(', ') + '\n';
+      }
+
+      // Avg time per task
+      var withActual = completedAll.filter(function(t) { return t.actualMin > 0; });
+      if (withActual.length >= 3) {
+        var totalMin = 0;
+        withActual.forEach(function(t) { totalMin += t.actualMin; });
+        prompt += '- Average task duration: ' + Math.round(totalMin / withActual.length) + ' min\n';
+      }
+
+      prompt += '\n';
+    }
+
+    // ─── Current task context ───
+    prompt += '## Current Tasks\n';
+
+    // Recently completed (last 7 days)
+    if (completedRecent.length > 0) {
+      prompt += '\n### Recently Completed (' + completedRecent.length + ' in last 7 days)\n';
+      completedRecent.slice(0, 8).forEach(function(t) {
+        prompt += '- ' + t.title;
+        if (t.actualMin) prompt += ' (' + t.actualMin + 'min actual)';
+        if (t.category) prompt += ' [' + t.category + ']';
+        prompt += '\n';
+      });
+    }
+
+    // Overdue
+    if (overdue.length > 0) {
+      prompt += '\n### OVERDUE (' + overdue.length + ' — urge user to reschedule or complete)\n';
+      overdue.forEach(function(t) {
+        prompt += '- ' + t.title;
+        if (t.scheduledDate) prompt += ' (was: ' + t.scheduledDate + ')';
+        if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
+        if (t.projectId && projectMap[t.projectId]) prompt += ' {' + projectMap[t.projectId].name + '}';
+        prompt += '\n';
+      });
+    }
+
+    // Today
+    var todayTasks = pending.filter(function(t) { return t.scheduledDate === todayStr; });
+    if (todayTasks.length > 0) {
+      var todayTotalMin = 0;
+      prompt += '\n### TODAY (' + todayTasks.length + ' tasks)\n';
+      todayTasks.forEach(function(t) {
+        prompt += '- ' + t.title;
+        if (t.estimatedMin) { prompt += ' ~' + t.estimatedMin + 'min'; todayTotalMin += t.estimatedMin; }
+        if (t.category) prompt += ' [' + t.category + ']';
+        if (t.projectId && projectMap[t.projectId]) prompt += ' {' + projectMap[t.projectId].name + '}';
+        prompt += '\n';
+      });
+      if (todayTotalMin > 0) {
+        var hrs = Math.floor(todayTotalMin / 60);
+        var mins = todayTotalMin % 60;
+        prompt += 'Total estimated today: ' + (hrs > 0 ? hrs + 'h ' : '') + mins + 'min\n';
+      }
+    }
+
+    // Upcoming (next 7 days)
+    var futureTasks = pending.filter(function(t) { return t.scheduledDate && t.scheduledDate > todayStr; });
+    if (futureTasks.length > 0) {
+      prompt += '\n### Upcoming (' + futureTasks.length + ')\n';
+      futureTasks.sort(function(a, b) { return (a.scheduledDate || '').localeCompare(b.scheduledDate || ''); });
+      futureTasks.slice(0, 10).forEach(function(t) {
+        prompt += '- ' + t.title + ' (' + t.scheduledDate + ')';
+        if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
+        if (t.projectId && projectMap[t.projectId]) prompt += ' {' + projectMap[t.projectId].name + '}';
+        prompt += '\n';
+      });
+      if (futureTasks.length > 10) prompt += '- +' + (futureTasks.length - 10) + ' more\n';
+    }
+
+    // Backlog
+    var unscheduled = pending.filter(function(t) { return !t.scheduledDate; });
+    if (unscheduled.length > 0) {
+      prompt += '\n### Backlog/Unscheduled (' + unscheduled.length + ')\n';
+      unscheduled.slice(0, 10).forEach(function(t) {
+        prompt += '- ' + t.title;
+        if (t.estimatedMin) prompt += ' ~' + t.estimatedMin + 'min';
+        if (t.category) prompt += ' [' + t.category + ']';
+        if (t.projectId && projectMap[t.projectId]) prompt += ' {' + projectMap[t.projectId].name + '}';
+        prompt += '\n';
+      });
+      if (unscheduled.length > 10) prompt += '- +' + (unscheduled.length - 10) + ' more\n';
+    }
+
+    return prompt;
+  }
+
+  // ─── OpenAI streaming client ───
+  function parseSSEStream(response) {
+    var reader = response.body.getReader();
+    var decoder = new TextDecoder();
+    var buffer = '';
+
+    return {
+      [Symbol.asyncIterator]: function() {
+        return {
+          next: function() {
+            return new Promise(function(resolve, reject) {
+              function processBuffer() {
+                // Look for complete SSE events in the buffer
+                var lineEnd = buffer.indexOf('\n');
+                while (lineEnd !== -1) {
+                  var line = buffer.substring(0, lineEnd).trim();
+                  buffer = buffer.substring(lineEnd + 1);
+
+                  if (line === 'data: [DONE]') {
+                    resolve({ done: true, value: undefined });
+                    return;
+                  }
+                  if (line.startsWith('data: ')) {
+                    try {
+                      var data = JSON.parse(line.substring(6));
+                      resolve({ done: false, value: data });
+                      return;
+                    } catch(e) {
+                      // Incomplete JSON, continue reading
+                    }
+                  }
+                  lineEnd = buffer.indexOf('\n');
+                }
+                // Need more data
+                reader.read().then(function(result) {
+                  if (result.done) {
+                    resolve({ done: true, value: undefined });
+                    return;
+                  }
+                  buffer += decoder.decode(result.value, { stream: true });
+                  processBuffer();
+                }).catch(reject);
+              }
+              processBuffer();
+            });
+          }
+        };
+      }
+    };
+  }
+
+  function runOpenAIChat(userMessage, systemOverride) {
+    isGenerating = true;
+    sendBtn.disabled = true;
+    stopBtn.style.display = '';
+
+    addMessage('user', userMessage);
+    chatHistory.push({ role: 'user', content: userMessage });
+
+    var typingEl = addTypingIndicator();
+
+    var openaiAbort = new AbortController();
+    abortController = { stop: function() { openaiAbort.abort(); } };
+
+    getTaskContext().then(function(ctx) {
+      var tasks = ctx.tasks || ctx;
+      var projectMap = ctx.projectMap || {};
+      var systemPrompt = systemOverride || buildOpenAISystemPrompt(tasks, projectMap);
+      var messages = [{ role: 'system', content: systemPrompt }];
+      var recentHistory = chatHistory.slice(-10);
+      messages = messages.concat(recentHistory);
+
+      var apiKey = getOpenAIKey();
+      var model = getOpenAIModel();
+
+      return fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: messages,
+          stream: true,
+          temperature: 0.7,
+          max_tokens: 1024
+        }),
+        signal: openaiAbort.signal
+      });
+    }).then(function(response) {
+      if (!response.ok) {
+        return response.json().then(function(err) {
+          var msg = (err.error && err.error.message) || 'API request failed';
+          throw new Error(msg + ' (HTTP ' + response.status + ')');
+        }).catch(function(parseErr) {
+          if (parseErr.message && parseErr.message.indexOf('HTTP') !== -1) throw parseErr;
+          throw new Error('OpenAI API error (HTTP ' + response.status + ')');
+        });
+      }
+
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+      var msgEl = addMessage('assistant', '');
+      var bubbleEl = msgEl.querySelector('.ai-msg-bubble');
+      bubbleEl.classList.add('streaming');
+      var fullText = '';
+      var rafPending = false;
+
+      var stream = parseSSEStream(response);
+      var iterator = stream[Symbol.asyncIterator]();
+
+      function processIterator() {
+        return iterator.next().then(function(result) {
+          if (result.done) {
+            bubbleEl.classList.remove('streaming');
+            chatHistory.push({ role: 'assistant', content: fullText });
+            saveMessages();
+            bubbleEl.innerHTML = renderMarkdown(fullText);
+            addCopyButton(bubbleEl, fullText);
+            detectAndRenderTaskCards(bubbleEl, fullText);
+            isGenerating = false;
+            sendBtn.disabled = !inputEl.value.trim();
+            stopBtn.style.display = 'none';
+            abortController = null;
+            return;
+          }
+          var chunk = result.value;
+          var delta = '';
+          if (chunk.choices && chunk.choices[0] && chunk.choices[0].delta) {
+            delta = chunk.choices[0].delta.content || '';
+          }
+          if (delta) {
+            fullText += delta;
+            if (!rafPending) {
+              rafPending = true;
+              requestAnimationFrame(function() {
+                rafPending = false;
+                bubbleEl.innerHTML = renderMarkdown(fullText);
+                scrollToBottom();
+              });
+            }
+          }
+          return processIterator();
+        });
+      }
+      return processIterator();
+    }).catch(function(err) {
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+      var errMsg = err.message || String(err);
+      var friendlyMsg = 'Something went wrong.';
+
+      if (err.name === 'AbortError') {
+        // User stopped generation
+        isGenerating = false;
+        sendBtn.disabled = !inputEl.value.trim();
+        stopBtn.style.display = 'none';
+        abortController = null;
+        return;
+      }
+      if (errMsg.indexOf('401') !== -1 || errMsg.toLowerCase().indexOf('invalid') !== -1 || errMsg.toLowerCase().indexOf('auth') !== -1) {
+        friendlyMsg = 'Invalid API key. Please check your OpenAI API key in Settings.';
+      } else if (errMsg.indexOf('429') !== -1 || errMsg.toLowerCase().indexOf('rate') !== -1) {
+        friendlyMsg = 'Rate limited by OpenAI. Please wait a moment and try again.';
+      } else if (errMsg.indexOf('insufficient_quota') !== -1 || errMsg.indexOf('billing') !== -1) {
+        friendlyMsg = 'Your OpenAI account has insufficient credits. Check your billing at platform.openai.com.';
+      } else if (errMsg.toLowerCase().indexOf('network') !== -1 || errMsg.toLowerCase().indexOf('fetch') !== -1 || errMsg.toLowerCase().indexOf('failed') !== -1) {
+        friendlyMsg = 'Network error — check your connection and try again.';
+      } else {
+        friendlyMsg += ' ' + errMsg;
+      }
+      addMessage('assistant', friendlyMsg);
+      isGenerating = false;
+      sendBtn.disabled = !inputEl.value.trim();
+      stopBtn.style.display = 'none';
+      abortController = null;
+    });
+  }
+
   // ─── WebGPU check ───
   function checkWebGPU() {
     if (!hasWebGPU) {
@@ -1121,6 +1530,13 @@
   // ─── Chat completion ───
   function runChat(userMessage, systemOverride) {
     if (isGenerating) return;
+
+    // Branch by provider
+    if (isOpenAIProvider()) {
+      runOpenAIChat(userMessage, systemOverride);
+      return;
+    }
+
     isGenerating = true;
     sendBtn.disabled = true;
     stopBtn.style.display = '';
@@ -1530,7 +1946,10 @@
       quickActions.style.display = '';
       inputArea.style.display = '';
       notSupportedEl.style.display = 'none';
-      if (!hasWebGPU) {
+      if (isOpenAIProvider()) {
+        // OpenAI mode: no WebGPU needed
+        setStatus('ready', 'ChatGPT');
+      } else if (!hasWebGPU) {
         notSupportedEl.style.display = '';
         quickActions.style.display = 'none';
         inputArea.style.display = 'none';
@@ -2237,7 +2656,10 @@
   var enabled = isAiEnabled();
   if (enabledToggle) enabledToggle.checked = enabled;
   if (enabled) {
-    if (!hasWebGPU) {
+    if (isOpenAIProvider()) {
+      // OpenAI mode: ready immediately, no WebGPU needed
+      setStatus('ready', 'ChatGPT');
+    } else if (!hasWebGPU) {
       notSupportedEl.style.display = '';
     }
   }
@@ -2260,6 +2682,8 @@
     isEnabled: isAiEnabled,
     setEnabled: setAiEnabled,
     getStatus: function() { return aiStatus; },
+    getProvider: getProvider,
+    isOpenAIProvider: isOpenAIProvider,
     // Engine sharing: the dedicated AI page delegates to these
     _getEngine: function() {
       return engine ? Promise.resolve(engine) : Promise.reject(new Error('Engine not loaded'));
@@ -2267,7 +2691,9 @@
     _loadEngine: function() {
       return loadEngine();
     },
+    _runOpenAIChat: runOpenAIChat,
     _buildSystemPrompt: buildSystemPrompt,
+    _buildOpenAISystemPrompt: buildOpenAISystemPrompt,
     _renderMarkdown: renderMarkdown,
     _detectTaskIntent: detectTaskIntent,
     _parseTaskDetails: parseTaskDetails,
@@ -2276,7 +2702,11 @@
     _detectBujoType: detectBujoType,
     _parseDate: parseDate,
     _parseTimeOfDay: _parseTimeOfDay,
-    _fmtDate: _fmtDate
+    _fmtDate: _fmtDate,
+    _getOpenAIKey: getOpenAIKey,
+    _getOpenAIModel: getOpenAIModel,
+    _parseSSEStream: parseSSEStream,
+    _getTaskContext: getTaskContext
   };
 
 })();

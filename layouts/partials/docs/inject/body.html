@@ -3032,6 +3032,31 @@
     el = document.getElementById('setting-ai-enabled');
     if (el) el.checked = aiEnabled;
 
+    var aiProvider = 'local';
+    try { var v = localStorage.getItem('dm-ai-provider'); if (v === 'local' || v === 'openai') aiProvider = v; } catch(e) {}
+    el = document.getElementById('setting-ai-provider');
+    if (el) el.value = aiProvider;
+
+    var aiModel = 'gpt-4o-mini';
+    try { var v = localStorage.getItem('dm-ai-openai-model'); if (v) aiModel = v; } catch(e) {}
+    el = document.getElementById('setting-ai-openai-model');
+    if (el) el.value = aiModel;
+
+    var aiKey = '';
+    try { aiKey = localStorage.getItem('dm-ai-openai-key') || ''; } catch(e) {}
+    el = document.getElementById('setting-ai-openai-key');
+    if (el) el.value = aiKey;
+
+    // Show/hide OpenAI-specific settings and update info text based on provider
+    var openaiGroup = document.getElementById('setting-ai-openai-group');
+    var providerInfo = document.getElementById('setting-ai-provider-info');
+    if (openaiGroup) openaiGroup.style.display = aiProvider === 'openai' ? '' : 'none';
+    if (providerInfo) {
+      providerInfo.innerHTML = aiProvider === 'openai'
+        ? '<p>Uses <strong>OpenAI ChatGPT</strong> API. Requires an API key. Usage is billed by OpenAI.</p>'
+        : '<p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU. First use downloads ~350 MB.</p>';
+    }
+
     var customCtx = '';
     try { customCtx = localStorage.getItem('dm-ai-custom-context') || ''; } catch(e) {}
     el = document.getElementById('setting-ai-custom-context');
@@ -3246,8 +3271,51 @@
                 '</label>' +
               '</div>' +
             '</div>' +
-            '<div class="settings-modal-ai-info">' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-ai-provider">Provider</label>' +
+              '<div class="settings-modal-control">' +
+                '<select id="setting-ai-provider" class="settings-modal-select">' +
+                  '<option value="local">Local (Qwen2.5)</option>' +
+                  '<option value="openai">OpenAI (ChatGPT)</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-ai-info" id="setting-ai-provider-info">' +
               '<p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU. First use downloads ~350 MB.</p>' +
+            '</div>' +
+            // ── OpenAI-specific settings (hidden when provider = local) ──
+            '<div id="setting-ai-openai-group" style="display:none">' +
+              '<div class="settings-modal-row">' +
+                '<label class="settings-modal-label" for="setting-ai-openai-model">Model</label>' +
+                '<div class="settings-modal-control">' +
+                  '<select id="setting-ai-openai-model" class="settings-modal-select">' +
+                    '<option value="gpt-4o-mini">gpt-4o-mini</option>' +
+                    '<option value="gpt-4o">gpt-4o</option>' +
+                    '<option value="gpt-4-turbo">gpt-4-turbo</option>' +
+                  '</select>' +
+                '</div>' +
+              '</div>' +
+              '<div class="settings-modal-row">' +
+                '<label class="settings-modal-label" for="setting-ai-openai-key">API key</label>' +
+                '<div class="settings-modal-control settings-modal-key-control">' +
+                  '<input type="password" id="setting-ai-openai-key" class="settings-modal-input settings-modal-key-input" placeholder="sk-..." autocomplete="off" spellcheck="false">' +
+                  '<button type="button" id="setting-ai-openai-key-toggle" class="settings-modal-key-toggle" title="Show / hide key">' +
+                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                      '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>' +
+                    '</svg>' +
+                  '</button>' +
+                '</div>' +
+              '</div>' +
+              '<div class="settings-modal-row">' +
+                '<div class="settings-modal-label">&nbsp;</div>' +
+                '<div class="settings-modal-control">' +
+                  '<button type="button" id="setting-ai-openai-validate" class="settings-modal-validate-btn">Validate key</button>' +
+                  '<span id="setting-ai-openai-key-status" class="settings-modal-key-status"></span>' +
+                '</div>' +
+              '</div>' +
+              '<div class="settings-modal-ai-info">' +
+                '<p>Your API key is stored only in this browser\'s localStorage and sent directly to api.openai.com. It is never sent to our servers or committed to source code.</p>' +
+              '</div>' +
             '</div>' +
             '<div class="settings-modal-row">' +
               '<label class="settings-modal-label" for="setting-ai-custom-context">Custom context</label>' +
@@ -3421,6 +3489,111 @@
         window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-ai-enabled', value: val } }));
         // Notify AI companion if it has a handler
         if (window.dmAiSetEnabled) window.dmAiSetEnabled(val);
+      });
+    }
+
+    // ─── AI provider selector ───
+    var aiProviderSelect = document.getElementById('setting-ai-provider');
+    if (aiProviderSelect) {
+      aiProviderSelect.addEventListener('change', function() {
+        var val = aiProviderSelect.value;
+        try { localStorage.setItem('dm-ai-provider', val); } catch(e) {}
+        // Show/hide OpenAI settings group
+        var openaiGroup = document.getElementById('setting-ai-openai-group');
+        if (openaiGroup) openaiGroup.style.display = val === 'openai' ? '' : 'none';
+        // Update provider info text
+        var providerInfo = document.getElementById('setting-ai-provider-info');
+        if (providerInfo) {
+          providerInfo.innerHTML = val === 'openai'
+            ? '<p>Uses <strong>OpenAI ChatGPT</strong> API. Requires an API key. Usage is billed by OpenAI.</p>'
+            : '<p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU. First use downloads ~350 MB.</p>';
+        }
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-ai-provider', value: val } }));
+        // Re-initialize AI companion with new provider
+        if (window.dmAiSetEnabled && aiEnabledToggle && aiEnabledToggle.checked) {
+          window.dmAiSetEnabled(true);
+        }
+      });
+    }
+
+    // ─── OpenAI model selector ───
+    var aiModelSelect = document.getElementById('setting-ai-openai-model');
+    if (aiModelSelect) {
+      aiModelSelect.addEventListener('change', function() {
+        var val = aiModelSelect.value;
+        try { localStorage.setItem('dm-ai-openai-model', val); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-ai-openai-model', value: val } }));
+      });
+    }
+
+    // ─── OpenAI API key input ───
+    var aiKeyInput = document.getElementById('setting-ai-openai-key');
+    var _aiKeySaveTimer = null;
+    if (aiKeyInput) {
+      aiKeyInput.addEventListener('input', function() {
+        if (_aiKeySaveTimer) clearTimeout(_aiKeySaveTimer);
+        // Clear validation status on edit
+        var statusEl = document.getElementById('setting-ai-openai-key-status');
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = 'settings-modal-key-status'; }
+        _aiKeySaveTimer = setTimeout(function() {
+          var key = aiKeyInput.value.trim();
+          try { localStorage.setItem('dm-ai-openai-key', key); } catch(e) {}
+          _aiKeySaveTimer = null;
+        }, 500);
+      });
+    }
+
+    // ─── API key show/hide toggle ───
+    var aiKeyToggle = document.getElementById('setting-ai-openai-key-toggle');
+    if (aiKeyToggle && aiKeyInput) {
+      aiKeyToggle.addEventListener('click', function() {
+        var isPassword = aiKeyInput.type === 'password';
+        aiKeyInput.type = isPassword ? 'text' : 'password';
+        aiKeyToggle.title = isPassword ? 'Hide key' : 'Show / hide key';
+      });
+    }
+
+    // ─── API key validation ───
+    var aiKeyValidateBtn = document.getElementById('setting-ai-openai-validate');
+    if (aiKeyValidateBtn) {
+      aiKeyValidateBtn.addEventListener('click', function() {
+        var keyEl = document.getElementById('setting-ai-openai-key');
+        var statusEl = document.getElementById('setting-ai-openai-key-status');
+        if (!keyEl || !statusEl) return;
+        var key = keyEl.value.trim();
+        if (!key) {
+          statusEl.textContent = 'Enter a key first';
+          statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+          return;
+        }
+        statusEl.textContent = 'Validating...';
+        statusEl.className = 'settings-modal-key-status';
+        aiKeyValidateBtn.disabled = true;
+        fetch('https://api.openai.com/v1/models', {
+          method: 'GET',
+          headers: { 'Authorization': 'Bearer ' + key }
+        }).then(function(res) {
+          if (res.ok) {
+            statusEl.textContent = 'Valid';
+            statusEl.className = 'settings-modal-key-status settings-modal-key-ok';
+            // Save the validated key
+            try { localStorage.setItem('dm-ai-openai-key', key); } catch(e) {}
+          } else if (res.status === 401) {
+            statusEl.textContent = 'Invalid key';
+            statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+          } else if (res.status === 429) {
+            statusEl.textContent = 'Rate limited \u2014 try again';
+            statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+          } else {
+            statusEl.textContent = 'Error (' + res.status + ')';
+            statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+          }
+        }).catch(function() {
+          statusEl.textContent = 'Network error';
+          statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+        }).finally(function() {
+          aiKeyValidateBtn.disabled = false;
+        });
       });
     }
 

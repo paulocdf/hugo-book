@@ -27,7 +27,7 @@
         </svg>
         <div>
           <h2>AI Companion</h2>
-          <p class="ai-page-subtitle">Powered by Qwen2.5-0.5B running locally in your browser</p>
+          <p class="ai-page-subtitle" id="ai-page-subtitle">Powered by Qwen2.5-0.5B running locally in your browser</p>
         </div>
       </div>
       <div class="ai-page-header-actions">
@@ -568,6 +568,11 @@
   var hasWebGPU = typeof navigator !== 'undefined' && !!navigator.gpu;
   var isPageGenerating = false;
 
+  function isOpenAIProvider() {
+    if (window.dmAI && window.dmAI.isOpenAIProvider) return window.dmAI.isOpenAIProvider();
+    try { return localStorage.getItem('dm-ai-provider') === 'openai'; } catch(e) { return false; }
+  }
+
   // ─── Auth ───
   function updatePageAuth(user) {
     if (user) {
@@ -604,9 +609,23 @@
 
   function updatePageState() {
     var enabled = isAiEnabled();
+    var usingOpenAI = isOpenAIProvider();
     pageEnabledToggle.checked = enabled;
 
-    if (!hasWebGPU) {
+    // Update subtitle based on provider
+    var subtitleEl = document.getElementById('ai-page-subtitle');
+    if (subtitleEl) {
+      if (usingOpenAI) {
+        var model = 'gpt-4o-mini';
+        try { var v = localStorage.getItem('dm-ai-openai-model'); if (v) model = v; } catch(e) {}
+        subtitleEl.textContent = 'Powered by OpenAI ' + model;
+      } else {
+        subtitleEl.textContent = 'Powered by Qwen2.5-0.5B running locally in your browser';
+      }
+    }
+
+    // WebGPU check only applies to local provider
+    if (!hasWebGPU && !usingOpenAI) {
       pageWarning.style.display = '';
       pageDisabled.style.display = '';
       pageActions.style.display = 'none';
@@ -622,6 +641,15 @@
       pageActions.style.display = 'none';
       pageChat.style.display = 'none';
       pageContext.style.display = 'none';
+      // Update disabled detail text based on provider
+      var detailEl = document.querySelector('.ai-page-disabled-detail');
+      if (detailEl) {
+        if (usingOpenAI) {
+          detailEl.textContent = 'Using OpenAI API \u2014 requires an API key configured in Settings.';
+        } else {
+          detailEl.textContent = 'First use downloads ~350 MB (cached for future visits). Requires ~1 GB GPU memory and WebGPU support.';
+        }
+      }
       return;
     }
 
@@ -630,6 +658,18 @@
     pageChat.style.display = '';
     loadTaskContext();
     loadPageMessages();
+
+    // Update status badge for OpenAI
+    if (usingOpenAI) {
+      pageStatus.className = 'ai-page-status ready';
+      pageStatus.textContent = 'ChatGPT';
+      pageStatus.style.display = '';
+    } else {
+      // Reset status for local provider (will be updated when engine loads)
+      pageStatus.className = 'ai-page-status';
+      pageStatus.textContent = '';
+      pageStatus.style.display = 'none';
+    }
   }
 
   // ─── Enable/disable toggle ───
@@ -892,7 +932,203 @@
     _doPageChat(text, chatHistory, typingEl);
   }
 
+  // ── OpenAI chat execution for full page ──
+  function _doPageChatOpenAI(userMessage, chatHistory, typingEl) {
+    var stopped = false;
+    var openaiAbort = new AbortController();
+
+    // Get API key
+    var apiKey = '';
+    if (window.dmAI && window.dmAI._getOpenAIKey) {
+      apiKey = window.dmAI._getOpenAIKey();
+    } else {
+      try { apiKey = localStorage.getItem('dm-ai-openai-key') || ''; } catch(e) {}
+    }
+    if (!apiKey) {
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+      addPageMessage('assistant', 'No OpenAI API key configured. Go to **Settings > AI Companion** to add your key.');
+      isPageGenerating = false;
+      pageSendBtn.disabled = !pageInput.value.trim();
+      pageStopBtn.style.display = 'none';
+      return;
+    }
+
+    // Get model
+    var model = 'gpt-4o-mini';
+    if (window.dmAI && window.dmAI._getOpenAIModel) {
+      model = window.dmAI._getOpenAIModel();
+    } else {
+      try { var v = localStorage.getItem('dm-ai-openai-model'); if (v) model = v; } catch(e) {}
+    }
+
+    // Build system prompt and messages
+    function getTaskContext() {
+      return new Promise(function(resolve) {
+        if (!window.dmSync || !window.dmSync.getAllTodos) { resolve([]); return; }
+        window.dmSync.getAllTodos().then(function(t) { resolve(t || []); }).catch(function() { resolve([]); });
+      });
+    }
+
+    getTaskContext().then(function(tasks) {
+      var systemPrompt;
+      if (window.dmAI && window.dmAI._buildOpenAISystemPrompt) {
+        systemPrompt = window.dmAI._buildOpenAISystemPrompt(tasks);
+      } else if (window.dmAI && window.dmAI._buildSystemPrompt) {
+        systemPrompt = window.dmAI._buildSystemPrompt(tasks);
+      } else {
+        systemPrompt = 'You are a productivity assistant. Be concise. Use bullet points with dashes. Keep replies under 150 words. When suggesting tasks, wrap each title in **bold**.';
+      }
+
+      var messages = [{ role: 'system', content: systemPrompt }];
+      var recent = chatHistory.slice(-10);
+      messages = messages.concat(recent);
+
+      pageStatus.className = 'ai-page-status loading';
+      pageStatus.textContent = 'Thinking...';
+      pageStatus.style.display = '';
+
+      return fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: messages,
+          stream: true,
+          temperature: 0.7,
+          max_tokens: 1024
+        }),
+        signal: openaiAbort.signal
+      });
+    }).then(function(response) {
+      if (!response.ok) {
+        return response.text().then(function(text) {
+          try {
+            var errData = JSON.parse(text);
+            var errMsg = (errData.error && errData.error.message) ? errData.error.message : 'API error';
+            throw new Error(errMsg + ' (HTTP ' + response.status + ')');
+          } catch(parseErr) {
+            if (parseErr.message && parseErr.message.indexOf('HTTP') !== -1) throw parseErr;
+            throw new Error('OpenAI API error (HTTP ' + response.status + ')');
+          }
+        });
+      }
+
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+      var msgEl = addPageMessage('assistant', '');
+      var bubbleEl = msgEl.querySelector('.ai-msg-bubble');
+      bubbleEl.classList.add('streaming');
+      var fullText = '';
+      var rafPending = false;
+
+      pageStatus.className = 'ai-page-status ready';
+      pageStatus.textContent = 'ChatGPT';
+      pageStatus.style.display = '';
+
+      // Parse SSE stream
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+
+      function readChunk() {
+        return reader.read().then(function(result) {
+          if (result.done || stopped) {
+            bubbleEl.classList.remove('streaming');
+            chatHistory.push({ role: 'assistant', content: fullText });
+            try { sessionStorage.setItem(SS_KEY_MESSAGES, JSON.stringify(chatHistory.slice(-20))); } catch(e) {}
+            bubbleEl.innerHTML = renderPageMarkdown(fullText);
+            detectPageTaskCards(bubbleEl, fullText);
+            isPageGenerating = false;
+            pageSendBtn.disabled = !pageInput.value.trim();
+            pageStopBtn.style.display = 'none';
+            return;
+          }
+
+          buffer += decoder.decode(result.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line || !line.startsWith('data: ')) continue;
+            var data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              var parsed = JSON.parse(data);
+              var delta = (parsed.choices && parsed.choices[0] && parsed.choices[0].delta) ? (parsed.choices[0].delta.content || '') : '';
+              if (delta) {
+                fullText += delta;
+                if (!rafPending) {
+                  rafPending = true;
+                  requestAnimationFrame(function() {
+                    rafPending = false;
+                    bubbleEl.innerHTML = renderPageMarkdown(fullText);
+                    var atBottom = pageMessages.scrollHeight - pageMessages.scrollTop - pageMessages.clientHeight < 80;
+                    if (atBottom) pageMessages.scrollTop = pageMessages.scrollHeight;
+                  });
+                }
+              }
+            } catch(e) { /* skip malformed SSE lines */ }
+          }
+
+          return readChunk();
+        });
+      }
+
+      return readChunk();
+    }).catch(function(err) {
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+      // AbortController was triggered (user pressed stop) — not an error
+      if (err.name === 'AbortError') {
+        isPageGenerating = false;
+        pageSendBtn.disabled = !pageInput.value.trim();
+        pageStopBtn.style.display = 'none';
+        return;
+      }
+
+      var errMsg = err.message || String(err);
+      var errLower = errMsg.toLowerCase();
+      var friendlyMsg;
+
+      if (errLower.indexOf('401') !== -1 || errLower.indexOf('incorrect api key') !== -1) {
+        friendlyMsg = 'Invalid API key. Check your key in **Settings > AI Companion**.';
+      } else if (errLower.indexOf('429') !== -1 || errLower.indexOf('rate limit') !== -1) {
+        friendlyMsg = 'Rate limited by OpenAI. Wait a moment and try again.';
+      } else if (errLower.indexOf('billing') !== -1 || errLower.indexOf('quota') !== -1) {
+        friendlyMsg = 'OpenAI billing issue. Check your account at platform.openai.com.';
+      } else if (errLower.indexOf('network') !== -1 || errLower.indexOf('fetch') !== -1 || errLower.indexOf('failed to fetch') !== -1) {
+        friendlyMsg = 'Network error \u2014 check your internet connection.';
+      } else {
+        friendlyMsg = 'OpenAI error: ' + errMsg;
+      }
+
+      addPageMessage('assistant', friendlyMsg);
+      pageStatus.className = 'ai-page-status ready';
+      pageStatus.textContent = 'ChatGPT';
+      pageStatus.style.display = '';
+      isPageGenerating = false;
+      pageSendBtn.disabled = !pageInput.value.trim();
+      pageStopBtn.style.display = 'none';
+    });
+
+    pageStopBtn.addEventListener('click', function() {
+      stopped = true;
+      openaiAbort.abort();
+    }, { once: true });
+  }
+
   function _doPageChat(userMessage, chatHistory, typingEl) {
+    // ── OpenAI path ──
+    if (isOpenAIProvider()) {
+      _doPageChatOpenAI(userMessage, chatHistory, typingEl);
+      return;
+    }
+
+    // ── Local WebLLM path ──
     function getEngine() {
       if (!window.dmAI) {
         return Promise.reject(new Error('AI engine not available. Please ensure AI is enabled.'));
