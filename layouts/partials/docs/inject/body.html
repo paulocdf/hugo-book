@@ -3033,7 +3033,7 @@
     if (el) el.checked = aiEnabled;
 
     var aiProvider = 'local';
-    try { var v = localStorage.getItem('dm-ai-provider'); if (v === 'local' || v === 'openai') aiProvider = v; } catch(e) {}
+    try { var v = localStorage.getItem('dm-ai-provider'); if (v === 'local' || v === 'openai' || v === 'gemini') aiProvider = v; } catch(e) {}
     el = document.getElementById('setting-ai-provider');
     if (el) el.value = aiProvider;
 
@@ -3047,14 +3047,30 @@
     el = document.getElementById('setting-ai-openai-key');
     if (el) el.value = aiKey;
 
-    // Show/hide OpenAI-specific settings and update info text based on provider
+    var geminiModel = 'gemini-2.0-flash';
+    try { var v = localStorage.getItem('dm-ai-gemini-model'); if (v) geminiModel = v; } catch(e) {}
+    el = document.getElementById('setting-ai-gemini-model');
+    if (el) el.value = geminiModel;
+
+    var geminiKey = '';
+    try { geminiKey = localStorage.getItem('dm-ai-gemini-key') || ''; } catch(e) {}
+    el = document.getElementById('setting-ai-gemini-key');
+    if (el) el.value = geminiKey;
+
+    // Show/hide provider-specific settings and update info text based on provider
     var openaiGroup = document.getElementById('setting-ai-openai-group');
+    var geminiGroup = document.getElementById('setting-ai-gemini-group');
     var providerInfo = document.getElementById('setting-ai-provider-info');
     if (openaiGroup) openaiGroup.style.display = aiProvider === 'openai' ? '' : 'none';
+    if (geminiGroup) geminiGroup.style.display = aiProvider === 'gemini' ? '' : 'none';
     if (providerInfo) {
-      providerInfo.innerHTML = aiProvider === 'openai'
-        ? '<p>Uses <strong>OpenAI ChatGPT</strong> API. Requires an API key. Usage is billed by OpenAI.</p>'
-        : '<p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU. First use downloads ~350 MB.</p>';
+      if (aiProvider === 'openai') {
+        providerInfo.innerHTML = '<p>Uses <strong>OpenAI ChatGPT</strong> API. Requires an API key. Usage is billed by OpenAI.</p>';
+      } else if (aiProvider === 'gemini') {
+        providerInfo.innerHTML = '<p>Uses <strong>Google Gemini</strong> API with a generous free tier. Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>.</p>';
+      } else {
+        providerInfo.innerHTML = '<p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU. First use downloads ~350 MB.</p>';
+      }
     }
 
     var customCtx = '';
@@ -3276,6 +3292,7 @@
               '<div class="settings-modal-control">' +
                 '<select id="setting-ai-provider" class="settings-modal-select">' +
                   '<option value="local">Local (Qwen2.5)</option>' +
+                  '<option value="gemini">Google Gemini (free)</option>' +
                   '<option value="openai">OpenAI (ChatGPT)</option>' +
                 '</select>' +
               '</div>' +
@@ -3315,6 +3332,40 @@
               '</div>' +
               '<div class="settings-modal-ai-info">' +
                 '<p>Your API key is stored only in this browser\'s localStorage and sent directly to api.openai.com. It is never sent to our servers or committed to source code.</p>' +
+              '</div>' +
+            '</div>' +
+            // ── Gemini-specific settings (hidden when provider != gemini) ──
+            '<div id="setting-ai-gemini-group" style="display:none">' +
+              '<div class="settings-modal-row">' +
+                '<label class="settings-modal-label" for="setting-ai-gemini-model">Model</label>' +
+                '<div class="settings-modal-control">' +
+                  '<select id="setting-ai-gemini-model" class="settings-modal-select">' +
+                    '<option value="gemini-2.0-flash">gemini-2.0-flash</option>' +
+                    '<option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>' +
+                    '<option value="gemini-1.5-flash">gemini-1.5-flash</option>' +
+                  '</select>' +
+                '</div>' +
+              '</div>' +
+              '<div class="settings-modal-row">' +
+                '<label class="settings-modal-label" for="setting-ai-gemini-key">API key</label>' +
+                '<div class="settings-modal-control settings-modal-key-control">' +
+                  '<input type="password" id="setting-ai-gemini-key" class="settings-modal-input settings-modal-key-input" placeholder="AIza..." autocomplete="off" spellcheck="false">' +
+                  '<button type="button" id="setting-ai-gemini-key-toggle" class="settings-modal-key-toggle" title="Show / hide key">' +
+                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+                      '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>' +
+                    '</svg>' +
+                  '</button>' +
+                '</div>' +
+              '</div>' +
+              '<div class="settings-modal-row">' +
+                '<div class="settings-modal-label">&nbsp;</div>' +
+                '<div class="settings-modal-control">' +
+                  '<button type="button" id="setting-ai-gemini-validate" class="settings-modal-validate-btn">Validate key</button>' +
+                  '<span id="setting-ai-gemini-key-status" class="settings-modal-key-status"></span>' +
+                '</div>' +
+              '</div>' +
+              '<div class="settings-modal-ai-info">' +
+                '<p>Free API key from <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>. Stored only in localStorage and sent directly to Google. Free tier: 15 req/min, 1500 req/day.</p>' +
               '</div>' +
             '</div>' +
             '<div class="settings-modal-row">' +
@@ -3498,15 +3549,21 @@
       aiProviderSelect.addEventListener('change', function() {
         var val = aiProviderSelect.value;
         try { localStorage.setItem('dm-ai-provider', val); } catch(e) {}
-        // Show/hide OpenAI settings group
+        // Show/hide provider-specific settings groups
         var openaiGroup = document.getElementById('setting-ai-openai-group');
+        var geminiGroup = document.getElementById('setting-ai-gemini-group');
         if (openaiGroup) openaiGroup.style.display = val === 'openai' ? '' : 'none';
+        if (geminiGroup) geminiGroup.style.display = val === 'gemini' ? '' : 'none';
         // Update provider info text
         var providerInfo = document.getElementById('setting-ai-provider-info');
         if (providerInfo) {
-          providerInfo.innerHTML = val === 'openai'
-            ? '<p>Uses <strong>OpenAI ChatGPT</strong> API. Requires an API key. Usage is billed by OpenAI.</p>'
-            : '<p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU. First use downloads ~350 MB.</p>';
+          if (val === 'openai') {
+            providerInfo.innerHTML = '<p>Uses <strong>OpenAI ChatGPT</strong> API. Requires an API key. Usage is billed by OpenAI.</p>';
+          } else if (val === 'gemini') {
+            providerInfo.innerHTML = '<p>Uses <strong>Google Gemini</strong> API with a generous free tier. Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a>.</p>';
+          } else {
+            providerInfo.innerHTML = '<p>Uses <strong>Qwen2.5-0.5B</strong> running entirely in your browser via WebGPU. First use downloads ~350 MB.</p>';
+          }
         }
         window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-ai-provider', value: val } }));
         // Re-initialize AI companion with new provider
@@ -3593,6 +3650,84 @@
           statusEl.className = 'settings-modal-key-status settings-modal-key-error';
         }).finally(function() {
           aiKeyValidateBtn.disabled = false;
+        });
+      });
+    }
+
+    // ─── Gemini model selector ───
+    var geminiModelSelect = document.getElementById('setting-ai-gemini-model');
+    if (geminiModelSelect) {
+      geminiModelSelect.addEventListener('change', function() {
+        var val = geminiModelSelect.value;
+        try { localStorage.setItem('dm-ai-gemini-model', val); } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-ai-gemini-model', value: val } }));
+      });
+    }
+
+    // ─── Gemini API key input ───
+    var geminiKeyInput = document.getElementById('setting-ai-gemini-key');
+    var _geminiKeySaveTimer = null;
+    if (geminiKeyInput) {
+      geminiKeyInput.addEventListener('input', function() {
+        if (_geminiKeySaveTimer) clearTimeout(_geminiKeySaveTimer);
+        var statusEl = document.getElementById('setting-ai-gemini-key-status');
+        if (statusEl) { statusEl.textContent = ''; statusEl.className = 'settings-modal-key-status'; }
+        _geminiKeySaveTimer = setTimeout(function() {
+          var key = geminiKeyInput.value.trim();
+          try { localStorage.setItem('dm-ai-gemini-key', key); } catch(e) {}
+          _geminiKeySaveTimer = null;
+        }, 500);
+      });
+    }
+
+    // ─── Gemini key show/hide toggle ───
+    var geminiKeyToggle = document.getElementById('setting-ai-gemini-key-toggle');
+    if (geminiKeyToggle && geminiKeyInput) {
+      geminiKeyToggle.addEventListener('click', function() {
+        var isPassword = geminiKeyInput.type === 'password';
+        geminiKeyInput.type = isPassword ? 'text' : 'password';
+        geminiKeyToggle.title = isPassword ? 'Hide key' : 'Show / hide key';
+      });
+    }
+
+    // ─── Gemini key validation ───
+    var geminiKeyValidateBtn = document.getElementById('setting-ai-gemini-validate');
+    if (geminiKeyValidateBtn) {
+      geminiKeyValidateBtn.addEventListener('click', function() {
+        var keyEl = document.getElementById('setting-ai-gemini-key');
+        var statusEl = document.getElementById('setting-ai-gemini-key-status');
+        if (!keyEl || !statusEl) return;
+        var key = keyEl.value.trim();
+        if (!key) {
+          statusEl.textContent = 'Enter a key first';
+          statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+          return;
+        }
+        statusEl.textContent = 'Validating...';
+        statusEl.className = 'settings-modal-key-status';
+        geminiKeyValidateBtn.disabled = true;
+        fetch('https://generativelanguage.googleapis.com/v1beta/models?key=' + key, {
+          method: 'GET'
+        }).then(function(res) {
+          if (res.ok) {
+            statusEl.textContent = 'Valid';
+            statusEl.className = 'settings-modal-key-status settings-modal-key-ok';
+            try { localStorage.setItem('dm-ai-gemini-key', key); } catch(e) {}
+          } else if (res.status === 400 || res.status === 403) {
+            statusEl.textContent = 'Invalid key';
+            statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+          } else if (res.status === 429) {
+            statusEl.textContent = 'Rate limited \u2014 try again';
+            statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+          } else {
+            statusEl.textContent = 'Error (' + res.status + ')';
+            statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+          }
+        }).catch(function() {
+          statusEl.textContent = 'Network error';
+          statusEl.className = 'settings-modal-key-status settings-modal-key-error';
+        }).finally(function() {
+          geminiKeyValidateBtn.disabled = false;
         });
       });
     }

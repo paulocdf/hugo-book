@@ -838,9 +838,11 @@
   var CDN_URL = 'https://esm.run/@mlc-ai/web-llm';
   var LS_KEY_ENABLED = 'dm-ai-enabled';
   var LS_KEY_CONTEXT = 'dm-ai-custom-context';
-  var LS_KEY_PROVIDER = 'dm-ai-provider';         // 'local' | 'openai'
+  var LS_KEY_PROVIDER = 'dm-ai-provider';         // 'local' | 'openai' | 'gemini'
   var LS_KEY_OPENAI_KEY = 'dm-ai-openai-key';
   var LS_KEY_OPENAI_MODEL = 'dm-ai-openai-model'; // 'gpt-4o-mini' | 'gpt-4o' | 'gpt-4-turbo'
+  var LS_KEY_GEMINI_KEY = 'dm-ai-gemini-key';
+  var LS_KEY_GEMINI_MODEL = 'dm-ai-gemini-model'; // 'gemini-2.0-flash' | 'gemini-2.0-flash-lite' | 'gemini-1.5-flash'
   var SS_KEY_MESSAGES = 'dm-ai-messages';
   var SS_KEY_PANEL = 'dm-ai-panel-open';
 
@@ -1008,6 +1010,18 @@
   }
   function isOpenAIProvider() {
     return getProvider() === 'openai' && !!getOpenAIKey();
+  }
+  function getGeminiKey() {
+    return (localStorage.getItem(LS_KEY_GEMINI_KEY) || '').trim();
+  }
+  function getGeminiModel() {
+    return localStorage.getItem(LS_KEY_GEMINI_MODEL) || 'gemini-2.0-flash';
+  }
+  function isGeminiProvider() {
+    return getProvider() === 'gemini' && !!getGeminiKey();
+  }
+  function isCloudProvider() {
+    return isOpenAIProvider() || isGeminiProvider();
   }
 
   // ─── Enhanced system prompt for ChatGPT (richer than Qwen's) ───
@@ -1402,6 +1416,163 @@
     });
   }
 
+  // ─── Gemini streaming client ───
+  function runGeminiChat(userMessage, systemOverride) {
+    isGenerating = true;
+    sendBtn.disabled = true;
+    stopBtn.style.display = '';
+
+    addMessage('user', userMessage);
+    chatHistory.push({ role: 'user', content: userMessage });
+
+    var typingEl = addTypingIndicator();
+
+    var geminiAbort = new AbortController();
+    abortController = { stop: function() { geminiAbort.abort(); } };
+
+    getTaskContext().then(function(ctx) {
+      var tasks = ctx.tasks || ctx;
+      var projectMap = ctx.projectMap || {};
+      var systemPrompt = systemOverride || buildOpenAISystemPrompt(tasks, projectMap);
+
+      // Convert chat history to Gemini format: role 'assistant' → 'model'
+      var recentHistory = chatHistory.slice(-10);
+      var contents = [];
+      for (var i = 0; i < recentHistory.length; i++) {
+        var msg = recentHistory[i];
+        contents.push({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        });
+      }
+
+      var apiKey = getGeminiKey();
+      var model = getGeminiModel();
+
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':streamGenerateContent?alt=sse&key=' + apiKey, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024
+          }
+        }),
+        signal: geminiAbort.signal
+      });
+    }).then(function(response) {
+      if (!response.ok) {
+        return response.text().then(function(text) {
+          try {
+            var errData = JSON.parse(text);
+            var errMsg = (errData.error && errData.error.message) ? errData.error.message : 'API error';
+            throw new Error(errMsg + ' (HTTP ' + response.status + ')');
+          } catch(parseErr) {
+            if (parseErr.message && parseErr.message.indexOf('HTTP') !== -1) throw parseErr;
+            throw new Error('Gemini API error (HTTP ' + response.status + ')');
+          }
+        });
+      }
+
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+      var msgEl = addMessage('assistant', '');
+      var bubbleEl = msgEl.querySelector('.ai-msg-bubble');
+      bubbleEl.classList.add('streaming');
+      var fullText = '';
+      var rafPending = false;
+
+      // Gemini SSE uses same data: prefix but different JSON structure
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+
+      function readChunk() {
+        return reader.read().then(function(result) {
+          if (result.done) {
+            bubbleEl.classList.remove('streaming');
+            chatHistory.push({ role: 'assistant', content: fullText });
+            saveMessages();
+            bubbleEl.innerHTML = renderMarkdown(fullText);
+            addCopyButton(bubbleEl, fullText);
+            detectAndRenderTaskCards(bubbleEl, fullText);
+            isGenerating = false;
+            sendBtn.disabled = !inputEl.value.trim();
+            stopBtn.style.display = 'none';
+            abortController = null;
+            return;
+          }
+
+          buffer += decoder.decode(result.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line || !line.startsWith('data: ')) continue;
+            var data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              var parsed = JSON.parse(data);
+              var delta = '';
+              if (parsed.candidates && parsed.candidates[0] && parsed.candidates[0].content && parsed.candidates[0].content.parts) {
+                var parts = parsed.candidates[0].content.parts;
+                for (var j = 0; j < parts.length; j++) {
+                  if (parts[j].text) delta += parts[j].text;
+                }
+              }
+              if (delta) {
+                fullText += delta;
+                if (!rafPending) {
+                  rafPending = true;
+                  requestAnimationFrame(function() {
+                    rafPending = false;
+                    bubbleEl.innerHTML = renderMarkdown(fullText);
+                    scrollToBottom();
+                  });
+                }
+              }
+            } catch(e) { /* skip malformed SSE lines */ }
+          }
+
+          return readChunk();
+        });
+      }
+
+      return readChunk();
+    }).catch(function(err) {
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+      var errMsg = err.message || String(err);
+      var friendlyMsg = 'Something went wrong.';
+
+      if (err.name === 'AbortError') {
+        isGenerating = false;
+        sendBtn.disabled = !inputEl.value.trim();
+        stopBtn.style.display = 'none';
+        abortController = null;
+        return;
+      }
+      var errLower = errMsg.toLowerCase();
+      if (errLower.indexOf('api_key_invalid') !== -1 || errLower.indexOf('api key not valid') !== -1 || errMsg.indexOf('400') !== -1 || errMsg.indexOf('403') !== -1) {
+        friendlyMsg = 'Invalid API key. Please check your Gemini API key in Settings.';
+      } else if (errMsg.indexOf('429') !== -1 || errLower.indexOf('rate') !== -1 || errLower.indexOf('quota') !== -1) {
+        friendlyMsg = 'Rate limited by Gemini. The free tier allows 15 requests/minute. Wait a moment and try again.';
+      } else if (errLower.indexOf('network') !== -1 || errLower.indexOf('fetch') !== -1 || errLower.indexOf('failed') !== -1) {
+        friendlyMsg = 'Network error — check your connection and try again.';
+      } else {
+        friendlyMsg += ' ' + errMsg;
+      }
+      addMessage('assistant', friendlyMsg);
+      isGenerating = false;
+      sendBtn.disabled = !inputEl.value.trim();
+      stopBtn.style.display = 'none';
+      abortController = null;
+    });
+  }
+
   // ─── WebGPU check ───
   function checkWebGPU() {
     if (!hasWebGPU) {
@@ -1534,6 +1705,10 @@
     // Branch by provider
     if (isOpenAIProvider()) {
       runOpenAIChat(userMessage, systemOverride);
+      return;
+    }
+    if (isGeminiProvider()) {
+      runGeminiChat(userMessage, systemOverride);
       return;
     }
 
@@ -1949,6 +2124,9 @@
       if (isOpenAIProvider()) {
         // OpenAI mode: no WebGPU needed
         setStatus('ready', 'ChatGPT');
+      } else if (isGeminiProvider()) {
+        // Gemini mode: no WebGPU needed
+        setStatus('ready', 'Gemini');
       } else if (!hasWebGPU) {
         notSupportedEl.style.display = '';
         quickActions.style.display = 'none';
@@ -2659,6 +2837,9 @@
     if (isOpenAIProvider()) {
       // OpenAI mode: ready immediately, no WebGPU needed
       setStatus('ready', 'ChatGPT');
+    } else if (isGeminiProvider()) {
+      // Gemini mode: ready immediately, no WebGPU needed
+      setStatus('ready', 'Gemini');
     } else if (!hasWebGPU) {
       notSupportedEl.style.display = '';
     }
@@ -2684,6 +2865,8 @@
     getStatus: function() { return aiStatus; },
     getProvider: getProvider,
     isOpenAIProvider: isOpenAIProvider,
+    isGeminiProvider: isGeminiProvider,
+    isCloudProvider: isCloudProvider,
     // Engine sharing: the dedicated AI page delegates to these
     _getEngine: function() {
       return engine ? Promise.resolve(engine) : Promise.reject(new Error('Engine not loaded'));
@@ -2692,6 +2875,7 @@
       return loadEngine();
     },
     _runOpenAIChat: runOpenAIChat,
+    _runGeminiChat: runGeminiChat,
     _buildSystemPrompt: buildSystemPrompt,
     _buildOpenAISystemPrompt: buildOpenAISystemPrompt,
     _renderMarkdown: renderMarkdown,
@@ -2705,6 +2889,8 @@
     _fmtDate: _fmtDate,
     _getOpenAIKey: getOpenAIKey,
     _getOpenAIModel: getOpenAIModel,
+    _getGeminiKey: getGeminiKey,
+    _getGeminiModel: getGeminiModel,
     _parseSSEStream: parseSSEStream,
     _getTaskContext: getTaskContext
   };

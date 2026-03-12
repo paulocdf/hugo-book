@@ -573,6 +573,15 @@
     try { return localStorage.getItem('dm-ai-provider') === 'openai'; } catch(e) { return false; }
   }
 
+  function isGeminiProvider() {
+    if (window.dmAI && window.dmAI.isGeminiProvider) return window.dmAI.isGeminiProvider();
+    try { return localStorage.getItem('dm-ai-provider') === 'gemini'; } catch(e) { return false; }
+  }
+
+  function isCloudProvider() {
+    return isOpenAIProvider() || isGeminiProvider();
+  }
+
   // ─── Auth ───
   function updatePageAuth(user) {
     if (user) {
@@ -610,6 +619,8 @@
   function updatePageState() {
     var enabled = isAiEnabled();
     var usingOpenAI = isOpenAIProvider();
+    var usingGemini = isGeminiProvider();
+    var usingCloud = usingOpenAI || usingGemini;
     pageEnabledToggle.checked = enabled;
 
     // Update subtitle based on provider
@@ -619,13 +630,17 @@
         var model = 'gpt-4o-mini';
         try { var v = localStorage.getItem('dm-ai-openai-model'); if (v) model = v; } catch(e) {}
         subtitleEl.textContent = 'Powered by OpenAI ' + model;
+      } else if (usingGemini) {
+        var model = 'gemini-2.0-flash';
+        try { var v = localStorage.getItem('dm-ai-gemini-model'); if (v) model = v; } catch(e) {}
+        subtitleEl.textContent = 'Powered by Google ' + model;
       } else {
         subtitleEl.textContent = 'Powered by Qwen2.5-0.5B running locally in your browser';
       }
     }
 
     // WebGPU check only applies to local provider
-    if (!hasWebGPU && !usingOpenAI) {
+    if (!hasWebGPU && !usingCloud) {
       pageWarning.style.display = '';
       pageDisabled.style.display = '';
       pageActions.style.display = 'none';
@@ -646,6 +661,8 @@
       if (detailEl) {
         if (usingOpenAI) {
           detailEl.textContent = 'Using OpenAI API \u2014 requires an API key configured in Settings.';
+        } else if (usingGemini) {
+          detailEl.textContent = 'Using Google Gemini API (free tier) \u2014 requires an API key configured in Settings.';
         } else {
           detailEl.textContent = 'First use downloads ~350 MB (cached for future visits). Requires ~1 GB GPU memory and WebGPU support.';
         }
@@ -659,10 +676,14 @@
     loadTaskContext();
     loadPageMessages();
 
-    // Update status badge for OpenAI
+    // Update status badge based on provider
     if (usingOpenAI) {
       pageStatus.className = 'ai-page-status ready';
       pageStatus.textContent = 'ChatGPT';
+      pageStatus.style.display = '';
+    } else if (usingGemini) {
+      pageStatus.className = 'ai-page-status ready';
+      pageStatus.textContent = 'Gemini';
       pageStatus.style.display = '';
     } else {
       // Reset status for local provider (will be updated when engine loads)
@@ -1121,7 +1142,211 @@
     }, { once: true });
   }
 
+  // ── Gemini chat execution for full page ──
+  function _doPageChatGemini(userMessage, chatHistory, typingEl) {
+    var stopped = false;
+    var geminiAbort = new AbortController();
+
+    // Get API key
+    var apiKey = '';
+    if (window.dmAI && window.dmAI._getGeminiKey) {
+      apiKey = window.dmAI._getGeminiKey();
+    } else {
+      try { apiKey = localStorage.getItem('dm-ai-gemini-key') || ''; } catch(e) {}
+    }
+    if (!apiKey) {
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+      addPageMessage('assistant', 'No Gemini API key configured. Go to **Settings > AI Companion** to add your key. You can get a free key at [aistudio.google.com](https://aistudio.google.com/apikey).');
+      isPageGenerating = false;
+      pageSendBtn.disabled = !pageInput.value.trim();
+      pageStopBtn.style.display = 'none';
+      return;
+    }
+
+    // Get model
+    var model = 'gemini-2.0-flash';
+    if (window.dmAI && window.dmAI._getGeminiModel) {
+      model = window.dmAI._getGeminiModel();
+    } else {
+      try { var v = localStorage.getItem('dm-ai-gemini-model'); if (v) model = v; } catch(e) {}
+    }
+
+    // Build system prompt and messages
+    function getTaskContext() {
+      return new Promise(function(resolve) {
+        if (!window.dmSync || !window.dmSync.getAllTodos) { resolve([]); return; }
+        window.dmSync.getAllTodos().then(function(t) { resolve(t || []); }).catch(function() { resolve([]); });
+      });
+    }
+
+    getTaskContext().then(function(tasks) {
+      var systemPrompt;
+      if (window.dmAI && window.dmAI._buildOpenAISystemPrompt) {
+        systemPrompt = window.dmAI._buildOpenAISystemPrompt(tasks);
+      } else if (window.dmAI && window.dmAI._buildSystemPrompt) {
+        systemPrompt = window.dmAI._buildSystemPrompt(tasks);
+      } else {
+        systemPrompt = 'You are a productivity assistant. Be concise. Use bullet points with dashes. Keep replies under 150 words. When suggesting tasks, wrap each title in **bold**.';
+      }
+
+      // Convert chat history to Gemini format: role 'assistant' → 'model'
+      var recent = chatHistory.slice(-10);
+      var contents = [];
+      for (var i = 0; i < recent.length; i++) {
+        var msg = recent[i];
+        contents.push({
+          role: msg.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: msg.content }]
+        });
+      }
+
+      pageStatus.className = 'ai-page-status loading';
+      pageStatus.textContent = 'Thinking...';
+      pageStatus.style.display = '';
+
+      return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':streamGenerateContent?alt=sse&key=' + apiKey, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: contents,
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024
+          }
+        }),
+        signal: geminiAbort.signal
+      });
+    }).then(function(response) {
+      if (!response.ok) {
+        return response.text().then(function(text) {
+          try {
+            var errData = JSON.parse(text);
+            var errMsg = (errData.error && errData.error.message) ? errData.error.message : 'API error';
+            throw new Error(errMsg + ' (HTTP ' + response.status + ')');
+          } catch(parseErr) {
+            if (parseErr.message && parseErr.message.indexOf('HTTP') !== -1) throw parseErr;
+            throw new Error('Gemini API error (HTTP ' + response.status + ')');
+          }
+        });
+      }
+
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+      var msgEl = addPageMessage('assistant', '');
+      var bubbleEl = msgEl.querySelector('.ai-msg-bubble');
+      bubbleEl.classList.add('streaming');
+      var fullText = '';
+      var rafPending = false;
+
+      pageStatus.className = 'ai-page-status ready';
+      pageStatus.textContent = 'Gemini';
+      pageStatus.style.display = '';
+
+      // Parse SSE stream — Gemini uses data: prefix but different JSON structure
+      var reader = response.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = '';
+
+      function readChunk() {
+        return reader.read().then(function(result) {
+          if (result.done || stopped) {
+            bubbleEl.classList.remove('streaming');
+            chatHistory.push({ role: 'assistant', content: fullText });
+            try { sessionStorage.setItem(SS_KEY_MESSAGES, JSON.stringify(chatHistory.slice(-20))); } catch(e) {}
+            bubbleEl.innerHTML = renderPageMarkdown(fullText);
+            detectPageTaskCards(bubbleEl, fullText);
+            isPageGenerating = false;
+            pageSendBtn.disabled = !pageInput.value.trim();
+            pageStopBtn.style.display = 'none';
+            return;
+          }
+
+          buffer += decoder.decode(result.value, { stream: true });
+          var lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim();
+            if (!line || !line.startsWith('data: ')) continue;
+            var data = line.slice(6);
+            if (data === '[DONE]') continue;
+            try {
+              var parsed = JSON.parse(data);
+              var delta = '';
+              if (parsed.candidates && parsed.candidates[0] && parsed.candidates[0].content && parsed.candidates[0].content.parts) {
+                var parts = parsed.candidates[0].content.parts;
+                for (var j = 0; j < parts.length; j++) {
+                  if (parts[j].text) delta += parts[j].text;
+                }
+              }
+              if (delta) {
+                fullText += delta;
+                if (!rafPending) {
+                  rafPending = true;
+                  requestAnimationFrame(function() {
+                    rafPending = false;
+                    bubbleEl.innerHTML = renderPageMarkdown(fullText);
+                    var atBottom = pageMessages.scrollHeight - pageMessages.scrollTop - pageMessages.clientHeight < 80;
+                    if (atBottom) pageMessages.scrollTop = pageMessages.scrollHeight;
+                  });
+                }
+              }
+            } catch(e) { /* skip malformed SSE lines */ }
+          }
+
+          return readChunk();
+        });
+      }
+
+      return readChunk();
+    }).catch(function(err) {
+      if (typingEl && typingEl.parentNode) typingEl.parentNode.removeChild(typingEl);
+
+      // AbortController was triggered (user pressed stop) — not an error
+      if (err.name === 'AbortError') {
+        isPageGenerating = false;
+        pageSendBtn.disabled = !pageInput.value.trim();
+        pageStopBtn.style.display = 'none';
+        return;
+      }
+
+      var errMsg = err.message || String(err);
+      var errLower = errMsg.toLowerCase();
+      var friendlyMsg;
+
+      if (errLower.indexOf('api_key_invalid') !== -1 || errLower.indexOf('api key not valid') !== -1 || errMsg.indexOf('400') !== -1 || errMsg.indexOf('403') !== -1) {
+        friendlyMsg = 'Invalid API key. Please check your Gemini API key in **Settings > AI Companion**.';
+      } else if (errMsg.indexOf('429') !== -1 || errLower.indexOf('rate') !== -1 || errLower.indexOf('quota') !== -1) {
+        friendlyMsg = 'Rate limited by Gemini. The free tier allows 15 requests/minute. Wait a moment and try again.';
+      } else if (errLower.indexOf('network') !== -1 || errLower.indexOf('fetch') !== -1 || errLower.indexOf('failed to fetch') !== -1) {
+        friendlyMsg = 'Network error \u2014 check your internet connection.';
+      } else {
+        friendlyMsg = 'Gemini error: ' + errMsg;
+      }
+
+      addPageMessage('assistant', friendlyMsg);
+      pageStatus.className = 'ai-page-status ready';
+      pageStatus.textContent = 'Gemini';
+      pageStatus.style.display = '';
+      isPageGenerating = false;
+      pageSendBtn.disabled = !pageInput.value.trim();
+      pageStopBtn.style.display = 'none';
+    });
+
+    pageStopBtn.addEventListener('click', function() {
+      stopped = true;
+      geminiAbort.abort();
+    }, { once: true });
+  }
+
   function _doPageChat(userMessage, chatHistory, typingEl) {
+    // ── Gemini path ──
+    if (isGeminiProvider()) {
+      _doPageChatGemini(userMessage, chatHistory, typingEl);
+      return;
+    }
+
     // ── OpenAI path ──
     if (isOpenAIProvider()) {
       _doPageChatOpenAI(userMessage, chatHistory, typingEl);
