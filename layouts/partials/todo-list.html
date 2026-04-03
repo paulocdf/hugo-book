@@ -2814,7 +2814,6 @@
   var _justCompletedIds = {}; // { todoId: true } — for slide-down animation on just-completed tasks
   var _justAddedIds = {}; // { todoId: true } — for highlight flash animation on just-added tasks
   var _addFormCategory = null; // Selected category string for new task
-  var _addFormCategoryPrompted = false; // True when Enter opened category popover (submit on select/skip)
   var _addFormBujoType = 'task'; // Selected BuJo type for new item (task/event/note)
   var _addFormProjectId = null; // Selected project ID for new task
   var _addFormProjectName = ''; // Display name for selected project
@@ -3559,12 +3558,7 @@
   function selectCat(cat) {
     _addFormCategory = cat;
     updateCategoryChip();
-    var shouldSubmit = _addFormCategoryPrompted;
-    _addFormCategoryPrompted = false;
     hideCatPopover();
-    if (shouldSubmit) {
-      addFromForm();
-    }
   }
 
   function navigateCatDropdown(direction) {
@@ -3591,7 +3585,6 @@
     addCategoryPopover.style.display = 'none';
     hideCatDropdown();
     addCategoryInput.value = '';
-    _addFormCategoryPrompted = false;
   }
 
   addCategoryIcon.addEventListener('click', function(e) {
@@ -3635,13 +3628,8 @@
       } else if (addCategoryInput.value.trim()) {
         selectCat(addCategoryInput.value.trim().toLowerCase());
       } else {
-        // Empty Enter = skip category
-        var shouldSubmit = _addFormCategoryPrompted;
-        _addFormCategoryPrompted = false;
+        // Empty Enter = close popover
         hideCatPopover();
-        if (shouldSubmit) {
-          addFromForm();
-        }
       }
     } else if (e.key === 'Escape') {
       e.preventDefault();
@@ -7539,12 +7527,6 @@
       e.preventDefault();
       var title = addTitleInput.value.trim();
       if (!title) { addTitleInput.focus(); return; }
-      // If no category set yet, prompt user to pick one first
-      if (!_addFormCategory) {
-        _addFormCategoryPrompted = true;
-        showCatPopover();
-        return;
-      }
       // Cmd+Enter or Shift+Enter → submit and keep form open for rapid add
       var keepOpen = e.metaKey || e.shiftKey;
       addFromForm(keepOpen);
