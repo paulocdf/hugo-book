@@ -20,10 +20,17 @@
         <span class="todo-pf-badge" id="todo-pf-badge" style="display:none;"></span>
       </button>
     </div>
+    <button type="button" class="todo-hide-completed-btn" id="todo-hide-completed-btn" title="Hide completed (h)" aria-label="Hide completed tasks">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      <span class="todo-hc-badge" id="todo-hc-badge" style="display:none;"></span>
+    </button>
     <button type="button" class="todo-shortcuts-btn" id="todo-shortcuts-btn" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
     </button>
   </div>
+
+  <!-- Today's Focus Dashboard -->
+  <div class="todo-focus-dashboard" id="todo-focus-dashboard" style="display:none;"></div>
 
   <div class="todo-list-body" id="todo-list-body">
     <!-- Add todo form — two rows: inputs + icon bar with chips -->
@@ -136,6 +143,7 @@
       <div class="todo-shortcuts-section">
         <h5>Global</h5>
         <div class="todo-shortcut-row"><kbd>t</kbd><span>Focus task input</span></div>
+        <div class="todo-shortcut-row"><kbd>h</kbd><span>Toggle hide completed</span></div>
         <div class="todo-shortcut-row"><kbd>?</kbd><span>Show this help</span></div>
         <div class="todo-shortcut-row"><kbd>Esc</kbd><span>Close overlay / form</span></div>
       </div>
@@ -214,6 +222,110 @@
   fill: var(--body-font-color);
 }
 
+/* Today's Focus Dashboard */
+.todo-focus-dashboard {
+  padding: 10px 14px;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
+  font-size: 0.78rem;
+  color: var(--body-font-color);
+}
+.todo-focus-dashboard.collapsed .todo-focus-body {
+  display: none;
+}
+.todo-focus-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+.todo-focus-chevron {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.2s;
+  color: var(--gray-400);
+}
+.todo-focus-dashboard.collapsed .todo-focus-chevron {
+  transform: rotate(-90deg);
+}
+.todo-focus-title {
+  font-weight: 600;
+  color: var(--color-link);
+}
+.todo-focus-header-stats {
+  font-size: 0.7rem;
+  color: var(--gray-400);
+  margin-left: auto;
+}
+.todo-focus-body {
+  margin-top: 8px;
+}
+.todo-focus-progress-bar {
+  height: 6px;
+  background: var(--gray-200);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.todo-focus-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--color-link);
+  width: 0;
+  transition: width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.todo-focus-progress-fill.complete {
+  background: var(--color-success, #2e7d32);
+}
+.todo-focus-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.72rem;
+  color: var(--gray-500);
+}
+.todo-focus-stat {
+  white-space: nowrap;
+}
+.todo-focus-stat strong {
+  font-weight: 600;
+  color: var(--body-font-color);
+}
+.todo-focus-stat.overdue {
+  color: var(--color-danger, #e53935);
+  cursor: pointer;
+}
+.todo-focus-stat.overdue:hover {
+  text-decoration: underline;
+}
+.todo-focus-migrate-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 8px;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-danger, #e53935);
+  background: transparent;
+  border: 1px solid var(--color-danger, #e53935);
+  border-radius: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+}
+.todo-focus-migrate-all:hover {
+  background: var(--color-danger, #e53935);
+  color: #fff;
+}
+.todo-focus-migrate-all svg {
+  flex-shrink: 0;
+}
+.todo-focus-stat.upcoming {
+  color: var(--gray-400);
+}
+
 /* Shortcuts help button */
 .todo-shortcuts-btn {
   display: inline-flex;
@@ -234,6 +346,50 @@
 .todo-shortcuts-btn:hover {
   color: var(--body-font-color);
   border-color: var(--gray-300);
+}
+/* Hide completed toggle */
+.todo-hide-completed-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  margin-left: 4px;
+}
+.todo-hide-completed-btn:hover {
+  color: var(--body-font-color);
+  border-color: var(--gray-300);
+}
+.todo-hide-completed-btn.active {
+  border-color: var(--color-link);
+  color: var(--color-link);
+  background: color-mix(in srgb, var(--color-link) 8%, var(--body-background));
+}
+.todo-hc-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  background: var(--color-link);
+  color: #fff;
+  font-size: 0.6rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3px;
+  line-height: 1;
 }
 /* Shortcuts overlay */
 .todo-shortcuts-overlay {
@@ -1066,6 +1222,13 @@
   border-left-color: var(--color-danger);
   background: var(--color-danger-bg);
 }
+.todo-day-header.overdue .todo-day-badge {
+  animation: overdue-pulse 2.5s ease-in-out infinite;
+}
+@keyframes overdue-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 .todo-day-header.tomorrow {
   color: var(--color-success);
   border-left-color: var(--color-success);
@@ -1096,7 +1259,48 @@
   font-size: 0.68rem;
   font-weight: 500;
   color: var(--gray-400);
+  white-space: nowrap;
+}
+.todo-day-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   margin-left: auto;
+}
+.todo-day-progress-bar {
+  width: 48px;
+  height: 4px;
+  background: var(--gray-200);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.todo-day-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  width: 0;
+  background: var(--gray-400);
+  transition: width 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+.todo-day-header.today .todo-day-progress-fill {
+  background: var(--color-link);
+}
+.todo-day-header.overdue .todo-day-progress-fill {
+  background: var(--color-danger, #e53935);
+}
+.todo-day-header.tomorrow .todo-day-progress-fill {
+  background: var(--color-success, #43a047);
+}
+.todo-day-progress-fill.complete {
+  background: var(--color-success, #2e7d32);
+}
+.todo-day-time-summary {
+  font-size: 0.65rem;
+  font-weight: 400;
+  color: var(--gray-400);
+  white-space: nowrap;
+  margin-left: 4px;
+  flex-shrink: 0;
 }
 .todo-add-btn {
   display: inline-flex;
@@ -1665,6 +1869,31 @@
     color: #e0b44a;
   }
 }
+/* Task age badge */
+.todo-item-age {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 0 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.todo-item-age.age-mild {
+  color: var(--gray-400);
+  background: rgba(0, 0, 0, 0.04);
+}
+.todo-item-age.age-notice {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+.todo-item-age.age-warning {
+  color: #ea580c;
+  background: rgba(234, 88, 12, 0.08);
+}
+.todo-item-age.age-critical {
+  color: var(--color-danger, #e53935);
+  background: rgba(229, 57, 53, 0.08);
+}
 .todo-item-finish-at {
   font-size: 0.66rem;
   color: var(--gray-400);
@@ -2021,6 +2250,12 @@
     font-size: 0.72rem;
     padding: 5px 8px;
     gap: 6px;
+  }
+  .todo-day-progress-bar {
+    width: 36px;
+  }
+  .todo-day-time-summary {
+    display: none;
   }
   .todo-reminder-popover {
     right: auto;
@@ -2425,6 +2660,37 @@
   color: var(--color-success, #2e7d32);
   font-size: 0.6rem;
 }
+/* Today pulse dot */
+.todo-week-today-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-link);
+  animation: week-today-pulse 2s ease-in-out infinite;
+}
+@keyframes week-today-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+/* Overdue dot + styling for past days with open tasks */
+.todo-week-overdue-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--color-danger, #e53935);
+}
+.todo-week-day.is-overdue {
+  opacity: 1;
+}
+.todo-week-day.is-overdue .todo-week-day-label {
+  color: var(--color-danger, #e53935);
+}
+.todo-week-day.is-overdue .todo-week-bar-fill {
+  background: var(--color-danger, #e53935);
+}
+.todo-week-day.is-overdue .todo-week-day-count {
+  color: var(--color-danger, #e53935);
+}
 @media (prefers-color-scheme: dark) {
   .todo-week-bar {
     background: var(--body-background, #1a1a1a);
@@ -2530,6 +2796,9 @@
   var projectFilterChips = document.getElementById('todo-pf-chips');
   var projectFilterTrigger = document.getElementById('todo-pf-trigger');
   var projectFilterBadge = document.getElementById('todo-pf-badge');
+  var hideCompletedBtn = document.getElementById('todo-hide-completed-btn');
+  var hideCompletedBadge = document.getElementById('todo-hc-badge');
+  var focusDashboard = document.getElementById('todo-focus-dashboard');
 
   if (!container || !itemsEl) return;
 
@@ -2552,6 +2821,10 @@
   var _addFormProjectColor = ''; // Color of selected project
   var _projectMap = {}; // { projectId: { name, color } } — populated in render() for display
   var _filterProjectIds = new Set(['__none__']); // Active project filters — default to "No project"
+  var _hideCompleted = false; // Hide completed tasks toggle
+  try { _hideCompleted = localStorage.getItem('dm-todo-hide-completed') === '1'; } catch(e) {}
+  var _focusDashboardCollapsed = false; // Focus dashboard collapsed state
+  try { _focusDashboardCollapsed = localStorage.getItem('dm-todo-focus-dashboard') === '1'; } catch(e) {}
   var _existingCategories = []; // Cached list of existing categories for autocomplete
   var _catDropdownActiveIdx = -1; // Active index in category dropdown
   var _defaultPomodoroCount = 1;
@@ -2761,6 +3034,14 @@
     var d = new Date();
     d.setDate(d.getDate() + offset);
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+
+  function formatMinutes(min) {
+    if (min < 60) return min + 'min';
+    var h = (min / 60).toFixed(1);
+    // Drop trailing .0 for whole hours
+    if (h.endsWith('.0')) h = h.slice(0, -2);
+    return h + 'h';
   }
 
   function getReminderMs(type) {
@@ -3937,6 +4218,23 @@
         escapeHtml(proj.name) + '</span>';
     }
 
+    // Task age badge (undone tasks older than 3 days)
+    if (!todo.done && todo.createdAt) {
+      var ageDays = Math.floor((Date.now() - todo.createdAt) / 86400000);
+      if (ageDays >= 3) {
+        var ageLabel, ageClass;
+        if (ageDays >= 30) { ageLabel = Math.floor(ageDays / 30) + 'mo'; ageClass = 'age-critical'; }
+        else if (ageDays >= 14) { ageLabel = Math.floor(ageDays / 7) + 'w'; ageClass = 'age-warning'; }
+        else if (ageDays >= 7) { ageLabel = '1w'; ageClass = 'age-notice'; }
+        else { ageLabel = ageDays + 'd'; ageClass = 'age-mild'; }
+        var ageDate = new Date(todo.createdAt);
+        var ageDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        var ageMonthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var ageTooltip = 'Created ' + ageDayNames[ageDate.getDay()] + ', ' + ageMonthNames[ageDate.getMonth()] + ' ' + ageDate.getDate();
+        html += '<span class="todo-item-age ' + ageClass + '" title="' + escapeHtml(ageTooltip) + '">' + ageLabel + '</span>';
+      }
+    }
+
     // Notes indicator icon
     if (todo.notes) {
       html += '<span class="todo-item-has-notes" title="Has notes"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg></span>';
@@ -4032,6 +4330,29 @@
       });
     }
 
+    // Update hide-completed button state
+    var completedCount = 0;
+    visibleTodos.forEach(function(t) { if (t.done) completedCount++; });
+    if (hideCompletedBtn) {
+      if (_hideCompleted) {
+        hideCompletedBtn.classList.add('active');
+        hideCompletedBtn.title = 'Show completed (h)';
+        hideCompletedBtn.setAttribute('aria-label', 'Show completed tasks');
+      } else {
+        hideCompletedBtn.classList.remove('active');
+        hideCompletedBtn.title = 'Hide completed (h)';
+        hideCompletedBtn.setAttribute('aria-label', 'Hide completed tasks');
+      }
+    }
+    if (hideCompletedBadge) {
+      if (_hideCompleted && completedCount > 0) {
+        hideCompletedBadge.textContent = completedCount;
+        hideCompletedBadge.style.display = '';
+      } else {
+        hideCompletedBadge.style.display = 'none';
+      }
+    }
+
     // Separate parents and children
     var parents = [];
     var childrenMap = {}; // parentId -> [children]
@@ -4089,20 +4410,156 @@
     var today = getTodayStr();
     var tomorrow = getDateOffset(1);
 
+    // ─── Today's Focus Dashboard ───
+    if (focusDashboard) {
+      var todayTasks = dateGroups[today] || [];
+      if (todayTasks.length === 0 && totalParents === 0) {
+        focusDashboard.style.display = 'none';
+      } else {
+        // Compute today's stats (leaf tasks only)
+        var tdDone = 0, tdTotal = 0, tdEstMin = 0, tdTrackedMin = 0;
+        todayTasks.forEach(function(p) {
+          var ch = childrenMap[p.id] || [];
+          if (ch.length > 0) {
+            ch.forEach(function(c) {
+              tdTotal++;
+              if (c.done) { tdDone++; if (c.actualMin > 0) tdTrackedMin += c.actualMin; }
+              else { if (c.estimatedMin > 0) tdEstMin += c.estimatedMin; }
+            });
+          } else {
+            tdTotal++;
+            if (p.done) { tdDone++; if (p.actualMin > 0) tdTrackedMin += p.actualMin; }
+            else { if (p.estimatedMin > 0) tdEstMin += p.estimatedMin; }
+          }
+        });
+
+        // Count overdue and upcoming
+        var overdueCount = 0, upcomingCount = 0;
+        sortedDates.forEach(function(d) {
+          if (d < today) {
+            dateGroups[d].forEach(function(p) {
+              var ch = childrenMap[p.id] || [];
+              if (ch.length > 0) {
+                ch.forEach(function(c) { if (!c.done) overdueCount++; });
+              } else {
+                if (!p.done) overdueCount++;
+              }
+            });
+          } else if (d > today) {
+            dateGroups[d].forEach(function(p) {
+              var ch = childrenMap[p.id] || [];
+              if (ch.length > 0) { upcomingCount += ch.length; } else { upcomingCount++; }
+            });
+          }
+        });
+
+        var tdPct = tdTotal > 0 ? Math.round(tdDone / tdTotal * 100) : 0;
+        var isAllDone = tdDone === tdTotal && tdTotal > 0;
+
+        // Format today's date label
+        var todayDate = new Date();
+        var dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var todayLabel = 'Today \u00B7 ' + dayNames[todayDate.getDay()] + ', ' + monthNames[todayDate.getMonth()] + ' ' + todayDate.getDate();
+
+        var dh = '';
+        // Header row: chevron + title + collapsed stats
+        dh += '<div class="todo-focus-header" data-focus-toggle>';
+        dh += '<span class="todo-focus-chevron"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg></span>';
+        dh += '<span class="todo-focus-title">' + todayLabel + '</span>';
+        if (tdTotal > 0) {
+          dh += '<span class="todo-focus-header-stats">' + tdDone + '/' + tdTotal + ' (' + tdPct + '%)</span>';
+        }
+        dh += '</div>';
+
+        // Body: progress bar + stats
+        dh += '<div class="todo-focus-body">';
+        // Progress bar
+        if (tdTotal > 0) {
+          var fillCls = 'todo-focus-progress-fill' + (isAllDone ? ' complete' : '');
+          dh += '<div class="todo-focus-progress-bar"><div class="' + fillCls + '" data-focus-pct="' + tdPct + '"></div></div>';
+        }
+        // Stats row
+        dh += '<div class="todo-focus-stats">';
+        if (tdTotal > 0) {
+          dh += '<span class="todo-focus-stat"><strong>' + tdDone + '/' + tdTotal + '</strong> tasks (' + tdPct + '%)</span>';
+        }
+        if (tdTrackedMin > 0) {
+          dh += '<span class="todo-focus-stat">' + formatMinutes(tdTrackedMin) + ' tracked</span>';
+        }
+        if (tdEstMin > 0) {
+          var remainMin = tdEstMin;
+          if (window.dmPomodoro && window.dmPomodoro.isTimerRunning && window.dmPomodoro.isTimerRunning()) {
+            var si = window.dmPomodoro.getSessionInfo ? window.dmPomodoro.getSessionInfo() : null;
+            if (si && si.elapsedSec > 0) remainMin = Math.max(0, remainMin - Math.floor(si.elapsedSec / 60));
+          }
+          dh += '<span class="todo-focus-stat">' + formatMinutes(tdEstMin) + ' left</span>';
+          var finishMs = Date.now() + remainMin * 60000;
+          var fd = new Date(finishMs);
+          dh += '<span class="todo-focus-stat">finish ~' + String(fd.getHours()).padStart(2, '0') + ':' + String(fd.getMinutes()).padStart(2, '0') + '</span>';
+        }
+        if (overdueCount > 0) {
+          dh += '<span class="todo-focus-stat overdue" data-focus-scroll-overdue title="Scroll to overdue tasks">' + overdueCount + ' overdue</span>';
+          dh += '<button type="button" class="todo-focus-migrate-all" data-focus-migrate-all title="Migrate all overdue tasks to today">';
+          dh += '<svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg>';
+          dh += ' Migrate all';
+          dh += '</button>';
+        }
+        if (upcomingCount > 0) {
+          dh += '<span class="todo-focus-stat upcoming">' + upcomingCount + ' upcoming</span>';
+        }
+        dh += '</div>';
+        dh += '</div>';
+
+        focusDashboard.innerHTML = dh;
+        focusDashboard.style.display = '';
+        if (_focusDashboardCollapsed) {
+          focusDashboard.classList.add('collapsed');
+        } else {
+          focusDashboard.classList.remove('collapsed');
+        }
+        // Animate progress fill
+        requestAnimationFrame(function() {
+          var fill = focusDashboard.querySelector('.todo-focus-progress-fill[data-focus-pct]');
+          if (fill) fill.style.width = fill.getAttribute('data-focus-pct') + '%';
+        });
+      }
+    }
+
     // Helper: build a day group with header, chevron, progress, collapse
     function buildDayGroup(groupKey, headerInfo, tasksInGroup) {
       // Calculate progress (count leaf tasks — parent tasks with children are excluded)
       var doneInGroup = 0;
       var totalInGroup = 0;
+      var groupEstMin = 0;   // estimated minutes for undone leaf tasks
+      var groupTrackedMin = 0; // actual minutes for done leaf tasks
       tasksInGroup.forEach(function(p) {
         var ch = childrenMap[p.id] || [];
         if (ch.length > 0) {
-          ch.forEach(function(c) { totalInGroup++; if (c.done) doneInGroup++; });
+          ch.forEach(function(c) {
+            totalInGroup++;
+            if (c.done) {
+              doneInGroup++;
+              if (c.actualMin > 0) groupTrackedMin += c.actualMin;
+            } else {
+              if (c.estimatedMin > 0) groupEstMin += c.estimatedMin;
+            }
+          });
         } else {
           totalInGroup++;
-          if (p.done) doneInGroup++;
+          if (p.done) {
+            doneInGroup++;
+            if (p.actualMin > 0) groupTrackedMin += p.actualMin;
+          } else {
+            if (p.estimatedMin > 0) groupEstMin += p.estimatedMin;
+          }
         }
       });
+
+      // Hide entire group when hiding completed and all tasks are done
+      if (_hideCompleted && doneInGroup === totalInGroup && totalInGroup > 0) {
+        return '';
+      }
 
       // Fix 6: overdue styling only when group has at least one incomplete task
       var cssClass = headerInfo.cssClass;
@@ -4117,7 +4574,10 @@
       var stored = null;
       try { stored = localStorage.getItem(storageKey); } catch(e) {}
       var isCollapsed;
-      if (stored !== null) {
+      // Overdue groups with open tasks are always expanded (prevent "collapse and forget")
+      if (cssClass === 'overdue') {
+        isCollapsed = false;
+      } else if (stored !== null) {
         isCollapsed = stored === '1';
       } else {
         // Default: collapse future dates, unscheduled, and past dates where all tasks are done
@@ -4137,7 +4597,42 @@
         g += '<span class="todo-day-badge">' + escapeHtml(badge) + '</span>';
       }
       g += '<span class="todo-day-label">' + escapeHtml(headerInfo.label) + '</span>';
-      g += '<span class="todo-day-progress">' + doneInGroup + '/' + totalInGroup + '</span>';
+      // Progress wrapper: count + bar
+      var pct = totalInGroup > 0 ? Math.round(doneInGroup / totalInGroup * 100) : 0;
+      var progressText = doneInGroup + '/' + totalInGroup;
+      if (totalInGroup >= 3) progressText += ' (' + pct + '%)';
+      var fillClass = 'todo-day-progress-fill' + (doneInGroup === totalInGroup && totalInGroup > 0 ? ' complete' : '');
+      g += '<span class="todo-day-progress-wrap">';
+      g += '<span class="todo-day-progress">' + progressText + '</span>';
+      g += '<span class="todo-day-progress-bar"><span class="' + fillClass + '" data-pct="' + pct + '"></span></span>';
+      g += '</span>';
+      // Time summary: Est + Tracked + finish time (for today)
+      if (groupEstMin > 0 || groupTrackedMin > 0) {
+        var timeParts = [];
+        if (groupEstMin > 0) {
+          timeParts.push('Est: ' + formatMinutes(groupEstMin));
+        }
+        if (groupTrackedMin > 0) {
+          timeParts.push('Tracked: ' + formatMinutes(groupTrackedMin));
+        }
+        // Finish time for today's group only
+        if (groupKey === today && groupEstMin > 0) {
+          var remainMin = groupEstMin;
+          // Subtract elapsed pomodoro time if timer is active on a task in this group
+          if (window.dmPomodoro && window.dmPomodoro.isTimerRunning && window.dmPomodoro.isTimerRunning()) {
+            var si = window.dmPomodoro.getSessionInfo ? window.dmPomodoro.getSessionInfo() : null;
+            if (si && si.elapsedSec > 0) {
+              remainMin = Math.max(0, remainMin - Math.floor(si.elapsedSec / 60));
+            }
+          }
+          var finishMs = Date.now() + remainMin * 60000;
+          var fd = new Date(finishMs);
+          var fh = String(fd.getHours()).padStart(2, '0');
+          var fm = String(fd.getMinutes()).padStart(2, '0');
+          timeParts.push('~' + fh + ':' + fm);
+        }
+        g += '<span class="todo-day-time-summary">' + timeParts.join(' · ') + '</span>';
+      }
       // Migrate to Today button for overdue groups with open tasks
       if (cssClass === 'overdue' && doneInGroup < totalInGroup) {
         g += '<button type="button" class="todo-day-migrate-btn" data-migrate-group="' + escapeHtml(groupKey) + '" title="Migrate open tasks to today">';
@@ -4216,19 +4711,29 @@
       });
 
       tasksInGroup.forEach(function(parent) {
+        // Skip done parent tasks when hiding completed
+        if (_hideCompleted && parent.done) {
+          // Still check: if this parent has undone children, render the parent as a container
+          var ch = childrenMap[parent.id] || [];
+          var hasUndoneChild = ch.some(function(c) { return !c.done; });
+          if (!hasUndoneChild) return; // all children done or no children — skip entirely
+        }
         var children = childrenMap[parent.id] || [];
         g += '<div class="todo-item-group" data-group-id="' + parent.id + '">';
         g += buildTodoItemHtml(parent, false, children.length > 0, finishAtMap[parent.id] || null);
         if (children.length > 0) {
-          var subCollapsed = false;
-          try { subCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + parent.id) === '1'; } catch(e) {}
-          g += '<div class="todo-subtasks-wrapper' + (subCollapsed ? ' collapsed' : '') + '" data-subtasks-parent="' + parent.id + '">';
-          g += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
-          children.forEach(function(child) {
-            g += buildTodoItemHtml(child, true, false, finishAtMap[child.id] || null);
-          });
-          g += '</div>';
-          g += '</div>';
+          var visibleChildren = _hideCompleted ? children.filter(function(c) { return !c.done; }) : children;
+          if (visibleChildren.length > 0) {
+            var subCollapsed = false;
+            try { subCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + parent.id) === '1'; } catch(e) {}
+            g += '<div class="todo-subtasks-wrapper' + (subCollapsed ? ' collapsed' : '') + '" data-subtasks-parent="' + parent.id + '">';
+            g += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
+            visibleChildren.forEach(function(child) {
+              g += buildTodoItemHtml(child, true, false, finishAtMap[child.id] || null);
+            });
+            g += '</div>';
+            g += '</div>';
+          }
         }
         g += '</div>';
       });
@@ -4266,37 +4771,75 @@
         var wParts = wDateStr.split('-');
         var wDate = new Date(parseInt(wParts[0]), parseInt(wParts[1]) - 1, parseInt(wParts[2]));
 
-        // Count top-level tasks for this day
+        // Count top-level tasks for this day (leaf counting)
         var wTasks = dateGroups[wDateStr] || [];
-        var wTotal = 0, wDone = 0;
+        var wTotal = 0, wDone = 0, wEstMin = 0, wTrackedMin = 0;
         wTasks.forEach(function(p) {
           var ch = childrenMap[p.id] || [];
           if (ch.length > 0) {
-            ch.forEach(function(c) { wTotal++; if (c.done) wDone++; });
+            ch.forEach(function(c) {
+              wTotal++;
+              if (c.done) {
+                wDone++;
+                wTrackedMin += c.actualMin || 0;
+              } else {
+                wEstMin += c.estimatedMin || 0;
+              }
+            });
           } else {
             wTotal++;
-            if (p.done) wDone++;
+            if (p.done) {
+              wDone++;
+              wTrackedMin += p.actualMin || 0;
+            } else {
+              wEstMin += p.estimatedMin || 0;
+            }
           }
         });
 
         var wClasses = 'todo-week-day';
         var wIsClosed = !!_closedDays[wDateStr];
+        var wIsOverdue = false;
         if (wDateStr === today) {
           wClasses += ' is-today';
           if (wTotal > 0 && wDone === wTotal) wClasses += ' is-all-done';
         } else if (wDateStr < today) {
           wClasses += ' is-past';
           if (wTotal > 0 && wDone === wTotal) wClasses += ' is-all-done';
+          if (wTotal > 0 && wDone < wTotal) wIsOverdue = true;
         } else {
           wClasses += ' is-future';
         }
         if (wIsClosed) wClasses += ' is-closed';
+        if (wIsOverdue) wClasses += ' is-overdue';
 
-        html += '<div class="' + wClasses + '" data-week-day="' + wDateStr + '">';
+        // Build tooltip text
+        var fullDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+        var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var wTooltip = fullDayNames[wDate.getDay()] + ', ' + monthNames[wDate.getMonth()] + ' ' + wDate.getDate();
+        if (wTotal > 0) {
+          var wPct = Math.round((wDone / wTotal) * 100);
+          wTooltip += ' \u2022 ' + wDone + '/' + wTotal + ' tasks (' + wPct + '%)';
+          if (wEstMin > 0) wTooltip += ' \u2022 Est: ' + formatMinutes(wEstMin);
+          if (wTrackedMin > 0) wTooltip += ' \u2022 Tracked: ' + formatMinutes(wTrackedMin);
+          if (wIsOverdue) wTooltip += ' \u2022 Overdue!';
+        } else {
+          wTooltip += ' \u2022 No tasks';
+        }
+
+        html += '<div class="' + wClasses + '" data-week-day="' + wDateStr + '" title="' + escapeHtml(wTooltip) + '">';
         html += '<span class="todo-week-day-label">' + dayLabels[wi] + ' ' + wDate.getDate() + '</span>';
         html += buildWeekDayProgress(wDone, wTotal);
         if (wTotal > 0) {
           html += '<span class="todo-week-day-count">' + wDone + '/' + wTotal + '</span>';
+        }
+        // Today pulse dot
+        if (wDateStr === today && !(wTotal > 0 && wDone === wTotal)) {
+          html += '<span class="todo-week-today-dot"></span>';
+        }
+        // Overdue dot
+        if (wIsOverdue) {
+          html += '<span class="todo-week-overdue-dot"></span>';
         }
         html += '</div>';
       }
@@ -4402,6 +4945,13 @@
         }
       });
     }
+
+    // Animate day group progress bar fills
+    requestAnimationFrame(function() {
+      itemsEl.querySelectorAll('.todo-day-progress-fill[data-pct]').forEach(function(fill) {
+        fill.style.width = fill.getAttribute('data-pct') + '%';
+      });
+    });
 
     // Summary (counts visible tasks only — active + done, not archived/deleted)
     var totalEst = 0, totalActual = 0, doneCount = 0, totalCount = 0;
@@ -4529,9 +5079,9 @@
 
   function migrateGroupToToday(groupDateStr) {
     var today = getTodayStr();
-    // Find all open (not done, not already migrated/scheduled) tasks in this date group
+    // Find all undone tasks in this date group (regardless of bujoState)
     var tasksToMigrate = allTodos.filter(function(t) {
-      return t.scheduledDate === groupDateStr && !t.done && (t.bujoState || 'open') === 'open' && !t.parentId;
+      return t.scheduledDate === groupDateStr && !t.done && !t.parentId;
     });
     tasksToMigrate.forEach(function(parent) {
       changeBujoState(parent, 'migrated', today);
@@ -4991,6 +5541,18 @@
           }
           group.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
+      });
+    });
+
+    // Week summary bar: double-click a future day to pre-fill add-task date
+    itemsEl.querySelectorAll('.todo-week-day.is-future[data-week-day]').forEach(function(col) {
+      col.addEventListener('dblclick', function(e) {
+        e.preventDefault();
+        var dateKey = col.getAttribute('data-week-day');
+        _addFormDate = dateKey;
+        updateDateChip();
+        addTitleInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        addTitleInput.focus();
       });
     });
 
@@ -7047,6 +7609,70 @@
     });
   }
 
+  // ─── Hide completed toggle ───
+  function toggleHideCompleted() {
+    _hideCompleted = !_hideCompleted;
+    try { localStorage.setItem('dm-todo-hide-completed', _hideCompleted ? '1' : '0'); } catch(e) {}
+    render();
+  }
+  if (hideCompletedBtn) {
+    hideCompletedBtn.addEventListener('click', toggleHideCompleted);
+    // Apply initial state
+    if (_hideCompleted) hideCompletedBtn.classList.add('active');
+  }
+
+  // ─── Focus Dashboard: collapse/expand + scroll-to-overdue ───
+  if (focusDashboard) {
+    focusDashboard.addEventListener('click', function(e) {
+      // Collapse / expand toggle
+      var toggleEl = e.target.closest('[data-focus-toggle]');
+      if (toggleEl) {
+        _focusDashboardCollapsed = !_focusDashboardCollapsed;
+        try { localStorage.setItem('dm-todo-focus-dashboard', _focusDashboardCollapsed ? '1' : '0'); } catch(ex) {}
+        if (_focusDashboardCollapsed) {
+          focusDashboard.classList.add('collapsed');
+        } else {
+          focusDashboard.classList.remove('collapsed');
+          // Re-animate progress fill on expand
+          requestAnimationFrame(function() {
+            var fill = focusDashboard.querySelector('.todo-focus-progress-fill[data-focus-pct]');
+            if (fill) fill.style.width = fill.getAttribute('data-focus-pct') + '%';
+          });
+        }
+        return;
+      }
+      // Scroll to first overdue day group
+      var scrollBtn = e.target.closest('[data-focus-scroll-overdue]');
+      if (scrollBtn) {
+        var overdueHeader = todoBody.querySelector('.todo-day-header.overdue');
+        if (overdueHeader) {
+          var group = overdueHeader.closest('.todo-day-group');
+          if (group && group.classList.contains('collapsed')) {
+            group.classList.remove('collapsed');
+            try { localStorage.setItem('dm-todo-daygroup-' + group.getAttribute('data-day-group'), '0'); } catch(ex) {}
+          }
+          overdueHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        return;
+      }
+      // Batch migrate all overdue tasks to today
+      var migrateBtn = e.target.closest('[data-focus-migrate-all]');
+      if (migrateBtn) {
+        var todayStr = getTodayStr();
+        var overdueGroups = [];
+        allTodos.forEach(function(t) {
+          if (t.scheduledDate && t.scheduledDate < todayStr && !t.done && !t.parentId) {
+            if (overdueGroups.indexOf(t.scheduledDate) === -1) overdueGroups.push(t.scheduledDate);
+          }
+        });
+        if (overdueGroups.length === 0) return;
+        overdueGroups.forEach(function(groupDate) {
+          migrateGroupToToday(groupDate);
+        });
+      }
+    });
+  }
+
   // Global shortcut: T to focus the task input
   document.addEventListener('keydown', function(e) {
     if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
@@ -7057,6 +7683,17 @@
       // Scroll the input into view if needed
       addTitleInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
       addTitleInput.focus();
+    }
+  });
+
+  // Global shortcut: H to toggle hide completed
+  document.addEventListener('keydown', function(e) {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
+    if (e.key === 'h' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+      var todoList = document.getElementById('todo-list');
+      if (!todoList || todoList.style.display === 'none') return;
+      e.preventDefault();
+      toggleHideCompleted();
     }
   });
 
