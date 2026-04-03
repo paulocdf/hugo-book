@@ -263,6 +263,185 @@
 })();
 </script>
 
+<!-- ─── Pending Note Share Invitations UI ─── -->
+<div class="dm-invitations-banner" id="dm-note-invitations-banner"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  var banner = document.getElementById('dm-note-invitations-banner');
+  if (!banner) return;
+
+  var dismissed = {};
+
+  function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  function renderNoteInvitations(invites) {
+    var pending = invites.filter(function(inv) {
+      return inv.status === 'pending' && !dismissed[inv.id];
+    });
+
+    if (pending.length === 0) {
+      banner.innerHTML = '';
+      return;
+    }
+
+    var html = '';
+    pending.forEach(function(inv) {
+      html += '<div class="dm-invitation-card" data-note-invitation-id="' + inv.id + '" style="position: relative;">';
+      html += '<button type="button" class="dm-invitation-dismiss" data-note-dismiss-id="' + inv.id + '" title="Dismiss">&times;</button>';
+      html += '<div class="dm-invitation-header">';
+      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>';
+      html += 'Note Shared With You';
+      html += '</div>';
+      html += '<div class="dm-invitation-body">';
+      html += '<span class="dm-invitation-from">' + escapeHtml(inv.ownerName || inv.ownerEmail || 'Someone') + '</span>';
+      html += ' shared a note';
+      if (inv.noteTitle) {
+        html += ': <span class="dm-invitation-task-title">"' + escapeHtml(inv.noteTitle) + '"</span>';
+      }
+      html += '</div>';
+      html += '<div class="dm-invitation-actions">';
+      html += '<button type="button" class="dm-invitation-accept" data-note-accept-id="' + inv.id + '">Accept</button>';
+      html += '<button type="button" class="dm-invitation-decline" data-note-decline-id="' + inv.id + '">Decline</button>';
+      html += '</div>';
+      html += '</div>';
+    });
+
+    banner.innerHTML = html;
+
+    // Accept handlers
+    banner.querySelectorAll('[data-note-accept-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var shareId = btn.getAttribute('data-note-accept-id');
+        btn.disabled = true;
+        btn.textContent = 'Accepting...';
+        if (window.dmSync && window.dmSync.acceptNoteShare) {
+          window.dmSync.acceptNoteShare(shareId).then(function() {
+            removeNoteCard(shareId);
+          }).catch(function(err) {
+            console.error('[note-invitations] Accept failed:', err);
+            btn.disabled = false;
+            btn.textContent = 'Accept';
+            var card = btn.closest('.dm-invitation-card');
+            if (card) {
+              var existing = card.querySelector('.dm-invitation-error');
+              if (existing) existing.remove();
+              var errEl = document.createElement('div');
+              errEl.className = 'dm-invitation-error';
+              errEl.style.cssText = 'color:#e74c3c;font-size:0.82em;margin-top:6px;';
+              errEl.textContent = 'Failed to accept: ' + (err.message || 'Unknown error');
+              card.appendChild(errEl);
+            }
+          });
+        }
+      });
+    });
+
+    // Decline handlers
+    banner.querySelectorAll('[data-note-decline-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var shareId = btn.getAttribute('data-note-decline-id');
+        btn.disabled = true;
+        btn.textContent = 'Declining...';
+        if (window.dmSync && window.dmSync.declineNoteShare) {
+          window.dmSync.declineNoteShare(shareId).then(function() {
+            removeNoteCard(shareId);
+          }).catch(function(err) {
+            console.error('[note-invitations] Decline failed:', err);
+            btn.disabled = false;
+            btn.textContent = 'Decline';
+          });
+        }
+      });
+    });
+
+    // Dismiss handlers
+    banner.querySelectorAll('[data-note-dismiss-id]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var shareId = btn.getAttribute('data-note-dismiss-id');
+        dismissed[shareId] = true;
+        removeNoteCard(shareId);
+      });
+    });
+  }
+
+  function removeNoteCard(shareId) {
+    var card = banner.querySelector('[data-note-invitation-id="' + shareId + '"]');
+    if (card) {
+      card.style.transition = 'opacity 0.2s, transform 0.2s';
+      card.style.opacity = '0';
+      card.style.transform = 'translateX(20px)';
+      setTimeout(function() { card.remove(); }, 200);
+    }
+  }
+
+  function loadPendingNoteInvites() {
+    if (!window.dmSync || !window.dmSync.getPendingNoteInvites) return;
+    window.dmSync.getPendingNoteInvites().then(function(invites) {
+      var enriched = [];
+      var chain = Promise.resolve();
+      invites.forEach(function(inv) {
+        chain = chain.then(function() {
+          if (inv.noteTitle) {
+            enriched.push(inv);
+            return Promise.resolve();
+          }
+          // Try local IDB for the note title
+          if (window.dmSync.getNote) {
+            return window.dmSync.getNote(inv.noteId).then(function(note) {
+              if (note) {
+                inv.noteTitle = note.title || '';
+                enriched.push(inv);
+              } else if (window.dmDb) {
+                return window.dmDb.collection('notes').doc(inv.noteId).get().then(function(doc) {
+                  inv.noteTitle = doc.exists ? (doc.data().title || '') : '';
+                  enriched.push(inv);
+                }).catch(function() {
+                  enriched.push(inv);
+                });
+              } else {
+                enriched.push(inv);
+              }
+            }).catch(function() {
+              enriched.push(inv);
+            });
+          } else {
+            enriched.push(inv);
+            return Promise.resolve();
+          }
+        });
+      });
+      chain.then(function() {
+        renderNoteInvitations(enriched);
+      });
+    });
+  }
+
+  // Listen for real-time note share updates
+  window.addEventListener('dm-note-shares-updated', function() {
+    loadPendingNoteInvites();
+  });
+
+  // Also load once on initial auth/sync
+  var _noteInviteInitRetries = 0;
+  function tryNoteInitialLoad() {
+    if (window.dmSync && window.dmSync.getPendingNoteInvites) {
+      loadPendingNoteInvites();
+    } else if (_noteInviteInitRetries < 10) {
+      _noteInviteInitRetries++;
+      setTimeout(tryNoteInitialLoad, 1000);
+    }
+  }
+  setTimeout(tryNoteInitialLoad, 1500);
+})();
+</script>
+
 <!-- Quick Capture FAB (Floating Action Button) -->
 <button class="quick-capture-fab" id="quick-capture-btn" aria-label="Quick Capture (Q)" title="Quick Capture">
   <svg class="fab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

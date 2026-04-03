@@ -161,7 +161,7 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-   var DB_VERSION = 14;
+   var DB_VERSION = 15;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -170,6 +170,7 @@
   var STORE_ATTACHMENTS = 'attachments';
   var STORE_REVIEW_CARDS = 'reviewCards';
   var STORE_TASK_SHARES = 'taskShares';
+  var STORE_NOTE_SHARES = 'noteShares';
   var STORE_PROJECTS = 'projects';
   var STORE_KANBAN_COLUMNS = 'kanbanColumns';
   var MAX_VERSIONS_PER_NOTE = 50;
@@ -313,6 +314,14 @@
           var colStore = db.createObjectStore(STORE_KANBAN_COLUMNS, { keyPath: 'id' });
           colStore.createIndex('userId', 'userId', { unique: false });
           colStore.createIndex('order', 'order', { unique: false });
+        }
+        // Note shares store (v15) — for collaborative note sharing
+        if (!db.objectStoreNames.contains(STORE_NOTE_SHARES)) {
+          var noteShareStore = db.createObjectStore(STORE_NOTE_SHARES, { keyPath: 'id' });
+          noteShareStore.createIndex('noteId', 'noteId', { unique: false });
+          noteShareStore.createIndex('ownerId', 'ownerId', { unique: false });
+          noteShareStore.createIndex('inviteeEmail', 'inviteeEmail', { unique: false });
+          noteShareStore.createIndex('status', 'status', { unique: false });
         }
       };
       req.onblocked = function() {
@@ -811,6 +820,7 @@
       userEmail: data.userEmail || '',
       userName: data.userName || '',
       pinned: data.pinned || false,
+      collaborators: data.collaborators || [],
       deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
       createdAt: createdAt,
       updatedAt: updatedAt
@@ -1331,6 +1341,8 @@
       .then(function() { return syncPageFilters(userId); })
       .then(function() { return syncTaskShares(userId); })
       .then(function() { return syncSharedTodos(userId); })
+      .then(function() { return syncNoteShares(userId); })
+      .then(function() { return syncSharedNotes(userId); })
       .then(function() {
         _syncing = false;
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -2575,6 +2587,403 @@
     });
   }
 
+  // ─── Note Sharing ───
+
+  /**
+   * Serialize a noteShares Firestore document for IndexedDB storage.
+   */
+  function serializeNoteShare(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      noteId: data.noteId || '',
+      noteTitle: data.noteTitle || '',
+      ownerId: data.ownerId || '',
+      ownerEmail: data.ownerEmail || '',
+      ownerName: data.ownerName || '',
+      inviteeEmail: data.inviteeEmail || '',
+      inviteeUid: data.inviteeUid || null,
+      status: data.status || 'pending',
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  /**
+   * Share a note with another user by email.
+   * Creates a noteShares doc with a deterministic ID (noteId_inviteeUid) so
+   * Firestore security rules can verify the share exists when the invitee
+   * adds themselves to the note's collaborators array.
+   * @param {string} noteId — the note to share
+   * @param {string} email — invitee's email address
+   * @returns {Promise<Object>} — the created share doc
+   */
+  function shareNote(noteId, email) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+    if (!window.dmDb) return Promise.reject(new Error('Firestore not available'));
+    if (email === user.email) return Promise.reject(new Error('Cannot share with yourself'));
+
+    // Look up invitee first — they must have an account for deterministic ID
+    return lookupUserByEmail(email).then(function(invitee) {
+      if (!invitee) return Promise.reject(new Error('No account found for ' + email + '. They must sign in at least once before you can share with them.'));
+
+      // Deterministic share ID: noteId_inviteeUid
+      var shareId = noteId + '_' + invitee.uid;
+
+      // Check if already shared with this user, and fetch note title
+      return Promise.all([
+        idbGetAll(STORE_NOTE_SHARES),
+        idbGet(STORE_NOTES, noteId)
+      ]).then(function(results) {
+        var shares = results[0];
+        var note = results[1];
+        var existing = shares.find(function(s) {
+          return s.id === shareId && s.status !== 'declined';
+        });
+        if (existing) return Promise.reject(new Error('Already shared with ' + email));
+
+        var now = Date.now();
+        var noteTitle = (note && note.title) || '';
+
+        // Backfill collaborators array for pre-sharing notes
+        var backfillPromise = Promise.resolve();
+        if (note && (!note.collaborators || !Array.isArray(note.collaborators))) {
+          backfillPromise = window.dmDb.collection('notes').doc(noteId).set({
+            collaborators: []
+          }, { merge: true }).then(function() {
+            note.collaborators = [];
+            return idbPut(STORE_NOTES, note);
+          }).catch(function(err) {
+            console.warn('[dm-sync] Note collaborators backfill failed (non-fatal):', err.message);
+          });
+        }
+
+        var shareData = {
+          noteId: noteId,
+          noteTitle: noteTitle,
+          ownerId: user.uid,
+          ownerEmail: user.email || '',
+          ownerName: user.displayName || '',
+          inviteeEmail: email,
+          inviteeUid: invitee.uid,
+          status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        var localShare = {
+          id: shareId,
+          noteId: noteId,
+          noteTitle: noteTitle,
+          ownerId: user.uid,
+          ownerEmail: user.email || '',
+          ownerName: user.displayName || '',
+          inviteeEmail: email,
+          inviteeUid: invitee.uid,
+          status: 'pending',
+          createdAt: now,
+          updatedAt: now
+        };
+
+        return backfillPromise.then(function() {
+          return firestoreWrite({
+            collection: 'noteShares',
+            docId: shareId,
+            op: 'set',
+            data: shareData,
+            localOp: function() { return idbPut(STORE_NOTE_SHARES, localShare); }
+          });
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-note-shares-updated'));
+          return localShare;
+        });
+      });
+    });
+  }
+
+  /**
+   * Accept a pending note share invitation.
+   * Updates status to 'accepted', sets inviteeUid, adds current user to note's
+   * collaborators array, and fetches the shared note into local IDB.
+   * @param {string} shareId — the noteShares document ID (format: noteId_inviteeUid)
+   */
+  function acceptNoteShare(shareId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+    if (!window.dmDb) return Promise.reject(new Error('You must be online to accept a share'));
+
+    return idbGet(STORE_NOTE_SHARES, shareId).then(function(share) {
+      if (!share) return Promise.reject(new Error('Share not found'));
+      if (share.status !== 'pending') return Promise.reject(new Error('Share is not pending'));
+
+      // Step 1: Update the share document status to 'accepted' — direct Firestore write
+      return window.dmDb.collection('noteShares').doc(shareId).update({
+        status: 'accepted',
+        inviteeUid: user.uid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(function() {
+        share.status = 'accepted';
+        share.inviteeUid = user.uid;
+        share.updatedAt = Date.now();
+        return idbPut(STORE_NOTE_SHARES, share);
+      }).then(function() {
+        // Step 2: Add current user to the note's collaborators array
+        return window.dmDb.collection('notes').doc(share.noteId).update({
+          collaborators: firebase.firestore.FieldValue.arrayUnion(user.uid),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }).then(function() {
+        // Step 3: Fetch the shared note into local IDB
+        return window.dmDb.collection('notes').doc(share.noteId).get().then(function(doc) {
+          if (doc.exists) {
+            var note = serializeNote(doc);
+            return idbPut(STORE_NOTES, note);
+          }
+        });
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-note-shares-updated'));
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    });
+  }
+
+  /**
+   * Decline a pending note share invitation.
+   * @param {string} shareId — the noteShares document ID
+   */
+  function declineNoteShare(shareId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+
+    return idbGet(STORE_NOTE_SHARES, shareId).then(function(share) {
+      if (!share) return Promise.reject(new Error('Share not found'));
+
+      share.status = 'declined';
+      share.inviteeUid = user.uid;
+      share.updatedAt = Date.now();
+
+      return firestoreWrite({
+        collection: 'noteShares',
+        docId: shareId,
+        op: 'update',
+        data: {
+          status: 'declined',
+          inviteeUid: user.uid,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        },
+        localOp: function() { return idbPut(STORE_NOTE_SHARES, share); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-note-shares-updated'));
+      });
+    });
+  }
+
+  /**
+   * Remove sharing for a note with a specific user. Owner-only operation.
+   * Removes the share doc and the user from the note's collaborators array.
+   * @param {string} shareId — the noteShares document ID
+   */
+  function unshareNote(shareId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+
+    return idbGet(STORE_NOTE_SHARES, shareId).then(function(share) {
+      if (!share) return Promise.reject(new Error('Share not found'));
+      if (share.ownerId !== user.uid) return Promise.reject(new Error('Only the owner can unshare'));
+
+      var inviteeUid = share.inviteeUid;
+      var noteId = share.noteId;
+
+      // Delete the share document
+      return firestoreWrite({
+        collection: 'noteShares',
+        docId: shareId,
+        op: 'delete',
+        data: null,
+        localOp: function() { return idbDelete(STORE_NOTE_SHARES, shareId); }
+      }).then(function() {
+        // Remove collaborator from note's collaborators array
+        if (inviteeUid && window.dmDb) {
+          return window.dmDb.collection('notes').doc(noteId).update({
+            collaborators: firebase.firestore.FieldValue.arrayRemove(inviteeUid),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function() {
+            return idbGet(STORE_NOTES, noteId).then(function(note) {
+              if (note && note.collaborators) {
+                note.collaborators = note.collaborators.filter(function(uid) { return uid !== inviteeUid; });
+                note.updatedAt = Date.now();
+                return idbPut(STORE_NOTES, note);
+              }
+            });
+          }).catch(function(err) {
+            console.warn('[dm-sync] Failed to remove note collaborator:', err);
+          });
+        }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-note-shares-updated'));
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    });
+  }
+
+  /**
+   * Get all shares for a specific note.
+   * @param {string} noteId
+   * @returns {Promise<Array>}
+   */
+  function getSharesForNote(noteId) {
+    return idbGetAll(STORE_NOTE_SHARES).then(function(shares) {
+      return shares.filter(function(s) { return s.noteId === noteId; });
+    });
+  }
+
+  /**
+   * Get pending note share invitations for the current user.
+   * @returns {Promise<Array>}
+   */
+  function getPendingNoteInvites() {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve([]);
+
+    return idbGetAll(STORE_NOTE_SHARES).then(function(shares) {
+      return shares.filter(function(s) {
+        return s.inviteeEmail === user.email && s.status === 'pending';
+      });
+    });
+  }
+
+  /**
+   * Get all note shares owned by the current user.
+   * @returns {Promise<Array>}
+   */
+  function getMyNoteShares() {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve([]);
+
+    return idbGetAll(STORE_NOTE_SHARES).then(function(shares) {
+      return shares.filter(function(s) { return s.ownerId === user.uid; });
+    });
+  }
+
+  /**
+   * Sync note shares from Firestore for the current user.
+   * Fetches shares where user is owner OR where user is invitee.
+   */
+  function syncNoteShares(userId) {
+    if (!window.dmDb) return Promise.resolve();
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve();
+
+    console.log('[dm-sync] Syncing note shares...');
+
+    var ownerQuery = window.dmDb.collection('noteShares')
+      .where('ownerId', '==', userId)
+      .get();
+
+    var inviteeQuery = window.dmDb.collection('noteShares')
+      .where('inviteeEmail', '==', user.email)
+      .get();
+
+    return Promise.all([ownerQuery, inviteeQuery]).then(function(results) {
+      var remoteShares = [];
+      var seen = {};
+
+      results.forEach(function(snapshot) {
+        snapshot.forEach(function(doc) {
+          if (!seen[doc.id]) {
+            seen[doc.id] = true;
+            remoteShares.push(serializeNoteShare(doc));
+          }
+        });
+      });
+
+      return idbGetAll(STORE_NOTE_SHARES).then(function(localShares) {
+        var localMap = {};
+        localShares.forEach(function(s) { localMap[s.id] = s; });
+
+        var remoteMap = {};
+        remoteShares.forEach(function(s) { remoteMap[s.id] = s; });
+
+        var toUpsert = [];
+        remoteShares.forEach(function(rs) {
+          var ls = localMap[rs.id];
+          if (!ls || ls.updatedAt !== rs.updatedAt) {
+            toUpsert.push(rs);
+          }
+        });
+
+        var toDelete = [];
+        localShares.forEach(function(ls) {
+          if (!remoteMap[ls.id]) {
+            toDelete.push(ls.id);
+          }
+        });
+
+        var promises = [];
+        if (toUpsert.length > 0) {
+          promises.push(idbPutBatch(STORE_NOTE_SHARES, toUpsert));
+        }
+        toDelete.forEach(function(id) {
+          promises.push(idbDelete(STORE_NOTE_SHARES, id));
+        });
+
+        return Promise.all(promises).then(function() {
+          console.log('[dm-sync] Note shares sync complete. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
+          if (toUpsert.length > 0 || toDelete.length > 0) {
+            window.dispatchEvent(new CustomEvent('dm-note-shares-updated'));
+          }
+        });
+      });
+    });
+  }
+
+  /**
+   * Sync shared notes — fetch notes where current user is a collaborator.
+   * These are merged into the local notes store.
+   */
+  function syncSharedNotes(userId) {
+    if (!window.dmDb) return Promise.resolve();
+
+    console.log('[dm-sync] Syncing shared notes...');
+    return window.dmDb.collection('notes')
+      .where('collaborators', 'array-contains', userId)
+      .get()
+      .then(function(snapshot) {
+        var sharedNotes = [];
+        snapshot.forEach(function(doc) {
+          sharedNotes.push(serializeNote(doc));
+        });
+
+        if (sharedNotes.length === 0) {
+          console.log('[dm-sync] No shared notes found');
+          return;
+        }
+
+        var toUpsert = [];
+        return idbGetAll(STORE_NOTES).then(function(localNotes) {
+          var localMap = {};
+          localNotes.forEach(function(n) { localMap[n.id] = n; });
+
+          sharedNotes.forEach(function(sn) {
+            var ln = localMap[sn.id];
+            if (!ln || ln.updatedAt !== sn.updatedAt) {
+              toUpsert.push(sn);
+            }
+          });
+
+          if (toUpsert.length > 0) {
+            return idbPutBatch(STORE_NOTES, toUpsert).then(function() {
+              console.log('[dm-sync] Shared notes synced: ' + toUpsert.length);
+              window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+            });
+          }
+        });
+      }).catch(function(err) {
+        console.warn('[dm-sync] Shared notes sync error:', err);
+      });
+  }
+
   /**
    * Sync task shares from Firestore for the current user.
    * Fetches shares where user is owner OR where user is invitee.
@@ -2892,6 +3301,196 @@
     if (_ownerSharesUnsubscribe) {
       _ownerSharesUnsubscribe();
       _ownerSharesUnsubscribe = null;
+    }
+  }
+
+  // ─── Real-Time Listeners for Shared Notes ───
+
+  var _sharedNotesUnsubscribe = null;
+  var _ownNotesUnsubscribe = null;
+  var _noteShareInvitesUnsubscribe = null;
+  var _ownerNoteSharesUnsubscribe = null;
+  var _sharedNotesRetryTimer = null;
+  var _sharedNotesRetryCount = 0;
+  var _ownNotesRetryTimer = null;
+  var _ownNotesRetryCount = 0;
+  var SHARED_NOTES_MAX_RETRIES = 5;
+
+  function _attachSharedNotesListener(userId) {
+    if (!window.dmDb) return;
+    _sharedNotesUnsubscribe = window.dmDb.collection('notes')
+      .where('collaborators', 'array-contains', userId)
+      .onSnapshot(function(snapshot) {
+        _sharedNotesRetryCount = 0;
+        var changes = [];
+        snapshot.docChanges().forEach(function(change) {
+          if (change.type === 'added' || change.type === 'modified') {
+            console.log('[dm-sync] Shared note ' + change.type + ':', change.doc.id, change.doc.data().title);
+            changes.push(serializeNote(change.doc));
+          } else if (change.type === 'removed') {
+            console.log('[dm-sync] Shared note removed:', change.doc.id);
+            idbGet(STORE_NOTES, change.doc.id).then(function(note) {
+              if (note && note.userId !== userId) {
+                idbDelete(STORE_NOTES, change.doc.id);
+              }
+            });
+          }
+        });
+        if (changes.length > 0) {
+          idbPutBatch(STORE_NOTES, changes).then(function() {
+            window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Shared notes listener error:', err);
+        if (_sharedNotesRetryCount < SHARED_NOTES_MAX_RETRIES) {
+          var delay = Math.min(1000 * Math.pow(2, _sharedNotesRetryCount), 30000);
+          _sharedNotesRetryCount++;
+          console.log('[dm-sync] Retrying shared notes listener in ' + delay + 'ms (attempt ' + _sharedNotesRetryCount + '/' + SHARED_NOTES_MAX_RETRIES + ')');
+          _sharedNotesRetryTimer = setTimeout(function() {
+            _attachSharedNotesListener(userId);
+          }, delay);
+        } else {
+          console.error('[dm-sync] Shared notes listener failed after ' + SHARED_NOTES_MAX_RETRIES + ' retries — falling back to periodic sync');
+        }
+      });
+  }
+
+  function _attachOwnNotesListener(userId) {
+    if (!window.dmDb) return;
+    _ownNotesUnsubscribe = window.dmDb.collection('notes')
+      .where('userId', '==', userId)
+      .onSnapshot(function(snapshot) {
+        _ownNotesRetryCount = 0;
+        var changes = [];
+        snapshot.docChanges().forEach(function(change) {
+          if (change.type === 'added' || change.type === 'modified') {
+            if (change.doc.metadata.hasPendingWrites) return;
+            changes.push(serializeNote(change.doc));
+          }
+        });
+        if (changes.length > 0) {
+          var filterPromises = changes.map(function(change) {
+            return idbGet(STORE_NOTES, change.id).then(function(existing) {
+              if (!existing || change.updatedAt > existing.updatedAt) return change;
+              return null;
+            });
+          });
+          Promise.all(filterPromises).then(function(results) {
+            var filtered = results.filter(function(r) { return r !== null; });
+            if (filtered.length > 0) {
+              idbPutBatch(STORE_NOTES, filtered).then(function() {
+                window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+              });
+            }
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Own notes listener error:', err);
+        if (_ownNotesRetryCount < SHARED_NOTES_MAX_RETRIES) {
+          var delay = Math.min(1000 * Math.pow(2, _ownNotesRetryCount), 30000);
+          _ownNotesRetryCount++;
+          console.log('[dm-sync] Retrying own notes listener in ' + delay + 'ms (attempt ' + _ownNotesRetryCount + '/' + SHARED_NOTES_MAX_RETRIES + ')');
+          _ownNotesRetryTimer = setTimeout(function() {
+            _attachOwnNotesListener(userId);
+          }, delay);
+        } else {
+          console.error('[dm-sync] Own notes listener failed after ' + SHARED_NOTES_MAX_RETRIES + ' retries — falling back to periodic sync');
+        }
+      });
+  }
+
+  function startSharedNoteListeners(userId) {
+    stopSharedNoteListeners();
+    if (!window.dmDb) return;
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return;
+
+    // Listen for changes to notes where current user is a collaborator
+    _sharedNotesRetryCount = 0;
+    _attachSharedNotesListener(userId);
+
+    // Listen for changes to user's own notes (e.g. collaborator edits)
+    _ownNotesRetryCount = 0;
+    _attachOwnNotesListener(userId);
+
+    // Listen for incoming note share invitations
+    _noteShareInvitesUnsubscribe = window.dmDb.collection('noteShares')
+      .where('inviteeEmail', '==', user.email)
+      .onSnapshot(function(snapshot) {
+        var hasChanges = false;
+        var chain = Promise.resolve();
+        snapshot.docChanges().forEach(function(change) {
+          var shareDoc = serializeNoteShare(change.doc);
+          if (change.type === 'added' || change.type === 'modified') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbPut(STORE_NOTE_SHARES, shareDoc); });
+          } else if (change.type === 'removed') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbDelete(STORE_NOTE_SHARES, shareDoc.id); });
+          }
+        });
+        if (hasChanges) {
+          chain.then(function() {
+            window.dispatchEvent(new CustomEvent('dm-note-shares-updated'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Note share invites listener error:', err);
+      });
+
+    // Listen for status changes on note shares owned by this user
+    _ownerNoteSharesUnsubscribe = window.dmDb.collection('noteShares')
+      .where('ownerId', '==', userId)
+      .onSnapshot(function(snapshot) {
+        var hasChanges = false;
+        var chain = Promise.resolve();
+        snapshot.docChanges().forEach(function(change) {
+          var shareDoc = serializeNoteShare(change.doc);
+          if (change.type === 'added' || change.type === 'modified') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbPut(STORE_NOTE_SHARES, shareDoc); });
+          } else if (change.type === 'removed') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbDelete(STORE_NOTE_SHARES, shareDoc.id); });
+          }
+        });
+        if (hasChanges) {
+          chain.then(function() {
+            window.dispatchEvent(new CustomEvent('dm-note-shares-updated'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Owner note shares listener error:', err);
+      });
+  }
+
+  function stopSharedNoteListeners() {
+    if (_sharedNotesRetryTimer) {
+      clearTimeout(_sharedNotesRetryTimer);
+      _sharedNotesRetryTimer = null;
+    }
+    _sharedNotesRetryCount = 0;
+    if (_ownNotesRetryTimer) {
+      clearTimeout(_ownNotesRetryTimer);
+      _ownNotesRetryTimer = null;
+    }
+    _ownNotesRetryCount = 0;
+    if (_sharedNotesUnsubscribe) {
+      _sharedNotesUnsubscribe();
+      _sharedNotesUnsubscribe = null;
+    }
+    if (_ownNotesUnsubscribe) {
+      _ownNotesUnsubscribe();
+      _ownNotesUnsubscribe = null;
+    }
+    if (_noteShareInvitesUnsubscribe) {
+      _noteShareInvitesUnsubscribe();
+      _noteShareInvitesUnsubscribe = null;
+    }
+    if (_ownerNoteSharesUnsubscribe) {
+      _ownerNoteSharesUnsubscribe();
+      _ownerNoteSharesUnsubscribe = null;
     }
   }
 
@@ -3737,6 +4336,7 @@
         idbClear(STORE_ATTACHMENTS),
         idbClear(STORE_REVIEW_CARDS),
         idbClear(STORE_TASK_SHARES),
+        idbClear(STORE_NOTE_SHARES),
         idbClear(STORE_PROJECTS),
         idbClear(STORE_KANBAN_COLUMNS),
         clearQueue()
@@ -3799,6 +4399,15 @@
     getPendingInvites: getPendingInvites,
     getMyShares: getMyShares,
     lookupUserByEmail: lookupUserByEmail,
+
+    // Note sharing
+    shareNote: shareNote,
+    acceptNoteShare: acceptNoteShare,
+    declineNoteShare: declineNoteShare,
+    unshareNote: unshareNote,
+    getSharesForNote: getSharesForNote,
+    getPendingNoteInvites: getPendingNoteInvites,
+    getMyNoteShares: getMyNoteShares,
 
     // Closed days (day-level finalization for todo list)
     getClosedDays: function() {
@@ -3897,7 +4506,7 @@
             : (function() {
                 // Different user — clear backup to prevent data leak
                 try { localStorage.removeItem('dm-closedDays-backup'); } catch(e) {}
-                return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
+                return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_NOTE_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
               })();
 
           return proceed.then(function() {
@@ -3914,6 +4523,7 @@
             });
             startBackgroundSync(user.uid);
             startSharedTaskListeners(user.uid);
+            startSharedNoteListeners(user.uid);
             scheduleAllReminders();
             updateOfflineIndicator();
           });
@@ -3937,12 +4547,14 @@
           if (user) {
             startBackgroundSync(user.uid);
             startSharedTaskListeners(user.uid);
+            startSharedNoteListeners(user.uid);
             scheduleAllReminders();
           }
         });
       } else {
         stopBackgroundSync();
         stopSharedTaskListeners();
+        stopSharedNoteListeners();
         clearAllReminderTimers();
         // Backup closedDays to localStorage before clearing IDB.
         // If the Firestore write from setClosedDays was still in-flight,
@@ -3954,7 +4566,7 @@
           }
         }).catch(function() {}).then(function() {
           // Clear cache on sign-out so no data leaks to another user
-          return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
+          return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_NOTE_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
         }).then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));
