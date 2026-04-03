@@ -2738,6 +2738,8 @@
   }
 
   // ─── Load data ───
+  var _columnsSeeded = false; // Only seed default columns once per session
+
   function loadBoard() {
     if (!window.dmSync) {
       showState('auth');
@@ -2760,10 +2762,18 @@
         updateKanbanProjectFilter();
       });
     }).catch(function() { /* keep existing */ });
-    // Seed default columns if none exist, then load them
-    var columnsPromise = window.dmSync.seedDefaultKanbanColumns().then(function(cols) {
-      _kanbanColumns = cols;
-    });
+    // Only seed default columns on first load; subsequent loads just read from IDB
+    var columnsPromise;
+    if (!_columnsSeeded) {
+      columnsPromise = window.dmSync.seedDefaultKanbanColumns().then(function(cols) {
+        _kanbanColumns = cols;
+        _columnsSeeded = true;
+      });
+    } else {
+      columnsPromise = window.dmSync.getAllKanbanColumns().then(function(cols) {
+        _kanbanColumns = cols;
+      });
+    }
 
     Promise.all([todosPromise, projectsPromise, columnsPromise]).then(function(results) {
       allTodos = results[0] || [];
@@ -3055,6 +3065,7 @@
         if (user) {
           loadBoard();
         } else {
+          _columnsSeeded = false; // Reset so next login re-seeds properly
           showState('auth');
         }
       });

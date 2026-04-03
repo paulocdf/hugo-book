@@ -185,6 +185,7 @@
   var _quotaCooldownUntil = 0; // Timestamp: suppress Firestore until this time
   var QUOTA_COOLDOWN_MS = 60 * 60 * 1000; // 1 hour cooldown on quota errors
   var _inFlightTodoWrites = {}; // { docId: timestamp } — tracks in-flight Firestore todo writes
+  var _seedingPromise = null;   // Concurrency guard for seedDefaultKanbanColumns
 
   function isQuotaError(err) {
     if (!err) return false;
@@ -1147,6 +1148,43 @@
           });
 
           return Promise.all(promises).then(function() {
+            // ─── Deduplication safety net ───
+            // After ID-based merge, check for columns with duplicate `status` slugs.
+            // Keep the oldest (earliest createdAt) and delete the rest from both IDB and Firestore.
+            return idbGetAll(STORE_KANBAN_COLUMNS).then(function(allCols) {
+              var statusGroups = {};
+              allCols.forEach(function(c) {
+                var key = c.status || '';
+                if (!statusGroups[key]) statusGroups[key] = [];
+                statusGroups[key].push(c);
+              });
+              var dupDeletePromises = [];
+              Object.keys(statusGroups).forEach(function(status) {
+                var group = statusGroups[status];
+                if (group.length <= 1) return;
+                // Sort by createdAt ascending — keep the first (oldest)
+                group.sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+                console.warn('[dm-sync] Found ' + group.length + ' duplicate columns with status "' + status + '". Removing ' + (group.length - 1) + ' duplicates.');
+                for (var i = 1; i < group.length; i++) {
+                  var dupId = group[i].id;
+                  dupDeletePromises.push(idbDelete(STORE_KANBAN_COLUMNS, dupId));
+                  // Also remove from Firestore to prevent re-sync of duplicates
+                  if (window.dmDb) {
+                    dupDeletePromises.push(
+                      window.dmDb.collection('kanbanColumns').doc(dupId).delete().catch(function(err) {
+                        console.warn('[dm-sync] Failed to delete duplicate column from Firestore:', err);
+                      })
+                    );
+                  }
+                }
+              });
+              if (dupDeletePromises.length > 0) {
+                return Promise.all(dupDeletePromises).then(function() {
+                  window.dispatchEvent(new CustomEvent('dm-kanban-columns-updated'));
+                });
+              }
+            });
+          }).then(function() {
             var elapsed = Date.now() - startTime;
             console.log('[dm-sync] Kanban columns sync complete in ' + elapsed + 'ms. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
             return { upserted: toUpsert.length, deleted: toDelete.length };
@@ -1154,6 +1192,84 @@
           });
         });
       });
+  }
+
+  // ─── One-time migration: deduplicate kanban columns ───
+
+  function migrateDeduplicateKanbanColumns(userId) {
+    var MIGRATION_KEY = 'migration_dedup_kanban_columns';
+    return idbGet(STORE_META, MIGRATION_KEY).then(function(meta) {
+      if (meta && meta.value === true) return; // Already migrated
+
+      console.log('[dm-sync] Running one-time kanban column deduplication migration...');
+
+      // Read from both Firestore and IDB to get the full picture
+      var getColumns;
+      if (window.dmDb) {
+        getColumns = window.dmDb.collection('kanbanColumns')
+          .where('userId', '==', userId)
+          .get()
+          .then(function(snapshot) {
+            var cols = [];
+            snapshot.forEach(function(doc) { cols.push(serializeKanbanColumn(doc)); });
+            return cols;
+          })
+          .catch(function() {
+            // Firestore unavailable — fall back to IDB
+            return idbGetAll(STORE_KANBAN_COLUMNS);
+          });
+      } else {
+        getColumns = idbGetAll(STORE_KANBAN_COLUMNS);
+      }
+
+      return getColumns.then(function(allCols) {
+        // Group by status slug
+        var statusGroups = {};
+        allCols.forEach(function(c) {
+          var key = c.status || '';
+          if (!statusGroups[key]) statusGroups[key] = [];
+          statusGroups[key].push(c);
+        });
+
+        var deletePromises = [];
+        Object.keys(statusGroups).forEach(function(status) {
+          var group = statusGroups[status];
+          if (group.length <= 1) return;
+
+          // Sort by createdAt ascending — keep the oldest
+          group.sort(function(a, b) { return (a.createdAt || 0) - (b.createdAt || 0); });
+          var keepId = group[0].id;
+          console.log('[dm-sync] Dedup migration: keeping column "' + group[0].name + '" (id=' + keepId + '), removing ' + (group.length - 1) + ' duplicates with status "' + status + '"');
+
+          for (var i = 1; i < group.length; i++) {
+            var dupId = group[i].id;
+            // Delete from IDB
+            deletePromises.push(idbDelete(STORE_KANBAN_COLUMNS, dupId));
+            // Delete from Firestore
+            if (window.dmDb) {
+              deletePromises.push(
+                window.dmDb.collection('kanbanColumns').doc(dupId).delete().catch(function(err) {
+                  console.warn('[dm-sync] Dedup migration: failed to delete Firestore column:', err);
+                })
+              );
+            }
+          }
+        });
+
+        if (deletePromises.length > 0) {
+          return Promise.all(deletePromises).then(function() {
+            console.log('[dm-sync] Dedup migration: removed ' + deletePromises.length + ' duplicate column entries');
+            window.dispatchEvent(new CustomEvent('dm-kanban-columns-updated'));
+          });
+        }
+      }).then(function() {
+        // Mark migration as complete
+        return idbPut(STORE_META, { key: MIGRATION_KEY, value: true });
+      }).catch(function(err) {
+        console.warn('[dm-sync] Dedup migration failed (will retry next session):', err);
+        // Don't mark as complete — retry next time
+      });
+    });
   }
 
   // ─── Auto-purge expired trash ───
@@ -3370,6 +3486,9 @@
       });
     },
     seedDefaultKanbanColumns: function() {
+      // Concurrency guard: if already seeding, return the in-flight promise
+      if (_seedingPromise) return _seedingPromise;
+
       var user = window.dmAuth && window.dmAuth.currentUser;
       if (!user) return Promise.resolve([]);
 
@@ -3377,9 +3496,11 @@
         return arr.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
       };
 
+      var doSeed;
+
       // Firestore is the source of truth — always try it first
       if (window.dmDb) {
-        return window.dmDb.collection('kanbanColumns')
+        doSeed = window.dmDb.collection('kanbanColumns')
           .where('userId', '==', user.uid)
           .get()
           .then(function(snapshot) {
@@ -3406,19 +3527,29 @@
               return createDefaultColumns();
             });
           });
+      } else {
+        // Offline / no Firestore — use IDB or create defaults
+        doSeed = idbGetAll(STORE_KANBAN_COLUMNS).then(function(local) {
+          if (local.length > 0) return sortByOrder(local);
+          return createDefaultColumns();
+        });
       }
 
-      // Offline / no Firestore — use IDB or create defaults
-      return idbGetAll(STORE_KANBAN_COLUMNS).then(function(local) {
-        if (local.length > 0) return sortByOrder(local);
-        return createDefaultColumns();
+      _seedingPromise = doSeed.then(function(result) {
+        _seedingPromise = null;
+        return result;
+      }).catch(function(err) {
+        _seedingPromise = null;
+        throw err;
       });
+
+      return _seedingPromise;
 
       function createDefaultColumns() {
         var defaults = [
-          { name: 'To Do', status: 'todo', color: '#42a5f5', order: 0, isDoneColumn: false },
-          { name: 'In Progress', status: 'in_progress', color: '#ffa726', order: 1, isDoneColumn: false },
-          { name: 'Done', status: 'done', color: '#66bb6a', order: 2, isDoneColumn: true }
+          { id: user.uid + '_col_todo', name: 'To Do', status: 'todo', color: '#42a5f5', order: 0, isDoneColumn: false },
+          { id: user.uid + '_col_in_progress', name: 'In Progress', status: 'in_progress', color: '#ffa726', order: 1, isDoneColumn: false },
+          { id: user.uid + '_col_done', name: 'Done', status: 'done', color: '#66bb6a', order: 2, isDoneColumn: true }
         ];
         return Promise.all(defaults.map(function(d) {
           return window.dmSync.createKanbanColumn(d);
@@ -3776,6 +3907,10 @@
           }).then(function() {
             return syncAll(user.uid);
           }).then(function() {
+            // Run one-time dedup migration after sync (non-blocking)
+            migrateDeduplicateKanbanColumns(user.uid).catch(function(err) {
+              console.warn('[dm-sync] Dedup migration error:', err);
+            });
             startBackgroundSync(user.uid);
             startSharedTaskListeners(user.uid);
             scheduleAllReminders();
