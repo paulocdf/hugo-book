@@ -37,7 +37,7 @@
   padding: 10px 24px;
   border: 1px solid var(--gray-200);
   border-radius: 8px;
-  background: #fff;
+  background: var(--body-background);
   color: var(--body-font-color);
   font-size: 0.9rem;
   font-weight: 500;
@@ -105,7 +105,8 @@
   border: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
-  overflow: visible;
+  overflow: hidden;
+  max-height: calc(100vh - 140px);
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .kanban-column-items:last-of-type {
@@ -120,6 +121,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex-shrink: 0;
 }
 
 /* Column drag handle */
@@ -177,6 +182,12 @@
   border-radius: 10px;
   min-width: 20px;
   text-align: center;
+}
+
+.kanban-column-time {
+  font-size: 0.7rem;
+  color: var(--text-faint);
+  font-weight: 400;
 }
 
 /* Done column filter */
@@ -621,9 +632,11 @@
   border-radius: 8px;
   padding: 10px 12px;
   margin-bottom: 6px;
-  cursor: grab;
+  cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
   user-select: none;
+  display: flex;
+  align-items: stretch;
 }
 
 .kanban-card:hover {
@@ -631,17 +644,58 @@
   box-shadow: 0 2px 8px var(--shadow-color);
 }
 
-.kanban-card:active {
+/* Card drag grip handle */
+.kanban-card-grip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  flex-shrink: 0;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.15s;
+  color: var(--text-faint);
+  margin-left: -4px;
+  margin-right: 4px;
+  border-radius: 3px;
+}
+.kanban-card:hover .kanban-card-grip {
+  opacity: 0.5;
+}
+.kanban-card-grip:hover {
+  opacity: 1 !important;
+  background: var(--surface-3);
+}
+.kanban-card-grip:active {
   cursor: grabbing;
 }
 
+/* Card body wrapper */
+.kanban-card-body {
+  flex: 1;
+  min-width: 0;
+}
+
 .kanban-card--done {
-  opacity: 0.6;
+  border-color: var(--border-subtle);
 }
 
 .kanban-card--done .kanban-card-title {
   text-decoration: line-through;
   color: var(--text-muted);
+}
+
+.kanban-card--done .kanban-card-bujo {
+  opacity: 0.4;
+}
+
+.kanban-card--done .kanban-card-meta {
+  opacity: 0.5;
+}
+
+.kanban-card--done:hover {
+  border-color: var(--border-subtle);
+  box-shadow: none;
 }
 
 /* Card header */
@@ -828,6 +882,16 @@
 .kanban-card-age--critical {
   color: var(--color-danger, #e53e3e);
   font-weight: 600;
+}
+
+/* Started badge */
+.kanban-card-started {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--accent-green, #2e7d32);
+  background: color-mix(in srgb, var(--accent-green, #2e7d32) 12%, transparent);
+  padding: 1px 6px;
+  border-radius: 4px;
 }
 
 /* Quick-add */
@@ -1065,6 +1129,416 @@
   }
 }
 
+/* ─── Board header bar ─── */
+.kanban-settings-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  position: relative;
+}
+.kanban-board-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--body-font-color);
+  letter-spacing: -0.01em;
+}
+.kanban-board-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+.kanban-board-stats span + span::before {
+  content: '\00b7';
+  margin-right: 6px;
+  color: var(--text-faint);
+}
+.kanban-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kanban-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  padding: 0;
+}
+.kanban-settings-btn:hover,
+.kanban-settings-btn.active {
+  border-color: var(--color-link);
+  color: var(--color-link);
+  background: var(--surface-2);
+}
+
+/* ─── Board settings popover ─── */
+.kanban-settings-popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 300;
+  width: 310px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.14);
+  padding: 16px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.kanban-settings-popover h4 {
+  margin: 0 0 12px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--body-font-color);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.kanban-sp-section {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--gray-200);
+}
+.kanban-sp-section:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+.kanban-sp-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.kanban-sp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.kanban-sp-row:last-child {
+  margin-bottom: 0;
+}
+
+/* Segmented control (for density, color mode, bg type) */
+.kanban-sp-segmented {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  overflow: hidden;
+  width: 100%;
+}
+.kanban-sp-seg-btn {
+  flex: 1;
+  padding: 5px 4px;
+  border: none;
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  text-align: center;
+  white-space: nowrap;
+}
+.kanban-sp-seg-btn:not(:last-child) {
+  border-right: 1px solid var(--gray-300);
+}
+.kanban-sp-seg-btn:hover {
+  background: var(--surface-2);
+  color: var(--body-font-color);
+}
+.kanban-sp-seg-btn.active {
+  background: var(--color-link);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Color picker row for bg */
+.kanban-sp-colors {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+.kanban-sp-color-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  padding: 0;
+  background: none;
+}
+.kanban-sp-color-swatch:hover {
+  transform: scale(1.15);
+}
+.kanban-sp-color-swatch.active {
+  border-color: var(--body-font-color);
+}
+
+/* Gradient pick row */
+.kanban-sp-gradient-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.kanban-sp-gradient-swatch {
+  width: 48px;
+  height: 22px;
+  border-radius: 6px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+  padding: 0;
+}
+.kanban-sp-gradient-swatch:hover {
+  transform: scale(1.08);
+}
+.kanban-sp-gradient-swatch.active {
+  border-color: var(--body-font-color);
+}
+
+/* Pattern selector */
+.kanban-sp-pattern-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+.kanban-sp-pattern-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--surface-1);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  font-size: 0.66rem;
+  color: var(--text-muted);
+  font-family: inherit;
+}
+.kanban-sp-pattern-btn:hover {
+  border-color: var(--border-medium);
+  background: var(--surface-2);
+}
+.kanban-sp-pattern-btn.active {
+  border-color: var(--color-link);
+  background: color-mix(in srgb, var(--color-link) 8%, transparent);
+  color: var(--color-link);
+}
+.kanban-sp-pattern-preview {
+  width: 32px;
+  height: 22px;
+  border-radius: 3px;
+  border: 1px solid var(--border-subtle);
+}
+
+/* Column resize toggle */
+.kanban-sp-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.kanban-sp-toggle-label {
+  font-size: 0.78rem;
+  color: var(--body-font-color);
+}
+.kanban-sp-toggle {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.kanban-sp-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+.kanban-sp-toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--gray-300);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.kanban-sp-toggle-track::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+.kanban-sp-toggle input:checked + .kanban-sp-toggle-track {
+  background: var(--color-link);
+}
+.kanban-sp-toggle input:checked + .kanban-sp-toggle-track::after {
+  transform: translateX(16px);
+}
+
+/* ─── Board background ─── */
+.kanban-board--bg-solid {
+  border-radius: 12px;
+  padding: 16px;
+}
+.kanban-board--bg-gradient {
+  border-radius: 12px;
+  padding: 16px;
+}
+.kanban-board--bg-pattern {
+  border-radius: 12px;
+  padding: 16px;
+  position: relative;
+}
+.kanban-board--bg-pattern::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+/* Pattern: dots */
+.kanban-board--bg-pattern.kb-pat-dots::before {
+  background-image: radial-gradient(circle, var(--kb-pattern-color, rgba(0,0,0,0.15)) 1px, transparent 1px);
+  background-size: 16px 16px;
+}
+/* Pattern: grid */
+.kanban-board--bg-pattern.kb-pat-grid::before {
+  background-image:
+    linear-gradient(var(--kb-pattern-color, rgba(0,0,0,0.08)) 1px, transparent 1px),
+    linear-gradient(90deg, var(--kb-pattern-color, rgba(0,0,0,0.08)) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+/* Pattern: crosshatch */
+.kanban-board--bg-pattern.kb-pat-crosshatch::before {
+  background-image:
+    linear-gradient(45deg, var(--kb-pattern-color, rgba(0,0,0,0.06)) 25%, transparent 25%, transparent 75%, var(--kb-pattern-color, rgba(0,0,0,0.06)) 75%),
+    linear-gradient(-45deg, var(--kb-pattern-color, rgba(0,0,0,0.06)) 25%, transparent 25%, transparent 75%, var(--kb-pattern-color, rgba(0,0,0,0.06)) 75%);
+  background-size: 20px 20px;
+}
+
+/* ─── Card density: compact ─── */
+.kanban-board--compact .kanban-card {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+}
+.kanban-board--compact .kanban-card-title {
+  font-size: 0.78rem;
+  line-height: 1.3;
+}
+.kanban-board--compact .kanban-card-meta {
+  margin-top: 3px;
+  gap: 5px;
+  padding-left: 14px;
+}
+.kanban-board--compact .kanban-card-category,
+.kanban-board--compact .kanban-card-time,
+.kanban-board--compact .kanban-card-date,
+.kanban-board--compact .kanban-card-project,
+.kanban-board--compact .kanban-card-age {
+  font-size: 0.66rem;
+}
+.kanban-board--compact .kanban-card-bujo {
+  width: 10px;
+  height: 10px;
+}
+.kanban-board--compact .kanban-card-pomo {
+  width: 18px;
+  height: 15px;
+}
+
+/* ─── Card density: comfortable ─── */
+.kanban-board--comfortable .kanban-card {
+  padding: 14px 16px;
+  margin-bottom: 8px;
+}
+.kanban-board--comfortable .kanban-card-title {
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+.kanban-board--comfortable .kanban-card-meta {
+  margin-top: 8px;
+  gap: 10px;
+  padding-left: 22px;
+}
+.kanban-board--comfortable .kanban-card-header {
+  gap: 8px;
+}
+
+/* ─── Card color mode: left border ─── */
+.kanban-board--color-left-border .kanban-card[data-task-color] {
+  border-left: 4px solid var(--kb-card-accent-color);
+  background: var(--surface-2) !important;
+}
+
+/* ─── Card color mode: top stripe ─── */
+.kanban-board--color-top-stripe .kanban-card[data-task-color] {
+  border-top: 3px solid var(--kb-card-accent-color);
+  background: var(--surface-2) !important;
+}
+
+/* ─── Column resize ─── */
+.kanban-board--resizable .kanban-column {
+  flex: 0 0 auto;
+  min-width: 220px;
+  max-width: 600px;
+}
+.kanban-col-resize-handle {
+  width: 6px;
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 5;
+  align-self: stretch;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.kanban-col-resize-handle::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 2px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--color-link);
+}
+.kanban-col-resize-handle:hover,
+.kanban-col-resize-handle.dragging {
+  opacity: 1;
+}
+.kanban-board--resizable:hover .kanban-col-resize-handle {
+  opacity: 0.4;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .kanban-card,
@@ -1079,6 +1553,22 @@
   }
   .kanban-spinner {
     animation-duration: 0.01ms;
+  }
+}
+
+/* Touch device fixes — always show interactive elements */
+@media (hover: none) {
+  .kanban-card-pomo {
+    opacity: 1;
+  }
+  .kanban-col-settings-btn {
+    opacity: 0.6;
+  }
+  .kanban-card-grip {
+    opacity: 0.35;
+  }
+  .kanban-col-drag-handle {
+    opacity: 0.4;
   }
 }
 </style>
@@ -1116,6 +1606,15 @@
   </div>
 
   <div class="kanban-content" id="kanban-content" style="display: none;">
+    <div class="kanban-settings-bar">
+      <span class="kanban-board-title">Board</span>
+      <div class="kanban-header-right">
+        <div class="kanban-board-stats" id="kanban-board-stats"></div>
+        <button type="button" class="kanban-settings-btn" id="kanban-settings-btn" title="Board settings" aria-label="Board settings" aria-haspopup="true" aria-expanded="false">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+      </div>
+    </div>
     <div class="kanban-project-filter" id="kanban-project-filter" style="display:none;">
       <div class="kanban-pf-chips" id="kanban-pf-chips"></div>
       <button type="button" class="kanban-pf-trigger" id="kanban-pf-trigger" title="Filter by project">
@@ -1144,10 +1643,423 @@
 
   var boardEl = document.getElementById('kanban-board');
 
+  // ─── Board customization preferences ───
+  var KB_PREFS = {
+    bgType: localStorage.getItem('dm-kanban-bg-type') || 'none',
+    bgColor: localStorage.getItem('dm-kanban-bg-color') || '#e8eaf6',
+    bgGradient: localStorage.getItem('dm-kanban-bg-gradient') || '#e8eaf6,#fce4ec',
+    bgPattern: localStorage.getItem('dm-kanban-bg-pattern') || 'dots',
+    cardDensity: localStorage.getItem('dm-kanban-card-density') || 'default',
+    cardColorMode: localStorage.getItem('dm-kanban-card-color-mode') || 'tint',
+    colResize: localStorage.getItem('dm-kanban-col-resize') === 'on',
+    colWidths: (function() { try { return JSON.parse(localStorage.getItem('dm-kanban-col-widths') || '{}'); } catch(e) { return {}; } })()
+  };
+
+  function savePref(key, value) {
+    localStorage.setItem('dm-kanban-' + key, typeof value === 'object' ? JSON.stringify(value) : value);
+  }
+
+  // Background color presets (light mode / dark mode pairs)
+  var BG_SOLID_COLORS = [
+    { light: '#e8eaf6', dark: '#1a1d2e' },
+    { light: '#e3f2fd', dark: '#152238' },
+    { light: '#e8f5e9', dark: '#1a2e1a' },
+    { light: '#fff3e0', dark: '#2e2214' },
+    { light: '#fce4ec', dark: '#2e1520' },
+    { light: '#f3e5f5', dark: '#251a2e' },
+    { light: '#e0f2f1', dark: '#142e2a' },
+    { light: '#f5f5f5', dark: '#1e1e1e' },
+    { light: '#fffde7', dark: '#2e2c0f' },
+    { light: '#efebe9', dark: '#2a2320' }
+  ];
+
+  // Gradient presets
+  var BG_GRADIENTS = [
+    { light: ['#e8eaf6','#fce4ec'], dark: ['#1a1d2e','#2e1520'] },
+    { light: ['#e3f2fd','#e8f5e9'], dark: ['#152238','#1a2e1a'] },
+    { light: ['#fff3e0','#f3e5f5'], dark: ['#2e2214','#251a2e'] },
+    { light: ['#e0f2f1','#e3f2fd'], dark: ['#142e2a','#152238'] },
+    { light: ['#fce4ec','#f3e5f5'], dark: ['#2e1520','#251a2e'] },
+    { light: ['#fffde7','#e8f5e9'], dark: ['#2e2c0f','#1a2e1a'] }
+  ];
+
+  function isDarkMode() {
+    return document.documentElement.classList.contains('dark') ||
+           (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
+            !document.documentElement.classList.contains('light'));
+  }
+
+  function getBgColorForMode(preset) {
+    return isDarkMode() ? preset.dark : preset.light;
+  }
+
+  function getBgGradientForMode(preset) {
+    return isDarkMode() ? preset.dark : preset.light;
+  }
+
+  // Apply board background based on current preferences
+  function applyBoardBackground() {
+    if (!boardEl) return;
+    // Clear previous background classes and inline styles
+    boardEl.classList.remove('kanban-board--bg-solid', 'kanban-board--bg-gradient', 'kanban-board--bg-pattern',
+      'kb-pat-dots', 'kb-pat-grid', 'kb-pat-crosshatch');
+    boardEl.style.background = '';
+    boardEl.style.removeProperty('--kb-pattern-color');
+
+    var dark = isDarkMode();
+    if (KB_PREFS.bgType === 'solid') {
+      boardEl.classList.add('kanban-board--bg-solid');
+      // Find matching preset to get dark/light variant
+      var solidColor = KB_PREFS.bgColor;
+      var preset = BG_SOLID_COLORS.find(function(p) { return p.light === solidColor || p.dark === solidColor; });
+      if (preset) {
+        boardEl.style.background = getBgColorForMode(preset);
+      } else {
+        boardEl.style.background = solidColor;
+      }
+    } else if (KB_PREFS.bgType === 'gradient') {
+      boardEl.classList.add('kanban-board--bg-gradient');
+      var parts = KB_PREFS.bgGradient.split(',');
+      // Find matching gradient preset
+      var gradPreset = BG_GRADIENTS.find(function(p) {
+        return (p.light[0] === parts[0] && p.light[1] === parts[1]) ||
+               (p.dark[0] === parts[0] && p.dark[1] === parts[1]);
+      });
+      if (gradPreset) {
+        var colors = getBgGradientForMode(gradPreset);
+        boardEl.style.background = 'linear-gradient(135deg, ' + colors[0] + ', ' + colors[1] + ')';
+      } else {
+        boardEl.style.background = 'linear-gradient(135deg, ' + parts[0] + ', ' + (parts[1] || parts[0]) + ')';
+      }
+    } else if (KB_PREFS.bgType === 'pattern') {
+      boardEl.classList.add('kanban-board--bg-pattern', 'kb-pat-' + KB_PREFS.bgPattern);
+      boardEl.style.setProperty('--kb-pattern-color', dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.1)');
+      boardEl.style.background = dark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)';
+    }
+  }
+
+  // Apply card density
+  function applyCardDensity() {
+    if (!boardEl) return;
+    boardEl.classList.remove('kanban-board--compact', 'kanban-board--comfortable');
+    if (KB_PREFS.cardDensity === 'compact') {
+      boardEl.classList.add('kanban-board--compact');
+    } else if (KB_PREFS.cardDensity === 'comfortable') {
+      boardEl.classList.add('kanban-board--comfortable');
+    }
+  }
+
+  // Apply card color mode
+  function applyCardColorMode() {
+    if (!boardEl) return;
+    boardEl.classList.remove('kanban-board--color-left-border', 'kanban-board--color-top-stripe');
+    if (KB_PREFS.cardColorMode === 'left-border') {
+      boardEl.classList.add('kanban-board--color-left-border');
+    } else if (KB_PREFS.cardColorMode === 'top-stripe') {
+      boardEl.classList.add('kanban-board--color-top-stripe');
+    }
+  }
+
+  // Apply column resize mode
+  function applyColResize() {
+    if (!boardEl) return;
+    boardEl.classList.toggle('kanban-board--resizable', KB_PREFS.colResize);
+    // Apply saved widths
+    if (KB_PREFS.colResize) {
+      _kanbanColumns.forEach(function(colDef) {
+        var w = KB_PREFS.colWidths[colDef.id];
+        if (w) {
+          var colEl = boardEl.querySelector('[data-kanban-col-id="' + colDef.id + '"]');
+          if (colEl) colEl.style.width = w + 'px';
+        }
+      });
+    } else {
+      boardEl.querySelectorAll('.kanban-column').forEach(function(colEl) {
+        colEl.style.width = '';
+      });
+    }
+  }
+
+  // Apply all preferences
+  function applyAllPrefs() {
+    applyBoardBackground();
+    applyCardDensity();
+    applyCardColorMode();
+    applyColResize();
+  }
+
+  // ─── Settings popover ───
+  var _settingsOpen = false;
+  var settingsBtn = document.getElementById('kanban-settings-btn');
+
+  function openSettingsPopover() {
+    if (_settingsOpen) { closeSettingsPopover(); return; }
+    _settingsOpen = true;
+    if (settingsBtn) {
+      settingsBtn.classList.add('active');
+      settingsBtn.setAttribute('aria-expanded', 'true');
+    }
+    var bar = container.querySelector('.kanban-settings-bar');
+    if (!bar) return;
+
+    var dark = isDarkMode();
+    var pop = document.createElement('div');
+    pop.className = 'kanban-settings-popover';
+    pop.id = 'kanban-settings-popover';
+
+    var html = '<h4>Board Settings</h4>';
+
+    // ── Background section ──
+    html += '<div class="kanban-sp-section">';
+    html += '<span class="kanban-sp-label">Background</span>';
+    // Type selector
+    html += '<div class="kanban-sp-segmented" data-sp-group="bg-type">';
+    ['none','solid','gradient','pattern'].forEach(function(t) {
+      var label = t === 'none' ? 'None' : t.charAt(0).toUpperCase() + t.slice(1);
+      html += '<button type="button" class="kanban-sp-seg-btn' + (KB_PREFS.bgType === t ? ' active' : '') + '" data-sp-bg-type="' + t + '">' + label + '</button>';
+    });
+    html += '</div>';
+    // Solid color swatches
+    html += '<div class="kanban-sp-colors" data-sp-solid-colors style="' + (KB_PREFS.bgType === 'solid' ? '' : 'display:none;') + '">';
+    BG_SOLID_COLORS.forEach(function(p) {
+      var display = dark ? p.dark : p.light;
+      var isActive = KB_PREFS.bgColor === p.light || KB_PREFS.bgColor === p.dark;
+      html += '<button type="button" class="kanban-sp-color-swatch' + (isActive ? ' active' : '') + '" style="background:' + display + ';" data-sp-solid="' + p.light + '"></button>';
+    });
+    html += '</div>';
+    // Gradient swatches
+    html += '<div class="kanban-sp-gradient-row" data-sp-gradient-colors style="' + (KB_PREFS.bgType === 'gradient' ? '' : 'display:none;') + '">';
+    BG_GRADIENTS.forEach(function(g) {
+      var colors = dark ? g.dark : g.light;
+      var stored = g.light[0] + ',' + g.light[1];
+      var isActive = KB_PREFS.bgGradient === stored || KB_PREFS.bgGradient === g.dark[0] + ',' + g.dark[1];
+      html += '<button type="button" class="kanban-sp-gradient-swatch' + (isActive ? ' active' : '') + '" style="background:linear-gradient(135deg,' + colors[0] + ',' + colors[1] + ');" data-sp-gradient="' + stored + '"></button>';
+    });
+    html += '</div>';
+    // Pattern selector
+    html += '<div class="kanban-sp-pattern-row" data-sp-pattern-row style="' + (KB_PREFS.bgType === 'pattern' ? '' : 'display:none;') + '">';
+    var patternColor = dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.15)';
+    html += '<button type="button" class="kanban-sp-pattern-btn' + (KB_PREFS.bgPattern === 'dots' ? ' active' : '') + '" data-sp-pattern="dots">';
+    html += '<svg class="kanban-sp-pattern-preview" viewBox="0 0 32 22"><defs><pattern id="ksp-dots" width="8" height="8" patternUnits="userSpaceOnUse"><circle cx="4" cy="4" r="1" fill="' + patternColor + '"/></pattern></defs><rect width="32" height="22" fill="url(#ksp-dots)"/></svg>';
+    html += 'Dots</button>';
+    html += '<button type="button" class="kanban-sp-pattern-btn' + (KB_PREFS.bgPattern === 'grid' ? ' active' : '') + '" data-sp-pattern="grid">';
+    html += '<svg class="kanban-sp-pattern-preview" viewBox="0 0 32 22"><defs><pattern id="ksp-grid" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M 8 0 L 0 0 0 8" fill="none" stroke="' + patternColor + '" stroke-width="0.5"/></pattern></defs><rect width="32" height="22" fill="url(#ksp-grid)"/></svg>';
+    html += 'Grid</button>';
+    html += '<button type="button" class="kanban-sp-pattern-btn' + (KB_PREFS.bgPattern === 'crosshatch' ? ' active' : '') + '" data-sp-pattern="crosshatch">';
+    html += '<svg class="kanban-sp-pattern-preview" viewBox="0 0 32 22"><defs><pattern id="ksp-cross" width="8" height="8" patternUnits="userSpaceOnUse"><path d="M0 0L8 8M8 0L0 8" stroke="' + patternColor + '" stroke-width="0.5"/></pattern></defs><rect width="32" height="22" fill="url(#ksp-cross)"/></svg>';
+    html += 'Crosshatch</button>';
+    html += '</div>';
+    html += '</div>';
+
+    // ── Card density section ──
+    html += '<div class="kanban-sp-section">';
+    html += '<span class="kanban-sp-label">Card Density</span>';
+    html += '<div class="kanban-sp-segmented" data-sp-group="card-density">';
+    [['compact','Compact'],['default','Default'],['comfortable','Comfortable']].forEach(function(pair) {
+      html += '<button type="button" class="kanban-sp-seg-btn' + (KB_PREFS.cardDensity === pair[0] ? ' active' : '') + '" data-sp-density="' + pair[0] + '">' + pair[1] + '</button>';
+    });
+    html += '</div>';
+    html += '</div>';
+
+    // ── Card color mode section ──
+    html += '<div class="kanban-sp-section">';
+    html += '<span class="kanban-sp-label">Card Color Style</span>';
+    html += '<div class="kanban-sp-segmented" data-sp-group="card-color">';
+    [['tint','Full Tint'],['left-border','Left Border'],['top-stripe','Top Stripe']].forEach(function(pair) {
+      html += '<button type="button" class="kanban-sp-seg-btn' + (KB_PREFS.cardColorMode === pair[0] ? ' active' : '') + '" data-sp-color-mode="' + pair[0] + '">' + pair[1] + '</button>';
+    });
+    html += '</div>';
+    html += '</div>';
+
+    // ── Column resize section ──
+    html += '<div class="kanban-sp-section">';
+    html += '<div class="kanban-sp-toggle-row">';
+    html += '<span class="kanban-sp-toggle-label">Resizable columns</span>';
+    html += '<label class="kanban-sp-toggle"><input type="checkbox" data-sp-col-resize' + (KB_PREFS.colResize ? ' checked' : '') + '><span class="kanban-sp-toggle-track"></span></label>';
+    html += '</div>';
+    html += '</div>';
+
+    pop.innerHTML = html;
+    bar.appendChild(pop);
+
+    // Wire up event delegation
+    pop.addEventListener('click', function(e) {
+      // Background type
+      var bgTypeBtn = e.target.closest('[data-sp-bg-type]');
+      if (bgTypeBtn) {
+        var newType = bgTypeBtn.getAttribute('data-sp-bg-type');
+        KB_PREFS.bgType = newType;
+        savePref('bg-type', newType);
+        // Update segmented control
+        pop.querySelectorAll('[data-sp-bg-type]').forEach(function(b) { b.classList.toggle('active', b === bgTypeBtn); });
+        // Show/hide sub-options
+        var solidRow = pop.querySelector('[data-sp-solid-colors]');
+        var gradRow = pop.querySelector('[data-sp-gradient-colors]');
+        var patRow = pop.querySelector('[data-sp-pattern-row]');
+        if (solidRow) solidRow.style.display = newType === 'solid' ? '' : 'none';
+        if (gradRow) gradRow.style.display = newType === 'gradient' ? '' : 'none';
+        if (patRow) patRow.style.display = newType === 'pattern' ? '' : 'none';
+        applyBoardBackground();
+        return;
+      }
+      // Solid color
+      var solidBtn = e.target.closest('[data-sp-solid]');
+      if (solidBtn) {
+        KB_PREFS.bgColor = solidBtn.getAttribute('data-sp-solid');
+        savePref('bg-color', KB_PREFS.bgColor);
+        pop.querySelectorAll('[data-sp-solid]').forEach(function(b) { b.classList.toggle('active', b === solidBtn); });
+        applyBoardBackground();
+        return;
+      }
+      // Gradient
+      var gradBtn = e.target.closest('[data-sp-gradient]');
+      if (gradBtn) {
+        KB_PREFS.bgGradient = gradBtn.getAttribute('data-sp-gradient');
+        savePref('bg-gradient', KB_PREFS.bgGradient);
+        pop.querySelectorAll('[data-sp-gradient]').forEach(function(b) { b.classList.toggle('active', b === gradBtn); });
+        applyBoardBackground();
+        return;
+      }
+      // Pattern
+      var patBtn = e.target.closest('[data-sp-pattern]');
+      if (patBtn) {
+        KB_PREFS.bgPattern = patBtn.getAttribute('data-sp-pattern');
+        savePref('bg-pattern', KB_PREFS.bgPattern);
+        pop.querySelectorAll('[data-sp-pattern]').forEach(function(b) { b.classList.toggle('active', b === patBtn); });
+        applyBoardBackground();
+        return;
+      }
+      // Card density
+      var densityBtn = e.target.closest('[data-sp-density]');
+      if (densityBtn) {
+        KB_PREFS.cardDensity = densityBtn.getAttribute('data-sp-density');
+        savePref('card-density', KB_PREFS.cardDensity);
+        pop.querySelectorAll('[data-sp-density]').forEach(function(b) { b.classList.toggle('active', b === densityBtn); });
+        applyCardDensity();
+        return;
+      }
+      // Card color mode
+      var colorBtn = e.target.closest('[data-sp-color-mode]');
+      if (colorBtn) {
+        KB_PREFS.cardColorMode = colorBtn.getAttribute('data-sp-color-mode');
+        savePref('card-color-mode', KB_PREFS.cardColorMode);
+        pop.querySelectorAll('[data-sp-color-mode]').forEach(function(b) { b.classList.toggle('active', b === colorBtn); });
+        applyCardColorMode();
+        renderBoard();
+        return;
+      }
+    });
+
+    // Column resize toggle
+    var resizeCheck = pop.querySelector('[data-sp-col-resize]');
+    if (resizeCheck) {
+      resizeCheck.addEventListener('change', function() {
+        KB_PREFS.colResize = resizeCheck.checked;
+        savePref('col-resize', KB_PREFS.colResize ? 'on' : 'off');
+        applyColResize();
+        renderBoard();
+      });
+    }
+
+    // Close on outside click
+    setTimeout(function() {
+      document.addEventListener('mousedown', _handleSettingsOutside);
+      document.addEventListener('keydown', _handleSettingsEscape);
+    }, 0);
+  }
+
+  function closeSettingsPopover() {
+    _settingsOpen = false;
+    if (settingsBtn) {
+      settingsBtn.classList.remove('active');
+      settingsBtn.setAttribute('aria-expanded', 'false');
+    }
+    var pop = document.getElementById('kanban-settings-popover');
+    if (pop) pop.remove();
+    document.removeEventListener('mousedown', _handleSettingsOutside);
+    document.removeEventListener('keydown', _handleSettingsEscape);
+  }
+
+  function _handleSettingsOutside(e) {
+    var pop = document.getElementById('kanban-settings-popover');
+    if (pop && !pop.contains(e.target) && !e.target.closest('.kanban-settings-btn')) {
+      closeSettingsPopover();
+    }
+  }
+  function _handleSettingsEscape(e) {
+    if (e.key === 'Escape' && _settingsOpen) { closeSettingsPopover(); e.stopPropagation(); }
+  }
+
+  if (settingsBtn) {
+    settingsBtn.addEventListener('click', function() {
+      openSettingsPopover();
+    });
+  }
+
+  // Re-apply preferences when theme changes (light/dark toggle)
+  var _themeObserver = new MutationObserver(function() {
+    applyBoardBackground();
+  });
+  _themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+
+  // ─── Column resize drag handling ───
+  var _resizeDragCol = null;
+  var _resizeDragStartX = 0;
+  var _resizeDragStartW = 0;
+
+  function initColResizeHandles() {
+    if (!KB_PREFS.colResize || !boardEl) return;
+    // Remove existing handles
+    boardEl.querySelectorAll('.kanban-col-resize-handle').forEach(function(h) { h.remove(); });
+    // Insert handle after each column (except the last column, before the add-column button)
+    var colEls = boardEl.querySelectorAll('.kanban-column');
+    for (var i = 0; i < colEls.length - 1; i++) {
+      var handle = document.createElement('div');
+      handle.className = 'kanban-col-resize-handle';
+      handle.setAttribute('data-resize-after', colEls[i].getAttribute('data-kanban-col-id'));
+      colEls[i].after(handle);
+    }
+  }
+
+  boardEl && boardEl.addEventListener('mousedown', function(e) {
+    var handle = e.target.closest('.kanban-col-resize-handle');
+    if (!handle || !KB_PREFS.colResize) return;
+    e.preventDefault();
+    var colId = handle.getAttribute('data-resize-after');
+    var colEl = boardEl.querySelector('[data-kanban-col-id="' + colId + '"]');
+    if (!colEl) return;
+    _resizeDragCol = { el: colEl, id: colId };
+    _resizeDragStartX = e.clientX;
+    _resizeDragStartW = colEl.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!_resizeDragCol) return;
+    var dx = e.clientX - _resizeDragStartX;
+    var newW = Math.max(220, Math.min(600, _resizeDragStartW + dx));
+    _resizeDragCol.el.style.width = newW + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (!_resizeDragCol) return;
+    var colId = _resizeDragCol.id;
+    var newW = _resizeDragCol.el.offsetWidth;
+    KB_PREFS.colWidths[colId] = newW;
+    savePref('col-widths', KB_PREFS.colWidths);
+    boardEl.querySelectorAll('.kanban-col-resize-handle.dragging').forEach(function(h) { h.classList.remove('dragging'); });
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    _resizeDragCol = null;
+  });
+
   // Dynamic column data — populated from dmSync kanbanColumns store
   var _kanbanColumns = [];  // Array of column objects from dmSync, sorted by order
   var columns = {};         // { statusSlug: DOM element } — built dynamically
   var counts = {};          // { statusSlug: DOM element } — built dynamically
+  var times = {};           // { statusSlug: DOM element } — column time totals
   var _columnOrder = [];    // ['todo', 'in_progress', 'done', ...] — built dynamically
 
   var allTodos = [];
@@ -1155,6 +2067,7 @@
   var _isDragging = false;
   var _renderPending = false;
   var _doneFilter = 'today'; // 'today' | '7days' | 'all'
+  var _pomoProgressCache = {}; // Cached pomodoro progress from localStorage
   var _kanbanProjectMap = {}; // { projectId: { name, color } }
   var _kanbanFilterProjectIds = new Set(['__none__']); // Active project filters — default to "No project"
   var kanbanProjectFilterBar = document.getElementById('kanban-project-filter');
@@ -1372,6 +2285,7 @@
     boardEl.innerHTML = '';
     columns = {};
     counts = {};
+    times = {};
     _columnOrder = [];
 
     _kanbanColumns.forEach(function(colDef) {
@@ -1390,6 +2304,7 @@
       headerHtml += '<span class="kanban-column-dot" style="background:' + escapeHtml(colDef.color) + ';"></span>';
       headerHtml += '<h3 class="kanban-col-name" data-col-id="' + colDef.id + '">' + escapeHtml(colDef.name) + '</h3>';
       headerHtml += '<span class="kanban-column-count" data-col-count="' + slug + '">0</span>';
+      headerHtml += '<span class="kanban-column-time" data-col-time="' + slug + '"></span>';
       // Done filter for done columns
       if (colDef.isDoneColumn) {
         headerHtml += '<select class="kanban-done-filter" data-done-filter="' + slug + '">';
@@ -1425,6 +2340,7 @@
 
       columns[slug] = itemsDiv;
       counts[slug] = colDiv.querySelector('[data-col-count="' + slug + '"]');
+      times[slug] = colDiv.querySelector('[data-col-time="' + slug + '"]');
     });
 
     // Add the "+ Add Column" button at the end
@@ -1439,6 +2355,9 @@
     // Wire up event listeners
     initColumnEvents();
     initQuickAdd();
+
+    // Apply board customization preferences
+    applyAllPrefs();
   }
 
   // ─── Column management event listeners ───
@@ -1850,14 +2769,33 @@
         metaParts.push('<span class="kanban-card-age ' + age.cssClass + '" title="Created ' + age.label + ' ago">' + age.label + '</span>');
       }
     }
+    // Started badge (pomodoro progress)
+    if (!isDone) {
+      var prog = _pomoProgressCache[todo.id];
+      if (prog && prog.accumulatedSeconds > 0) {
+        var startedMin = Math.round(prog.accumulatedSeconds / 60);
+        var startedLabel = startedMin > 0 ? 'started \u00b7 ' + startedMin + 'min' : 'started';
+        metaParts.push('<span class="kanban-card-started">' + startedLabel + '</span>');
+      }
+    }
 
     var html = '<div class="kanban-card' + (isDone ? ' kanban-card--done' : '') + '" data-todo-id="' + todo.id + '"';
-    // Task color background tint
-    if (todo.color && window.dmTaskColors) {
-      var tint = window.dmTaskColors.tint(todo.color, isDone, todo.color2);
-      if (tint) html += ' style="background:' + tint + '"';
+    // Task color background tint or accent
+    if (todo.color) {
+      var accentColor = todo.color;
+      html += ' data-task-color="1"';
+      if (KB_PREFS.cardColorMode === 'tint' && window.dmTaskColors) {
+        var tint = window.dmTaskColors.tint(todo.color, isDone, todo.color2);
+        if (tint) html += ' style="background:' + tint + ';--kb-card-accent-color:' + accentColor + '"';
+        else html += ' style="--kb-card-accent-color:' + accentColor + '"';
+      } else {
+        html += ' style="--kb-card-accent-color:' + accentColor + '"';
+      }
     }
     html += '>';
+    // Drag grip handle
+    html += '<span class="kanban-card-grip" title="Drag to move"><svg width="6" height="10" viewBox="0 0 6 10"><circle cx="1.5" cy="1.5" r="1" fill="currentColor"/><circle cx="4.5" cy="1.5" r="1" fill="currentColor"/><circle cx="1.5" cy="5" r="1" fill="currentColor"/><circle cx="4.5" cy="5" r="1" fill="currentColor"/><circle cx="1.5" cy="8.5" r="1" fill="currentColor"/><circle cx="4.5" cy="8.5" r="1" fill="currentColor"/></svg></span>';
+    html += '<div class="kanban-card-body">';
     html += '<div class="kanban-card-header">';
     html += bujoIcon;
     html += '<span class="kanban-card-title">' + title + '</span>';
@@ -1887,7 +2825,8 @@
     if (metaParts.length > 0) {
       html += '<div class="kanban-card-meta">' + metaParts.join('') + '</div>';
     }
-    html += '</div>';
+    html += '</div>'; // close card-body
+    html += '</div>'; // close card
     return html;
   }
 
@@ -1897,6 +2836,9 @@
       _renderPending = true;
       return;
     }
+    // Refresh pomodoro progress cache for started badges
+    try { _pomoProgressCache = JSON.parse(localStorage.getItem('dm-pomodoro-progress') || '{}'); } catch(e) { _pomoProgressCache = {}; }
+
     // Only show parent-level tasks (no subtasks as standalone cards)
     var visibleTodos = allTodos.filter(function(t) {
       if (t.deletedAt) return false;
@@ -1958,6 +2900,18 @@
       }
       if (columns[col]) columns[col].innerHTML = html;
       if (counts[col]) counts[col].textContent = items.length;
+      // Update column time total
+      if (times[col]) {
+        var colMin = 0;
+        items.forEach(function(t) { if (t.estimatedMin) colMin += t.estimatedMin; });
+        if (colMin > 0) {
+          var ch = Math.floor(colMin / 60);
+          var cm = colMin % 60;
+          times[col].textContent = '\u00b7 ' + (ch > 0 ? ch + 'h' + (cm > 0 ? ' ' + cm + 'm' : '') : cm + 'm');
+        } else {
+          times[col].textContent = '';
+        }
+      }
     });
 
     // Set up click handlers on cards
@@ -2010,6 +2964,51 @@
 
     // Initialize SortableJS
     initSortable();
+
+    // Initialize column resize handles if enabled
+    initColResizeHandles();
+
+    // Update board header stats
+    updateBoardStats();
+  }
+
+  function updateBoardStats() {
+    var statsEl = document.getElementById('kanban-board-stats');
+    if (!statsEl) return;
+    var visible = allTodos.filter(function(t) {
+      if (t.deletedAt || t.parentId) return false;
+      var s = t.status || 'active';
+      return s === 'active' || s === 'done';
+    });
+    if (_kanbanFilterProjectIds.size > 0) {
+      visible = visible.filter(function(t) {
+        if (_kanbanFilterProjectIds.has('__none__') && !t.projectId) return true;
+        return t.projectId && _kanbanFilterProjectIds.has(t.projectId);
+      });
+    }
+    var total = visible.length;
+    var totalMin = 0;
+    var doneToday = 0;
+    var todayStr = new Date().toISOString().slice(0, 10);
+    visible.forEach(function(t) {
+      if (t.estimatedMin) totalMin += t.estimatedMin;
+      if (t.done && t.completedAt) {
+        var d = new Date(t.completedAt);
+        if (d.toISOString().slice(0, 10) === todayStr) doneToday++;
+      }
+    });
+    var parts = [];
+    parts.push('<span>' + total + ' task' + (total !== 1 ? 's' : '') + '</span>');
+    if (totalMin > 0) {
+      var h = Math.floor(totalMin / 60);
+      var m = totalMin % 60;
+      var timeStr = h > 0 ? h + 'h' + (m > 0 ? ' ' + m + 'm' : '') : m + 'm';
+      parts.push('<span>' + timeStr + ' est.</span>');
+    }
+    if (doneToday > 0) {
+      parts.push('<span>' + doneToday + ' done today</span>');
+    }
+    statsEl.innerHTML = parts.join('');
   }
 
   function applyEditResult(todo, result) {
@@ -2172,6 +3171,7 @@
       if (!el) return;
       var sortable = Sortable.create(el, {
         group: 'kanban',
+        handle: '.kanban-card-grip',
         forceFallback: true,
         animation: 150,
         ghostClass: 'kanban-card--ghost',
@@ -2844,6 +3844,127 @@
     });
   }
 
+  // ─── Move card between columns (used by keyboard shortcut) ───
+  function moveCardToColumn(todoId, targetColSlug) {
+    var todo = allTodos.find(function(t) { return t.id === todoId; });
+    if (!todo || !window.dmSync) return;
+
+    var prevStatus = todo.kanbanStatus || getFirstColumnStatus();
+    if (prevStatus === targetColSlug) return;
+
+    var movingToDone = isColumnDone(targetColSlug) && !isColumnDone(prevStatus);
+    var movingFromDone = !isColumnDone(targetColSlug) && isColumnDone(prevStatus);
+
+    // Snapshot for undo if moving to Done
+    var snapshot = null;
+    if (movingToDone) {
+      snapshot = {
+        kanbanStatus: prevStatus,
+        kanbanOrder: todo.kanbanOrder || 0,
+        done: todo.done,
+        status: todo.status,
+        bujoState: todo.bujoState,
+        completedAt: todo.completedAt,
+        actualMin: todo.actualMin
+      };
+    }
+
+    // Compute kanbanOrder for end of target column
+    var targetCards = allTodos.filter(function(t) {
+      return t.kanbanStatus === targetColSlug && !t.deletedAt && !t.parentId && t.id !== todoId;
+    });
+    var maxOrder = 0;
+    targetCards.forEach(function(t) {
+      if ((t.kanbanOrder || 0) > maxOrder) maxOrder = t.kanbanOrder || 0;
+    });
+    var newOrder = maxOrder + 1;
+
+    var firestoreUpdates = {
+      kanbanStatus: targetColSlug,
+      kanbanOrder: newOrder,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    var localUpdates = {
+      kanbanStatus: targetColSlug,
+      kanbanOrder: newOrder,
+      updatedAt: Date.now()
+    };
+
+    if (movingToDone) {
+      firestoreUpdates.done = true;
+      firestoreUpdates.status = 'done';
+      firestoreUpdates.bujoState = 'done';
+      firestoreUpdates.completedAt = firebase.firestore.FieldValue.serverTimestamp();
+      localUpdates.done = true;
+      localUpdates.status = 'done';
+      localUpdates.bujoState = 'done';
+      localUpdates.completedAt = Date.now();
+    } else if (movingFromDone) {
+      firestoreUpdates.done = false;
+      firestoreUpdates.status = 'active';
+      firestoreUpdates.bujoState = 'open';
+      firestoreUpdates.completedAt = null;
+      firestoreUpdates.actualMin = null;
+      localUpdates.done = false;
+      localUpdates.status = 'active';
+      localUpdates.bujoState = 'open';
+      localUpdates.completedAt = null;
+      localUpdates.actualMin = null;
+    }
+
+    // Apply local updates
+    Object.keys(localUpdates).forEach(function(key) {
+      todo[key] = localUpdates[key];
+    });
+
+    window.dmSync.firestoreWrite({
+      collection: 'todos',
+      docId: todo.id,
+      op: 'update',
+      data: firestoreUpdates,
+      localOp: function() { return window.dmSync.putTodo(todo); }
+    }).then(function() {
+      updateCounts();
+      if (snapshot) {
+        showUndoToast('Marked "' + (todo.title || 'task') + '" done', function() {
+          var undoFirestore = {
+            kanbanStatus: snapshot.kanbanStatus,
+            kanbanOrder: snapshot.kanbanOrder,
+            done: snapshot.done,
+            status: snapshot.status,
+            bujoState: snapshot.bujoState,
+            completedAt: snapshot.completedAt,
+            actualMin: snapshot.actualMin,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          };
+          var undoLocal = {
+            kanbanStatus: snapshot.kanbanStatus,
+            kanbanOrder: snapshot.kanbanOrder,
+            done: snapshot.done,
+            status: snapshot.status,
+            bujoState: snapshot.bujoState,
+            completedAt: snapshot.completedAt,
+            actualMin: snapshot.actualMin,
+            updatedAt: Date.now()
+          };
+          Object.keys(undoLocal).forEach(function(key) {
+            todo[key] = undoLocal[key];
+          });
+          window.dmSync.firestoreWrite({
+            collection: 'todos',
+            docId: todo.id,
+            op: 'update',
+            data: undoFirestore,
+            localOp: function() { return window.dmSync.putTodo(todo); }
+          }).then(function() { renderBoard(); });
+        });
+      }
+    });
+
+    renderBoard();
+    setFocusedCard(todoId);
+  }
+
   // ─── Keyboard navigation ───
   var _focusedCardId = null;
 
@@ -2925,10 +4046,19 @@
         if (visCards.length > 0) setFocusedCard(visCards[0].el.getAttribute('data-todo-id'));
         return;
       }
+      // Ctrl/Cmd+Arrow = move card to next column
+      if (e.ctrlKey || e.metaKey) {
+        var curCol = getFocusedColumn();
+        var colIdx = _columnOrder.indexOf(curCol);
+        if (colIdx < _columnOrder.length - 1) {
+          moveCardToColumn(_focusedCardId, _columnOrder[colIdx + 1]);
+        }
+        return;
+      }
       var curCol = getFocusedColumn();
       var colIdx = _columnOrder.indexOf(curCol);
       if (colIdx < _columnOrder.length - 1) {
-        // Move to next column, try same row index
+        // Move focus to next column, try same row index
         var curCards = visCards.filter(function(c) { return c.col === curCol; });
         var curRow = -1;
         curCards.forEach(function(c, i) { if (c.el.getAttribute('data-todo-id') === _focusedCardId) curRow = i; });
@@ -2943,6 +4073,15 @@
       e.preventDefault();
       if (!_focusedCardId) {
         if (visCards.length > 0) setFocusedCard(visCards[0].el.getAttribute('data-todo-id'));
+        return;
+      }
+      // Ctrl/Cmd+Arrow = move card to prev column
+      if (e.ctrlKey || e.metaKey) {
+        var curCol = getFocusedColumn();
+        var colIdx = _columnOrder.indexOf(curCol);
+        if (colIdx > 0) {
+          moveCardToColumn(_focusedCardId, _columnOrder[colIdx - 1]);
+        }
         return;
       }
       var curCol = getFocusedColumn();
