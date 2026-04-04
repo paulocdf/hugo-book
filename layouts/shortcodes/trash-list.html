@@ -528,6 +528,12 @@
         }).then(function() {
           loadFromCache();
           window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+          // ─── Calendar sync: re-create event for restored task ───
+          if (window.dmCalendar && window.dmSync) {
+            window.dmSync.getTodo(todoId).then(function(todo) {
+              if (todo) window.dmCalendar.onTaskRestored(todo);
+            });
+          }
         }).catch(function(err) {
           console.error('Restore todo error:', err);
           btn.disabled = false;

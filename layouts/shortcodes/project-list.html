@@ -2069,6 +2069,7 @@
         // Build diff of changed fields for both Firestore and local
         var fsData = {};
         var origBujoState = todo.bujoState || 'open';
+        var _calOldScheduledDate = todo.scheduledDate || null;  // Capture before fields are updated
         var fields = ['title', 'scheduledDate', 'estimatedMin', 'pomodoroCount',
           'pomodoroLength', 'breakLength', 'category', 'projectId', 'bujoType', 'notes', 'color', 'color2'];
         fields.forEach(function(f) {
@@ -2123,6 +2124,11 @@
         fsData.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
         todo.updatedAt = Date.now();
 
+        // Track calendar-relevant state before write
+        var _calCompleted = fsData.done === true;
+        var _calReopened = fsData.done === false && (fsData.completedAt === null || fsData.completedAt === undefined);
+        var _calDateChanged = 'scheduledDate' in fsData;
+
         window.dmSync.firestoreWrite({
           collection: 'todos',
           docId: todoId,
@@ -2132,6 +2138,12 @@
         }).then(function() {
           renderDetail(_currentProjectId);
           loadTodoCounts().then(function() { renderList(); });
+          // Calendar sync
+          if (window.dmCalendar) {
+            if (_calCompleted) { window.dmCalendar.onTaskCompleted(todo); }
+            else if (_calReopened) { window.dmCalendar.onTaskReopened(todo); }
+            if (_calDateChanged) { window.dmCalendar.onTaskUpdated(todo, _calOldScheduledDate); }
+          }
         });
       }
       window.dmTodoEdit.open(todo, onEditSave, anchorEl);
@@ -2190,6 +2202,8 @@
           collection: 'todos', docId: todoId, op: 'update', data: fsData,
           localOp: function() { return window.dmSync.putTodo(todo); }
         }).then(function() {
+          // Calendar sync: task completed
+          if (window.dmCalendar) { window.dmCalendar.onTaskCompleted(todo); }
           // Parent auto-complete
           if (todo.parentId && projectTodos) {
             pjCheckParentAutoComplete(todo.parentId, projectTodos);
@@ -2230,6 +2244,8 @@
             }).then(function() {
               renderDetail(_currentProjectId);
               loadTodoCounts().then(function() { renderList(); });
+              // Calendar sync: undo completion = reopen
+              if (window.dmCalendar) { window.dmCalendar.onTaskReopened(todo); }
             });
           }
         });
@@ -2250,6 +2266,8 @@
         }).then(function() {
           renderDetail(_currentProjectId);
           loadTodoCounts().then(function() { renderList(); });
+          // Calendar sync: task reopened
+          if (window.dmCalendar) { window.dmCalendar.onTaskReopened(todo); }
         });
       }
     });
@@ -2287,6 +2305,8 @@
     }).then(function() {
       renderDetail(_currentProjectId);
       loadTodoCounts().then(function() { renderList(); });
+      // Calendar sync: parent auto-completed
+      if (window.dmCalendar) { window.dmCalendar.onTaskCompleted(parent); }
     });
   }
 
@@ -2316,6 +2336,9 @@
           return window.dmSync.firestoreWrite({
             collection: 'todos', docId: id, op: 'update', data: updateData,
             localOp: function() { return window.dmSync.putTodo(todo); }
+          }).then(function() {
+            // Calendar sync: delete event
+            if (window.dmCalendar) { window.dmCalendar.onTaskDeleted(todo); }
           });
         });
       });
@@ -2386,6 +2409,9 @@
           return window.dmSync.firestoreWrite({
             collection: 'todos', docId: snap.id, op: 'update', data: updateData,
             localOp: function() { return window.dmSync.putTodo(todo); }
+          }).then(function() {
+            // Calendar sync: restore event
+            if (window.dmCalendar) { window.dmCalendar.onTaskRestored(todo); }
           });
         });
       });
@@ -3050,6 +3076,8 @@
       });
     }).then(function() {
       _pjAddBtn.disabled = false;
+      // Calendar sync: task created
+      if (window.dmCalendar) { window.dmCalendar.onTaskCreated(localTodo); }
       // Reset form fields
       _pjAddTitle.value = '';
       _pjAddCustomMin.value = '';
@@ -3274,8 +3302,10 @@
     var detail = e.detail || {};
     if (!detail.todoId || !_currentProjectId || !detailView.classList.contains('active')) return;
 
+    var _pomodoroTodo = null;  // Hoist for calendar sync in chained .then()
     window.dmSync.getTodo(detail.todoId).then(function(todo) {
       if (!todo || todo.projectId !== _currentProjectId) return;
+      _pomodoroTodo = todo;
 
       // Use tracked minutes from the event
       var actualMin = detail.trackedMinutes || todo.estimatedMin || null;
@@ -3316,6 +3346,8 @@
       }
       renderDetail(_currentProjectId);
       loadTodoCounts().then(function() { renderList(); });
+      // Calendar sync: pomodoro completion
+      if (window.dmCalendar && _pomodoroTodo) { window.dmCalendar.onTaskCompleted(_pomodoroTodo); }
     });
   });
 

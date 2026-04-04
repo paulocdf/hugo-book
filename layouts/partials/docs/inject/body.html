@@ -3374,6 +3374,40 @@
             '<textarea class="settings-modal-textarea" id="setting-ai-custom-context" placeholder="e.g. I\'m a software engineer. I prefer short actionable tasks." rows="3"></textarea>' +
           '</div>' +
 
+          // ─── Google Calendar section ───
+          '<div class="settings-modal-section">' +
+            '<h4 class="settings-modal-section-title">' +
+              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px">' +
+                '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>' +
+                '<line x1="16" y1="2" x2="16" y2="6"/>' +
+                '<line x1="8" y1="2" x2="8" y2="6"/>' +
+                '<line x1="3" y1="10" x2="21" y2="10"/>' +
+              '</svg>' +
+              'Google Calendar' +
+            '</h4>' +
+            '<p class="settings-modal-ai-info" style="margin-top:0">Sync tasks with scheduled dates to Google Calendar for native phone notifications.</p>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label">Status</label>' +
+              '<div class="settings-modal-control">' +
+                '<span id="setting-calendar-status" style="font-size:0.85rem;opacity:0.7">Not connected</span>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<div class="settings-modal-label">&nbsp;</div>' +
+              '<div class="settings-modal-control" style="display:flex;gap:8px;align-items:center">' +
+                '<button type="button" id="setting-calendar-connect" class="settings-modal-validate-btn">Connect Google Calendar</button>' +
+                '<button type="button" id="setting-calendar-disconnect" class="settings-modal-validate-btn" style="display:none">Disconnect</button>' +
+              '</div>' +
+            '</div>' +
+            '<div id="setting-calendar-sync-row" class="settings-modal-row" style="display:none">' +
+              '<div class="settings-modal-label">&nbsp;</div>' +
+              '<div class="settings-modal-control" style="display:flex;gap:8px;align-items:center">' +
+                '<span id="setting-calendar-sync-info" style="font-size:0.85rem"></span>' +
+                '<button type="button" id="setting-calendar-sync-btn" class="settings-modal-validate-btn" style="display:none">Sync now</button>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
         '</div>' +
       '</div>';
 
@@ -3743,6 +3777,104 @@
         }, 500);
       });
     }
+
+    // ─── Google Calendar bindings ───
+    var calConnectBtn = document.getElementById('setting-calendar-connect');
+    var calDisconnectBtn = document.getElementById('setting-calendar-disconnect');
+    var calStatusEl = document.getElementById('setting-calendar-status');
+    var calSyncRow = document.getElementById('setting-calendar-sync-row');
+    var calSyncInfo = document.getElementById('setting-calendar-sync-info');
+    var calSyncBtn = document.getElementById('setting-calendar-sync-btn');
+
+    function updateCalendarUI() {
+      if (!calStatusEl || !calConnectBtn || !calDisconnectBtn) return;
+      var cal = window.dmCalendar;
+      if (!cal) return;
+
+      if (cal.isConnected()) {
+        calStatusEl.textContent = 'Connected';
+        calStatusEl.style.color = 'var(--color-link)';
+        calConnectBtn.style.display = 'none';
+        calDisconnectBtn.style.display = '';
+        // Check for unsynced tasks
+        cal.countUnsyncedTasks().then(function(count) {
+          if (count > 0 && calSyncRow && calSyncInfo && calSyncBtn) {
+            calSyncRow.style.display = '';
+            calSyncInfo.textContent = count + ' scheduled task' + (count === 1 ? '' : 's') + ' not yet synced.';
+            calSyncBtn.style.display = '';
+          } else if (calSyncRow) {
+            calSyncRow.style.display = 'none';
+          }
+        });
+      } else if (cal.isEnabled()) {
+        calStatusEl.textContent = 'Enabled (reconnect needed)';
+        calStatusEl.style.color = '';
+        calConnectBtn.style.display = '';
+        calConnectBtn.textContent = 'Reconnect';
+        calDisconnectBtn.style.display = '';
+        if (calSyncRow) calSyncRow.style.display = 'none';
+      } else {
+        calStatusEl.textContent = 'Not connected';
+        calStatusEl.style.color = '';
+        calConnectBtn.style.display = '';
+        calConnectBtn.textContent = 'Connect Google Calendar';
+        calDisconnectBtn.style.display = 'none';
+        if (calSyncRow) calSyncRow.style.display = 'none';
+      }
+    }
+
+    if (calConnectBtn) {
+      calConnectBtn.addEventListener('click', function() {
+        var cal = window.dmCalendar;
+        if (!cal) return;
+        calConnectBtn.disabled = true;
+        calConnectBtn.textContent = 'Connecting...';
+        cal.connect().then(function() {
+          updateCalendarUI();
+          calConnectBtn.disabled = false;
+        }).catch(function(err) {
+          calStatusEl.textContent = 'Error: ' + (err.message || 'Unknown');
+          calStatusEl.style.color = 'var(--color-danger, #d32f2f)';
+          calConnectBtn.disabled = false;
+          calConnectBtn.textContent = 'Connect Google Calendar';
+        });
+      });
+    }
+
+    if (calDisconnectBtn) {
+      calDisconnectBtn.addEventListener('click', function() {
+        var cal = window.dmCalendar;
+        if (cal) cal.disconnect();
+        updateCalendarUI();
+      });
+    }
+
+    if (calSyncBtn) {
+      calSyncBtn.addEventListener('click', function() {
+        var cal = window.dmCalendar;
+        if (!cal) return;
+        calSyncBtn.disabled = true;
+        calSyncBtn.textContent = 'Syncing...';
+        cal.syncAll(function(done, total) {
+          if (calSyncInfo) calSyncInfo.textContent = 'Syncing ' + done + ' / ' + total + '...';
+        }).then(function(total) {
+          if (calSyncInfo) calSyncInfo.textContent = total + ' task' + (total === 1 ? '' : 's') + ' synced!';
+          calSyncBtn.style.display = 'none';
+          calSyncBtn.disabled = false;
+          calSyncBtn.textContent = 'Sync now';
+          // Hide the row after a moment
+          setTimeout(function() {
+            if (calSyncRow) calSyncRow.style.display = 'none';
+          }, 3000);
+        }).catch(function(err) {
+          if (calSyncInfo) calSyncInfo.textContent = 'Sync failed: ' + (err.message || 'Unknown');
+          calSyncBtn.disabled = false;
+          calSyncBtn.textContent = 'Retry';
+        });
+      });
+    }
+
+    updateCalendarUI();
   }
 
   function renderAuthPrompt() {

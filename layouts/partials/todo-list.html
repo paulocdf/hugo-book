@@ -6473,8 +6473,18 @@
       localUpdates.scheduledDate = newDate;
     }
 
+    var _oldBujoDate = todo.scheduledDate || null;
     updateTodoField(todo.id, firestoreUpdates, localUpdates);
     render();
+
+    // ─── Calendar sync: handle BuJo state changes ───
+    if (window.dmCalendar) {
+      if (newState === 'done') {
+        window.dmCalendar.onTaskCompleted(todo);
+      } else if (newDate !== undefined) {
+        window.dmCalendar.onTaskUpdated(todo, _oldBujoDate);
+      }
+    }
   }
 
   function showMigratePrompt(anchorEl, todo, stateType) {
@@ -7043,8 +7053,15 @@
         if (Object.keys(firestoreUpdates).length > 0) {
           firestoreUpdates.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
           localUpdates.updatedAt = Date.now();
+          // ─── Calendar sync: detect scheduledDate changes ───
+          var _oldScheduledDate = todo.scheduledDate || null;
           updateTodoField(todoId, firestoreUpdates, localUpdates);
           render();
+          if (window.dmCalendar && localUpdates.scheduledDate !== undefined) {
+            // Apply local updates to the todo object first for the calendar hook
+            var updatedTodo = allTodos.find(function(t) { return t.id === todoId; });
+            if (updatedTodo) window.dmCalendar.onTaskUpdated(updatedTodo, _oldScheduledDate);
+          }
         }
       }
       window.dmTodoEdit.open(todo, onEditSave, anchorEl);
@@ -7423,6 +7440,7 @@
 
     // Update scheduledDate if moved to a different group
     if (todo.scheduledDate !== newScheduledDate) {
+      var _oldDragDate = todo.scheduledDate || null;
       updates.scheduledDate = newScheduledDate;
       localUpdates.scheduledDate = newScheduledDate;
       // Also update children's scheduledDate
@@ -7441,6 +7459,11 @@
 
     // Write to Firestore
     updateTodoField(todoId, updates, localUpdates);
+
+    // ─── Calendar sync: update event date if scheduledDate changed ───
+    if (window.dmCalendar && typeof _oldDragDate !== 'undefined') {
+      window.dmCalendar.onTaskUpdated(todo, _oldDragDate);
+    }
 
     // Re-render to reflect sorted state
     render();
@@ -8140,6 +8163,8 @@
       render();
       // Clear flash class after animation completes
       setTimeout(function() { delete _justAddedIds[newDocId]; }, 1600);
+      // ─── Calendar sync: create event for new task ───
+      if (window.dmCalendar) window.dmCalendar.onTaskCreated(localTodo);
     }).catch(function(err) {
       console.error('Error creating todo:', err);
       showTodoError('Failed to add task — check console');
@@ -8252,6 +8277,8 @@
         checkParentAutoComplete(todo.parentId);
         render();
         clearJustCompletedIds();
+        // ─── Calendar sync: mark event as done ───
+        if (window.dmCalendar) window.dmCalendar.onTaskCompleted(todo);
       }).catch(function(err) {
         console.error('Error completing todo:', err);
         showTodoError('Failed to complete task — check console');
@@ -8372,6 +8399,8 @@
           }
         }
         render();
+        // ─── Calendar sync: update event (remove checkmark) ───
+        if (window.dmCalendar) window.dmCalendar.onTaskReopened(todo);
       }).catch(function(err) {
         console.error('Error reopening todo:', err);
       });
@@ -8415,6 +8444,13 @@
 
     chain.then(function() {
       render();
+      // ─── Calendar sync: delete events for deleted tasks ───
+      if (window.dmCalendar) {
+        toDelete.forEach(function(id) {
+          var todo = allTodos.find(function(t) { return t.id === id; });
+          if (todo) window.dmCalendar.onTaskDeleted(todo);
+        });
+      }
     }).catch(function(err) {
       console.error('Error deleting todo:', err);
       showTodoError('Failed to delete task — check console');

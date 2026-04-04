@@ -2122,12 +2122,20 @@
       firestoreUpdates.updatedAt = firebase.firestore.FieldValue.serverTimestamp();
       localUpdates.updatedAt = Date.now();
 
+      // Capture old scheduledDate before applying local updates (for calendar sync)
+      var _calOldScheduledDate = todo.scheduledDate || null;
+
       // Apply local updates
       Object.keys(localUpdates).forEach(function(key) {
         todo[key] = localUpdates[key];
       });
 
       if (window.dmSync) {
+        // Track calendar-relevant state before write
+        var _calCompleted = firestoreUpdates.done === true;
+        var _calReopened = firestoreUpdates.done === false && firestoreUpdates.completedAt === null;
+        var _calDateChanged = 'scheduledDate' in firestoreUpdates;
+
         window.dmSync.firestoreWrite({
           collection: 'todos',
           docId: todo.id,
@@ -2138,6 +2146,12 @@
           }
         }).then(function() {
           renderBoard();
+          // Calendar sync
+          if (window.dmCalendar) {
+            if (_calCompleted) { window.dmCalendar.onTaskCompleted(todo); }
+            else if (_calReopened) { window.dmCalendar.onTaskReopened(todo); }
+            if (_calDateChanged) { window.dmCalendar.onTaskUpdated(todo, _calOldScheduledDate); }
+          }
         }).catch(function(err) {
           console.error('[kanban] Error updating todo:', err);
         });
@@ -2272,6 +2286,11 @@
             }).then(function() {
               // Update counts without full re-render to keep DOM position
               updateCounts();
+              // Calendar sync: drag completion/reopen
+              if (window.dmCalendar) {
+                if (movingToDone) { window.dmCalendar.onTaskCompleted(todo); }
+                else if (movingFromDone) { window.dmCalendar.onTaskReopened(todo); }
+              }
               // Show undo toast when moved to Done
               if (snapshot) {
                 showUndoToast('Marked "' + (todo.title || 'task') + '" done', function() {
@@ -2309,6 +2328,8 @@
                     }
                   }).then(function() {
                     renderBoard();
+                    // Calendar sync: undo drag-to-done = reopen
+                    if (window.dmCalendar) { window.dmCalendar.onTaskReopened(todo); }
                   });
                 });
               }
@@ -2462,6 +2483,9 @@
           localOp: function() {
             return window.dmSync.putTodo(todo);
           }
+        }).then(function() {
+          // Calendar sync: delete event
+          if (window.dmCalendar) { window.dmCalendar.onTaskDeleted(todo); }
         });
       });
     });
@@ -2538,6 +2562,9 @@
           localOp: function() {
             return window.dmSync.putTodo(todo);
           }
+        }).then(function() {
+          // Calendar sync: restore event
+          if (window.dmCalendar) { window.dmCalendar.onTaskRestored(todo); }
         });
       });
     });
@@ -2728,6 +2755,8 @@
         }
       }).then(function() {
         window.dispatchEvent(new Event('dm-todos-updated'));
+        // Calendar sync: create event
+        if (window.dmCalendar) { window.dmCalendar.onTaskCreated(localTodo); }
       }).catch(function(err) {
         console.error('[kanban] Error creating task:', err);
         // Remove from local array on error
@@ -3045,6 +3074,8 @@
         localOp: function() { return window.dmSync.putTodo(todo); }
       }).then(function() {
         renderBoard();
+        // Calendar sync: pomodoro completion
+        if (window.dmCalendar) { window.dmCalendar.onTaskCompleted(todo); }
       }).catch(function(err) {
         console.error('[kanban] Error completing todo from pomodoro:', err);
       });

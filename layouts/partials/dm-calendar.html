@@ -1,0 +1,526 @@
+<!-- ─── Google Calendar Integration ─────────────────────────────────
+     One-way sync: Digital Memory tasks → Google Calendar events.
+     Uses Google Identity Services (GIS) OAuth2 token client for
+     an access token with calendar.events scope.  Token lives in
+     memory only (short-lived ~1h).  All calendar operations are
+     fire-and-forget — they never block task CRUD.
+
+     Exposed API: window.dmCalendar
+──────────────────────────────────────────────────────────────────── -->
+<script>
+(function() {
+  'use strict';
+
+  // ─── Constants ───
+  var CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+  var CALENDAR_API   = 'https://www.googleapis.com/calendar/v3/calendars/primary/events';
+  var LS_ENABLED     = 'dm-calendar-enabled';
+
+  // GIS Client ID — same one used for sign-in (head.html)
+  var GIS_CLIENT_ID = '722285589293-sn6f6i3c51sn5519tq1alf239biorvg7.apps.googleusercontent.com';
+
+  // ─── State ───
+  var _accessToken   = null;
+  var _tokenExpiresAt = 0;   // epoch ms
+  var _tokenClient   = null;
+  var _pendingResolve = null; // for the connect() promise
+  var _pendingReject  = null;
+
+  // ─── Helpers ───
+
+  /** Is the calendar integration enabled (user opted in via settings)? */
+  function isEnabled() {
+    try { return localStorage.getItem(LS_ENABLED) === 'true'; } catch(e) { return false; }
+  }
+
+  /** Is there a valid (non-expired) access token in memory? */
+  function isConnected() {
+    return !!_accessToken && Date.now() < _tokenExpiresAt;
+  }
+
+  /** Compute next day string for all-day event end (exclusive).
+   *  Input: "2026-04-04"  Output: "2026-04-05"  */
+  function nextDay(dateStr) {
+    var d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    var mm = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return d.getFullYear() + '-' + mm + '-' + dd;
+  }
+
+  /** Build event description from task fields. */
+  function buildDescription(todo) {
+    var parts = [];
+    if (todo.category)     parts.push('Category: ' + todo.category);
+    if (todo.estimatedMin) parts.push('Estimated: ' + todo.estimatedMin + ' min');
+    if (todo.notes)        parts.push('Notes: ' + todo.notes);
+    parts.push('Managed by Digital Memory');
+    return parts.join('\n');
+  }
+
+  /** Resolve task share emails for attendees (accepted shares only). */
+  function getAttendeesForTodo(todoId) {
+    if (!window.dmSync || !window.dmSync.getSharesForTodo) return Promise.resolve([]);
+    return window.dmSync.getSharesForTodo(todoId).then(function(shares) {
+      if (!shares || !shares.length) return [];
+      return shares
+        .filter(function(s) { return s.status === 'accepted'; })
+        .map(function(s) { return { email: s.inviteeEmail }; });
+    }).catch(function() { return []; });
+  }
+
+  // ─── Token Management ───
+
+  /** Initialize the GIS OAuth2 token client (lazy, once). */
+  function _initTokenClient() {
+    if (_tokenClient) return;
+    if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) {
+      console.warn('[dm-calendar] GIS OAuth2 library not loaded');
+      return;
+    }
+    _tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: GIS_CLIENT_ID,
+      scope: CALENDAR_SCOPE,
+      callback: function(tokenResponse) {
+        if (tokenResponse.error) {
+          console.error('[dm-calendar] Token error:', tokenResponse.error);
+          _accessToken = null;
+          _tokenExpiresAt = 0;
+          if (_pendingReject) _pendingReject(new Error(tokenResponse.error));
+          _pendingResolve = null;
+          _pendingReject = null;
+          return;
+        }
+        _accessToken = tokenResponse.access_token;
+        // expires_in is in seconds; subtract 60s buffer
+        _tokenExpiresAt = Date.now() + ((tokenResponse.expires_in || 3600) - 60) * 1000;
+        try { localStorage.setItem(LS_ENABLED, 'true'); } catch(e) {}
+        console.log('[dm-calendar] Token acquired, expires in ~' + Math.round((tokenResponse.expires_in || 3600) / 60) + ' min');
+        if (_pendingResolve) _pendingResolve();
+        _pendingResolve = null;
+        _pendingReject = null;
+      }
+    });
+  }
+
+  /**
+   * Request a fresh access token.  If the user hasn't consented yet,
+   * this will show a popup.  Subsequent calls in the same session
+   * should be silent (GIS remembers consent).
+   * Returns a Promise that resolves when the token is ready.
+   */
+  function connect() {
+    return new Promise(function(resolve, reject) {
+      _initTokenClient();
+      if (!_tokenClient) {
+        reject(new Error('GIS OAuth2 library not available'));
+        return;
+      }
+      _pendingResolve = resolve;
+      _pendingReject = reject;
+      _tokenClient.requestAccessToken();
+    });
+  }
+
+  /** Disconnect: revoke token and clear state. */
+  function disconnect() {
+    if (_accessToken) {
+      try {
+        google.accounts.oauth2.revoke(_accessToken, function() {
+          console.log('[dm-calendar] Token revoked');
+        });
+      } catch(e) {}
+    }
+    _accessToken = null;
+    _tokenExpiresAt = 0;
+    try { localStorage.setItem(LS_ENABLED, 'false'); } catch(e) {}
+  }
+
+  /**
+   * Ensure we have a valid token.  If expired, silently re-request.
+   * Returns a Promise<string> with the access token, or rejects.
+   */
+  function _ensureToken() {
+    if (isConnected()) return Promise.resolve(_accessToken);
+    if (!isEnabled()) return Promise.reject(new Error('Calendar not enabled'));
+    return connect();
+  }
+
+  // ─── API Helpers ───
+
+  /**
+   * Fetch wrapper for Calendar API calls.
+   * Retries once on 401 (token revoked externally).
+   */
+  function _calendarFetch(url, opts, retried) {
+    return _ensureToken().then(function(token) {
+      var headers = Object.assign({}, opts.headers || {}, {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      });
+      return fetch(url, Object.assign({}, opts, { headers: headers }));
+    }).then(function(resp) {
+      if (resp.status === 401 && !retried) {
+        // Token might have been revoked externally — try once more
+        _accessToken = null;
+        _tokenExpiresAt = 0;
+        return _calendarFetch(url, opts, true);
+      }
+      return resp;
+    });
+  }
+
+  // ─── Calendar CRUD ───
+
+  /**
+   * Create a Google Calendar event for a task.
+   * Returns a Promise<string|null> with the event ID.
+   */
+  function createEvent(todo) {
+    if (!todo.scheduledDate) return Promise.resolve(null);
+    if (!isEnabled()) return Promise.resolve(null);
+
+    return getAttendeesForTodo(todo.id).then(function(attendees) {
+      var body = {
+        summary: todo.title,
+        description: buildDescription(todo),
+        start: { date: todo.scheduledDate },
+        end:   { date: nextDay(todo.scheduledDate) },
+        extendedProperties: {
+          private: { todoId: todo.id, app: 'digital-memory' }
+        }
+      };
+      if (attendees.length > 0) body.attendees = attendees;
+
+      return _calendarFetch(CALENDAR_API, {
+        method: 'POST',
+        body: JSON.stringify(body)
+      });
+    }).then(function(resp) {
+      if (!resp.ok) {
+        return resp.text().then(function(t) {
+          console.warn('[dm-calendar] Create event failed:', resp.status, t);
+          return null;
+        });
+      }
+      return resp.json();
+    }).then(function(data) {
+      if (!data || !data.id) return null;
+      console.log('[dm-calendar] Created event:', data.id);
+      return data.id;
+    }).catch(function(err) {
+      console.warn('[dm-calendar] createEvent error:', err.message || err);
+      return null;
+    });
+  }
+
+  /**
+   * Update an existing Google Calendar event (date, title, description, attendees).
+   */
+  function updateEvent(todo) {
+    if (!todo.calendarEventId) return Promise.resolve();
+    if (!isEnabled()) return Promise.resolve();
+
+    return getAttendeesForTodo(todo.id).then(function(attendees) {
+      var body = {
+        summary: todo.done ? '\u2713 ' + todo.title : todo.title,
+        description: buildDescription(todo)
+      };
+      if (todo.scheduledDate) {
+        body.start = { date: todo.scheduledDate };
+        body.end   = { date: nextDay(todo.scheduledDate) };
+      }
+      if (attendees.length > 0) body.attendees = attendees;
+
+      return _calendarFetch(CALENDAR_API + '/' + encodeURIComponent(todo.calendarEventId), {
+        method: 'PATCH',
+        body: JSON.stringify(body)
+      });
+    }).then(function(resp) {
+      if (resp.status === 404) {
+        // Event was deleted externally — clear the mapping
+        console.warn('[dm-calendar] Event not found, clearing calendarEventId');
+        _clearCalendarEventId(todo);
+        return;
+      }
+      if (!resp.ok) {
+        return resp.text().then(function(t) {
+          console.warn('[dm-calendar] Update event failed:', resp.status, t);
+        });
+      }
+      console.log('[dm-calendar] Updated event:', todo.calendarEventId);
+    }).catch(function(err) {
+      console.warn('[dm-calendar] updateEvent error:', err.message || err);
+    });
+  }
+
+  /**
+   * Mark a calendar event as done (update title with checkmark).
+   */
+  function markEventDone(todo) {
+    if (!todo.calendarEventId) return Promise.resolve();
+    if (!isEnabled()) return Promise.resolve();
+
+    return _calendarFetch(CALENDAR_API + '/' + encodeURIComponent(todo.calendarEventId), {
+      method: 'PATCH',
+      body: JSON.stringify({
+        summary: '\u2713 ' + todo.title,
+        colorId: '8'  // Graphite — muted color to indicate done
+      })
+    }).then(function(resp) {
+      if (resp.status === 404) {
+        _clearCalendarEventId(todo);
+        return;
+      }
+      if (!resp.ok) {
+        return resp.text().then(function(t) {
+          console.warn('[dm-calendar] markEventDone failed:', resp.status, t);
+        });
+      }
+      console.log('[dm-calendar] Marked event done:', todo.calendarEventId);
+    }).catch(function(err) {
+      console.warn('[dm-calendar] markEventDone error:', err.message || err);
+    });
+  }
+
+  /**
+   * Delete a Google Calendar event.
+   */
+  function deleteEvent(todo) {
+    if (!todo.calendarEventId) return Promise.resolve();
+    if (!isEnabled()) return Promise.resolve();
+
+    return _calendarFetch(CALENDAR_API + '/' + encodeURIComponent(todo.calendarEventId), {
+      method: 'DELETE'
+    }).then(function(resp) {
+      if (resp.status === 404 || resp.status === 410) {
+        // Already gone — just clear the mapping
+        _clearCalendarEventId(todo);
+        return;
+      }
+      if (!resp.ok) {
+        return resp.text().then(function(t) {
+          console.warn('[dm-calendar] Delete event failed:', resp.status, t);
+        });
+      }
+      console.log('[dm-calendar] Deleted event:', todo.calendarEventId);
+      _clearCalendarEventId(todo);
+    }).catch(function(err) {
+      console.warn('[dm-calendar] deleteEvent error:', err.message || err);
+    });
+  }
+
+  /**
+   * Clear calendarEventId from a task (after external deletion or cleanup).
+   */
+  function _clearCalendarEventId(todo) {
+    todo.calendarEventId = null;
+    if (window.dmSync) {
+      window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: todo.id,
+        op: 'update',
+        data: {
+          calendarEventId: null,
+          updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null
+        },
+        localOp: function() {
+          return window.dmSync.putTodo(todo);
+        }
+      }).catch(function(err) {
+        console.warn('[dm-calendar] Failed to clear calendarEventId:', err);
+      });
+    }
+  }
+
+  /**
+   * Save calendarEventId back to a task after creating a Calendar event.
+   */
+  function _saveCalendarEventId(todo, eventId) {
+    todo.calendarEventId = eventId;
+    if (window.dmSync) {
+      window.dmSync.firestoreWrite({
+        collection: 'todos',
+        docId: todo.id,
+        op: 'update',
+        data: {
+          calendarEventId: eventId,
+          updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null
+        },
+        localOp: function() {
+          return window.dmSync.putTodo(todo);
+        }
+      }).catch(function(err) {
+        console.warn('[dm-calendar] Failed to save calendarEventId:', err);
+      });
+    }
+  }
+
+  // ─── High-level sync helpers (called from task lifecycle hooks) ───
+
+  /**
+   * Handle task creation: create a Calendar event if the task has a scheduledDate.
+   * @param {object} todo — the local todo object (must have .id)
+   */
+  function onTaskCreated(todo) {
+    if (!isEnabled() || !todo.scheduledDate) return;
+    createEvent(todo).then(function(eventId) {
+      if (eventId) _saveCalendarEventId(todo, eventId);
+    });
+  }
+
+  /**
+   * Handle task completion: mark the Calendar event as done.
+   * @param {object} todo — the local todo object
+   */
+  function onTaskCompleted(todo) {
+    if (!isEnabled() || !todo.calendarEventId) return;
+    markEventDone(todo);
+  }
+
+  /**
+   * Handle task reopened: update the Calendar event to remove the checkmark.
+   * @param {object} todo — the local todo object
+   */
+  function onTaskReopened(todo) {
+    if (!isEnabled() || !todo.calendarEventId) return;
+    updateEvent(todo);
+  }
+
+  /**
+   * Handle task deleted: delete the Calendar event.
+   * @param {object} todo — the local todo object
+   */
+  function onTaskDeleted(todo) {
+    if (!isEnabled() || !todo.calendarEventId) return;
+    deleteEvent(todo);
+  }
+
+  /**
+   * Handle task updated: update or create/delete the Calendar event
+   * depending on whether scheduledDate was added, changed, or removed.
+   * @param {object} todo — the local todo object (with updated fields)
+   * @param {string|null} oldScheduledDate — previous scheduledDate value
+   */
+  function onTaskUpdated(todo, oldScheduledDate) {
+    if (!isEnabled()) return;
+
+    var hadDate = !!oldScheduledDate;
+    var hasDate = !!todo.scheduledDate;
+
+    if (!hadDate && hasDate) {
+      // scheduledDate was added — create event
+      createEvent(todo).then(function(eventId) {
+        if (eventId) _saveCalendarEventId(todo, eventId);
+      });
+    } else if (hadDate && !hasDate) {
+      // scheduledDate was removed — delete event
+      if (todo.calendarEventId) deleteEvent(todo);
+    } else if (hadDate && hasDate) {
+      // scheduledDate was changed — update event (or create if missing)
+      if (todo.calendarEventId) {
+        updateEvent(todo);
+      } else {
+        createEvent(todo).then(function(eventId) {
+          if (eventId) _saveCalendarEventId(todo, eventId);
+        });
+      }
+    }
+  }
+
+  /**
+   * Handle task restored from trash: re-create the Calendar event
+   * if the task has a scheduledDate.
+   * @param {object} todo — the restored todo object
+   */
+  function onTaskRestored(todo) {
+    if (!isEnabled() || !todo.scheduledDate) return;
+    // Clear old eventId (the event was deleted when task was trashed)
+    todo.calendarEventId = null;
+    createEvent(todo).then(function(eventId) {
+      if (eventId) _saveCalendarEventId(todo, eventId);
+    });
+  }
+
+  // ─── Retroactive sync ───
+
+  /**
+   * Sync all existing tasks with scheduledDate that don't yet have a Calendar event.
+   * Returns a Promise that resolves when all events are created.
+   * @param {function} onProgress — called with (completed, total)
+   */
+  function syncAll(onProgress) {
+    if (!window.dmSync) return Promise.reject(new Error('dmSync not available'));
+
+    return window.dmSync.getAllTodos().then(function(todos) {
+      var toSync = todos.filter(function(t) {
+        return t.scheduledDate
+          && !t.calendarEventId
+          && t.status !== 'deleted'
+          && !t.deletedAt
+          && !t.parentId;  // Only sync parent tasks
+      });
+
+      if (toSync.length === 0) return 0;
+
+      var completed = 0;
+      var total = toSync.length;
+
+      function syncNext(index) {
+        if (index >= toSync.length) return Promise.resolve();
+        var todo = toSync[index];
+
+        return createEvent(todo).then(function(eventId) {
+          if (eventId) _saveCalendarEventId(todo, eventId);
+          completed++;
+          if (onProgress) onProgress(completed, total);
+          // 200ms delay between API calls to respect quota
+          return new Promise(function(resolve) {
+            setTimeout(function() { resolve(syncNext(index + 1)); }, 200);
+          });
+        });
+      }
+
+      return syncNext(0).then(function() { return total; });
+    });
+  }
+
+  /**
+   * Count tasks that would be synced (have scheduledDate but no calendarEventId).
+   */
+  function countUnsyncedTasks() {
+    if (!window.dmSync) return Promise.resolve(0);
+    return window.dmSync.getAllTodos().then(function(todos) {
+      return todos.filter(function(t) {
+        return t.scheduledDate
+          && !t.calendarEventId
+          && t.status !== 'deleted'
+          && !t.deletedAt
+          && !t.parentId;
+      }).length;
+    });
+  }
+
+  // ─── Public API ───
+  window.dmCalendar = {
+    connect: connect,
+    disconnect: disconnect,
+    isConnected: isConnected,
+    isEnabled: isEnabled,
+    createEvent: createEvent,
+    updateEvent: updateEvent,
+    markEventDone: markEventDone,
+    deleteEvent: deleteEvent,
+    syncAll: syncAll,
+    countUnsyncedTasks: countUnsyncedTasks,
+    // High-level lifecycle hooks (called from task CRUD code)
+    onTaskCreated: onTaskCreated,
+    onTaskCompleted: onTaskCompleted,
+    onTaskReopened: onTaskReopened,
+    onTaskDeleted: onTaskDeleted,
+    onTaskUpdated: onTaskUpdated,
+    onTaskRestored: onTaskRestored
+  };
+
+})();
+</script>
