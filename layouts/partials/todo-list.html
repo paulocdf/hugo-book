@@ -2458,28 +2458,36 @@
 
 /* Summary bar */
 .todo-summary {
-  margin-top: 0.75rem;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--gray-100);
-  font-size: 0.78rem;
+  margin-top: 0.5rem;
+  padding: 6px 2px;
+  border-top: 1px solid var(--gray-200);
+  font-size: 0.75rem;
   color: var(--gray-500);
   display: flex;
-  gap: 16px;
+  align-items: center;
+  gap: 6px;
   flex-wrap: wrap;
 }
 .todo-summary-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 .todo-summary-item svg {
   flex-shrink: 0;
-  opacity: 0.6;
+  opacity: 0.5;
 }
 .todo-summary-item strong {
   color: var(--body-font-color);
   font-weight: 600;
+}
+.todo-summary-sep {
+  color: var(--gray-300);
+  user-select: none;
+}
+.todo-summary-pom {
+  font-size: 0.68rem;
+  color: var(--gray-400);
 }
 
 /* Clear all completed bar */
@@ -6323,12 +6331,27 @@
     });
 
     if (totalCount > 0) {
-      var pomEst = (totalEst / _globalPomoShortWork).toFixed(1);
-      var pomActual = (totalActual / _globalPomoShortWork).toFixed(1);
-      summaryEl.innerHTML =
-        '<span class="todo-summary-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg><strong>' + doneCount + '/' + totalCount + '</strong> tasks done</span>' +
-        (totalEst ? '<span class="todo-summary-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Est: <strong>' + totalEst + 'min</strong> (' + pomEst + ' pom)</span>' : '') +
-        (totalActual ? '<span class="todo-summary-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Actual: <strong>' + totalActual + 'min</strong> (' + pomActual + ' pom)</span>' : '');
+      var pomEst = Math.round(totalEst / _globalPomoShortWork);
+      var pomActual = Math.round(totalActual / _globalPomoShortWork);
+      // Format minutes as human-readable: 90 -> "1h 30m", 45 -> "45m", 120 -> "2h"
+      function fmtMin(m) {
+        if (!m) return '0m';
+        var h = Math.floor(m / 60);
+        var r = m % 60;
+        if (h === 0) return r + 'm';
+        if (r === 0) return h + 'h';
+        return h + 'h ' + r + 'm';
+      }
+      var sep = '<span class="todo-summary-sep">\u00b7</span>';
+      var parts = [];
+      parts.push('<span class="todo-summary-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg><strong>' + doneCount + '/' + totalCount + '</strong> done</span>');
+      if (totalEst) {
+        parts.push('<span class="todo-summary-item">Est <strong>' + fmtMin(totalEst) + '</strong> <span class="todo-summary-pom">' + pomEst + ' pom</span></span>');
+      }
+      if (totalActual) {
+        parts.push('<span class="todo-summary-item">Actual <strong>' + fmtMin(totalActual) + '</strong> <span class="todo-summary-pom">' + pomActual + ' pom</span></span>');
+      }
+      summaryEl.innerHTML = parts.join(sep);
       summaryEl.style.display = '';
     } else {
       summaryEl.style.display = 'none';
