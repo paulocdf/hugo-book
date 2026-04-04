@@ -161,7 +161,7 @@
   'use strict';
 
   var DB_NAME = 'dm-notes';
-   var DB_VERSION = 15;
+   var DB_VERSION = 16;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -171,6 +171,7 @@
   var STORE_REVIEW_CARDS = 'reviewCards';
   var STORE_TASK_SHARES = 'taskShares';
   var STORE_NOTE_SHARES = 'noteShares';
+  var STORE_PROJECT_SHARES = 'projectShares';
   var STORE_PROJECTS = 'projects';
   var STORE_KANBAN_COLUMNS = 'kanbanColumns';
   var MAX_VERSIONS_PER_NOTE = 50;
@@ -322,6 +323,14 @@
           noteShareStore.createIndex('ownerId', 'ownerId', { unique: false });
           noteShareStore.createIndex('inviteeEmail', 'inviteeEmail', { unique: false });
           noteShareStore.createIndex('status', 'status', { unique: false });
+        }
+        // Project shares store (v16) — for collaborative project sharing
+        if (!db.objectStoreNames.contains(STORE_PROJECT_SHARES)) {
+          var projShareStore = db.createObjectStore(STORE_PROJECT_SHARES, { keyPath: 'id' });
+          projShareStore.createIndex('projectId', 'projectId', { unique: false });
+          projShareStore.createIndex('ownerId', 'ownerId', { unique: false });
+          projShareStore.createIndex('inviteeEmail', 'inviteeEmail', { unique: false });
+          projShareStore.createIndex('status', 'status', { unique: false });
         }
       };
       req.onblocked = function() {
@@ -888,6 +897,7 @@
       deadline: deadline,
       archived: !!data.archived,
       order: data.order || 0,
+      collaborators: data.collaborators || [],
       createdAt: createdAt,
       updatedAt: updatedAt
     };
@@ -1343,6 +1353,8 @@
       .then(function() { return syncSharedTodos(userId); })
       .then(function() { return syncNoteShares(userId); })
       .then(function() { return syncSharedNotes(userId); })
+      .then(function() { return syncProjectShares(userId); })
+      .then(function() { return syncSharedProjects(userId); })
       .then(function() {
         _syncing = false;
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -2866,6 +2878,337 @@
     });
   }
 
+  // ─── Project Sharing ───
+
+  /**
+   * Serialize a projectShares Firestore document for IndexedDB storage.
+   */
+  function serializeProjectShare(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      projectId: data.projectId || '',
+      projectName: data.projectName || '',
+      ownerId: data.ownerId || '',
+      ownerEmail: data.ownerEmail || '',
+      ownerName: data.ownerName || '',
+      inviteeEmail: data.inviteeEmail || '',
+      inviteeUid: data.inviteeUid || null,
+      status: data.status || 'pending',
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  /**
+   * Share a project with another user by email.
+   * Creates a projectShares doc with a deterministic ID (projectId_inviteeUid).
+   * Cascades: adds collaborator to the project AND all existing tasks in the project.
+   * @param {string} projectId - the project to share
+   * @param {string} email - invitee's email address
+   * @returns {Promise<Object>} - the created share doc
+   */
+  function shareProject(projectId, email) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+    if (!window.dmDb) return Promise.reject(new Error('Firestore not available'));
+    if (email === user.email) return Promise.reject(new Error('Cannot share with yourself'));
+
+    return lookupUserByEmail(email).then(function(invitee) {
+      if (!invitee) return Promise.reject(new Error('No account found for ' + email + '. They must sign in at least once before you can share with them.'));
+
+      var shareId = projectId + '_' + invitee.uid;
+
+      return Promise.all([
+        idbGetAll(STORE_PROJECT_SHARES),
+        idbGet(STORE_PROJECTS, projectId)
+      ]).then(function(results) {
+        var shares = results[0];
+        var project = results[1];
+        var existing = shares.find(function(s) {
+          return s.id === shareId && s.status !== 'declined';
+        });
+        if (existing) return Promise.reject(new Error('Already shared with ' + email));
+
+        var now = Date.now();
+        var projectName = (project && project.name) || '';
+
+        // Backfill collaborators array for pre-sharing projects
+        var backfillPromise = Promise.resolve();
+        if (project && (!project.collaborators || !Array.isArray(project.collaborators))) {
+          backfillPromise = window.dmDb.collection('projects').doc(projectId).set({
+            collaborators: []
+          }, { merge: true }).then(function() {
+            project.collaborators = [];
+            return idbPut(STORE_PROJECTS, project);
+          }).catch(function(err) {
+            console.warn('[dm-sync] Project collaborators backfill failed (non-fatal):', err.message);
+          });
+        }
+
+        var shareData = {
+          projectId: projectId,
+          projectName: projectName,
+          ownerId: user.uid,
+          ownerEmail: user.email || '',
+          ownerName: user.displayName || '',
+          inviteeEmail: email,
+          inviteeUid: invitee.uid,
+          status: 'pending',
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
+        var localShare = {
+          id: shareId,
+          projectId: projectId,
+          projectName: projectName,
+          ownerId: user.uid,
+          ownerEmail: user.email || '',
+          ownerName: user.displayName || '',
+          inviteeEmail: email,
+          inviteeUid: invitee.uid,
+          status: 'pending',
+          createdAt: now,
+          updatedAt: now
+        };
+
+        return backfillPromise.then(function() {
+          return firestoreWrite({
+            collection: 'projectShares',
+            docId: shareId,
+            op: 'set',
+            data: shareData,
+            localOp: function() { return idbPut(STORE_PROJECT_SHARES, localShare); }
+          });
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-project-shares-updated'));
+          return localShare;
+        });
+      });
+    });
+  }
+
+  /**
+   * Accept a pending project share invitation.
+   * Updates status to 'accepted', adds current user to project's collaborators
+   * array, cascades collaborator to all tasks in the project, and fetches the
+   * shared project and its tasks into local IDB.
+   * @param {string} shareId - the projectShares document ID (format: projectId_inviteeUid)
+   */
+  function acceptProjectShare(shareId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+    if (!window.dmDb) return Promise.reject(new Error('You must be online to accept a share'));
+
+    return idbGet(STORE_PROJECT_SHARES, shareId).then(function(share) {
+      if (!share) return Promise.reject(new Error('Share not found'));
+      if (share.status !== 'pending') return Promise.reject(new Error('Share is not pending'));
+
+      var projectId = share.projectId;
+
+      // Step 1: Update the share document status to 'accepted'
+      return window.dmDb.collection('projectShares').doc(shareId).update({
+        status: 'accepted',
+        inviteeUid: user.uid,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).then(function() {
+        share.status = 'accepted';
+        share.inviteeUid = user.uid;
+        share.updatedAt = Date.now();
+        return idbPut(STORE_PROJECT_SHARES, share);
+      }).then(function() {
+        // Step 2: Add current user to project's collaborators array
+        return window.dmDb.collection('projects').doc(projectId).update({
+          collaborators: firebase.firestore.FieldValue.arrayUnion(user.uid),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+      }).then(function() {
+        // Step 3: Fetch the shared project into local IDB
+        return window.dmDb.collection('projects').doc(projectId).get().then(function(doc) {
+          if (doc.exists) {
+            var project = serializeProject(doc);
+            return idbPut(STORE_PROJECTS, project);
+          }
+        });
+      }).then(function() {
+        // Step 4: Cascade — add user to all tasks in this project
+        return window.dmDb.collection('todos')
+          .where('projectId', '==', projectId)
+          .get()
+          .then(function(snapshot) {
+            var batch = window.dmDb.batch();
+            snapshot.forEach(function(doc) {
+              batch.update(doc.ref, {
+                collaborators: firebase.firestore.FieldValue.arrayUnion(user.uid),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+            });
+            return batch.commit().then(function() {
+              // Also store the tasks locally
+              var promises = [];
+              snapshot.forEach(function(doc) {
+                if (doc.exists) {
+                  var todo = serializeTodo(doc);
+                  promises.push(idbPut(STORE_TODOS, todo));
+                }
+              });
+              return Promise.all(promises);
+            });
+          });
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-project-shares-updated'));
+        window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    });
+  }
+
+  /**
+   * Decline a pending project share invitation.
+   * @param {string} shareId - the projectShares document ID
+   */
+  function declineProjectShare(shareId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+
+    return idbGet(STORE_PROJECT_SHARES, shareId).then(function(share) {
+      if (!share) return Promise.reject(new Error('Share not found'));
+
+      share.status = 'declined';
+      share.inviteeUid = user.uid;
+      share.updatedAt = Date.now();
+
+      return firestoreWrite({
+        collection: 'projectShares',
+        docId: shareId,
+        op: 'update',
+        data: {
+          status: 'declined',
+          inviteeUid: user.uid,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        },
+        localOp: function() { return idbPut(STORE_PROJECT_SHARES, share); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-project-shares-updated'));
+      });
+    });
+  }
+
+  /**
+   * Remove sharing for a project with a specific user. Owner-only operation.
+   * Removes the share doc, the user from the project's collaborators array,
+   * and cascades removal from all tasks in the project.
+   * @param {string} shareId - the projectShares document ID
+   */
+  function unshareProject(shareId) {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.reject(new Error('Not authenticated'));
+
+    return idbGet(STORE_PROJECT_SHARES, shareId).then(function(share) {
+      if (!share) return Promise.reject(new Error('Share not found'));
+      if (share.ownerId !== user.uid) return Promise.reject(new Error('Only the owner can unshare'));
+
+      var inviteeUid = share.inviteeUid;
+      var projectId = share.projectId;
+
+      // Delete the share document
+      return firestoreWrite({
+        collection: 'projectShares',
+        docId: shareId,
+        op: 'delete',
+        data: null,
+        localOp: function() { return idbDelete(STORE_PROJECT_SHARES, shareId); }
+      }).then(function() {
+        // Remove collaborator from project's collaborators array
+        if (inviteeUid && window.dmDb) {
+          return window.dmDb.collection('projects').doc(projectId).update({
+            collaborators: firebase.firestore.FieldValue.arrayRemove(inviteeUid),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          }).then(function() {
+            return idbGet(STORE_PROJECTS, projectId).then(function(project) {
+              if (project && project.collaborators) {
+                project.collaborators = project.collaborators.filter(function(uid) { return uid !== inviteeUid; });
+                project.updatedAt = Date.now();
+                return idbPut(STORE_PROJECTS, project);
+              }
+            });
+          }).then(function() {
+            // Cascade: remove collaborator from all tasks in this project
+            return idbGetAll(STORE_TODOS).then(function(todos) {
+              var projectTodos = todos.filter(function(t) { return t.projectId === projectId && !t.deletedAt; });
+              var promises = projectTodos.map(function(t) {
+                if (t.collaborators && t.collaborators.indexOf(inviteeUid) !== -1) {
+                  t.collaborators = t.collaborators.filter(function(uid) { return uid !== inviteeUid; });
+                  t.updatedAt = Date.now();
+                  return firestoreWrite({
+                    collection: 'todos',
+                    docId: t.id,
+                    op: 'update',
+                    data: {
+                      collaborators: firebase.firestore.FieldValue.arrayRemove(inviteeUid),
+                      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    },
+                    localOp: function() { return idbPut(STORE_TODOS, t); }
+                  });
+                }
+                return Promise.resolve();
+              });
+              return Promise.all(promises);
+            });
+          }).catch(function(err) {
+            console.warn('[dm-sync] Failed to remove project collaborator:', err);
+          });
+        }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-project-shares-updated'));
+        window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+        window.dispatchEvent(new CustomEvent('dm-todos-updated'));
+        window.dispatchEvent(new CustomEvent('dm-sync-complete'));
+      });
+    });
+  }
+
+  /**
+   * Get all shares for a specific project.
+   * @param {string} projectId
+   * @returns {Promise<Array>}
+   */
+  function getSharesForProject(projectId) {
+    return idbGetAll(STORE_PROJECT_SHARES).then(function(shares) {
+      return shares.filter(function(s) { return s.projectId === projectId; });
+    });
+  }
+
+  /**
+   * Get pending project share invitations for the current user.
+   * @returns {Promise<Array>}
+   */
+  function getPendingProjectInvites() {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve([]);
+
+    return idbGetAll(STORE_PROJECT_SHARES).then(function(shares) {
+      return shares.filter(function(s) {
+        return s.inviteeEmail === user.email && s.status === 'pending';
+      });
+    });
+  }
+
+  /**
+   * Get all project shares owned by the current user.
+   * @returns {Promise<Array>}
+   */
+  function getMyProjectShares() {
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve([]);
+
+    return idbGetAll(STORE_PROJECT_SHARES).then(function(shares) {
+      return shares.filter(function(s) { return s.ownerId === user.uid; });
+    });
+  }
+
   /**
    * Sync note shares from Firestore for the current user.
    * Fetches shares where user is owner OR where user is invitee.
@@ -2981,6 +3324,124 @@
         });
       }).catch(function(err) {
         console.warn('[dm-sync] Shared notes sync error:', err);
+      });
+  }
+
+  /**
+   * Sync project shares from Firestore for the current user.
+   * Fetches shares where user is owner OR where user is invitee.
+   */
+  function syncProjectShares(userId) {
+    if (!window.dmDb) return Promise.resolve();
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return Promise.resolve();
+
+    console.log('[dm-sync] Syncing project shares...');
+
+    var ownerQuery = window.dmDb.collection('projectShares')
+      .where('ownerId', '==', userId)
+      .get();
+
+    var inviteeQuery = window.dmDb.collection('projectShares')
+      .where('inviteeEmail', '==', user.email)
+      .get();
+
+    return Promise.all([ownerQuery, inviteeQuery]).then(function(results) {
+      var remoteShares = [];
+      var seen = {};
+
+      results.forEach(function(snapshot) {
+        snapshot.forEach(function(doc) {
+          if (!seen[doc.id]) {
+            seen[doc.id] = true;
+            remoteShares.push(serializeProjectShare(doc));
+          }
+        });
+      });
+
+      return idbGetAll(STORE_PROJECT_SHARES).then(function(localShares) {
+        var localMap = {};
+        localShares.forEach(function(s) { localMap[s.id] = s; });
+
+        var remoteMap = {};
+        remoteShares.forEach(function(s) { remoteMap[s.id] = s; });
+
+        var toUpsert = [];
+        remoteShares.forEach(function(rs) {
+          var ls = localMap[rs.id];
+          if (!ls || ls.updatedAt !== rs.updatedAt) {
+            toUpsert.push(rs);
+          }
+        });
+
+        var toDelete = [];
+        localShares.forEach(function(ls) {
+          if (!remoteMap[ls.id]) {
+            toDelete.push(ls.id);
+          }
+        });
+
+        var promises = [];
+        if (toUpsert.length > 0) {
+          promises.push(idbPutBatch(STORE_PROJECT_SHARES, toUpsert));
+        }
+        toDelete.forEach(function(id) {
+          promises.push(idbDelete(STORE_PROJECT_SHARES, id));
+        });
+
+        return Promise.all(promises).then(function() {
+          console.log('[dm-sync] Project shares sync complete. Upserted: ' + toUpsert.length + ', Deleted: ' + toDelete.length);
+          if (toUpsert.length > 0 || toDelete.length > 0) {
+            window.dispatchEvent(new CustomEvent('dm-project-shares-updated'));
+          }
+        });
+      });
+    });
+  }
+
+  /**
+   * Sync shared projects — fetch projects where current user is a collaborator.
+   * These are merged into the local projects store.
+   */
+  function syncSharedProjects(userId) {
+    if (!window.dmDb) return Promise.resolve();
+
+    console.log('[dm-sync] Syncing shared projects...');
+    return window.dmDb.collection('projects')
+      .where('collaborators', 'array-contains', userId)
+      .get()
+      .then(function(snapshot) {
+        var sharedProjects = [];
+        snapshot.forEach(function(doc) {
+          sharedProjects.push(serializeProject(doc));
+        });
+
+        if (sharedProjects.length === 0) {
+          console.log('[dm-sync] No shared projects found');
+          return;
+        }
+
+        var toUpsert = [];
+        return idbGetAll(STORE_PROJECTS).then(function(localProjects) {
+          var localMap = {};
+          localProjects.forEach(function(p) { localMap[p.id] = p; });
+
+          sharedProjects.forEach(function(sp) {
+            var lp = localMap[sp.id];
+            if (!lp || lp.updatedAt !== sp.updatedAt) {
+              toUpsert.push(sp);
+            }
+          });
+
+          if (toUpsert.length > 0) {
+            return idbPutBatch(STORE_PROJECTS, toUpsert).then(function() {
+              console.log('[dm-sync] Shared projects synced: ' + toUpsert.length);
+              window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+            });
+          }
+        });
+      }).catch(function(err) {
+        console.warn('[dm-sync] Shared projects sync error:', err);
       });
   }
 
@@ -3494,6 +3955,136 @@
     }
   }
 
+  // ─── Real-Time Listeners for Shared Projects ───
+
+  var _sharedProjectsUnsubscribe = null;
+  var _projectShareInvitesUnsubscribe = null;
+  var _ownerProjectSharesUnsubscribe = null;
+  var _sharedProjectsRetryTimer = null;
+  var _sharedProjectsRetryCount = 0;
+  var SHARED_PROJECTS_MAX_RETRIES = 5;
+
+  function _attachSharedProjectsListener(userId) {
+    if (!window.dmDb) return;
+    _sharedProjectsUnsubscribe = window.dmDb.collection('projects')
+      .where('collaborators', 'array-contains', userId)
+      .onSnapshot(function(snapshot) {
+        _sharedProjectsRetryCount = 0;
+        var changes = [];
+        snapshot.docChanges().forEach(function(change) {
+          if (change.type === 'added' || change.type === 'modified') {
+            console.log('[dm-sync] Shared project ' + change.type + ':', change.doc.id, change.doc.data().name);
+            changes.push(serializeProject(change.doc));
+          } else if (change.type === 'removed') {
+            console.log('[dm-sync] Shared project removed:', change.doc.id);
+            idbGet(STORE_PROJECTS, change.doc.id).then(function(project) {
+              if (project && project.userId !== userId) {
+                idbDelete(STORE_PROJECTS, change.doc.id);
+              }
+            });
+          }
+        });
+        if (changes.length > 0) {
+          idbPutBatch(STORE_PROJECTS, changes).then(function() {
+            window.dispatchEvent(new CustomEvent('dm-projects-updated'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Shared projects listener error:', err);
+        if (_sharedProjectsRetryCount < SHARED_PROJECTS_MAX_RETRIES) {
+          var delay = Math.min(1000 * Math.pow(2, _sharedProjectsRetryCount), 30000);
+          _sharedProjectsRetryCount++;
+          console.log('[dm-sync] Retrying shared projects listener in ' + delay + 'ms (attempt ' + _sharedProjectsRetryCount + '/' + SHARED_PROJECTS_MAX_RETRIES + ')');
+          _sharedProjectsRetryTimer = setTimeout(function() {
+            _attachSharedProjectsListener(userId);
+          }, delay);
+        } else {
+          console.error('[dm-sync] Shared projects listener failed after ' + SHARED_PROJECTS_MAX_RETRIES + ' retries — falling back to periodic sync');
+        }
+      });
+  }
+
+  function startSharedProjectListeners(userId) {
+    stopSharedProjectListeners();
+    if (!window.dmDb) return;
+    var user = window.dmAuth && window.dmAuth.currentUser;
+    if (!user) return;
+
+    // Listen for changes to projects where current user is a collaborator
+    _sharedProjectsRetryCount = 0;
+    _attachSharedProjectsListener(userId);
+
+    // Listen for incoming project share invitations
+    _projectShareInvitesUnsubscribe = window.dmDb.collection('projectShares')
+      .where('inviteeEmail', '==', user.email)
+      .onSnapshot(function(snapshot) {
+        var hasChanges = false;
+        var chain = Promise.resolve();
+        snapshot.docChanges().forEach(function(change) {
+          var shareDoc = serializeProjectShare(change.doc);
+          if (change.type === 'added' || change.type === 'modified') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbPut(STORE_PROJECT_SHARES, shareDoc); });
+          } else if (change.type === 'removed') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbDelete(STORE_PROJECT_SHARES, shareDoc.id); });
+          }
+        });
+        if (hasChanges) {
+          chain.then(function() {
+            window.dispatchEvent(new CustomEvent('dm-project-shares-updated'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Project share invites listener error:', err);
+      });
+
+    // Listen for status changes on project shares owned by this user
+    _ownerProjectSharesUnsubscribe = window.dmDb.collection('projectShares')
+      .where('ownerId', '==', userId)
+      .onSnapshot(function(snapshot) {
+        var hasChanges = false;
+        var chain = Promise.resolve();
+        snapshot.docChanges().forEach(function(change) {
+          var shareDoc = serializeProjectShare(change.doc);
+          if (change.type === 'added' || change.type === 'modified') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbPut(STORE_PROJECT_SHARES, shareDoc); });
+          } else if (change.type === 'removed') {
+            hasChanges = true;
+            chain = chain.then(function() { return idbDelete(STORE_PROJECT_SHARES, shareDoc.id); });
+          }
+        });
+        if (hasChanges) {
+          chain.then(function() {
+            window.dispatchEvent(new CustomEvent('dm-project-shares-updated'));
+          });
+        }
+      }, function(err) {
+        console.warn('[dm-sync] Owner project shares listener error:', err);
+      });
+  }
+
+  function stopSharedProjectListeners() {
+    if (_sharedProjectsRetryTimer) {
+      clearTimeout(_sharedProjectsRetryTimer);
+      _sharedProjectsRetryTimer = null;
+    }
+    _sharedProjectsRetryCount = 0;
+    if (_sharedProjectsUnsubscribe) {
+      _sharedProjectsUnsubscribe();
+      _sharedProjectsUnsubscribe = null;
+    }
+    if (_projectShareInvitesUnsubscribe) {
+      _projectShareInvitesUnsubscribe();
+      _projectShareInvitesUnsubscribe = null;
+    }
+    if (_ownerProjectSharesUnsubscribe) {
+      _ownerProjectSharesUnsubscribe();
+      _ownerProjectSharesUnsubscribe = null;
+    }
+  }
+
   // ─── Public API ───
 
   // Helper: get all non-trashed notes from IDB
@@ -3808,6 +4399,7 @@
         deadline: projectData.deadline || null,
         archived: false,
         order: projectData.order || 0,
+        collaborators: projectData.collaborators || [],
         createdAt: now,
         updatedAt: now
       };
@@ -3819,6 +4411,7 @@
         deadline: project.deadline,
         archived: false,
         order: project.order,
+        collaborators: project.collaborators,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
@@ -3843,6 +4436,7 @@
         if (updates.deadline !== undefined) { project.deadline = updates.deadline; firestoreUpdates.deadline = updates.deadline; }
         if (updates.archived !== undefined) { project.archived = updates.archived; firestoreUpdates.archived = updates.archived; }
         if (updates.order !== undefined) { project.order = updates.order; firestoreUpdates.order = updates.order; }
+        if (updates.collaborators !== undefined) { project.collaborators = updates.collaborators; firestoreUpdates.collaborators = updates.collaborators; }
         project.updatedAt = Date.now();
         return firestoreWrite({
           collection: 'projects',
@@ -4337,6 +4931,7 @@
         idbClear(STORE_REVIEW_CARDS),
         idbClear(STORE_TASK_SHARES),
         idbClear(STORE_NOTE_SHARES),
+        idbClear(STORE_PROJECT_SHARES),
         idbClear(STORE_PROJECTS),
         idbClear(STORE_KANBAN_COLUMNS),
         clearQueue()
@@ -4408,6 +5003,15 @@
     getSharesForNote: getSharesForNote,
     getPendingNoteInvites: getPendingNoteInvites,
     getMyNoteShares: getMyNoteShares,
+
+    // Project sharing
+    shareProject: shareProject,
+    acceptProjectShare: acceptProjectShare,
+    declineProjectShare: declineProjectShare,
+    unshareProject: unshareProject,
+    getSharesForProject: getSharesForProject,
+    getPendingProjectInvites: getPendingProjectInvites,
+    getMyProjectShares: getMyProjectShares,
 
     // Closed days (day-level finalization for todo list)
     getClosedDays: function() {
@@ -4506,7 +5110,7 @@
             : (function() {
                 // Different user — clear backup to prevent data leak
                 try { localStorage.removeItem('dm-closedDays-backup'); } catch(e) {}
-                return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_NOTE_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
+                return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_NOTE_SHARES), idbClear(STORE_PROJECT_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
               })();
 
           return proceed.then(function() {
@@ -4524,6 +5128,7 @@
             startBackgroundSync(user.uid);
             startSharedTaskListeners(user.uid);
             startSharedNoteListeners(user.uid);
+            startSharedProjectListeners(user.uid);
             scheduleAllReminders();
             updateOfflineIndicator();
           });
@@ -4548,6 +5153,7 @@
             startBackgroundSync(user.uid);
             startSharedTaskListeners(user.uid);
             startSharedNoteListeners(user.uid);
+            startSharedProjectListeners(user.uid);
             scheduleAllReminders();
           }
         });
@@ -4555,6 +5161,7 @@
         stopBackgroundSync();
         stopSharedTaskListeners();
         stopSharedNoteListeners();
+        stopSharedProjectListeners();
         clearAllReminderTimers();
         // Backup closedDays to localStorage before clearing IDB.
         // If the Firestore write from setClosedDays was still in-flight,
@@ -4566,7 +5173,7 @@
           }
         }).catch(function() {}).then(function() {
           // Clear cache on sign-out so no data leaks to another user
-          return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_NOTE_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
+          return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_NOTE_SHARES), idbClear(STORE_PROJECT_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
         }).then(function() {
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
             window.dispatchEvent(new CustomEvent('dm-todos-updated'));

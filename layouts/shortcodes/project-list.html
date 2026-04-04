@@ -1175,6 +1175,143 @@
 }
 .project-modal-save:hover { opacity: 0.85; }
 
+/* ─── Project Sharing ─── */
+.project-share-section {
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+.project-share-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--body-font-color);
+  margin-bottom: 8px;
+}
+.project-share-header svg {
+  color: var(--color-link, #0069ff);
+}
+.project-share-owner-info {
+  font-size: 0.82rem;
+  color: var(--gray-500);
+  background: rgba(0, 105, 255, 0.05);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+}
+.project-share-input-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.project-share-email-input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1.5px solid var(--gray-200, #e5e7eb);
+  border-radius: 8px;
+  font-size: 0.82rem;
+  background: var(--body-background);
+  color: var(--body-font-color);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.project-share-email-input:focus {
+  border-color: var(--color-link, #0069ff);
+}
+.project-share-send-btn {
+  padding: 7px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--color-link, #0069ff);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: filter 0.15s;
+}
+.project-share-send-btn:hover {
+  filter: brightness(1.1);
+}
+.project-share-send-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.project-share-feedback {
+  font-size: 0.78rem;
+  margin-bottom: 6px;
+}
+.project-share-feedback.is-error {
+  color: #d32f2f;
+}
+.project-share-feedback.is-success {
+  color: #2e7d32;
+}
+.project-share-list {
+  margin-top: 4px;
+}
+.project-share-list-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-500, #6b7280);
+  margin-bottom: 4px;
+}
+.project-share-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--gray-100, #f3f4f6);
+}
+.project-share-item-email {
+  flex: 1;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-share-item-status {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.project-share-item-status.status-pending {
+  color: #e65100;
+  background: rgba(230, 81, 0, 0.08);
+}
+.project-share-item-status.status-accepted {
+  color: #2e7d32;
+  background: rgba(46, 125, 50, 0.08);
+}
+.project-share-item-status.status-declined {
+  color: #c62828;
+  background: rgba(198, 40, 40, 0.08);
+}
+.project-share-item-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-400, #9ca3af);
+  font-size: 1rem;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.15s;
+}
+.project-share-item-remove:hover {
+  color: #d32f2f;
+}
+.project-share-empty {
+  font-size: 0.78rem;
+  color: var(--gray-400, #9ca3af);
+  padding: 4px 0;
+}
+
 /* ─── Confirm Dialog ─── */
 .project-confirm-overlay {
   display: none;
@@ -1408,6 +1545,24 @@
     <div class="project-modal-field">
       <label for="project-modal-deadline">Deadline <span style="font-weight:normal;color:var(--gray-400)">(optional)</span></label>
       <input type="date" id="project-modal-deadline">
+    </div>
+    <div class="project-share-section" id="project-share-section" style="display: none;">
+      <div class="project-share-header">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span>Sharing</span>
+      </div>
+      <div class="project-share-owner-info" id="project-share-owner-info" style="display: none;">
+        Shared by <strong id="project-share-owner-name"></strong>
+      </div>
+      <div id="project-share-controls" style="display: none;">
+        <div class="project-share-input-row">
+          <input type="email" class="project-share-email-input" id="project-share-email"
+                 placeholder="Enter email to share..." autocomplete="off">
+          <button type="button" class="project-share-send-btn" id="project-share-send">Share</button>
+        </div>
+        <div class="project-share-feedback" id="project-share-feedback" style="display: none;"></div>
+      </div>
+      <div class="project-share-list" id="project-share-list"></div>
     </div>
     <div class="project-modal-actions">
       <button class="project-modal-cancel" id="project-modal-cancel">Cancel</button>
@@ -3031,7 +3186,7 @@
         bujoType: _pjBujoType,
         bujoState: 'open',
         kanbanStatus: 'todo',
-        collaborators: [],
+        collaborators: (function() { var p = _projects.find(function(pr) { return pr.id === _currentProjectId; }); return (p && p.collaborators) ? p.collaborators.slice() : []; })(),
         createdAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
         updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
         completedAt: null
@@ -3061,7 +3216,7 @@
         bujoType: _pjBujoType,
         bujoState: 'open',
         kanbanStatus: 'todo',
-        collaborators: [],
+        collaborators: todoData.collaborators,
         createdAt: Date.now(),
         updatedAt: Date.now(),
         completedAt: null
@@ -3174,6 +3329,7 @@
       descInput.value = project.description || '';
       deadlineInput.value = project.deadline || '';
       _selectedColor = getCanonicalColor(project.color);
+      initProjectSharingSection(project);
     } else {
       // Create mode
       title.textContent = 'New Project';
@@ -3182,6 +3338,7 @@
       descInput.value = '';
       deadlineInput.value = '';
       _selectedColor = COLORS[0].light;
+      cleanupProjectSharingSection();
     }
 
     // Highlight selected color
@@ -3194,8 +3351,157 @@
   }
 
   function closeModal() {
+    cleanupProjectSharingSection();
     modalOverlay.classList.remove('active');
     _editingProjectId = null;
+  }
+
+  // ============================
+  // Project Sharing section logic
+  // ============================
+  var _projShareFeedbackTimer = null;
+  var _projShareSectionEl = document.getElementById('project-share-section');
+  var _projShareOwnerInfoEl = document.getElementById('project-share-owner-info');
+  var _projShareOwnerNameEl = document.getElementById('project-share-owner-name');
+  var _projShareControlsEl = document.getElementById('project-share-controls');
+  var _projShareEmailInputEl = document.getElementById('project-share-email');
+  var _projShareSendBtnEl = document.getElementById('project-share-send');
+  var _projShareFeedbackEl = document.getElementById('project-share-feedback');
+  var _projShareListEl = document.getElementById('project-share-list');
+
+  function escapeHtmlProjShare(str) {
+    var div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
+  }
+
+  function showProjShareFeedback(msg, isError) {
+    if (!_projShareFeedbackEl) return;
+    clearTimeout(_projShareFeedbackTimer);
+    _projShareFeedbackEl.textContent = msg;
+    _projShareFeedbackEl.className = 'project-share-feedback ' + (isError ? 'is-error' : 'is-success');
+    _projShareFeedbackEl.style.display = '';
+    _projShareFeedbackTimer = setTimeout(function() {
+      _projShareFeedbackEl.style.display = 'none';
+    }, isError ? 4000 : 3000);
+  }
+
+  function refreshProjectShareList(projectId) {
+    if (!_projShareListEl || !window.dmSync || !window.dmSync.getSharesForProject) return;
+    window.dmSync.getSharesForProject(projectId).then(function(shares) {
+      if (shares.length === 0) {
+        _projShareListEl.innerHTML = '<div class="project-share-empty">Not shared with anyone</div>';
+        return;
+      }
+      var html = '<div class="project-share-list-label">Collaborators</div>';
+      shares.forEach(function(s) {
+        html += '<div class="project-share-item">';
+        html += '<span class="project-share-item-email">' + escapeHtmlProjShare(s.inviteeEmail) + '</span>';
+        html += '<span class="project-share-item-status status-' + s.status + '">' + s.status + '</span>';
+        html += '<button type="button" class="project-share-item-remove" data-proj-unshare-id="' + s.id + '" title="Remove">&times;</button>';
+        html += '</div>';
+      });
+      _projShareListEl.innerHTML = html;
+
+      _projShareListEl.querySelectorAll('[data-proj-unshare-id]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var shareId = btn.getAttribute('data-proj-unshare-id');
+          btn.disabled = true;
+          window.dmSync.unshareProject(shareId).then(function() {
+            refreshProjectShareList(projectId);
+          }).catch(function(err) {
+            showProjShareFeedback(err.message || 'Failed to remove', true);
+            btn.disabled = false;
+          });
+        });
+      });
+    });
+  }
+
+  function initProjectSharingSection(project) {
+    if (!_projShareSectionEl) return;
+
+    if (!window.dmSync || !window.dmAuth || !window.dmAuth.currentUser) {
+      _projShareSectionEl.style.display = 'none';
+      return;
+    }
+
+    _projShareSectionEl.style.display = '';
+    if (_projShareFeedbackEl) _projShareFeedbackEl.style.display = 'none';
+
+    var user = window.dmAuth.currentUser;
+    var isOwner = !project.userId || (user && project.userId === user.uid);
+
+    if (isOwner) {
+      if (_projShareOwnerInfoEl) _projShareOwnerInfoEl.style.display = 'none';
+      if (_projShareControlsEl) _projShareControlsEl.style.display = '';
+      if (_projShareEmailInputEl) _projShareEmailInputEl.value = '';
+
+      function doProjShare() {
+        var email = _projShareEmailInputEl.value.trim().toLowerCase();
+        if (!email || !email.includes('@')) {
+          showProjShareFeedback('Please enter a valid email address', true);
+          return;
+        }
+        _projShareSendBtnEl.disabled = true;
+        _projShareSendBtnEl.textContent = '...';
+
+        window.dmSync.shareProject(project.id, email).then(function() {
+          _projShareEmailInputEl.value = '';
+          _projShareSendBtnEl.disabled = false;
+          _projShareSendBtnEl.textContent = 'Share';
+          showProjShareFeedback('Invitation sent to ' + email, false);
+          refreshProjectShareList(project.id);
+        }).catch(function(err) {
+          _projShareSendBtnEl.disabled = false;
+          _projShareSendBtnEl.textContent = 'Share';
+          showProjShareFeedback(err.message || 'Failed to share', true);
+        });
+      }
+
+      // Remove old listeners by cloning
+      var newSendBtn = _projShareSendBtnEl.cloneNode(true);
+      _projShareSendBtnEl.parentNode.replaceChild(newSendBtn, _projShareSendBtnEl);
+      _projShareSendBtnEl = newSendBtn;
+
+      var newEmailInput = _projShareEmailInputEl.cloneNode(true);
+      _projShareEmailInputEl.parentNode.replaceChild(newEmailInput, _projShareEmailInputEl);
+      _projShareEmailInputEl = newEmailInput;
+
+      _projShareSendBtnEl.addEventListener('click', function(e) {
+        e.stopPropagation();
+        doProjShare();
+      });
+
+      _projShareEmailInputEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.stopPropagation();
+          doProjShare();
+        }
+      });
+    } else {
+      if (_projShareControlsEl) _projShareControlsEl.style.display = 'none';
+      if (_projShareOwnerInfoEl) _projShareOwnerInfoEl.style.display = '';
+      if (_projShareOwnerNameEl) _projShareOwnerNameEl.textContent = 'someone';
+      if (window.dmSync.getSharesForProject) {
+        window.dmSync.getSharesForProject(project.id).then(function(shares) {
+          if (shares.length > 0) {
+            var ownerShare = shares[0];
+            if (_projShareOwnerNameEl) _projShareOwnerNameEl.textContent = ownerShare.ownerName || ownerShare.ownerEmail || 'someone';
+          }
+        });
+      }
+    }
+
+    refreshProjectShareList(project.id);
+  }
+
+  function cleanupProjectSharingSection() {
+    if (_projShareFeedbackEl) _projShareFeedbackEl.style.display = 'none';
+    if (_projShareListEl) _projShareListEl.innerHTML = '';
+    if (_projShareSectionEl) _projShareSectionEl.style.display = 'none';
+    clearTimeout(_projShareFeedbackTimer);
   }
 
   function handleSave() {
@@ -3356,7 +3662,9 @@
     setProjects: function(projects) { _projects = projects; },
     showDetail: showDetail,
     renderDetail: renderDetail,
-    setHideDone: function(val) { _hideDone = val; }
+    setHideDone: function(val) { _hideDone = val; },
+    openModal: openModal,
+    closeModal: closeModal
   };
 
   // ─── Bootstrap ───

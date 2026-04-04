@@ -8248,6 +8248,12 @@
       if (parentTodo && parentTodo.projectId) projectId = parentTodo.projectId;
     }
 
+    // Inherit collaborators from the project (if task belongs to a shared project)
+    var projectCollaborators = [];
+    if (projectId && _projectMap[projectId] && _projectMap[projectId].collaborators) {
+      projectCollaborators = _projectMap[projectId].collaborators.slice();
+    }
+
     var todoData = {
       userId: userId,
       title: title,
@@ -8271,7 +8277,7 @@
       bujoType: bujoType,
       bujoState: 'open',
       kanbanStatus: 'todo',
-      collaborators: [],
+      collaborators: projectCollaborators,
       createdAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
       updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
       completedAt: null
@@ -8303,6 +8309,7 @@
       bujoType: bujoType,
       bujoState: 'open',
       kanbanStatus: 'todo',
+      collaborators: projectCollaborators,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       completedAt: null
@@ -9751,7 +9758,7 @@
     var projectsPromise = window.dmSync.getAllProjects().then(function(projects) {
       _projectMap = {};
       projects.forEach(function(p) {
-        _projectMap[p.id] = { name: p.name, color: p.color || '' };
+        _projectMap[p.id] = { name: p.name, color: p.color || '', collaborators: p.collaborators || [] };
       });
       // Restore saved filter from IDB/Firestore before rendering
       return window.dmSync.getPageFilterProjectIds('inbox').then(function(saved) {
