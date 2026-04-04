@@ -13,10 +13,14 @@
         </svg>
       </span>
     </h3>
+    <div class="todo-view-toggle" id="todo-view-toggle">
+      <button type="button" class="todo-view-btn active" data-view="today" title="Today's tasks">Today</button>
+      <button type="button" class="todo-view-btn" data-view="all" title="All tasks">All</button>
+    </div>
     <div class="todo-project-filter" id="todo-project-filter" style="display:none;">
       <div class="todo-pf-chips" id="todo-pf-chips"></div>
       <button type="button" class="todo-pf-trigger" id="todo-pf-trigger" title="Filter by project">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
         <span class="todo-pf-badge" id="todo-pf-badge" style="display:none;"></span>
       </button>
     </div>
@@ -106,7 +110,7 @@
         </span>
         <div class="todo-add-project-icon-wrap" id="todo-add-project-icon-wrap">
           <button type="button" class="todo-add-icon-btn" id="todo-add-project-icon" title="Assign project" aria-label="Assign project">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
           </button>
           <div class="todo-add-project-popover" id="todo-add-project-popover" style="display:none;">
             <div class="todo-add-project-dropdown" id="todo-add-project-dropdown"></div>
@@ -240,6 +244,156 @@
   font-size: 10px;
   font-weight: 700;
   fill: var(--body-font-color);
+}
+
+/* ─── View Mode Toggle (Today | All) ─── */
+.todo-view-toggle {
+  display: flex;
+  align-items: center;
+  background: var(--gray-200);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 1px;
+  margin-left: auto;
+  margin-right: 8px;
+}
+.todo-view-btn {
+  background: none;
+  border: none;
+  padding: 3px 10px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.todo-view-btn:hover {
+  color: var(--body-font-color);
+}
+.todo-view-btn.active {
+  background: var(--body-background);
+  color: var(--body-font-color);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+}
+
+/* ─── Today Mode: accent tint header ─── */
+.todo-list[data-view-mode="today"] .todo-list-header {
+  background: linear-gradient(135deg, color-mix(in srgb, var(--color-link) 6%, var(--gray-100)) 0%, var(--gray-100) 60%);
+}
+
+/* ─── Today Mode: hide week bar ─── */
+.todo-list[data-view-mode="today"] .todo-week-bar {
+  display: none;
+}
+
+/* ─── Today Mode: Today progress section ─── */
+.todo-today-progress {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--gray-200);
+  font-size: 0.78rem;
+  color: var(--body-font-color);
+}
+.todo-today-progress-bar {
+  height: 4px;
+  background: var(--gray-200);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+.todo-today-progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--color-link);
+  border-radius: 2px;
+  transition: width 0.6s ease-out;
+}
+.todo-today-progress-fill.complete {
+  background: var(--color-success, #2e7d32);
+}
+.todo-today-progress-stats {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+.todo-today-progress-stats strong {
+  color: var(--body-font-color);
+  font-weight: 600;
+}
+
+/* ─── Today Mode: card-style tasks ─── */
+.todo-list[data-view-mode="today"] .todo-day-group-items .todo-item-group {
+  margin: 0 10px 4px;
+}
+.todo-list[data-view-mode="today"] .todo-day-group-items .todo-item {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 8px 12px 8px 15px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.todo-list[data-view-mode="today"] .todo-day-group-items .todo-item::before {
+  left: 3px;
+  top: 6px;
+  bottom: 6px;
+}
+.todo-list[data-view-mode="today"] .todo-day-group-items .todo-item:hover {
+  border-color: color-mix(in srgb, var(--color-link) 30%, var(--gray-200));
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* Today mode: hide age badges, finish-at times; keep estimate + category + project */
+.todo-list[data-view-mode="today"] .todo-item-age {
+  display: none;
+}
+.todo-list[data-view-mode="today"] .todo-item-finish-at {
+  display: none;
+}
+
+/* Today mode: reduce action buttons — hide migrate, flashcard, share, archive */
+.todo-list[data-view-mode="today"] .todo-item-action-btn.migrate-forward,
+.todo-list[data-view-mode="today"] .todo-item-action-btn.flashcard-create,
+.todo-list[data-view-mode="today"] .todo-item-action-btn.share,
+.todo-list[data-view-mode="today"] .todo-item-action-btn.archive {
+  display: none;
+}
+
+/* Today mode: collapsed overdue/upcoming groups */
+.todo-list[data-view-mode="today"] .todo-day-group[data-day-group="_today_overdue"],
+.todo-list[data-view-mode="today"] .todo-day-group[data-day-group="_today_upcoming"],
+.todo-list[data-view-mode="today"] .todo-day-group[data-day-group="_unscheduled"] {
+  border-top: 1px solid var(--gray-200);
+}
+.todo-list[data-view-mode="today"] .todo-day-group[data-day-group="_today_overdue"] .todo-day-header,
+.todo-list[data-view-mode="today"] .todo-day-group[data-day-group="_today_upcoming"] .todo-day-header,
+.todo-list[data-view-mode="today"] .todo-day-group[data-day-group="_unscheduled"] .todo-day-header {
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+
+/* ─── Today Mode: completion celebration ─── */
+.todo-today-celebration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-success, #2e7d32);
+  animation: todo-celebrate-fade-in 0.4s ease-out;
+}
+.todo-today-celebration svg {
+  flex-shrink: 0;
+}
+@keyframes todo-celebrate-fade-in {
+  0%   { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 /* Today's Focus Dashboard */
@@ -1394,25 +1548,37 @@
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  padding: 6px 10px;
+  padding: 6px 10px 6px 13px;
   border-radius: 8px;
   transition: background 0.15s;
-  border-left: 3px solid transparent;
+  position: relative;
 }
-.todo-item.priority-overdue {
-  border-left-color: var(--color-danger, #c62828);
+/* Gradient priority accent bar (::before pseudo-element) */
+.todo-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 1.5px;
+  background: transparent;
+  transition: background 0.15s;
 }
-.todo-item.priority-today {
-  border-left-color: var(--accent-blue, #1a73e8);
+.todo-item.priority-overdue::before {
+  background: linear-gradient(to bottom, var(--color-danger, #c62828) 30%, transparent);
 }
-.todo-item.priority-tomorrow {
-  border-left-color: var(--color-success, #2e7d32);
+.todo-item.priority-today::before {
+  background: linear-gradient(to bottom, var(--accent-blue, #1a73e8) 30%, transparent);
 }
-.todo-item.priority-future {
-  border-left-color: var(--gray-300);
+.todo-item.priority-tomorrow::before {
+  background: linear-gradient(to bottom, var(--color-success, #2e7d32) 30%, transparent);
 }
-.todo-item.done {
-  border-left-color: transparent;
+.todo-item.priority-future::before {
+  background: linear-gradient(to bottom, var(--gray-300) 30%, transparent);
+}
+.todo-item.done::before {
+  background: transparent;
 }
 .todo-item:hover {
   background: var(--gray-100);
@@ -1946,6 +2112,20 @@
   padding: 1px 5px;
   border-radius: 4px;
   font-weight: 500;
+}
+.todo-item-project {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 0.68rem;
+  color: var(--gray-400);
+  font-weight: 500;
+}
+.todo-item-project-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 .todo-item-has-notes {
   display: inline-flex;
@@ -3549,6 +3729,8 @@
   try { _hideCompleted = localStorage.getItem('dm-todo-hide-completed') === '1'; } catch(e) {}
   var _focusDashboardCollapsed = false; // Focus dashboard collapsed state
   try { _focusDashboardCollapsed = localStorage.getItem('dm-todo-focus-dashboard') === '1'; } catch(e) {}
+  var _viewMode = 'today'; // View mode: 'today' or 'all'
+  try { var _vm = localStorage.getItem('dm-inbox-view-mode'); if (_vm === 'all') _viewMode = 'all'; } catch(e) {}
   var _existingCategories = []; // Cached list of existing categories for autocomplete
   var _catDropdownActiveIdx = -1; // Active index in category dropdown
   var _defaultPomodoroCount = 1;
@@ -3620,6 +3802,13 @@
       container.removeAttribute('data-accent');
       container.style.removeProperty('--todo-accent-override');
     }
+    // View mode
+    container.setAttribute('data-view-mode', _viewMode);
+    var toggleBtnsView = document.querySelectorAll('.todo-view-btn');
+    toggleBtnsView.forEach(function(btn) {
+      if (btn.getAttribute('data-view') === _viewMode) btn.classList.add('active');
+      else btn.classList.remove('active');
+    });
   }
 
   // Apply default BuJo type to add form
@@ -4471,10 +4660,9 @@
       if (!projects.length) {
         addProjectDropdown.innerHTML = '<div style="padding:8px 12px;color:var(--gray-500);font-size:0.82rem;">No projects yet</div>';
       } else {
-        var isDark = document.documentElement.classList.contains('dark');
         var html = '';
         projects.forEach(function(p) {
-          var color = isDark ? (getProjectDarkColor(p.color) || p.color) : p.color;
+          var color = window.dmTaskColors ? window.dmTaskColors.getColor(p.color) : p.color;
           var selected = _addFormProjectId === p.id ? ' style="background:var(--gray-100);font-weight:500;"' : '';
           html += '<div class="todo-add-project-option" data-project-id="' + p.id + '" data-project-name="' + escapeHtml(p.name) + '" data-project-color="' + (p.color || '') + '"' + selected + '>' +
             '<span class="todo-add-project-dot" style="background:' + color + ';width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:8px;flex-shrink:0;"></span>' +
@@ -4793,6 +4981,35 @@
     }, 4000);
   }
 
+  // ─── Card tint helpers ───
+
+  // Hash category string to deterministic color from TASK_COLORS palette
+  function _getCategoryColor(category) {
+    if (!category || !window.dmTaskColors) return null;
+    var colors = window.dmTaskColors.COLORS;
+    if (!colors || !colors.length) return null;
+    var hash = 0;
+    for (var i = 0; i < category.length; i++) {
+      hash = ((hash << 5) - hash) + category.charCodeAt(i);
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    var idx = Math.abs(hash) % colors.length;
+    var isDark = document.documentElement.classList.contains('dark');
+    return isDark ? colors[idx].dark : colors[idx].light;
+  }
+
+  // Compute subtle rgba tint from a hex color
+  function _computeSubtleTint(hexColor, isDone, activeAlpha, doneAlpha) {
+    if (!hexColor) return '';
+    var display = window.dmTaskColors ? window.dmTaskColors.getColor(hexColor) : hexColor;
+    if (!display || display.charAt(0) !== '#') return '';
+    var r = parseInt(display.slice(1, 3), 16);
+    var g = parseInt(display.slice(3, 5), 16);
+    var b = parseInt(display.slice(5, 7), 16);
+    var alpha = isDone ? doneAlpha : activeAlpha;
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
+  }
+
   // ─── Render ───
   function buildTodoItemHtml(todo, isSubtask, childCount, doneChildCount, finishAtLabel) {
     var hasChildren = childCount > 0;
@@ -4821,11 +5038,20 @@
       }
     }
     var html = '<div class="todo-item' + doneClass + justCompletedClass + justAddedClass + stateClass + priorityClass + '" data-todo-id="' + todo.id + '"';
-    // Task color background tint
+    // Card background tint cascade: user color > project color > category color
+    var _bgTint = '';
     if (todo.color && window.dmTaskColors) {
-      var tint = window.dmTaskColors.tint(todo.color, todo.done, todo.color2);
-      if (tint) html += ' style="background:' + tint + '"';
+      // 1. User-set color (highest priority)
+      _bgTint = window.dmTaskColors.tint(todo.color, todo.done, todo.color2);
+    } else if (todo.projectId && _projectMap[todo.projectId] && _projectMap[todo.projectId].color) {
+      // 2. Project color
+      _bgTint = _computeSubtleTint(_projectMap[todo.projectId].color, todo.done, 0.10, 0.05);
+    } else if (todo.category) {
+      // 3. Category color (hash-based)
+      var _catHexColor = _getCategoryColor(todo.category);
+      if (_catHexColor) _bgTint = _computeSubtleTint(_catHexColor, todo.done, 0.08, 0.04);
     }
+    if (_bgTint) html += ' style="background:' + _bgTint + '"';
     html += '>';
 
     // Drag handle (all tasks are draggable)
@@ -4990,17 +5216,16 @@
     // Project indicator (color dot + name)
     if (todo.projectId && _projectMap[todo.projectId]) {
       var proj = _projectMap[todo.projectId];
-      var isDark = document.documentElement.classList.contains('dark');
-      var dotColor = isDark ? (getProjectDarkColor(proj.color) || proj.color) : proj.color;
+      var dotColor = window.dmTaskColors ? window.dmTaskColors.getColor(proj.color) : proj.color;
       html += '<span class="todo-item-project" title="Project: ' + escapeHtml(proj.name) + '">' +
         '<span class="todo-item-project-dot" style="background:' + dotColor + ';"></span>' +
         escapeHtml(proj.name) + '</span>';
     }
 
-    // Task age badge (undone tasks older than 3 days)
+    // Task age badge (undone tasks older than 5 days)
     if (!todo.done && todo.createdAt) {
       var ageDays = Math.floor((Date.now() - todo.createdAt) / 86400000);
-      if (ageDays >= 3) {
+      if (ageDays >= 5) {
         var ageLabel, ageClass;
         if (ageDays >= 30) { ageLabel = Math.floor(ageDays / 30) + 'mo'; ageClass = 'age-critical'; }
         else if (ageDays >= 14) { ageLabel = Math.floor(ageDays / 7) + 'w'; ageClass = 'age-warning'; }
@@ -5189,6 +5414,186 @@
     var today = getTodayStr();
     var tomorrow = getDateOffset(1);
 
+    // ═══════════════════════════════════════════
+    // Today Mode rendering
+    // ═══════════════════════════════════════════
+    if (_viewMode === 'today' && totalParents > 0) {
+      // --- Today progress section (replaces focus dashboard) ---
+      var todayTasks = dateGroups[today] || [];
+      var tdDone = 0, tdTotal = 0, tdEstMin = 0, tdTrackedMin = 0;
+      todayTasks.forEach(function(p) {
+        var ch = childrenMap[p.id] || [];
+        if (ch.length > 0) {
+          ch.forEach(function(c) {
+            tdTotal++;
+            if (c.done) { tdDone++; if (c.actualMin > 0) tdTrackedMin += c.actualMin; }
+            else { if (c.estimatedMin > 0) tdEstMin += c.estimatedMin; }
+          });
+        } else {
+          tdTotal++;
+          if (p.done) { tdDone++; if (p.actualMin > 0) tdTrackedMin += p.actualMin; }
+          else { if (p.estimatedMin > 0) tdEstMin += p.estimatedMin; }
+        }
+      });
+
+      var tdPct = tdTotal > 0 ? Math.round(tdDone / tdTotal * 100) : 0;
+      var tdAllDone = tdDone === tdTotal && tdTotal > 0;
+
+      if (focusDashboard) {
+        var ph = '<div class="todo-today-progress">';
+        if (tdTotal > 0) {
+          var fillCls = 'todo-today-progress-fill' + (tdAllDone ? ' complete' : '');
+          ph += '<div class="todo-today-progress-bar"><div class="' + fillCls + '" data-today-pct="' + tdPct + '"></div></div>';
+          ph += '<div class="todo-today-progress-stats">';
+          ph += '<span><strong>' + tdDone + '/' + tdTotal + '</strong> tasks</span>';
+          if (tdTrackedMin > 0) {
+            ph += '<span>' + formatMinutes(tdTrackedMin) + ' tracked</span>';
+          }
+          if (tdEstMin > 0) {
+            var remainMin = tdEstMin;
+            if (window.dmPomodoro && window.dmPomodoro.isTimerRunning && window.dmPomodoro.isTimerRunning()) {
+              var si = window.dmPomodoro.getSessionInfo ? window.dmPomodoro.getSessionInfo() : null;
+              if (si && si.elapsedSec > 0) remainMin = Math.max(0, remainMin - Math.floor(si.elapsedSec / 60));
+            }
+            ph += '<span>' + formatMinutes(tdEstMin) + ' left</span>';
+            var finishMs = Date.now() + remainMin * 60000;
+            var fd = new Date(finishMs);
+            ph += '<span>finish ~' + String(fd.getHours()).padStart(2, '0') + ':' + String(fd.getMinutes()).padStart(2, '0') + '</span>';
+          }
+          ph += '</div>';
+        } else {
+          ph += '<div class="todo-today-progress-stats"><span>No tasks scheduled for today</span></div>';
+        }
+
+        // Celebration when all done
+        if (tdAllDone) {
+          ph += '<div class="todo-today-celebration">';
+          ph += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>';
+          ph += 'All done for today!';
+          ph += '</div>';
+        }
+        ph += '</div>';
+
+        focusDashboard.innerHTML = ph;
+        focusDashboard.style.display = '';
+        focusDashboard.classList.remove('collapsed', 'collapsing', 'expanding');
+        // Animate progress fill
+        requestAnimationFrame(function() {
+          var fill = focusDashboard.querySelector('.todo-today-progress-fill[data-today-pct]');
+          if (fill) fill.style.width = fill.getAttribute('data-today-pct') + '%';
+        });
+      }
+
+      // --- Build flat today task list (no day group header) ---
+      if (todayTasks.length > 0) {
+        // Compute finish times for today's tasks
+        var finishAtMap = {};
+        var cumulativeMin = 0;
+        var baseTime = Date.now();
+        todayTasks.forEach(function(parent) {
+          var children = childrenMap[parent.id] || [];
+          if (children.length > 0) {
+            children.forEach(function(child) {
+              if (!child.done && child.estimatedMin > 0) {
+                var taskMin = child.estimatedMin;
+                if (window.dmPomodoro && window.dmPomodoro.isActive(child.id) && window.dmPomodoro.getSessionInfo) {
+                  var si = window.dmPomodoro.getSessionInfo();
+                  if (si && si.elapsedSec > 0) taskMin = Math.max(0, taskMin - Math.floor(si.elapsedSec / 60));
+                }
+                cumulativeMin += taskMin;
+                var finishMs = baseTime + cumulativeMin * 60000;
+                var fdd = new Date(finishMs);
+                finishAtMap[child.id] = String(fdd.getHours()).padStart(2, '0') + ':' + String(fdd.getMinutes()).padStart(2, '0') + ' (' + (cumulativeMin / 60).toFixed(1) + 'h)';
+              }
+            });
+          } else {
+            if (!parent.done && parent.estimatedMin > 0) {
+              var taskMin = parent.estimatedMin;
+              if (window.dmPomodoro && window.dmPomodoro.isActive(parent.id) && window.dmPomodoro.getSessionInfo) {
+                var si = window.dmPomodoro.getSessionInfo();
+                if (si && si.elapsedSec > 0) taskMin = Math.max(0, taskMin - Math.floor(si.elapsedSec / 60));
+              }
+              cumulativeMin += taskMin;
+              var finishMs = baseTime + cumulativeMin * 60000;
+              var fdd = new Date(finishMs);
+              finishAtMap[parent.id] = String(fdd.getHours()).padStart(2, '0') + ':' + String(fdd.getMinutes()).padStart(2, '0') + ' (' + (cumulativeMin / 60).toFixed(1) + 'h)';
+            }
+          }
+        });
+
+        // Render today's tasks flat (wrapped in a day group for SortableJS compatibility)
+        html += '<div class="todo-day-group" data-day-group="' + escapeHtml(today) + '">';
+        html += '<div class="todo-day-group-items">';
+        todayTasks.forEach(function(parent) {
+          if (_hideCompleted && parent.done) {
+            var ch = childrenMap[parent.id] || [];
+            var hasUndoneChild = ch.some(function(c) { return !c.done; });
+            if (!hasUndoneChild) return;
+          }
+          var children = childrenMap[parent.id] || [];
+          var doneChildCount = children.filter(function(c) { return c.done; }).length;
+          html += '<div class="todo-item-group" data-group-id="' + parent.id + '">';
+          html += buildTodoItemHtml(parent, false, children.length, doneChildCount, finishAtMap[parent.id] || null);
+          if (children.length > 0) {
+            var visibleChildren = _hideCompleted ? children.filter(function(c) { return !c.done; }) : children;
+            if (visibleChildren.length > 0) {
+              var subCollapsed = false;
+              try { subCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + parent.id) === '1'; } catch(e) {}
+              html += '<div class="todo-subtasks-wrapper' + (subCollapsed ? ' collapsed' : '') + '" data-subtasks-parent="' + parent.id + '">';
+              html += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
+              visibleChildren.forEach(function(child) {
+                html += buildTodoItemHtml(child, true, 0, 0, finishAtMap[child.id] || null);
+              });
+              html += '</div>';
+              html += '</div>';
+            }
+          }
+          html += '</div>';
+        });
+        html += '</div>';
+        html += '</div>';
+      }
+
+      // --- Overdue tasks as collapsed secondary group ---
+      var overdueGroups = sortedDates.filter(function(d) { return d < today; });
+      var overdueTasks = [];
+      overdueGroups.forEach(function(d) {
+        if (!_closedDays[d]) {
+          (dateGroups[d] || []).forEach(function(p) { overdueTasks.push(p); });
+        }
+      });
+      if (overdueTasks.length > 0) {
+        var overdueUndone = 0;
+        overdueTasks.forEach(function(p) {
+          var ch = childrenMap[p.id] || [];
+          if (ch.length > 0) { ch.forEach(function(c) { if (!c.done) overdueUndone++; }); }
+          else { if (!p.done) overdueUndone++; }
+        });
+        if (overdueUndone > 0 || !_hideCompleted) {
+          html += buildDayGroup('_today_overdue', { label: 'Overdue \u00B7 ' + overdueUndone + ' task' + (overdueUndone !== 1 ? 's' : ''), cssClass: 'overdue', badge: 'Overdue' }, overdueTasks);
+        }
+      }
+
+      // --- Upcoming tasks as collapsed secondary group ---
+      var upcomingGroups = sortedDates.filter(function(d) { return d > today; });
+      var upcomingTasks = [];
+      upcomingGroups.forEach(function(d) {
+        (dateGroups[d] || []).forEach(function(p) { upcomingTasks.push(p); });
+      });
+      if (upcomingTasks.length > 0) {
+        html += buildDayGroup('_today_upcoming', { label: 'Upcoming \u00B7 ' + upcomingTasks.length + ' task' + (upcomingTasks.length !== 1 ? 's' : ''), cssClass: '', badge: '' }, upcomingTasks);
+      }
+
+      // --- Unscheduled tasks as collapsed secondary group ---
+      if (unscheduled.length > 0) {
+        html += buildDayGroup('_unscheduled', { label: 'Unscheduled \u00B7 ' + unscheduled.length + ' task' + (unscheduled.length !== 1 ? 's' : ''), cssClass: '', badge: '' }, unscheduled);
+      }
+
+    } else {
+    // ═══════════════════════════════════════════
+    // All Mode rendering (existing behavior)
+    // ═══════════════════════════════════════════
+
     // ─── Today's Focus Dashboard ───
     if (focusDashboard) {
       var todayTasks = dateGroups[today] || [];
@@ -5353,9 +5758,16 @@
       var stored = null;
       try { stored = localStorage.getItem(storageKey); } catch(e) {}
       var isCollapsed;
-      // Overdue groups with open tasks are always expanded (prevent "collapse and forget")
-      if (cssClass === 'overdue') {
-        isCollapsed = false;
+      // Today mode secondary groups default to collapsed
+      if (groupKey === '_today_overdue' || groupKey === '_today_upcoming') {
+        isCollapsed = stored !== null ? stored === '1' : true;
+      // Overdue groups: default to collapsed, but respect explicit user toggle
+      } else if (cssClass === 'overdue') {
+        if (stored !== null) {
+          isCollapsed = stored === '1';
+        } else {
+          isCollapsed = true; // default collapsed to reduce urgency pressure
+        }
       } else if (stored !== null) {
         isCollapsed = stored === '1';
       } else {
@@ -5676,6 +6088,8 @@
       html += '</div>';
     }
 
+    } // end else (All mode)
+
     // --- FLIP animation: snapshot old positions ---
     var flipSnapshot = {};
     var oldGroups = itemsEl.querySelectorAll('.todo-item-group');
@@ -5871,9 +6285,17 @@
   function migrateGroupToToday(groupDateStr) {
     var today = getTodayStr();
     // Find all undone tasks in this date group (regardless of bujoState)
-    var tasksToMigrate = allTodos.filter(function(t) {
-      return t.scheduledDate === groupDateStr && !t.done && !t.parentId;
-    });
+    var tasksToMigrate;
+    if (groupDateStr === '_today_overdue') {
+      // Today mode: migrate all overdue tasks (scheduled before today)
+      tasksToMigrate = allTodos.filter(function(t) {
+        return t.scheduledDate && t.scheduledDate < today && !t.done && !t.parentId;
+      });
+    } else {
+      tasksToMigrate = allTodos.filter(function(t) {
+        return t.scheduledDate === groupDateStr && !t.done && !t.parentId;
+      });
+    }
     tasksToMigrate.forEach(function(parent) {
       changeBujoState(parent, 'migrated', today);
       // Migrate children too
@@ -8440,6 +8862,24 @@
       var tag = e.target.tagName;
       if (tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || e.target.closest('button')) return;
       addTitleInput.focus();
+    });
+  }
+
+  // ─── View mode toggle (Today | All) ───
+  var viewToggle = document.getElementById('todo-view-toggle');
+  if (viewToggle) {
+    viewToggle.addEventListener('click', function(e) {
+      var btn = e.target.closest('.todo-view-btn');
+      if (!btn) return;
+      var mode = btn.getAttribute('data-view');
+      if (mode === _viewMode) return;
+      _viewMode = mode;
+      try { localStorage.setItem('dm-inbox-view-mode', _viewMode); } catch(ex) {}
+      container.setAttribute('data-view-mode', _viewMode);
+      viewToggle.querySelectorAll('.todo-view-btn').forEach(function(b) {
+        b.classList.toggle('active', b.getAttribute('data-view') === _viewMode);
+      });
+      render();
     });
   }
 

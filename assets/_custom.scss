@@ -224,6 +224,16 @@ body {
   }
 }
 
+// ======================================
+// Inbox (todo-list): full-width layout
+// ======================================
+.book-page:has(.todo-list) {
+  .markdown {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
 // TOC sidebar — padding handled in main ToC section below
 
 // ======================================
