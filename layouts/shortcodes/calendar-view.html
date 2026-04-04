@@ -359,6 +359,120 @@
   filter: brightness(0.92);
 }
 
+/* ─── Google Calendar connect button ─── */
+.cal-gcal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--body-font-color);
+  transition: background 0.15s, border-color 0.15s;
+  position: relative;
+  white-space: nowrap;
+}
+.cal-gcal-btn:hover {
+  background: var(--gray-100);
+}
+.cal-gcal-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.cal-gcal-btn--connected {
+  border-color: color-mix(in srgb, #34a853 40%, var(--gray-200));
+  color: #34a853;
+}
+.cal-gcal-btn--connected:hover {
+  background: color-mix(in srgb, #34a853 8%, transparent);
+}
+.cal-gcal-btn--reconnect {
+  border-color: color-mix(in srgb, #fbbc05 50%, var(--gray-200));
+  color: color-mix(in srgb, #fbbc05 70%, var(--body-font-color));
+}
+.cal-gcal-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.cal-gcal-dot--green { background: #34a853; }
+.cal-gcal-dot--amber { background: #fbbc05; }
+.cal-gcal-chevron {
+  transition: transform 0.15s;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+.cal-gcal-btn[aria-expanded="true"] .cal-gcal-chevron {
+  transform: rotate(180deg);
+}
+
+/* Dropdown */
+.cal-gcal-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 200px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 100;
+  padding: 4px 0;
+  display: none;
+}
+.cal-gcal-dropdown--open {
+  display: block;
+}
+.cal-gcal-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  color: var(--body-font-color);
+  text-align: left;
+  transition: background 0.1s;
+}
+.cal-gcal-dropdown-item:hover {
+  background: var(--gray-100);
+}
+.cal-gcal-dropdown-item--danger {
+  color: var(--color-danger, #d32f2f);
+}
+.cal-gcal-dropdown-sep {
+  height: 1px;
+  background: var(--gray-200);
+  margin: 4px 0;
+}
+.cal-gcal-sync-info {
+  padding: 6px 12px;
+  font-size: 0.75rem;
+  color: var(--gray-500);
+}
+.cal-gcal-sync-progress {
+  height: 2px;
+  background: var(--gray-200);
+  border-radius: 1px;
+  margin: 0 12px 6px;
+  overflow: hidden;
+  display: none;
+}
+.cal-gcal-sync-progress-bar {
+  height: 100%;
+  background: #34a853;
+  border-radius: 1px;
+  width: 0%;
+  transition: width 0.3s;
+}
+
 /* ─── Responsive ─── */
 @media (max-width: 600px) {
   .cal-header {
@@ -408,6 +522,21 @@
   }
   .cal-grid--week {
     min-height: calc(100vh - 160px);
+  }
+  .cal-gcal-btn {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+  }
+  .cal-gcal-btn > span {
+    display: none;
+  }
+  .cal-gcal-btn > svg:first-child {
+    width: 16px;
+    height: 16px;
+  }
+  .cal-gcal-dropdown {
+    right: -8px;
+    min-width: 180px;
   }
 }
 </style>
@@ -459,6 +588,31 @@
         <button type="button" class="cal-view-btn cal-view-btn--active" data-view="month">Month</button>
         <button type="button" class="cal-view-btn" data-view="week">Week</button>
       </div>
+      <button type="button" class="cal-gcal-btn" id="cal-gcal-btn" style="display:none" aria-expanded="false" aria-haspopup="true">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span id="cal-gcal-label">Connect Google Calendar</span>
+        <svg class="cal-gcal-chevron" id="cal-gcal-chevron" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        <div class="cal-gcal-dropdown" id="cal-gcal-dropdown">
+          <div class="cal-gcal-sync-info" id="cal-gcal-sync-info" style="display:none"></div>
+          <div class="cal-gcal-sync-progress" id="cal-gcal-sync-progress">
+            <div class="cal-gcal-sync-progress-bar" id="cal-gcal-sync-bar"></div>
+          </div>
+          <button type="button" class="cal-gcal-dropdown-item" id="cal-gcal-sync-btn" style="display:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            <span id="cal-gcal-sync-text">Sync tasks now</span>
+          </button>
+          <div class="cal-gcal-dropdown-sep"></div>
+          <button type="button" class="cal-gcal-dropdown-item cal-gcal-dropdown-item--danger" id="cal-gcal-disconnect-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64A9 9 0 0 1 20.77 15"></path><path d="M6.16 6.16a9 9 0 0 0 12.68 12.68"></path><line x1="1" y1="1" x2="23" y2="23"></line><path d="M3.24 15A9 9 0 0 1 8.6 3.6"></path></svg>
+            Disconnect
+          </button>
+        </div>
+      </button>
     </div>
     <div class="cal-weekdays" id="cal-weekdays"></div>
     <div class="cal-grid" id="cal-grid"></div>
@@ -1045,6 +1199,164 @@
     });
   }
 
+  // ─── Google Calendar connect button ───
+  var gcalBtn = document.getElementById('cal-gcal-btn');
+  var gcalLabel = document.getElementById('cal-gcal-label');
+  var gcalChevron = document.getElementById('cal-gcal-chevron');
+  var gcalDropdown = document.getElementById('cal-gcal-dropdown');
+  var gcalSyncInfo = document.getElementById('cal-gcal-sync-info');
+  var gcalSyncProgress = document.getElementById('cal-gcal-sync-progress');
+  var gcalSyncBar = document.getElementById('cal-gcal-sync-bar');
+  var gcalSyncBtn = document.getElementById('cal-gcal-sync-btn');
+  var gcalSyncText = document.getElementById('cal-gcal-sync-text');
+  var gcalDisconnectBtn = document.getElementById('cal-gcal-disconnect-btn');
+  var _gcalDropdownOpen = false;
+
+  function updateGcalButton() {
+    if (!gcalBtn) return;
+    var cal = window.dmCalendar;
+    if (!cal) { gcalBtn.style.display = 'none'; return; }
+
+    gcalBtn.style.display = '';
+
+    // Reset classes
+    gcalBtn.classList.remove('cal-gcal-btn--connected', 'cal-gcal-btn--reconnect');
+
+    if (cal.isConnected()) {
+      // Connected state: green dot + "Connected" + dropdown chevron
+      gcalBtn.classList.add('cal-gcal-btn--connected');
+      gcalLabel.innerHTML = '<span class="cal-gcal-dot cal-gcal-dot--green"></span> Connected';
+      gcalChevron.style.display = '';
+
+      // Check for unsynced tasks
+      cal.countUnsyncedTasks().then(function(count) {
+        if (count > 0) {
+          gcalSyncInfo.textContent = count + ' task' + (count === 1 ? '' : 's') + ' not synced';
+          gcalSyncInfo.style.display = '';
+          gcalSyncBtn.style.display = '';
+        } else {
+          gcalSyncInfo.style.display = 'none';
+          gcalSyncBtn.style.display = 'none';
+        }
+      });
+    } else if (cal.isEnabled()) {
+      // Enabled but token expired — needs reconnect
+      gcalBtn.classList.add('cal-gcal-btn--reconnect');
+      gcalLabel.innerHTML = '<span class="cal-gcal-dot cal-gcal-dot--amber"></span> Reconnect';
+      gcalChevron.style.display = 'none';
+      gcalSyncInfo.style.display = 'none';
+      gcalSyncBtn.style.display = 'none';
+    } else {
+      // Not connected — show connect prompt
+      gcalLabel.textContent = 'Connect Google Calendar';
+      gcalChevron.style.display = 'none';
+      gcalSyncInfo.style.display = 'none';
+      gcalSyncBtn.style.display = 'none';
+    }
+
+    closeGcalDropdown();
+  }
+
+  function openGcalDropdown() {
+    if (!gcalDropdown) return;
+    _gcalDropdownOpen = true;
+    gcalDropdown.classList.add('cal-gcal-dropdown--open');
+    gcalBtn.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeGcalDropdown() {
+    if (!gcalDropdown) return;
+    _gcalDropdownOpen = false;
+    gcalDropdown.classList.remove('cal-gcal-dropdown--open');
+    gcalBtn.setAttribute('aria-expanded', 'false');
+  }
+
+  if (gcalBtn) {
+    gcalBtn.addEventListener('click', function(e) {
+      // Ignore clicks on dropdown items (they handle themselves)
+      if (e.target.closest('.cal-gcal-dropdown')) return;
+
+      var cal = window.dmCalendar;
+      if (!cal) return;
+
+      if (cal.isConnected()) {
+        // Toggle dropdown
+        if (_gcalDropdownOpen) {
+          closeGcalDropdown();
+        } else {
+          openGcalDropdown();
+        }
+      } else {
+        // Connect (or reconnect)
+        gcalBtn.disabled = true;
+        var origLabel = gcalLabel.textContent;
+        gcalLabel.textContent = 'Connecting...';
+        cal.connect().then(function() {
+          gcalBtn.disabled = false;
+          updateGcalButton();
+          // Also update Settings panel if it's open
+          if (typeof updateCalendarUI === 'function') updateCalendarUI();
+        }).catch(function(err) {
+          gcalBtn.disabled = false;
+          gcalLabel.textContent = origLabel;
+          console.error('[calendar-view] Google Calendar connect error:', err);
+        });
+      }
+    });
+
+    // Close dropdown on outside click
+    document.addEventListener('click', function(e) {
+      if (_gcalDropdownOpen && !gcalBtn.contains(e.target)) {
+        closeGcalDropdown();
+      }
+    });
+  }
+
+  if (gcalSyncBtn) {
+    gcalSyncBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var cal = window.dmCalendar;
+      if (!cal) return;
+
+      gcalSyncBtn.disabled = true;
+      gcalSyncText.textContent = 'Syncing...';
+      gcalSyncProgress.style.display = '';
+      gcalSyncBar.style.width = '0%';
+
+      cal.syncAll(function(done, total) {
+        var pct = Math.round((done / total) * 100);
+        gcalSyncBar.style.width = pct + '%';
+        gcalSyncInfo.textContent = 'Syncing ' + done + ' / ' + total + '...';
+        gcalSyncInfo.style.display = '';
+      }).then(function(total) {
+        gcalSyncInfo.textContent = total + ' task' + (total === 1 ? '' : 's') + ' synced!';
+        gcalSyncBar.style.width = '100%';
+        setTimeout(function() {
+          gcalSyncProgress.style.display = 'none';
+          gcalSyncBtn.style.display = 'none';
+          gcalSyncBtn.disabled = false;
+          gcalSyncText.textContent = 'Sync tasks now';
+          gcalSyncInfo.style.display = 'none';
+        }, 2000);
+      }).catch(function(err) {
+        gcalSyncInfo.textContent = 'Sync failed';
+        gcalSyncBtn.disabled = false;
+        gcalSyncText.textContent = 'Retry';
+        gcalSyncProgress.style.display = 'none';
+        console.error('[calendar-view] Sync error:', err);
+      });
+    });
+  }
+
+  if (gcalDisconnectBtn) {
+    gcalDisconnectBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var cal = window.dmCalendar;
+      if (cal) cal.disconnect();
+      updateGcalButton();
+    });
+  }
+
   // ─── Init ───
   // Pre-show loading state if cached user exists to prevent auth-card flash
   try {
@@ -1058,6 +1370,7 @@
       window.dmAuth.onAuthStateChanged(function(user) {
         if (user) {
           loadCalendar();
+          updateGcalButton();
         } else {
           showState('auth');
         }
