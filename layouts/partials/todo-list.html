@@ -582,18 +582,18 @@
   width: 26px;
   height: 26px;
   padding: 0;
-  border: 1px solid var(--gray-200);
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--body-background);
+  background: transparent;
   color: var(--gray-400);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s, background 0.15s;
   flex-shrink: 0;
   margin-left: 4px;
 }
 .todo-shortcuts-btn:hover {
   color: var(--body-font-color);
-  border-color: var(--gray-300);
+  background: var(--gray-100);
 }
 /* Hide completed toggle */
 .todo-hide-completed-btn {
@@ -604,23 +604,22 @@
   width: 26px;
   height: 26px;
   padding: 0;
-  border: 1px solid var(--gray-200);
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--body-background);
+  background: transparent;
   color: var(--gray-400);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  transition: color 0.15s, background 0.15s;
   flex-shrink: 0;
   margin-left: 4px;
 }
 .todo-hide-completed-btn:hover {
   color: var(--body-font-color);
-  border-color: var(--gray-300);
+  background: var(--gray-100);
 }
 .todo-hide-completed-btn.active {
-  border-color: var(--color-link);
   color: var(--color-link);
-  background: color-mix(in srgb, var(--color-link) 8%, var(--body-background));
+  background: color-mix(in srgb, var(--color-link) 10%, transparent);
 }
 .todo-hc-badge {
   position: absolute;
@@ -785,19 +784,19 @@
   position: relative;
   width: 26px;
   height: 26px;
-  border: 1px solid var(--gray-300);
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--body-background);
+  background: transparent;
   color: var(--gray-500);
   cursor: pointer;
-  transition: border-color 0.15s, color 0.15s, box-shadow 0.15s;
+  transition: color 0.15s, background 0.15s;
   flex-shrink: 0;
   padding: 0;
 }
 .todo-pf-trigger:hover,
 .todo-pf-trigger.active {
-  border-color: var(--color-link);
   color: var(--color-link);
+  background: color-mix(in srgb, var(--color-link) 10%, transparent);
 }
 .todo-pf-badge {
   position: absolute;
@@ -3235,23 +3234,22 @@
   width: 26px;
   height: 26px;
   padding: 0;
-  border: 1px solid var(--gray-200);
+  border: 1px solid transparent;
   border-radius: 6px;
-  background: var(--body-background);
+  background: transparent;
   color: var(--gray-400);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s, transform 0.2s;
+  transition: color 0.15s, background 0.15s, transform 0.2s;
   flex-shrink: 0;
   margin-left: 4px;
 }
 .todo-inbox-settings-btn:hover {
   color: var(--body-font-color);
-  border-color: var(--gray-300);
+  background: var(--gray-100);
 }
 .todo-inbox-settings-btn.active {
   color: var(--color-link);
-  border-color: var(--color-link);
-  background: color-mix(in srgb, var(--color-link) 8%, var(--body-background));
+  background: color-mix(in srgb, var(--color-link) 10%, transparent);
   transform: rotate(30deg);
 }
 
@@ -3742,14 +3740,13 @@
   background: color-mix(in srgb, var(--todo-inbox-accent, var(--color-link)) 9%, transparent);
 }
 .todo-list .todo-hide-completed-btn.active {
-  border-color: var(--todo-inbox-accent, var(--color-link));
   color: var(--todo-inbox-accent, var(--color-link));
-  background: color-mix(in srgb, var(--todo-inbox-accent, var(--color-link)) 8%, var(--body-background));
+  background: color-mix(in srgb, var(--todo-inbox-accent, var(--color-link)) 10%, transparent);
 }
 .todo-list .todo-pf-trigger:hover,
 .todo-list .todo-pf-trigger.active {
-  border-color: var(--todo-inbox-accent, var(--color-link));
   color: var(--todo-inbox-accent, var(--color-link));
+  background: color-mix(in srgb, var(--todo-inbox-accent, var(--color-link)) 10%, transparent);
 }
 .todo-list .todo-focus-title { color: var(--todo-inbox-accent, var(--color-link)); }
 .todo-list .todo-add-btn {
