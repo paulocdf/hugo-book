@@ -54,12 +54,31 @@
   <div class="single-note-content" style="display: none;">
     {{ if eq $destination "inbox" }}
     {{ partial "todo-list.html" . }}
-    {{ end }}
+    <!-- Notes card: wraps note body + attachments in a separate card for inbox -->
+    <div class="single-note-notes-card" id="sn-notes-card" style="display: none;">
+      <div class="sn-notes-card-header">
+        <h3 class="sn-notes-card-title">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          Notes
+          <span class="sn-notes-card-date"></span>
+        </h3>
+        <div class="sn-notes-card-actions"></div>
+      </div>
+      <div class="sn-notes-card-body">
+        <div class="single-note-body markdown"></div>
+        <div class="note-viewer-attachments" id="sn-attachments" style="display: none;">
+          <h3 class="note-viewer-attachments-title">Attachments</h3>
+          <div class="note-viewer-attachments-list" id="sn-attachments-list"></div>
+        </div>
+      </div>
+    </div>
+    {{ else }}
     <div class="single-note-body markdown"></div>
     <div class="note-viewer-attachments" id="sn-attachments" style="display: none;">
       <h3 class="note-viewer-attachments-title">Attachments</h3>
       <div class="note-viewer-attachments-list" id="sn-attachments-list"></div>
     </div>
+    {{ end }}
   </div>
   <!-- Paste/drop upload toast -->
   <div class="sn-upload-toast" style="display: none;">
@@ -253,6 +272,59 @@
   font-size: 0.85rem;
   color: var(--body-font-color);
 }
+/* ── Notes card (inbox only) ── */
+.single-note-notes-card {
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: 1rem;
+}
+.sn-notes-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  background: var(--gray-100);
+  border-bottom: 1px solid var(--gray-200);
+}
+.sn-notes-card-title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--body-font-color);
+}
+.sn-notes-card-title svg {
+  color: var(--color-link);
+  flex-shrink: 0;
+}
+.sn-notes-card-date {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--gray-400);
+  margin-left: 6px;
+}
+.sn-notes-card-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+.sn-notes-card-actions .note-action-btn {
+  width: 28px;
+  height: 28px;
+}
+.sn-notes-card-actions .note-action-btn svg {
+  width: 14px;
+  height: 14px;
+}
+.sn-notes-card-body {
+  padding: 1rem 1.25rem;
+}
+.sn-notes-card-body .single-note-body:empty {
+  display: none;
+}
 /* Drop zone highlight */
 .single-note.sn-drag-over {
   outline: 2px dashed var(--color-link);
@@ -287,15 +359,25 @@
     var dateEl = container.querySelector('.single-note-date');
     var snAttachSection = document.getElementById('sn-attachments');
     var snAttachList = document.getElementById('sn-attachments-list');
+    var notesCard = container.querySelector('.single-note-notes-card');
+    var notesCardDate = container.querySelector('.sn-notes-card-date');
+    var notesCardActions = container.querySelector('.sn-notes-card-actions');
+    var isInbox = destination === 'inbox';
 
     var currentNote = null;
     var allDestNotes = [];
     var selfTriggeredSync = false;
 
-    // Relocate action bar to sit inline with the page <h1> heading
-    // (matches note-viewer pattern: title + actions in one flex row)
+    // For inbox: move action buttons into the Notes card header
+    // For other pages: relocate action bar inline with the page <h1> heading
     var articleEl = container.closest('.markdown');
-    if (articleEl && topActionsEl) {
+    if (isInbox && notesCardActions && topActionsEl) {
+      // Move each action button from topActionsEl into the Notes card header
+      var btns = topActionsEl.querySelectorAll('.note-action-btn');
+      btns.forEach(function(btn) { notesCardActions.appendChild(btn); });
+      // Hide the original top actions bar entirely for inbox
+      topActionsEl.style.display = 'none';
+    } else if (articleEl && topActionsEl) {
       var pageH1 = articleEl.querySelector(':scope > h1');
       if (pageH1) {
         var titleRow = document.createElement('div');
@@ -315,16 +397,18 @@
       loadingEl.style.display = state === 'loading' ? '' : 'none';
       emptyEl.style.display = state === 'empty' ? '' : 'none';
       contentEl.style.display = state === 'content' ? '' : 'none';
-      topActionsEl.style.display = state === 'content' ? '' : 'none';
+      if (!isInbox) topActionsEl.style.display = state === 'content' ? '' : 'none';
     }
 
     function renderNote(note) {
       currentNote = note;
       var content = note.content || '';
 
-      // Update date label
-      if (dateEl && window.dmFormat) {
-        dateEl.textContent = note.updatedAt ? window.dmFormat.updatedLabel(note.updatedAt) : window.dmFormat.date(note.createdAt);
+      // Update date label (original top-actions date + Notes card date)
+      if (window.dmFormat) {
+        var dateText = note.updatedAt ? window.dmFormat.updatedLabel(note.updatedAt) : window.dmFormat.date(note.createdAt);
+        if (dateEl) dateEl.textContent = dateText;
+        if (notesCardDate) notesCardDate.textContent = '· ' + dateText;
       }
 
       // Strip leading top-level heading if present
@@ -373,6 +457,12 @@
 
       showState('content');
 
+      // Show Notes card for inbox when there is content or attachments
+      if (notesCard) {
+        var hasContent = content.trim().length > 0;
+        notesCard.style.display = hasContent ? '' : 'none';
+      }
+
       // Update pin button state
       updatePinBtn();
 
@@ -419,6 +509,8 @@
         });
         snAttachList.innerHTML = html;
         snAttachSection.style.display = '';
+        // Ensure Notes card is visible when attachments exist
+        if (notesCard) notesCard.style.display = '';
       });
     }
 
@@ -506,7 +598,8 @@
               });
             }
             showState('content');
-            bodyEl.innerHTML = '<p style="color: var(--gray-400); font-style: italic;">Start writing by clicking Edit below.</p>';
+            bodyEl.innerHTML = '<p style="color: var(--gray-400); font-style: italic;">Start writing by clicking Edit.</p>';
+            if (notesCard) notesCard.style.display = '';
             window.dispatchEvent(new CustomEvent('dm-sync-complete'));
           })
           .catch(function(err) {

@@ -13,9 +13,21 @@
         </svg>
       </span>
     </h3>
-    <div class="todo-view-toggle" id="todo-view-toggle">
-      <button type="button" class="todo-view-btn active" data-view="today" title="Today's tasks">Today</button>
-      <button type="button" class="todo-view-btn" data-view="all" title="All tasks">All</button>
+    <div class="todo-view-dropdown" id="todo-view-dropdown">
+      <button type="button" class="todo-view-dropdown-btn" id="todo-view-dropdown-btn" title="Switch view" aria-haspopup="true" aria-expanded="false">
+        <span class="todo-view-dropdown-label" id="todo-view-dropdown-label">Today</span>
+        <svg class="todo-view-dropdown-caret" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="todo-view-dropdown-menu" id="todo-view-dropdown-menu" role="listbox" style="display:none;">
+        <button type="button" class="todo-view-dropdown-item active" data-view="today" role="option" aria-selected="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Today
+        </button>
+        <button type="button" class="todo-view-dropdown-item" data-view="all" role="option" aria-selected="false">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          All
+        </button>
+      </div>
     </div>
     <div class="todo-project-filter" id="todo-project-filter" style="display:none;">
       <div class="todo-pf-chips" id="todo-pf-chips"></div>
@@ -246,41 +258,92 @@
   fill: var(--body-font-color);
 }
 
-/* ─── View Mode Toggle (Today | All) ─── */
-.todo-view-toggle {
-  display: flex;
-  align-items: center;
-  background: var(--gray-200);
-  border-radius: 6px;
-  padding: 2px;
-  gap: 1px;
+/* ─── View Mode Dropdown (Today ▾ / All ▾) ─── */
+.todo-view-dropdown {
+  position: relative;
   margin-left: auto;
   margin-right: 8px;
 }
-.todo-view-btn {
-  background: none;
-  border: none;
-  padding: 3px 10px;
-  font-size: 0.72rem;
+.todo-view-dropdown-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 3px 8px 3px 10px;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--gray-500);
-  border-radius: 4px;
+  color: var(--body-font-color);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
   line-height: 1.3;
   white-space: nowrap;
 }
-.todo-view-btn:hover {
-  color: var(--body-font-color);
+.todo-view-dropdown-btn:hover {
+  border-color: var(--gray-300);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
-.todo-view-btn.active {
+.todo-view-dropdown-btn[aria-expanded="true"] {
+  border-color: var(--todo-inbox-accent, var(--color-link));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--todo-inbox-accent, var(--color-link)) 12%, transparent);
+}
+.todo-view-dropdown-caret {
+  color: var(--gray-400);
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+.todo-view-dropdown-btn[aria-expanded="true"] .todo-view-dropdown-caret {
+  transform: rotate(180deg);
+}
+.todo-view-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 130px;
   background: var(--body-background);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  z-index: 100;
+  padding: 4px;
+  animation: todo-dropdown-in 0.12s ease-out;
+}
+@keyframes todo-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.todo-view-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  font-size: 0.78rem;
+  font-weight: 500;
   color: var(--body-font-color);
-  box-shadow: 0 1px 2px rgba(0,0,0,0.08);
+  cursor: pointer;
+  transition: background 0.12s;
+  text-align: left;
+}
+.todo-view-dropdown-item:hover {
+  background: var(--gray-100);
+}
+.todo-view-dropdown-item.active {
+  background: color-mix(in srgb, var(--todo-inbox-accent, var(--color-link)) 10%, transparent);
+  color: var(--todo-inbox-accent, var(--color-link));
+  font-weight: 600;
+}
+.todo-view-dropdown-item svg {
+  flex-shrink: 0;
+  color: inherit;
 }
 
-/* ─── Today Mode: accent tint header ─── */
-.todo-list[data-view-mode="today"] .todo-list-header {
+/* ─── Today Mode: accent tint header (only when no custom banner gradient) ─── */
+.todo-list[data-view-mode="today"]:not([data-banner-custom]) .todo-list-header {
   background: linear-gradient(135deg, color-mix(in srgb, var(--color-link) 6%, var(--gray-100)) 0%, var(--gray-100) 60%);
 }
 
@@ -3479,6 +3542,71 @@
 }
 .todo-isp-accent-color-input::-webkit-color-swatch-wrapper { padding: 0; }
 .todo-isp-accent-color-input::-webkit-color-swatch { border-radius: 50%; border: none; }
+
+/* Banner style presets */
+.todo-isp-banner-presets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
+  gap: 6px;
+}
+.todo-isp-banner-swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.todo-isp-banner-swatch:hover {
+  border-color: var(--gray-300);
+  transform: scale(1.03);
+}
+.todo-isp-banner-swatch.active {
+  border-color: var(--todo-inbox-accent, var(--color-link));
+}
+.todo-isp-banner-swatch-preview {
+  width: 100%;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-200);
+}
+.todo-isp-banner-swatch-label {
+  font-size: 0.65rem;
+  color: var(--gray-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.todo-isp-banner-swatch.active .todo-isp-banner-swatch-label {
+  color: var(--todo-inbox-accent, var(--color-link));
+  font-weight: 600;
+}
+.todo-isp-banner-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.todo-isp-banner-color-input {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  overflow: hidden;
+  -webkit-appearance: none;
+  background: none;
+}
+.todo-isp-banner-color-input::-webkit-color-swatch-wrapper { padding: 0; }
+.todo-isp-banner-color-input::-webkit-color-swatch { border-radius: 50%; border: none; }
+
 .todo-isp-reset-btn {
   display: block;
   width: 100%;
@@ -3771,6 +3899,20 @@
   // Accent color: '' (default) or a hex string like '#1976d2'
   var _inboxAccentColor = '';
   try { var _iac = localStorage.getItem('dm-inbox-accent'); if (_iac && /^#[0-9a-f]{6}$/i.test(_iac)) _inboxAccentColor = _iac; } catch(e) {}
+  // Banner gradient: null (default), or { type: 'preset', id: string } or { type: 'custom', from: '#hex', to: '#hex' }
+  var _inboxBannerGradient = null;
+  try {
+    var _ibg = JSON.parse(localStorage.getItem('dm-inbox-banner-bg') || 'null');
+    if (_ibg && typeof _ibg === 'object' && _ibg.type) _inboxBannerGradient = _ibg;
+  } catch(e) {}
+  var _BANNER_PRESETS = [
+    { id: 'subtle',  label: 'Subtle',  from: 'color-mix(in srgb, var(--color-link) 6%, var(--gray-100))', to: 'var(--gray-100)', css: 'linear-gradient(135deg, color-mix(in srgb, var(--color-link) 6%, var(--gray-100)) 0%, var(--gray-100) 60%)' },
+    { id: 'ocean',   label: 'Ocean',   from: '#e0f2fe', to: '#e0e7ff', css: 'linear-gradient(135deg, #e0f2fe 0%, #e0e7ff 100%)', cssDark: 'linear-gradient(135deg, #0c2d48 0%, #1a1a3e 100%)' },
+    { id: 'sunset',  label: 'Sunset',  from: '#fef3c7', to: '#fce7f3', css: 'linear-gradient(135deg, #fef3c7 0%, #fce7f3 100%)', cssDark: 'linear-gradient(135deg, #3d2e0a 0%, #3d1832 100%)' },
+    { id: 'forest',  label: 'Forest',  from: '#d1fae5', to: '#e0f2fe', css: 'linear-gradient(135deg, #d1fae5 0%, #e0f2fe 100%)', cssDark: 'linear-gradient(135deg, #0d3320 0%, #0c2d48 100%)' },
+    { id: 'lavender',label: 'Lavender',from: '#ede9fe', to: '#fce7f3', css: 'linear-gradient(135deg, #ede9fe 0%, #fce7f3 100%)', cssDark: 'linear-gradient(135deg, #2e1a5e 0%, #3d1832 100%)' },
+    { id: 'slate',   label: 'Slate',   from: '#f1f5f9', to: '#e2e8f0', css: 'linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%)', cssDark: 'linear-gradient(135deg, #1e293b 0%, #1a202c 100%)' },
+  ];
   // Inbox settings popover element
   var _inboxSettingsPopover = null;
   var _inboxSettingsBtnEl = document.getElementById('todo-inbox-settings-btn');
@@ -3802,13 +3944,31 @@
       container.removeAttribute('data-accent');
       container.style.removeProperty('--todo-accent-override');
     }
+    // Banner gradient
+    var headerEl = container.querySelector('.todo-list-header');
+    if (headerEl) {
+      if (_inboxBannerGradient) {
+        var isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.body.classList.contains('dark');
+        if (_inboxBannerGradient.type === 'preset') {
+          var preset = _BANNER_PRESETS.find(function(p) { return p.id === _inboxBannerGradient.id; });
+          if (preset) {
+            headerEl.style.background = (isDark && preset.cssDark) ? preset.cssDark : preset.css;
+          }
+        } else if (_inboxBannerGradient.type === 'custom') {
+          headerEl.style.background = 'linear-gradient(135deg, ' + _inboxBannerGradient.from + ' 0%, ' + _inboxBannerGradient.to + ' 100%)';
+        } else if (_inboxBannerGradient.type === 'solid') {
+          headerEl.style.background = _inboxBannerGradient.color;
+        }
+        container.setAttribute('data-banner-custom', '1');
+      } else {
+        headerEl.style.background = '';
+        container.removeAttribute('data-banner-custom');
+      }
+    }
     // View mode
     container.setAttribute('data-view-mode', _viewMode);
-    var toggleBtnsView = document.querySelectorAll('.todo-view-btn');
-    toggleBtnsView.forEach(function(btn) {
-      if (btn.getAttribute('data-view') === _viewMode) btn.classList.add('active');
-      else btn.classList.remove('active');
-    });
+    var ddLabel = document.getElementById('todo-view-dropdown-label');
+    if (ddLabel) ddLabel.textContent = _viewMode === 'today' ? 'Today' : 'All';
   }
 
   // Apply default BuJo type to add form
@@ -8901,23 +9061,69 @@
     });
   }
 
-  // ─── View mode toggle (Today | All) ───
-  var viewToggle = document.getElementById('todo-view-toggle');
-  if (viewToggle) {
-    viewToggle.addEventListener('click', function(e) {
-      var btn = e.target.closest('.todo-view-btn');
-      if (!btn) return;
-      var mode = btn.getAttribute('data-view');
-      if (mode === _viewMode) return;
-      _viewMode = mode;
-      try { localStorage.setItem('dm-inbox-view-mode', _viewMode); } catch(ex) {}
-      container.setAttribute('data-view-mode', _viewMode);
-      viewToggle.querySelectorAll('.todo-view-btn').forEach(function(b) {
-        b.classList.toggle('active', b.getAttribute('data-view') === _viewMode);
-      });
-      render();
+  // ─── View mode dropdown (Today ▾ / All ▾) ───
+  var viewDropdownBtn = document.getElementById('todo-view-dropdown-btn');
+  var viewDropdownLabel = document.getElementById('todo-view-dropdown-label');
+  var viewDropdownMenu = document.getElementById('todo-view-dropdown-menu');
+  var _viewDropdownOpen = false;
+
+  function updateViewDropdownLabel() {
+    if (viewDropdownLabel) viewDropdownLabel.textContent = _viewMode === 'today' ? 'Today' : 'All';
+  }
+
+  function openViewDropdown() {
+    if (!viewDropdownMenu) return;
+    _viewDropdownOpen = true;
+    viewDropdownMenu.style.display = '';
+    if (viewDropdownBtn) viewDropdownBtn.setAttribute('aria-expanded', 'true');
+    // Update active states
+    viewDropdownMenu.querySelectorAll('.todo-view-dropdown-item').forEach(function(item) {
+      var isActive = item.getAttribute('data-view') === _viewMode;
+      item.classList.toggle('active', isActive);
+      item.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    });
+    // Close on outside click (deferred)
+    setTimeout(function() {
+      document.addEventListener('click', _viewDropdownOutside, true);
+    }, 10);
+  }
+
+  function closeViewDropdown() {
+    if (!viewDropdownMenu) return;
+    _viewDropdownOpen = false;
+    viewDropdownMenu.style.display = 'none';
+    if (viewDropdownBtn) viewDropdownBtn.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('click', _viewDropdownOutside, true);
+  }
+
+  function _viewDropdownOutside(e) {
+    var dropdown = document.getElementById('todo-view-dropdown');
+    if (dropdown && !dropdown.contains(e.target)) closeViewDropdown();
+  }
+
+  if (viewDropdownBtn) {
+    viewDropdownBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (_viewDropdownOpen) closeViewDropdown(); else openViewDropdown();
     });
   }
+  if (viewDropdownMenu) {
+    viewDropdownMenu.addEventListener('click', function(e) {
+      var item = e.target.closest('.todo-view-dropdown-item');
+      if (!item) return;
+      var mode = item.getAttribute('data-view');
+      if (mode && mode !== _viewMode) {
+        _viewMode = mode;
+        try { localStorage.setItem('dm-inbox-view-mode', _viewMode); } catch(ex) {}
+        container.setAttribute('data-view-mode', _viewMode);
+        updateViewDropdownLabel();
+        render();
+      }
+      closeViewDropdown();
+    });
+  }
+  // Set initial label
+  updateViewDropdownLabel();
 
   // ─── Hide completed toggle ───
   function toggleHideCompleted() {
@@ -9174,6 +9380,20 @@
       + '</div>'
       + '</div>'
 
+      // Section: Banner style
+      + '<div class="todo-isp-section">'
+      + '<div class="todo-isp-section-title">Banner style</div>'
+      + '<div class="todo-isp-banner-presets" id="todo-isp-banner-presets">'
+      + buildBannerPresetSwatches()
+      + '</div>'
+      + '<div class="todo-isp-banner-custom-row" id="todo-isp-banner-custom-row">'
+      + '<span class="todo-isp-accent-custom-label">Custom</span>'
+      + '<input type="color" class="todo-isp-banner-color-input" id="todo-isp-banner-from" value="' + getBannerCustomFrom() + '" title="Start color">'
+      + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>'
+      + '<input type="color" class="todo-isp-banner-color-input" id="todo-isp-banner-to" value="' + getBannerCustomTo() + '" title="End color">'
+      + '</div>'
+      + '</div>'
+
       // Reset all
       + '<button type="button" class="todo-isp-reset-btn" id="todo-isp-reset-btn">Reset all to defaults</button>'
 
@@ -9266,6 +9486,31 @@
       });
     }
 
+    // Wire banner preset swatches
+    el.querySelectorAll('.todo-isp-banner-swatch').forEach(function(sw) {
+      sw.addEventListener('click', function() {
+        var id = sw.getAttribute('data-banner-id');
+        if (id === 'default') {
+          setInboxBanner(null);
+        } else {
+          setInboxBanner({ type: 'preset', id: id });
+        }
+        syncBannerUI(el);
+      });
+    });
+
+    // Wire banner custom color pickers
+    var bannerFrom = el.querySelector('#todo-isp-banner-from');
+    var bannerTo = el.querySelector('#todo-isp-banner-to');
+    function onBannerCustomChange() {
+      if (bannerFrom && bannerTo) {
+        setInboxBanner({ type: 'custom', from: bannerFrom.value, to: bannerTo.value });
+        syncBannerUI(el);
+      }
+    }
+    if (bannerFrom) bannerFrom.addEventListener('input', onBannerCustomChange);
+    if (bannerTo) bannerTo.addEventListener('input', onBannerCustomChange);
+
     // Wire reset button
     var resetBtn = el.querySelector('#todo-isp-reset-btn');
     if (resetBtn) {
@@ -9275,12 +9520,14 @@
         _inboxActions = { share: true, flashcard: true, migrate: true, archive: true, reminder: true };
         _inboxDefaultBujoType = 'task';
         _inboxAccentColor = '';
+        _inboxBannerGradient = null;
         try {
           localStorage.removeItem('dm-inbox-density');
           localStorage.removeItem('dm-inbox-meta');
           localStorage.removeItem('dm-inbox-actions');
           localStorage.removeItem('dm-inbox-default-bujo');
           localStorage.removeItem('dm-inbox-accent');
+          localStorage.removeItem('dm-inbox-banner-bg');
         } catch(ex) {}
         applyInboxSettings();
         applyDefaultBujoType();
@@ -9365,6 +9612,48 @@
     });
     var hexInput = el.querySelector('#todo-isp-hex-input');
     if (hexInput) hexInput.value = _inboxAccentColor || '';
+  }
+
+  // ─── Banner gradient helpers ───
+  function getBannerCustomFrom() {
+    return (_inboxBannerGradient && _inboxBannerGradient.type === 'custom' && _inboxBannerGradient.from) ? _inboxBannerGradient.from : '#e0f2fe';
+  }
+  function getBannerCustomTo() {
+    return (_inboxBannerGradient && _inboxBannerGradient.type === 'custom' && _inboxBannerGradient.to) ? _inboxBannerGradient.to : '#e0e7ff';
+  }
+
+  function buildBannerPresetSwatches() {
+    var isDefault = !_inboxBannerGradient;
+    var html = '<button type="button" class="todo-isp-banner-swatch' + (isDefault ? ' active' : '') + '" data-banner-id="default" title="Default">'
+      + '<span class="todo-isp-banner-swatch-preview" style="background: var(--gray-100);"></span>'
+      + '<span class="todo-isp-banner-swatch-label">Default</span>'
+      + '</button>';
+    _BANNER_PRESETS.forEach(function(p) {
+      var isActive = _inboxBannerGradient && _inboxBannerGradient.type === 'preset' && _inboxBannerGradient.id === p.id;
+      html += '<button type="button" class="todo-isp-banner-swatch' + (isActive ? ' active' : '') + '" data-banner-id="' + p.id + '" title="' + p.label + '">'
+        + '<span class="todo-isp-banner-swatch-preview" style="background: linear-gradient(135deg, ' + p.from + ' 0%, ' + p.to + ' 100%);"></span>'
+        + '<span class="todo-isp-banner-swatch-label">' + p.label + '</span>'
+        + '</button>';
+    });
+    return html;
+  }
+
+  function setInboxBanner(gradient) {
+    _inboxBannerGradient = gradient;
+    try {
+      if (gradient) localStorage.setItem('dm-inbox-banner-bg', JSON.stringify(gradient));
+      else localStorage.removeItem('dm-inbox-banner-bg');
+    } catch(ex) {}
+    applyInboxSettings();
+  }
+
+  function syncBannerUI(el) {
+    el.querySelectorAll('.todo-isp-banner-swatch').forEach(function(sw) {
+      var id = sw.getAttribute('data-banner-id');
+      var isActive = (id === 'default' && !_inboxBannerGradient)
+        || (_inboxBannerGradient && _inboxBannerGradient.type === 'preset' && _inboxBannerGradient.id === id);
+      sw.classList.toggle('active', !!isActive);
+    });
   }
 
   function positionInboxSettingsPopover(el) {
