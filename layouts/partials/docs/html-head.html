@@ -166,6 +166,50 @@
 })();
 </script>
 
+<script>
+/**
+ * Shared drag-and-drop order utility.
+ *
+ * Calculates the fractional `order` value for a dropped item by walking the
+ * container's children in their post-drop DOM order (which SortableJS has
+ * already finalised by the time `onEnd` fires).  We intentionally do NOT
+ * sort the collected order values: the DOM sequence after a drag IS the
+ * correct visual sequence, so sorting would break neighbour detection once
+ * any fractional values have been stored from prior reorders.
+ *
+ * @param {Element}  containerEl  - The SortableJS container after the drop
+ * @param {string}   itemSelector - CSS selector for draggable children
+ *                                  (e.g. '.todo-item', '.kanban-card')
+ * @param {string}   orderField   - Object property holding the order value
+ *                                  (e.g. 'order' or 'kanbanOrder')
+ * @param {number}   newIndex     - evt.newIndex from SortableJS onEnd
+ * @param {string}   movedId      - data-todo-id of the dragged element
+ * @param {Array}    allItems     - In-memory array of item objects to look up
+ * @returns {number} New fractional order value for the dropped item
+ */
+window.dmCalculateOrderForPosition = function(containerEl, itemSelector, orderField, newIndex, movedId, allItems) {
+  // Walk DOM in visual order, skip the dragged element itself
+  var orders = [];
+  var els = containerEl.querySelectorAll(itemSelector);
+  for (var i = 0; i < els.length; i++) {
+    var id = els[i].getAttribute('data-todo-id') || els[i].getAttribute('data-project-id');
+    if (id === movedId) continue;
+    var item = allItems.find(function(x) { return x.id === id; });
+    if (item != null) orders.push(item[orderField] || 0);
+  }
+
+  if (orders.length === 0) return 1;
+
+  var prevOrder = newIndex > 0             ? orders[newIndex - 1] : null;
+  var nextOrder = newIndex < orders.length ? orders[newIndex]     : null;
+
+  if      (prevOrder === null && nextOrder !== null) return nextOrder - 1;
+  else if (nextOrder === null && prevOrder !== null) return prevOrder + 1;
+  else if (prevOrder !== null && nextOrder !== null) return (prevOrder + nextOrder) / 2;
+  return 1;
+};
+</script>
+
 <!-- Configure marked.js to match Hugo's heading rendering -->
 <script>
 (function() {

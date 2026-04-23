@@ -3388,19 +3388,10 @@
   }
 
   function calculateOrderForPosition(columnEl, newIndex, todoId) {
-    var cards = columnEl.querySelectorAll('.kanban-card');
-    var orders = [];
-    for (var i = 0; i < cards.length; i++) {
-      if (cards[i].getAttribute('data-todo-id') === todoId) continue;
-      var cTodo = allTodos.find(function(t) { return t.id === cards[i].getAttribute('data-todo-id'); });
-      if (cTodo) orders.push(cTodo.kanbanOrder || 0);
-    }
-    orders.sort(function(a, b) { return a - b; });
-
-    if (orders.length === 0) return 1;
-    if (newIndex <= 0) return orders[0] - 1;
-    if (newIndex >= orders.length) return orders[orders.length - 1] + 1;
-    return (orders[newIndex - 1] + orders[newIndex]) / 2;
+    // Delegate to shared utility which walks the DOM in visual order without
+    // sorting, so fractional order values from prior reorders don't break
+    // neighbour detection.
+    return window.dmCalculateOrderForPosition(columnEl, '.kanban-card', 'kanbanOrder', newIndex, todoId, allTodos);
   }
 
   function updateCounts() {

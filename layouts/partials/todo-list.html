@@ -7762,7 +7762,10 @@
   }
 
   function calculateOrderForPosition(siblingEls, newIndex, movedId) {
-    // Get the order values of neighbors, excluding the moved item
+    // Walk siblings in their DOM order (as passed by the caller, which queries
+    // the live post-drop DOM).  Do NOT sort — the DOM order after SortableJS
+    // onEnd IS the correct visual sequence, and numeric sorting breaks neighbour
+    // detection once fractional order values exist from prior reorders.
     var orders = [];
     siblingEls.forEach(function(el) {
       var id = el.getAttribute('data-group-id') || el.getAttribute('data-todo-id');
@@ -7770,24 +7773,17 @@
       var t = allTodos.find(function(todo) { return todo.id === id; });
       if (t) orders.push(t.order || 0);
     });
-    orders.sort(function(a, b) { return a - b; });
 
     if (orders.length === 0) return 1;
 
-    // Adjust index since we excluded the moved item
-    var adjustedIndex = newIndex;
-    // Find the orders of the items before and after the new position
-    var prevOrder = adjustedIndex > 0 ? orders[adjustedIndex - 1] : null;
-    var nextOrder = adjustedIndex < orders.length ? orders[adjustedIndex] : null;
+    var prevOrder = newIndex > 0             ? orders[newIndex - 1] : null;
+    var nextOrder = newIndex < orders.length ? orders[newIndex]     : null;
 
     if (prevOrder === null && nextOrder !== null) {
-      // Moved to first position
       return nextOrder - 1;
     } else if (nextOrder === null && prevOrder !== null) {
-      // Moved to last position
       return prevOrder + 1;
     } else if (prevOrder !== null && nextOrder !== null) {
-      // Moved between two items
       return (prevOrder + nextOrder) / 2;
     }
     return 1;

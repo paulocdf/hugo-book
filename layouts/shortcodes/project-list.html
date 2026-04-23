@@ -2167,35 +2167,16 @@
     var todo = todos.find(function(t) { return t.id === todoId; });
     if (!todo) return;
 
-    // Calculate new order from neighbor positions
-    var siblings = evt.to.querySelectorAll('.project-task-item');
-    var orders = [];
-    siblings.forEach(function(el) {
-      var id = el.getAttribute('data-todo-id');
-      if (id === todoId) return;
-      var t = todos.find(function(tt) { return tt.id === id; });
-      if (t) orders.push(t.order || 0);
-    });
-    orders.sort(function(a, b) { return a - b; });
-
-    var adjustedIndex = evt.newIndex;
-    var prevOrder = adjustedIndex > 0 ? orders[adjustedIndex - 1] : null;
-    var nextOrder = adjustedIndex < orders.length ? orders[adjustedIndex] : null;
-
-    var newOrder;
-    if (prevOrder === null && nextOrder !== null) {
-      newOrder = nextOrder - 1;
-    } else if (nextOrder === null && prevOrder !== null) {
-      newOrder = prevOrder + 1;
-    } else if (prevOrder !== null && nextOrder !== null) {
-      newOrder = (prevOrder + nextOrder) / 2;
-    } else {
-      newOrder = 1;
-    }
+    // Use shared utility: walks DOM in visual order without sorting, so
+    // fractional order values from prior reorders don't break neighbour
+    // detection.  kanbanOrder is intentionally NOT touched here — it is
+    // managed independently by the Kanban board.
+    var newOrder = window.dmCalculateOrderForPosition(
+      evt.to, '.project-task-item', 'order', evt.newIndex, todoId, todos
+    );
 
     // Update local state
     todo.order = newOrder;
-    todo.kanbanOrder = newOrder;
     todo.updatedAt = Date.now();
 
     // Dual-write to Firestore + IDB
@@ -2205,7 +2186,6 @@
       op: 'update',
       data: {
         order: newOrder,
-        kanbanOrder: newOrder,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       },
       localOp: function() { return window.dmSync.putTodo(todo); }
