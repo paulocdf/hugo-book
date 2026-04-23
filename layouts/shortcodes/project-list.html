@@ -3136,7 +3136,17 @@
       return window.dmSync.getProjectTodos(_currentProjectId).then(function(todos) {
         var maxOrder = 0;
         todos.forEach(function(t) { if ((t.order || 0) > maxOrder) maxOrder = t.order || 0; });
-        return { userId: userId, order: maxOrder + 1 };
+        // Also resolve project collaborators here — fall back to IDB if _projects hasn't
+        // been populated yet (race condition with syncSharedProjects on shared projects).
+        var p = _projects.find(function(pr) { return pr.id === _currentProjectId; });
+        var collabPromise = (p && p.collaborators)
+          ? Promise.resolve(p.collaborators.slice())
+          : (window.dmSync.getProject
+              ? window.dmSync.getProject(_currentProjectId).then(function(proj) { return (proj && proj.collaborators) ? proj.collaborators.slice() : []; })
+              : Promise.resolve([]));
+        return collabPromise.then(function(collaborators) {
+          return { userId: userId, order: maxOrder + 1, collaborators: collaborators };
+        });
       });
     }).then(function(ctx) {
       if (!ctx) return;
@@ -3166,7 +3176,7 @@
         bujoType: _pjBujoType,
         bujoState: 'open',
         kanbanStatus: 'todo',
-        collaborators: (function() { var p = _projects.find(function(pr) { return pr.id === _currentProjectId; }); return (p && p.collaborators) ? p.collaborators.slice() : []; })(),
+        collaborators: ctx.collaborators,
         createdAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
         updatedAt: typeof firebase !== 'undefined' ? firebase.firestore.FieldValue.serverTimestamp() : null,
         completedAt: null

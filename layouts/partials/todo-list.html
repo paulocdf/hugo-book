@@ -8264,11 +8264,25 @@
       if (parentTodo && parentTodo.projectId) projectId = parentTodo.projectId;
     }
 
-    // Inherit collaborators from the project (if task belongs to a shared project)
-    var projectCollaborators = [];
+    // Inherit collaborators from the project (if task belongs to a shared project).
+    // Fall back to an IDB lookup if the project isn't in _projectMap yet — this happens
+    // when the task is being created in a shared project owned by another user, because
+    // _projectMap only holds projects returned by syncProjects() (userId == currentUser),
+    // while shared projects arrive later via syncSharedProjects(). Without this fallback
+    // the collaborators array would be empty and the other user's IDB would never receive
+    // this task via the 'collaborators array-contains' Firestore query.
+    var projectCollaboratorsPromise;
     if (projectId && _projectMap[projectId] && _projectMap[projectId].collaborators) {
-      projectCollaborators = _projectMap[projectId].collaborators.slice();
+      projectCollaboratorsPromise = Promise.resolve(_projectMap[projectId].collaborators.slice());
+    } else if (projectId && window.dmSync && window.dmSync.getProject) {
+      projectCollaboratorsPromise = window.dmSync.getProject(projectId).then(function(p) {
+        return (p && p.collaborators) ? p.collaborators.slice() : [];
+      });
+    } else {
+      projectCollaboratorsPromise = Promise.resolve([]);
     }
+
+    return projectCollaboratorsPromise.then(function(projectCollaborators) {
 
     var todoData = {
       userId: userId,
@@ -8354,6 +8368,7 @@
       if (onDone) onDone();
     });
 
+    }); // end projectCollaboratorsPromise.then
     }); // end userIdPromise.then
   }
 
