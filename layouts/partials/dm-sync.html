@@ -859,7 +859,7 @@
       parentId: data.parentId || null,
       order: data.order || 0,
       kanbanOrder: data.kanbanOrder != null ? data.kanbanOrder : (data.order || 0),
-      scheduledDate: data.scheduledDate || null,
+      scheduledDate: (data.scheduledDate && /^\d{4}-\d{2}-\d{2}$/.test(data.scheduledDate)) ? data.scheduledDate : null,
       reminderAt: reminderAt,
       reminderFired: !!data.reminderFired,
       reminderAcked: !!data.reminderAcked,

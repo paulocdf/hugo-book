@@ -4829,9 +4829,9 @@
         projects.forEach(function(p) {
           var color = window.dmTaskColors ? window.dmTaskColors.getColor(p.color) : p.color;
           var selected = _addFormProjectId === p.id ? ' style="background:var(--gray-100);font-weight:500;"' : '';
-          html += '<div class="todo-add-project-option" data-project-id="' + p.id + '" data-project-name="' + escapeHtml(p.name) + '" data-project-color="' + (p.color || '') + '"' + selected + '>' +
+          html += '<div class="todo-add-project-option" data-project-id="' + p.id + '" data-project-name="' + escapeHtml(p.name || '') + '" data-project-color="' + (p.color || '') + '"' + selected + '>' +
             '<span class="todo-add-project-dot" style="background:' + color + ';width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:8px;flex-shrink:0;"></span>' +
-            '<span>' + escapeHtml(p.name) + '</span>' +
+            '<span>' + escapeHtml(p.name || '') + '</span>' +
           '</div>';
         });
         addProjectDropdown.innerHTML = html;
@@ -4945,7 +4945,7 @@
       }
       html += '<span class="todo-pf-chip" style="background:' + color + ';">';
       html += '<span class="todo-pf-chip-dot"></span>';
-      html += '<span class="todo-pf-chip-name">' + escapeHtml(name) + '</span>';
+      html += '<span class="todo-pf-chip-name">' + escapeHtml(name || '') + '</span>';
       html += '<span class="todo-pf-chip-x" data-pf-remove="' + id + '">&times;</span>';
       html += '</span>';
     });
@@ -4991,7 +4991,7 @@
       html += '<button type="button" class="todo-pf-dropdown-row" data-pf-id="' + pid + '">';
       html += '<span class="todo-pf-dropdown-check' + (isChecked ? ' checked' : '') + '"></span>';
       html += '<span class="todo-pf-dropdown-dot" style="background:' + displayColor + ';"></span>';
-      html += '<span class="todo-pf-dropdown-name">' + escapeHtml(p.name) + '</span>';
+      html += '<span class="todo-pf-dropdown-name">' + escapeHtml(p.name || '') + '</span>';
       html += '</button>';
     });
     html += '</div>';
@@ -5382,9 +5382,9 @@
     if (todo.projectId && _projectMap[todo.projectId]) {
       var proj = _projectMap[todo.projectId];
       var dotColor = window.dmTaskColors ? window.dmTaskColors.getColor(proj.color) : proj.color;
-      html += '<span class="todo-item-project" title="Project: ' + escapeHtml(proj.name) + '">' +
+      html += '<span class="todo-item-project" title="Project: ' + escapeHtml(proj.name || '') + '">' +
         '<span class="todo-item-project-dot" style="background:' + dotColor + ';"></span>' +
-        escapeHtml(proj.name) + '</span>';
+        escapeHtml(proj.name || '') + '</span>';
     }
 
     // Task age badge (undone tasks older than 5 days)
@@ -5545,8 +5545,9 @@
     // Group parents by scheduledDate
     var dateGroups = {}; // dateStr -> [parents]
     var unscheduled = [];
+    var _validDateRe = /^\d{4}-\d{2}-\d{2}$/;
     parents.forEach(function(p) {
-      if (p.scheduledDate) {
+      if (p.scheduledDate && _validDateRe.test(p.scheduledDate)) {
         if (!dateGroups[p.scheduledDate]) dateGroups[p.scheduledDate] = [];
         dateGroups[p.scheduledDate].push(p);
       } else {
@@ -9789,7 +9790,7 @@
     var projectsPromise = window.dmSync.getAllProjects().then(function(projects) {
       _projectMap = {};
       projects.forEach(function(p) {
-        _projectMap[p.id] = { name: p.name, color: p.color || '', collaborators: p.collaborators || [] };
+        _projectMap[p.id] = { name: p.name || '', color: p.color || '', collaborators: p.collaborators || [] };
       });
       // Restore saved filter from IDB/Firestore before rendering
       return window.dmSync.getPageFilterProjectIds('inbox').then(function(saved) {
