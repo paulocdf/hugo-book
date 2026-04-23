@@ -2088,6 +2088,7 @@
   var totalSessions = 1; // total pomodoro sessions for this task
   var accumulatedWorkSeconds = 0; // total work seconds done for this todo
   var _isFinalBreak = false; // true when playing the break after the last work session
+  var _pendingNextTodo = null; // next task to start after the inter-task break (set by nextTask())
   var startedAt = null; // Date.now() when timer started
   var activeTodoCategory = ''; // category for restored timer display
   var activeProjectId = '';    // project fields for restored timer display
@@ -3234,6 +3235,17 @@
         // Final break (after last work session) — now complete the task
         if (_isFinalBreak) {
           _isFinalBreak = false;
+          // If a next task is queued (pressed Next during work), start it now.
+          if (_pendingNextTodo) {
+            var nextTodo = _pendingNextTodo;
+            _pendingNextTodo = null;
+            phase = 'break'; // stay in break so closeTimer() inside start() doesn't re-accumulate work
+            accumulatedWorkSeconds = 0;
+            setTimeout(function() {
+              window.dmPomodoro.start(nextTodo.id, nextTodo.title);
+            }, 100);
+            return;
+          }
           if (activeParentId && activeParentId !== activeTodoId && isAutoAdvance()) {
             advanceToNextSubtask();
           } else {
@@ -3332,6 +3344,7 @@
     stopAmbientSound();
     // Discard all accumulated work
     _isFinalBreak = false;
+    _pendingNextTodo = null;
     accumulatedWorkSeconds = 0;
     sessionCount = 1;
     phase = 'work';
@@ -3417,6 +3430,17 @@
       // If this was the final break, complete the task now
       if (_isFinalBreak) {
         _isFinalBreak = false;
+        // If a next task is queued (inter-task break skipped), start it now.
+        if (_pendingNextTodo) {
+          var nextTodo = _pendingNextTodo;
+          _pendingNextTodo = null;
+          phase = 'break';
+          accumulatedWorkSeconds = 0;
+          setTimeout(function() {
+            window.dmPomodoro.start(nextTodo.id, nextTodo.title);
+          }, 100);
+          return;
+        }
         if (activeParentId && activeParentId !== activeTodoId) {
           advanceToNextSubtask();
         } else {
@@ -3579,6 +3603,7 @@
 
     // Accumulate any remaining partial work
     _isFinalBreak = false;
+    _pendingNextTodo = null;
     if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
     }
@@ -3771,10 +3796,7 @@
 
     // Helper: complete current task and optionally advance to next
     function _completeAndAdvance(nextTodo) {
-      // Close the timer (records time via dm-pomodoro-stopped)
-      closeTimer();
-
-      // Dispatch completion event for instant completion with undo toast
+      // Dispatch completion event immediately (marks task done with undo toast)
       window.dispatchEvent(new CustomEvent('dm-pomodoro-completed', {
         detail: {
           todoId: todoId,
@@ -3784,12 +3806,41 @@
         }
       }));
 
-      // Auto-advance to next task, or just stay closed
       if (nextTodo) {
-        // Small delay to let the completion event process and render
-        setTimeout(function() {
-          window.dmPomodoro.start(nextTodo.id, nextTodo.title);
-        }, 100);
+        // Play an inter-task break before starting the next task.
+        // Stop current work interval and cancel any scheduled notification.
+        if (intervalId) { clearInterval(intervalId); intervalId = null; }
+        cancelScheduledNotification();
+        isRunning = false;
+        showPlayIcon();
+
+        // Accumulate any remaining partial work seconds for tracking.
+        if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
+          accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
+        }
+        // Clear completed task's progress and reset accumulator so that
+        // when start() calls closeTimer() internally later it won't
+        // re-dispatch dm-pomodoro-stopped with stale time.
+        clearTaskProgress(todoId);
+        accumulatedWorkSeconds = 0;
+
+        // Queue the next task and play the break.
+        _pendingNextTodo = nextTodo;
+        _isFinalBreak = true;
+        phase = 'break';
+        secondsLeft = BREAK_SECONDS;
+        totalPhaseSeconds = BREAK_SECONDS;
+        updateDisplay();
+        persistProgressSnapshot();
+        saveStateImmediate();
+        if (isAutoAdvance() && isFocusMode) {
+          startAutoAdvanceCountdown('break');
+        } else {
+          startTimer();
+        }
+      } else {
+        // No next task — close the timer normally.
+        closeTimer();
       }
     }
 
