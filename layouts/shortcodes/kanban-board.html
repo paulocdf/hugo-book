@@ -1661,26 +1661,26 @@
 
   // Background color presets (light mode / dark mode pairs)
   var BG_SOLID_COLORS = [
-    { light: '#e8eaf6', dark: '#1a1d2e' },
-    { light: '#e3f2fd', dark: '#152238' },
-    { light: '#e8f5e9', dark: '#1a2e1a' },
-    { light: '#fff3e0', dark: '#2e2214' },
-    { light: '#fce4ec', dark: '#2e1520' },
-    { light: '#f3e5f5', dark: '#251a2e' },
-    { light: '#e0f2f1', dark: '#142e2a' },
-    { light: '#f5f5f5', dark: '#1e1e1e' },
-    { light: '#fffde7', dark: '#2e2c0f' },
-    { light: '#efebe9', dark: '#2a2320' }
+    { light: '#e8eaf6', dark: '#1a1d2e', name: 'Indigo' },
+    { light: '#e3f2fd', dark: '#152238', name: 'Blue' },
+    { light: '#e8f5e9', dark: '#1a2e1a', name: 'Green' },
+    { light: '#fff3e0', dark: '#2e2214', name: 'Orange' },
+    { light: '#fce4ec', dark: '#2e1520', name: 'Pink' },
+    { light: '#f3e5f5', dark: '#251a2e', name: 'Purple' },
+    { light: '#e0f2f1', dark: '#142e2a', name: 'Teal' },
+    { light: '#f5f5f5', dark: '#1e1e1e', name: 'Gray' },
+    { light: '#fffde7', dark: '#2e2c0f', name: 'Yellow' },
+    { light: '#efebe9', dark: '#2a2320', name: 'Brown' }
   ];
 
   // Gradient presets
   var BG_GRADIENTS = [
-    { light: ['#e8eaf6','#fce4ec'], dark: ['#1a1d2e','#2e1520'] },
-    { light: ['#e3f2fd','#e8f5e9'], dark: ['#152238','#1a2e1a'] },
-    { light: ['#fff3e0','#f3e5f5'], dark: ['#2e2214','#251a2e'] },
-    { light: ['#e0f2f1','#e3f2fd'], dark: ['#142e2a','#152238'] },
-    { light: ['#fce4ec','#f3e5f5'], dark: ['#2e1520','#251a2e'] },
-    { light: ['#fffde7','#e8f5e9'], dark: ['#2e2c0f','#1a2e1a'] }
+    { light: ['#e8eaf6','#fce4ec'], dark: ['#1a1d2e','#2e1520'], name: 'Indigo – Pink' },
+    { light: ['#e3f2fd','#e8f5e9'], dark: ['#152238','#1a2e1a'], name: 'Blue – Green' },
+    { light: ['#fff3e0','#f3e5f5'], dark: ['#2e2214','#251a2e'], name: 'Orange – Purple' },
+    { light: ['#e0f2f1','#e3f2fd'], dark: ['#142e2a','#152238'], name: 'Teal – Blue' },
+    { light: ['#fce4ec','#f3e5f5'], dark: ['#2e1520','#251a2e'], name: 'Pink – Purple' },
+    { light: ['#fffde7','#e8f5e9'], dark: ['#2e2c0f','#1a2e1a'], name: 'Yellow – Green' }
   ];
 
   function isDarkMode() {
@@ -1824,7 +1824,7 @@
     BG_SOLID_COLORS.forEach(function(p) {
       var display = dark ? p.dark : p.light;
       var isActive = KB_PREFS.bgColor === p.light || KB_PREFS.bgColor === p.dark;
-      html += '<button type="button" class="kanban-sp-color-swatch' + (isActive ? ' active' : '') + '" style="background:' + display + ';" data-sp-solid="' + p.light + '"></button>';
+      html += '<button type="button" class="kanban-sp-color-swatch' + (isActive ? ' active' : '') + '" style="background:' + display + ';" data-sp-solid="' + p.light + '" title="' + p.name + '"></button>';
     });
     html += '</div>';
     // Gradient swatches
@@ -1833,7 +1833,7 @@
       var colors = dark ? g.dark : g.light;
       var stored = g.light[0] + ',' + g.light[1];
       var isActive = KB_PREFS.bgGradient === stored || KB_PREFS.bgGradient === g.dark[0] + ',' + g.dark[1];
-      html += '<button type="button" class="kanban-sp-gradient-swatch' + (isActive ? ' active' : '') + '" style="background:linear-gradient(135deg,' + colors[0] + ',' + colors[1] + ');" data-sp-gradient="' + stored + '"></button>';
+      html += '<button type="button" class="kanban-sp-gradient-swatch' + (isActive ? ' active' : '') + '" style="background:linear-gradient(135deg,' + colors[0] + ',' + colors[1] + ');" data-sp-gradient="' + stored + '" title="' + g.name + '"></button>';
     });
     html += '</div>';
     // Pattern selector
@@ -2274,6 +2274,11 @@
     '#26c6da', '#ff7043', '#9ccc65', '#5c6bc0', '#ec407a',
     '#78909c', '#8d6e63'
   ];
+  var COLUMN_COLOR_NAMES = {
+    '#42a5f5': 'Blue', '#ffa726': 'Orange', '#66bb6a': 'Green', '#ef5350': 'Red', '#ab47bc': 'Purple',
+    '#26c6da': 'Cyan', '#ff7043': 'Deep Orange', '#9ccc65': 'Light Green', '#5c6bc0': 'Indigo', '#ec407a': 'Pink',
+    '#78909c': 'Blue Gray', '#8d6e63': 'Brown'
+  };
 
   // ─── Render columns from _kanbanColumns data ───
   function renderColumns() {
@@ -2409,7 +2414,7 @@
     // Color picker
     menu.innerHTML += '<div class="kanban-col-menu-item" style="flex-direction:column;align-items:flex-start;gap:4px;cursor:default;"><span style="font-size:0.72rem;color:var(--text-muted);">Color</span><div class="kanban-col-color-row">' +
       COLUMN_COLORS.map(function(c) {
-        return '<button type="button" class="kanban-col-color-swatch' + (c === colDef.color ? ' active' : '') + '" style="background:' + c + ';" data-action="color" data-color="' + c + '"></button>';
+        return '<button type="button" class="kanban-col-color-swatch' + (c === colDef.color ? ' active' : '') + '" style="background:' + c + ';" data-action="color" data-color="' + c + '" title="' + (COLUMN_COLOR_NAMES[c] || c) + '"></button>';
       }).join('') +
       '</div></div>';
     // Toggle isDoneColumn
