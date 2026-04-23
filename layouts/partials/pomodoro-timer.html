@@ -23,6 +23,9 @@
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="pomodoro-play-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" id="pomodoro-pause-icon" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
     </button>
+    <button type="button" class="pomodoro-btn pomodoro-btn-skip" id="pomodoro-skip" title="Skip to Break">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 4 14 12 6 20"></polyline><line x1="20" y1="5" x2="20" y2="19" stroke-width="2"></line><circle cx="20" cy="12" r="0" fill="currentColor"></circle></svg>
+    </button>
     <button type="button" class="pomodoro-btn pomodoro-btn-next" id="pomodoro-next" title="Complete task &amp; start next">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
     </button>
@@ -138,9 +141,18 @@
             <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" id="focus-play-icon"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" id="focus-pause-icon" style="display:none;"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
           </button>
+          <button type="button" class="pomodoro-btn pomodoro-focus-btn-skip" id="focus-skip" title="Skip to Break">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 4 14 12 6 20"></polyline><line x1="20" y1="5" x2="20" y2="19" stroke-width="2"></line></svg>
+          </button>
           <button type="button" class="pomodoro-btn pomodoro-focus-btn-next" id="focus-next" title="Complete task &amp; start next">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
           </button>
+        </div>
+        <div class="pomodoro-focus-btn-labels">
+          <span>Reset</span>
+          <span><!-- play/pause --></span>
+          <span id="focus-skip-label">Skip to Break</span>
+          <span>Complete &amp; next</span>
         </div>
         <div class="pomodoro-focus-session" id="focus-session">Session 1</div>
 
@@ -357,6 +369,16 @@
 .pomodoro-btn-next:hover {
   background: rgba(66, 133, 244, 0.12);
   color: var(--accent-blue);
+}
+.pomodoro-btn-skip {
+  width: 30px;
+  height: 30px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+.pomodoro-btn-skip:hover {
+  background: rgba(251, 140, 0, 0.12);
+  color: #fb8c00;
 }
 .pomodoro-timer-session {
   text-align: center;
@@ -918,6 +940,29 @@
 .pomodoro-focus-btn-next:hover {
   background: rgba(66, 133, 244, 0.12);
   color: var(--accent-blue);
+}
+.pomodoro-focus-btn-skip {
+  width: 54px;
+  height: 54px;
+  background: var(--gray-100);
+  color: var(--gray-500);
+}
+.pomodoro-focus-btn-skip:hover {
+  background: rgba(251, 140, 0, 0.12);
+  color: #fb8c00;
+}
+.pomodoro-focus-btn-labels {
+  display: grid;
+  grid-template-columns: 54px 72px 54px 54px;
+  gap: 8px;
+  margin-top: 6px;
+  text-align: center;
+}
+.pomodoro-focus-btn-labels span {
+  font-size: 0.67rem;
+  color: var(--text-faint);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 .pomodoro-focus-session {
   text-align: center;
@@ -1668,6 +1713,7 @@
   var pauseIcon = document.getElementById('pomodoro-pause-icon');
   var resetBtn = document.getElementById('pomodoro-reset');
   var nextBtn = document.getElementById('pomodoro-next');
+  var skipBtn = document.getElementById('pomodoro-skip');
   var closeBtn = document.getElementById('pomodoro-close');
   var sessionEl = document.getElementById('pomodoro-session');
   var infoEl = document.getElementById('pomodoro-info');
@@ -1692,6 +1738,7 @@
   var focusPauseIcon = document.getElementById('focus-pause-icon');
   var focusResetBtn = document.getElementById('focus-reset');
   var focusNextBtn = document.getElementById('focus-next');
+  var focusSkipBtn = document.getElementById('focus-skip');
   var focusSessionEl = document.getElementById('focus-session');
   var focusSubtasksEl = document.getElementById('focus-subtasks');
   var focusInlineStatsEl = document.getElementById('focus-inline-stats');
@@ -2270,6 +2317,13 @@
       var themeId = getFocusTheme();
       focusBackdropEl.className = 'pomodoro-focus-backdrop theme-' + themeId + ' ' + (phase === 'break' ? 'break' : 'work');
     }
+
+    // Update skip button label dynamically so it always reflects what's coming next
+    var skipLabel = phase === 'work' ? 'Skip to Break' : 'Skip to Work';
+    if (skipBtn) skipBtn.title = skipLabel;
+    if (focusSkipBtn) focusSkipBtn.title = skipLabel;
+    var focusSkipLabelEl = document.getElementById('focus-skip-label');
+    if (focusSkipLabelEl) focusSkipLabelEl.textContent = skipLabel;
 
     var sessionText = 'Session ' + sessionCount;
     if (totalSessions > 1) {
@@ -3324,7 +3378,6 @@
     if (phase === 'work') {
       // Accumulate partial work time
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
-
       // If this was the last session, start a final break instead of closing
       if (totalSessions > 1 && sessionCount >= totalSessions) {
         _isFinalBreak = true;
@@ -3380,6 +3433,7 @@
     }
     showPlayIcon();
     updateDisplay();
+    renderSessionTimeline();
     persistProgressSnapshot();
     saveStateImmediate();
     notifyStateChanged();
@@ -3766,6 +3820,7 @@
 
   resetBtn.addEventListener('click', resetTimer);
   nextBtn.addEventListener('click', nextTask);
+  skipBtn.addEventListener('click', skipPhase);
 
   // Close (x) button: save progress and close timer
   closeBtn.addEventListener('click', function() {
@@ -4626,6 +4681,10 @@
   focusNextBtn.addEventListener('click', function() {
     cancelAutoAdvanceCountdown();
     nextTask();
+  });
+  focusSkipBtn.addEventListener('click', function() {
+    cancelAutoAdvanceCountdown();
+    skipPhase();
   });
 
   // Focus close (x) button: save progress and close timer
