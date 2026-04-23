@@ -4902,9 +4902,7 @@
   };
   function getProjectDisplayColor(color) {
     if (!color) return 'var(--gray-400)';
-    var isDark = document.documentElement.classList.contains('dark') ||
-                 (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
-                  !document.documentElement.classList.contains('light'));
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     return isDark ? (PROJECT_DARK_COLORS[color.toLowerCase()] || color) : color;
   }
 
@@ -5159,7 +5157,7 @@
       hash = hash & hash; // Convert to 32-bit integer
     }
     var idx = Math.abs(hash) % colors.length;
-    var isDark = document.documentElement.classList.contains('dark');
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     return isDark ? colors[idx].dark : colors[idx].light;
   }
 

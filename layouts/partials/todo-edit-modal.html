@@ -1106,8 +1106,7 @@
   ];
 
   function _isDarkMode() {
-    return document.documentElement.classList.contains('dark') ||
-           document.body.classList.contains('dark');
+    return document.documentElement.getAttribute('data-theme') === 'dark';
   }
 
   /** Return display color for current theme */

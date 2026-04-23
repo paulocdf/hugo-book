@@ -1588,9 +1588,7 @@
   'use strict';
 
   // ─── Color Palette ───
-  var isDark = document.documentElement.classList.contains('dark') ||
-    (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
-     !document.documentElement.classList.contains('light'));
+  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
 
   var COLORS = [
     { name: 'Blue',   light: '#1976d2', dark: '#64b5f6' },

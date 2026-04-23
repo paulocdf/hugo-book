@@ -1684,9 +1684,7 @@
   ];
 
   function isDarkMode() {
-    return document.documentElement.classList.contains('dark') ||
-           (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
-            !document.documentElement.classList.contains('light'));
+    return document.documentElement.getAttribute('data-theme') === 'dark';
   }
 
   function getBgColorForMode(preset) {
@@ -2083,9 +2081,7 @@
   };
   function getKanbanProjectDisplayColor(color) {
     if (!color) return 'var(--gray-400)';
-    var isDark = document.documentElement.classList.contains('dark') ||
-                 (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches &&
-                  !document.documentElement.classList.contains('light'));
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     return isDark ? (KANBAN_PROJECT_DARK_COLORS[color.toLowerCase()] || color) : color;
   }
 
@@ -2738,7 +2734,7 @@
     }
     if (todo.projectId && _kanbanProjectMap[todo.projectId]) {
       var proj = _kanbanProjectMap[todo.projectId];
-      var isDarkMode = document.documentElement.classList.contains('dark');
+      var isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
       var dotColor = isDarkMode ? (getProjectDarkColor(proj.color) || proj.color) : proj.color;
       metaParts.push('<span class="kanban-card-project"><span class="kanban-card-project-dot" style="background:' + dotColor + ';"></span>' + escapeHtml(proj.name) + '</span>');
     }
