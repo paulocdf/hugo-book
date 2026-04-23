@@ -963,9 +963,11 @@
 
           // Find notes to delete locally (exist locally but not remotely)
           // Skip items with pending writes in the queue — they haven't synced yet
+          // Skip shared notes (collaborator but not owner) — those are managed by syncSharedNotes
           var toDelete = [];
           localNotes.forEach(function(ln) {
-            if (!remoteMap[ln.id] && !pendingIds[ln.id]) {
+            var isCollaborator = ln.collaborators && ln.collaborators.indexOf(userId) !== -1;
+            if (!remoteMap[ln.id] && !pendingIds[ln.id] && !isCollaborator) {
               toDelete.push(ln.id);
             }
           });
@@ -1094,7 +1096,8 @@
 
           var toDelete = [];
           localProjects.forEach(function(lp) {
-            if (!remoteMap[lp.id] && !pendingIds[lp.id]) {
+            var isCollaborator = lp.collaborators && lp.collaborators.indexOf(userId) !== -1;
+            if (!remoteMap[lp.id] && !pendingIds[lp.id] && !isCollaborator) {
               toDelete.push(lp.id);
             }
           });
