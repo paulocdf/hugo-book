@@ -2040,6 +2040,7 @@
   var sessionCount = 1;
   var totalSessions = 1; // total pomodoro sessions for this task
   var accumulatedWorkSeconds = 0; // total work seconds done for this todo
+  var _isFinalBreak = false; // true when playing the break after the last work session
   var startedAt = null; // Date.now() when timer started
   var activeTodoCategory = ''; // category for restored timer display
   var activeProjectId = '';    // project fields for restored timer display
@@ -3118,32 +3119,37 @@
 
         // If all sessions are complete (multi-session tasks)
         if (totalSessions > 1 && sessionCount >= totalSessions) {
+          // Play a final break before completing the task
+          _isFinalBreak = true;
+          phase = 'break';
+          secondsLeft = BREAK_SECONDS;
+          totalPhaseSeconds = BREAK_SECONDS;
           updateDisplay();
-          // If timing a subtask, try to advance to the next one (only when auto-advance is on)
-          if (activeParentId && activeParentId !== activeTodoId && isAutoAdvance()) {
-            advanceToNextSubtask();
+          persistProgressSnapshot();
+          saveStateImmediate();
+          if (isAutoAdvance() && isFocusMode) {
+            startAutoAdvanceCountdown('break');
           } else {
-            // All sessions finished — save tracked time but let user decide when to mark done
-            var finishedTitle = activeTodoTitle;
-            var finishedMins = Math.round((accumulatedWorkSeconds + totalPhaseSeconds) / 60);
-            closeTimer();
-            showPomodoroToast(finishedTitle, finishedMins);
+            startTimer();
           }
           return;
         }
 
-        // Single-session task just completed — check for subtask auto-advance
+        // Single-session task just completed — play a final break before completing
         if (totalSessions <= 1) {
-          // If timing a subtask, try to advance to the next one (only when auto-advance is on)
-          if (activeParentId && activeParentId !== activeTodoId && isAutoAdvance()) {
-            advanceToNextSubtask();
-            return;
+          // If timing a subtask and auto-advance is on, still play the break first
+          _isFinalBreak = true;
+          phase = 'break';
+          secondsLeft = BREAK_SECONDS;
+          totalPhaseSeconds = BREAK_SECONDS;
+          updateDisplay();
+          persistProgressSnapshot();
+          saveStateImmediate();
+          if (isAutoAdvance() && isFocusMode) {
+            startAutoAdvanceCountdown('break');
+          } else {
+            startTimer();
           }
-          // Non-subtask single-session (or auto-advance disabled): save tracked time but let user decide when to mark done
-          var finishedTitle = activeTodoTitle;
-          var finishedMins = Math.round((accumulatedWorkSeconds + totalPhaseSeconds) / 60);
-          closeTimer();
-          showPomodoroToast(finishedTitle, finishedMins);
           return;
         }
 
@@ -3170,7 +3176,22 @@
       } else {
         playBreakEndSound();
         stopAmbientSound();
-        // Break finished, start next work session
+
+        // Final break (after last work session) — now complete the task
+        if (_isFinalBreak) {
+          _isFinalBreak = false;
+          if (activeParentId && activeParentId !== activeTodoId && isAutoAdvance()) {
+            advanceToNextSubtask();
+          } else {
+            var finishedTitle = activeTodoTitle;
+            var finishedMins = Math.round(accumulatedWorkSeconds / 60);
+            closeTimer();
+            showPomodoroToast(finishedTitle, finishedMins);
+          }
+          return;
+        }
+
+        // Regular break finished, start next work session
         // Auto-advance: show countdown in focus mode, immediate transition otherwise
         if (isAutoAdvance() && isFocusMode) {
           updateDisplay();
@@ -3256,6 +3277,7 @@
     cancelScheduledNotification();
     stopAmbientSound();
     // Discard all accumulated work
+    _isFinalBreak = false;
     accumulatedWorkSeconds = 0;
     sessionCount = 1;
     phase = 'work';
@@ -3303,20 +3325,31 @@
       // Accumulate partial work time
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
 
-      // If this was the last session, auto-stop or auto-advance
+      // If this was the last session, start a final break instead of closing
       if (totalSessions > 1 && sessionCount >= totalSessions) {
+        _isFinalBreak = true;
+        phase = 'break';
+        secondsLeft = BREAK_SECONDS;
+        totalPhaseSeconds = BREAK_SECONDS;
+        showPlayIcon();
         updateDisplay();
-        if (activeParentId && activeParentId !== activeTodoId) {
-          advanceToNextSubtask();
-        } else {
-          closeTimer();
-        }
+        persistProgressSnapshot();
+        saveStateImmediate();
+        notifyStateChanged();
         return;
       }
 
-      // Single-session subtask: advance to next
-      if (totalSessions <= 1 && activeParentId && activeParentId !== activeTodoId) {
-        advanceToNextSubtask();
+      // Single-session subtask: start final break (will advance to next subtask when break ends)
+      if (totalSessions <= 1) {
+        _isFinalBreak = true;
+        phase = 'break';
+        secondsLeft = BREAK_SECONDS;
+        totalPhaseSeconds = BREAK_SECONDS;
+        showPlayIcon();
+        updateDisplay();
+        persistProgressSnapshot();
+        saveStateImmediate();
+        notifyStateChanged();
         return;
       }
 
@@ -3325,8 +3358,21 @@
       secondsLeft = BREAK_SECONDS;
       totalPhaseSeconds = BREAK_SECONDS;
     } else {
-      // Move to next work session
+      // Skipping a break
       stopAmbientSound();
+
+      // If this was the final break, complete the task now
+      if (_isFinalBreak) {
+        _isFinalBreak = false;
+        if (activeParentId && activeParentId !== activeTodoId) {
+          advanceToNextSubtask();
+        } else {
+          closeTimer();
+        }
+        return;
+      }
+
+      // Move to next work session
       sessionCount++;
       phase = 'work';
       secondsLeft = WORK_SECONDS;
@@ -3478,6 +3524,7 @@
     stopAmbientSound();
 
     // Accumulate any remaining partial work
+    _isFinalBreak = false;
     if (phase === 'work' && totalPhaseSeconds > secondsLeft) {
       accumulatedWorkSeconds += (totalPhaseSeconds - secondsLeft);
     }
