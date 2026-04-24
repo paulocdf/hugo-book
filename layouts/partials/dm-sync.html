@@ -1054,6 +1054,7 @@
       transferPairId: data.transferPairId || null,
       recurringId: data.recurringId || null,
       attachmentIds: data.attachmentIds || [],
+      splits: Array.isArray(data.splits) ? data.splits : [],
       source: data.source || 'manual',
       deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
       createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
@@ -5384,6 +5385,31 @@
     return y + '-' + m;
   }
 
+  // Validate and normalize a splits array. Throws if sum !== expectedAmount.
+  // An empty/undefined input returns []. Splits with amount === 0 are dropped.
+  function _normalizeSplits(splits, expectedAmount) {
+    if (!splits || !Array.isArray(splits) || splits.length === 0) return [];
+    var normalized = [];
+    var sum = 0;
+    for (var i = 0; i < splits.length; i++) {
+      var s = splits[i];
+      if (!s || typeof s !== 'object') continue;
+      var amt = typeof s.amount === 'number' ? s.amount : 0;
+      if (amt === 0) continue;
+      normalized.push({
+        categoryId: s.categoryId || null,
+        amount: amt,
+        memo: s.memo || ''
+      });
+      sum += amt;
+    }
+    if (normalized.length === 0) return [];
+    if (sum !== expectedAmount) {
+      throw new Error('Split sum (' + sum + ') must equal transaction amount (' + expectedAmount + ')');
+    }
+    return normalized;
+  }
+
   window.dmBudget = {
     // ── Currency ──
     getCurrency: function() {
@@ -5638,11 +5664,13 @@
       var user = _budgetUser();
       var id = data.id || _budgetId('tx');
       var now = _budgetNow();
+      var amount = typeof data.amount === 'number' ? data.amount : 0;
+      var splits = _normalizeSplits(data.splits, amount);
       var tx = {
         id: id, userId: user.uid,
         accountId: data.accountId || '',
-        categoryId: data.categoryId || null,
-        amount: typeof data.amount === 'number' ? data.amount : 0,
+        categoryId: splits.length > 0 ? null : (data.categoryId || null),
+        amount: amount,
         date: data.date || new Date().toISOString().substr(0, 10),
         payee: data.payee || '',
         memo: data.memo || '',
@@ -5652,6 +5680,7 @@
         transferPairId: data.transferPairId || null,
         recurringId: data.recurringId || null,
         attachmentIds: data.attachmentIds || [],
+        splits: splits,
         source: data.source || 'manual',
         deletedAt: null,
         createdAt: now, updatedAt: now
@@ -5661,7 +5690,7 @@
         amount: tx.amount, date: tx.date, payee: tx.payee, memo: tx.memo,
         tags: tx.tags, cleared: tx.cleared, reconciled: tx.reconciled,
         transferPairId: tx.transferPairId, recurringId: tx.recurringId,
-        attachmentIds: tx.attachmentIds, source: tx.source,
+        attachmentIds: tx.attachmentIds, splits: tx.splits, source: tx.source,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
@@ -5681,6 +5710,16 @@
         ['accountId','categoryId','amount','date','payee','memo','tags','cleared','reconciled','transferPairId','recurringId','attachmentIds','source'].forEach(function(k) {
           if (updates[k] !== undefined) { tx[k] = updates[k]; fs[k] = updates[k]; }
         });
+        if (updates.splits !== undefined) {
+          var newAmount = typeof updates.amount === 'number' ? updates.amount : tx.amount;
+          var newSplits = _normalizeSplits(updates.splits, newAmount);
+          tx.splits = newSplits;
+          fs.splits = newSplits;
+          if (newSplits.length > 0) {
+            tx.categoryId = null;
+            fs.categoryId = null;
+          }
+        }
         tx.updatedAt = _budgetNow();
         return firestoreWrite({
           collection: 'transactions', docId: id, op: 'update', data: fs,
@@ -5691,6 +5730,9 @@
           return tx;
         });
       });
+    },
+    splitTransaction: function(id, splits) {
+      return window.dmBudget.updateTransaction(id, { splits: splits });
     },
     deleteTransaction: function(id) {
       // Hard delete (Phase 1). Phase 2+ can switch to soft-delete with undo.
@@ -5733,15 +5775,27 @@
           }
         });
 
-        // Index: per-(cat,month) spent magnitude and raw sum
+        // Index: per-(cat,month) spent magnitude and raw sum.
+        // When a transaction has splits, credit each split's categoryId instead
+        // of the parent's categoryId (the parent is set to null in that case).
         var spendByCatMonth = {};
-        allTxs.forEach(function(t) {
-          if (!t.categoryId || !t.date) return;
-          var m = t.date.substr(0, 7);
-          var key = t.categoryId + '|' + m;
+        function creditCat(catId, month, amt) {
+          if (!catId || !month) return;
+          var key = catId + '|' + month;
           if (!spendByCatMonth[key]) spendByCatMonth[key] = { spent: 0, rawSum: 0 };
-          spendByCatMonth[key].rawSum += (t.amount || 0);
-          if (t.amount < 0) spendByCatMonth[key].spent += -t.amount;
+          spendByCatMonth[key].rawSum += amt;
+          if (amt < 0) spendByCatMonth[key].spent += -amt;
+        }
+        allTxs.forEach(function(t) {
+          if (!t.date) return;
+          var m = t.date.substr(0, 7);
+          if (Array.isArray(t.splits) && t.splits.length > 0) {
+            t.splits.forEach(function(sp) {
+              creditCat(sp.categoryId, m, sp.amount || 0);
+            });
+          } else {
+            creditCat(t.categoryId, m, t.amount || 0);
+          }
         });
 
         function prevMonth(ym) {
@@ -5775,13 +5829,19 @@
         }
 
         // Current-month income: positive amounts tagged to income-kind categories
-        // (or uncategorized positives).
+        // (or uncategorized positives). Splits are iterated individually.
         var incomeTotal = 0;
+        function addIncomePortion(catId, amt) {
+          if (amt <= 0) return;
+          var c = catId ? (cats.filter(function(x) { return x.id === catId; })[0]) : null;
+          if (!c || c.kind === 'income') incomeTotal += amt;
+        }
         allTxs.forEach(function(t) {
           if (!t.date || t.date.substr(0, 7) !== month) return;
-          if (t.amount > 0) {
-            var c = t.categoryId ? (cats.filter(function(x) { return x.id === t.categoryId; })[0]) : null;
-            if (!c || c.kind === 'income') incomeTotal += t.amount;
+          if (Array.isArray(t.splits) && t.splits.length > 0) {
+            t.splits.forEach(function(sp) { addIncomePortion(sp.categoryId, sp.amount || 0); });
+          } else {
+            addIncomePortion(t.categoryId, t.amount || 0);
           }
         });
 

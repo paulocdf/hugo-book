@@ -49,11 +49,66 @@
   .dm-tx-table td.amt .negative { color: #e53935; }
   .dm-tx-table td.amt .positive { color: #43a047; }
 
-  .dm-tx-table .tx-del {
+  .dm-tx-table .tx-del, .dm-tx-table .tx-split {
     border: 0; background: transparent; color: var(--body-font-color);
     opacity: 0.3; cursor: pointer; padding: 4px;
   }
-  .dm-tx-table tr:hover .tx-del { opacity: 0.9; }
+  .dm-tx-table tr:hover .tx-del,
+  .dm-tx-table tr:hover .tx-split { opacity: 0.9; }
+  .dm-tx-table .tx-split.active { opacity: 1; color: var(--color-accent); }
+
+  .dm-tx-split-row td { padding: 0; background: color-mix(in srgb, var(--color-accent) 6%, transparent); }
+  .dm-tx-split-panel { padding: 12px 16px 14px; border-top: 1px dashed var(--gray-200); }
+  .dm-tx-split-panel h5 { margin: 0 0 8px; font-size: 0.85rem; opacity: 0.8; font-weight: 600; }
+  .dm-tx-split-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+  .dm-tx-split-item {
+    display: grid; grid-template-columns: 1fr 140px 1fr 28px;
+    gap: 8px; align-items: center;
+  }
+  .dm-tx-split-item select, .dm-tx-split-item input {
+    padding: 6px 8px; border: 1px solid var(--gray-200); border-radius: 6px;
+    background: var(--body-background); color: var(--body-font-color);
+    font-size: 0.85rem; width: 100%;
+  }
+  .dm-tx-split-item input.amt { text-align: right; font-variant-numeric: tabular-nums; }
+  .dm-tx-split-item .split-remove {
+    border: 0; background: transparent; cursor: pointer; opacity: 0.5; padding: 4px;
+  }
+  .dm-tx-split-item .split-remove:hover { opacity: 1; color: #e53935; }
+  .dm-tx-split-footer {
+    display: flex; gap: 8px; align-items: center; justify-content: space-between;
+    font-size: 0.82rem;
+  }
+  .dm-tx-split-footer .sum-status {
+    font-variant-numeric: tabular-nums;
+    padding: 3px 8px; border-radius: 4px;
+  }
+  .dm-tx-split-footer .sum-status.ok {
+    color: #43a047;
+    background: color-mix(in srgb, #43a047 12%, transparent);
+  }
+  .dm-tx-split-footer .sum-status.err {
+    color: #e53935;
+    background: color-mix(in srgb, #e53935 12%, transparent);
+  }
+  .dm-tx-split-actions { display: flex; gap: 6px; }
+  .dm-tx-split-actions button {
+    padding: 5px 12px; border-radius: 6px; border: 1px solid var(--gray-200);
+    background: var(--body-background); color: var(--body-font-color);
+    cursor: pointer; font-size: 0.82rem;
+  }
+  .dm-tx-split-actions button.primary {
+    background: var(--color-accent); color: #fff; border-color: var(--color-accent);
+  }
+  .dm-tx-split-actions button.primary:disabled {
+    opacity: 0.4; cursor: not-allowed;
+  }
+  .split-badge {
+    display: inline-block; padding: 2px 8px;
+    font-size: 0.75rem; border-radius: 10px;
+    background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+    color: var(--color-accent);
+  }
 
   .dm-tx-empty {
     padding: 40px; text-align: center; opacity: 0.6;
@@ -137,6 +192,7 @@
   }
 
   function renderTable(txs, cats) {
+    _openSplitTx = null; // panel is wiped by innerHTML reset below
     var body = $('#dm-tx-body');
     if (txs.length === 0) {
       body.innerHTML = '<div class="dm-tx-empty">No transactions match these filters.</div>';
@@ -159,21 +215,31 @@
     var rows = txs.map(function(t) {
       var amt = t.amount || 0;
       var amtClass = amt < 0 ? 'negative' : (amt > 0 ? 'positive' : '');
+      var hasSplits = Array.isArray(t.splits) && t.splits.length > 0;
+      var catCell;
+      if (hasSplits) {
+        catCell = '<span class="split-badge">Split · ' + t.splits.length + '</span>';
+      } else {
+        catCell = '<select data-field="categoryId">' +
+                    '<option value="">—</option>' +
+                    catOptions +
+                  '</select>';
+      }
       return '' +
         '<tr data-tx="' + escapeHtml(t.id) + '">' +
           '<td><input type="date" data-field="date" value="' + escapeHtml(t.date) + '"></td>' +
           '<td><input type="text" data-field="payee" value="' + escapeHtml(t.payee) + '" placeholder="Payee"></td>' +
           '<td><input type="text" data-field="memo" value="' + escapeHtml(t.memo) + '" placeholder="Memo"></td>' +
-          '<td>' +
-            '<select data-field="categoryId">' +
-              '<option value="">—</option>' +
-              catOptions +
-            '</select>' +
-          '</td>' +
+          '<td>' + catCell + '</td>' +
           '<td class="amt"><input type="text" data-field="amount" value="' + (amt / 100).toFixed(2) + '" inputmode="decimal" class="' + amtClass + '"></td>' +
-          '<td style="width:32px"><button class="tx-del" data-tx-del="' + escapeHtml(t.id) + '" title="Delete">' +
-            '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>' +
-          '</button></td>' +
+          '<td style="width:32px;white-space:nowrap">' +
+            '<button class="tx-split' + (hasSplits ? ' active' : '') + '" data-tx-split="' + escapeHtml(t.id) + '" title="Split">' +
+              '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-git-branch"/></svg>' +
+            '</button>' +
+            '<button class="tx-del" data-tx-del="' + escapeHtml(t.id) + '" title="Delete">' +
+              '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>' +
+            '</button>' +
+          '</td>' +
         '</tr>';
     }).join('');
 
@@ -226,6 +292,167 @@
         }
       });
     });
+    body.querySelectorAll('[data-tx-split]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var id = btn.getAttribute('data-tx-split');
+        toggleSplitPanel(id);
+      });
+    });
+  }
+
+  // ── Split panel ──────────────────────────────────────────────
+
+  var _openSplitTx = null; // id of the tx whose split panel is open
+
+  function toggleSplitPanel(txId) {
+    if (_openSplitTx === txId) { closeSplitPanel(); return; }
+    closeSplitPanel();
+    var tx = _allTx.filter(function(x) { return x.id === txId; })[0];
+    if (!tx) return;
+    var row = document.querySelector('tr[data-tx="' + cssEscape(txId) + '"]');
+    if (!row) return;
+
+    var panelRow = document.createElement('tr');
+    panelRow.className = 'dm-tx-split-row';
+    panelRow.setAttribute('data-tx-split-row', txId);
+    var td = document.createElement('td');
+    td.colSpan = 6;
+    panelRow.appendChild(td);
+    row.parentNode.insertBefore(panelRow, row.nextSibling);
+    renderSplitPanel(td, tx);
+    _openSplitTx = txId;
+  }
+
+  function closeSplitPanel() {
+    if (!_openSplitTx) return;
+    var existing = document.querySelector('tr[data-tx-split-row="' + cssEscape(_openSplitTx) + '"]');
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+    _openSplitTx = null;
+  }
+
+  function cssEscape(s) {
+    return String(s).replace(/"/g, '\\"');
+  }
+
+  function renderSplitPanel(container, tx) {
+    var initial = Array.isArray(tx.splits) && tx.splits.length > 0
+      ? tx.splits.map(function(s) {
+          return { categoryId: s.categoryId || '', amount: s.amount || 0, memo: s.memo || '' };
+        })
+      : [
+          { categoryId: tx.categoryId || '', amount: tx.amount || 0, memo: '' },
+          { categoryId: '', amount: 0, memo: '' }
+        ];
+
+    var state = { splits: initial };
+    var parentAmount = tx.amount || 0;
+
+    var catOptions = _allCats.map(function(c) {
+      return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>';
+    }).join('');
+
+    function rowHtml(s, idx) {
+      return '' +
+        '<div class="dm-tx-split-item" data-split-idx="' + idx + '">' +
+          '<select data-split-field="categoryId">' +
+            '<option value="">— Category —</option>' + catOptions +
+          '</select>' +
+          '<input type="text" class="amt" data-split-field="amount" value="' + (s.amount / 100).toFixed(2) + '" placeholder="0.00" inputmode="decimal">' +
+          '<input type="text" data-split-field="memo" value="' + escapeHtml(s.memo) + '" placeholder="Memo (optional)">' +
+          '<button type="button" class="split-remove" data-split-remove="' + idx + '" title="Remove">' +
+            '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-x"/></svg>' +
+          '</button>' +
+        '</div>';
+    }
+
+    function render() {
+      var currency = window.dmBudget.getCurrency();
+      var fm = function(x) { return window.dmBudget.formatMoney(x, { currency: currency }); };
+      var sum = 0;
+      state.splits.forEach(function(s) { sum += (s.amount || 0); });
+      var delta = parentAmount - sum;
+      var ok = delta === 0 && state.splits.length >= 2 && state.splits.every(function(s) { return s.categoryId && s.amount !== 0; });
+      var statusClass = delta === 0 ? 'ok' : 'err';
+      var statusText = delta === 0
+        ? 'Splits total ' + fm(sum) + ' · balanced'
+        : 'Splits total ' + fm(sum) + ' · need ' + fm(delta);
+
+      container.innerHTML = '' +
+        '<div class="dm-tx-split-panel">' +
+          '<h5>Split this transaction (' + fm(parentAmount) + ') across categories</h5>' +
+          '<div class="dm-tx-split-list">' +
+            state.splits.map(rowHtml).join('') +
+          '</div>' +
+          '<div class="dm-tx-split-footer">' +
+            '<span class="sum-status ' + statusClass + '">' + statusText + '</span>' +
+            '<div class="dm-tx-split-actions">' +
+              '<button type="button" data-split-add>+ Add split</button>' +
+              '<button type="button" data-split-clear>Clear (unsplit)</button>' +
+              '<button type="button" data-split-cancel>Cancel</button>' +
+              '<button type="button" class="primary" data-split-save ' + (ok ? '' : 'disabled') + '>Save</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+      // Restore category selects
+      container.querySelectorAll('[data-split-idx]').forEach(function(row) {
+        var idx = parseInt(row.getAttribute('data-split-idx'), 10);
+        var sel = row.querySelector('[data-split-field="categoryId"]');
+        if (sel) sel.value = state.splits[idx].categoryId || '';
+      });
+
+      // Bind field changes
+      container.querySelectorAll('[data-split-idx]').forEach(function(row) {
+        var idx = parseInt(row.getAttribute('data-split-idx'), 10);
+        row.querySelectorAll('[data-split-field]').forEach(function(el) {
+          el.addEventListener('change', function() {
+            var field = el.getAttribute('data-split-field');
+            if (field === 'amount') {
+              state.splits[idx].amount = window.dmBudget.parseMoney(el.value);
+            } else {
+              state.splits[idx][field] = el.value;
+            }
+            render();
+          });
+          if (el.tagName === 'INPUT') {
+            el.addEventListener('blur', function() {
+              var field = el.getAttribute('data-split-field');
+              if (field === 'amount') el.value = ((state.splits[idx].amount || 0) / 100).toFixed(2);
+            });
+          }
+        });
+        var rm = row.querySelector('[data-split-remove]');
+        if (rm) rm.addEventListener('click', function() {
+          state.splits.splice(idx, 1);
+          render();
+        });
+      });
+      var addBtn = container.querySelector('[data-split-add]');
+      if (addBtn) addBtn.addEventListener('click', function() {
+        state.splits.push({ categoryId: '', amount: parentAmount - sum, memo: '' });
+        render();
+      });
+      var clearBtn = container.querySelector('[data-split-clear]');
+      if (clearBtn) clearBtn.addEventListener('click', function() {
+        window.dmBudget.updateTransaction(tx.id, { splits: [], categoryId: tx.categoryId || null })
+          .then(function() { closeSplitPanel(); refresh(); });
+      });
+      var cancelBtn = container.querySelector('[data-split-cancel]');
+      if (cancelBtn) cancelBtn.addEventListener('click', closeSplitPanel);
+      var saveBtn = container.querySelector('[data-split-save]');
+      if (saveBtn && ok) saveBtn.addEventListener('click', function() {
+        window.dmBudget.splitTransaction(tx.id, state.splits.map(function(s) {
+          return { categoryId: s.categoryId, amount: s.amount, memo: s.memo || '' };
+        })).then(function() {
+          closeSplitPanel();
+          refresh();
+        }).catch(function(err) {
+          console.error('[budget] split save failed:', err);
+          if (window.dmAlert) window.dmAlert('Could not save split: ' + (err.message || err));
+        });
+      });
+    }
+    render();
   }
 
   var _lastValues = {};
