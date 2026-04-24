@@ -1613,6 +1613,7 @@
       .then(function() { return syncReviewCards(userId); })
       .then(function() { return syncClosedDays(userId); })
       .then(function() { return syncPageFilters(userId); })
+      .then(function() { return syncBudgetCurrency(userId); })
       .then(function() { return syncTaskShares(userId); })
       .then(function() { return syncSharedTodos(userId); })
       .then(function() { return syncNoteShares(userId); })
@@ -4481,6 +4482,26 @@
     });
   }
 
+  // ─── Budget Currency Sync ───
+  // Pulls userSettings/{uid}.budgetCurrency into localStorage so the
+  // preference travels across devices. Cloud-to-local only; setCurrency()
+  // handles local-to-cloud writes. Runs even when budget local-only is on
+  // so a user can recover a previously-saved cloud preference by toggling
+  // local-only off.
+  function syncBudgetCurrency(userId) {
+    if (!window.dmDb) return Promise.resolve();
+    return window.dmDb.collection('userSettings').doc(userId).get().then(function(doc) {
+      if (!doc.exists) return;
+      var data = doc.data();
+      if (typeof data.budgetCurrency === 'string' && data.budgetCurrency.length > 0) {
+        try { localStorage.setItem('dm-budget-currency', data.budgetCurrency); } catch (e) {}
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+      }
+    }).catch(function(err) {
+      console.warn('[dm-sync] Failed to sync budget currency:', err);
+    });
+  }
+
   window.dmSync = {
     // IndexedDB operations — Notes
     getNote: function(id) {
@@ -5334,6 +5355,7 @@
       return idbPromise;
     },
     syncPageFilters: syncPageFilters,
+    syncBudgetCurrency: syncBudgetCurrency,
 
     // Search index cache
     getSearchIndexCache: function() { return idbGet(STORE_META, 'searchIndex'); },
@@ -5418,6 +5440,26 @@
     },
     setCurrency: function(code) {
       try { localStorage.setItem('dm-budget-currency', code); } catch (e) {}
+      // Dual-write to Firestore userSettings/{uid}.budgetCurrency so the
+      // preference syncs across devices. Skipped when budget local-only
+      // mode is on — consistent with the 5 budget collections.
+      // (firestoreWrite handles offline/null-dmDb queueing internally.)
+      try {
+        var user = window.dmAuth && window.dmAuth.currentUser;
+        if (user && !isBudgetLocalOnly()) {
+          firestoreWrite({
+            collection: 'userSettings',
+            docId: user.uid,
+            op: 'set',
+            data: {
+              budgetCurrency: code,
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            },
+            merge: true,
+            localOp: function() { return Promise.resolve(); }
+          });
+        }
+      } catch (e) { /* never block local update */ }
       window.dispatchEvent(new CustomEvent('dm-budget-updated'));
     },
     isLocalOnly: isBudgetLocalOnly,
