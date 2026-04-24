@@ -3025,6 +3025,91 @@ html.sidebar-collapsed {
   }
 }
 
+// Expense mode fields (Quick Capture)
+.qc-expense-fields {
+  margin-bottom: 0.6rem;
+}
+
+.qc-expense-row-main {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.qc-expense-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--body-font-color);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: border-color 0.2s ease, background 0.2s ease;
+
+  &:focus-visible {
+    outline: none;
+    border-color: var(--color-accent);
+    background: var(--surface-2);
+    box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
+  }
+
+  &::placeholder {
+    color: var(--text-faint);
+    font-weight: 400;
+  }
+}
+
+.qc-expense-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.qc-expense-label {
+  font-size: 0.78rem;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.qc-expense-select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--surface-1);
+  color: var(--body-font-color);
+  font-family: inherit;
+  font-size: 0.82rem;
+  max-width: 14rem;
+}
+
+.qc-expense-preview {
+  margin-left: auto;
+  font-size: 0.82rem;
+  color: var(--color-accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-expense-hint {
+  font-size: 0.72rem;
+  color: var(--text-faint);
+  line-height: 1.4;
+
+  kbd {
+    background: var(--surface-2);
+    border: 1px solid var(--border-subtle);
+    border-radius: 3px;
+    padding: 0 0.25rem;
+    font-family: inherit;
+    font-size: 0.7rem;
+  }
+}
+
 // Todo mode fields (Quick Capture)
 .qc-todo-fields {
   margin-bottom: 0.6rem;

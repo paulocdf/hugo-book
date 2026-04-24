@@ -55,6 +55,10 @@
         <svg class="dm-icon dm-icon--check-square" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check-square"/></svg>
         Todo
       </button>
+      <button type="button" class="qc-mode-btn" data-mode="expense">
+        <svg class="dm-icon dm-icon--wallet" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-wallet"/></svg>
+        Expense
+      </button>
     </div>
 
     <!-- Contextual row: changes based on mode -->
@@ -124,6 +128,21 @@
           <span class="qc-todo-chip-text" id="qc-todo-reminder-chip-text"></span>
           <button type="button" class="qc-todo-chip-clear" id="qc-todo-reminder-clear" title="Clear reminder">&times;</button>
         </span>
+      </div>
+    </div>
+
+    <!-- Expense mode fields (visible only when Expense mode is selected) -->
+    <div class="qc-expense-fields" id="qc-expense-fields" style="display: none;">
+      <div class="qc-expense-row-main">
+        <input type="text" id="qc-expense-input" class="qc-expense-input" placeholder="e.g. $12.50 coffee yesterday" maxlength="200" />
+      </div>
+      <div class="qc-expense-row-meta">
+        <label class="qc-expense-label" for="qc-expense-category">Category</label>
+        <select id="qc-expense-category" class="qc-expense-select"></select>
+        <span class="qc-expense-preview" id="qc-expense-preview" aria-live="polite"></span>
+      </div>
+      <div class="qc-expense-hint">
+        Tip: prefix with <kbd>+</kbd> for income &middot; add <kbd>today</kbd>, <kbd>yesterday</kbd>, or <kbd>MM/DD</kbd> for date &middot; use <kbd>#tag</kbd> to pick a category by name
       </div>
     </div>
 

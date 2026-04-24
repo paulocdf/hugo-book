@@ -710,6 +710,13 @@
   var todoReminderChipText = document.getElementById('qc-todo-reminder-chip-text');
   var todoReminderClear = document.getElementById('qc-todo-reminder-clear');
 
+  // Expense mode elements
+  var expenseFieldsEl = document.getElementById('qc-expense-fields');
+  var expenseInput = document.getElementById('qc-expense-input');
+  var expenseCategorySelect = document.getElementById('qc-expense-category');
+  var expensePreviewEl = document.getElementById('qc-expense-preview');
+  var _qcExpenseCategoriesLoaded = false;
+
   // AI mode elements
   var qcAiContainer = document.getElementById('qc-ai-container');
   var qcAiMessages = document.getElementById('qc-ai-messages');
@@ -731,7 +738,7 @@
   var qcAiModeBtn = document.querySelector('.qc-mode-btn-ai');
 
   // State
-  var currentMode = 'ai'; // 'ai', 'note', 'code', or 'todo'
+  var currentMode = 'ai'; // 'ai', 'note', 'code', 'todo', or 'expense'
   var selectedLang = 'kotlin';
   var inboxMode = 'append'; // 'append' or 'new'
   var selectedDest = {
@@ -1441,7 +1448,7 @@
   });
 
   // Mode switching logic
-  var modes = ['ai', 'note', 'code', 'todo'];
+  var modes = ['ai', 'note', 'code', 'todo', 'expense'];
 
   function setMode(mode) {
     if (mode === currentMode) return;
@@ -1458,6 +1465,7 @@
     previewWrapper.style.display = 'none';
     notePreviewWrapper.style.display = 'none';
     if (todoFieldsEl) todoFieldsEl.style.display = 'none';
+    if (expenseFieldsEl) expenseFieldsEl.style.display = 'none';
     if (qcAiContainer) qcAiContainer.style.display = 'none';
 
     // Hide/show common elements based on AI vs other modes
@@ -1500,6 +1508,16 @@
       input.classList.remove('code-mode');
       dialog.classList.remove('code-mode');
       dialog.classList.remove('ai-mode');
+    } else if (mode === 'expense') {
+      if (expenseFieldsEl) expenseFieldsEl.style.display = '';
+      if (toolbar) toolbar.style.display = 'none';
+      titleInput.style.display = 'none';
+      document.getElementById('qc-editor-box').style.display = 'none';
+      input.classList.remove('code-mode');
+      dialog.classList.remove('code-mode');
+      dialog.classList.remove('ai-mode');
+      loadExpenseCategories();
+      updateExpensePreview();
     } else {
       // note mode
       destRow.style.display = '';
@@ -1519,6 +1537,8 @@
       // already handled above
     } else if (mode === 'todo') {
       if (todoTitleInput) todoTitleInput.focus();
+    } else if (mode === 'expense') {
+      if (expenseInput) expenseInput.focus();
     } else {
       titleInput.focus();
     }
@@ -1844,6 +1864,8 @@
       setTimeout(function() { if (qcAiInput) qcAiInput.focus(); }, 50);
     } else if (mode === 'todo') {
       if (todoTitleInput) todoTitleInput.focus();
+    } else if (mode === 'expense') {
+      if (expenseInput) expenseInput.focus();
     } else {
       titleInput.focus();
     }
@@ -1870,6 +1892,8 @@
     _qcTodoDate = null;
     _qcTodoReminderMs = null;
     closeQcTodoPopover();
+    if (expenseInput) expenseInput.value = '';
+    if (expensePreviewEl) expensePreviewEl.textContent = '';
     isSaving = false;
     if (feedbackEl) feedbackEl.style.display = 'none';
     // Stop AI generation if in progress
@@ -1888,6 +1912,12 @@
     // Todo mode — different submit path
     if (currentMode === 'todo') {
       submitTodo();
+      return;
+    }
+
+    // Expense mode — different submit path
+    if (currentMode === 'expense') {
+      submitExpense();
       return;
     }
 
@@ -2147,6 +2177,214 @@
       });
   }
 
+  // =========================================================================
+  // Expense mode: natural-language expense capture
+  //   Examples:
+  //     "$12.50 coffee"            → -1250 cents, payee "coffee", today
+  //     "4.50 lunch yesterday"     → -450 cents, payee "lunch", yesterday
+  //     "+500 salary 04/15"        → +50000 cents, payee "salary", Apr 15
+  //     "12 groceries #food"       → -1200 cents, category matched by slug "food"
+  // =========================================================================
+
+  // Local-date YYYY-MM-DD formatter (avoids toISOString timezone drift)
+  function _qcFmtLocalDate(d) {
+    var y = d.getFullYear();
+    var m = d.getMonth() + 1;
+    var day = d.getDate();
+    return y + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+  }
+
+  function parseExpenseText(rawText) {
+    var result = {
+      amount: 0,             // integer cents, signed (negative = expense)
+      date: null,            // YYYY-MM-DD (local) or null (caller defaults to today)
+      payee: '',
+      memo: '',
+      categoryHint: null,    // slug string or null
+      income: false,
+      error: null
+    };
+    var text = (rawText || '').trim();
+    if (!text) { result.error = 'empty'; return result; }
+
+    // Leading '+' toggles income
+    if (text.charAt(0) === '+') {
+      result.income = true;
+      text = text.slice(1).trim();
+    }
+
+    // Extract #category hint (first one wins, strip from text)
+    var hintMatch = text.match(/#([a-zA-Z0-9_-]+)/);
+    if (hintMatch) {
+      result.categoryHint = hintMatch[1].toLowerCase();
+      text = (text.slice(0, hintMatch.index) + text.slice(hintMatch.index + hintMatch[0].length)).replace(/\s+/g, ' ').trim();
+    }
+
+    // Extract date keyword / pattern
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var dateMatched = false;
+    // today / yesterday / yday
+    var kwMatch = text.match(/\b(today|yesterday|yday)\b/i);
+    if (kwMatch) {
+      var kw = kwMatch[1].toLowerCase();
+      var d = new Date(today);
+      if (kw === 'yesterday' || kw === 'yday') d.setDate(d.getDate() - 1);
+      result.date = _qcFmtLocalDate(d);
+      text = (text.slice(0, kwMatch.index) + text.slice(kwMatch.index + kwMatch[0].length)).replace(/\s+/g, ' ').trim();
+      dateMatched = true;
+    }
+    // YYYY-MM-DD
+    if (!dateMatched) {
+      var isoMatch = text.match(/\b(\d{4})-(\d{1,2})-(\d{1,2})\b/);
+      if (isoMatch) {
+        var iy = parseInt(isoMatch[1], 10), im = parseInt(isoMatch[2], 10), id = parseInt(isoMatch[3], 10);
+        if (im >= 1 && im <= 12 && id >= 1 && id <= 31) {
+          result.date = iy + '-' + (im < 10 ? '0' : '') + im + '-' + (id < 10 ? '0' : '') + id;
+          text = (text.slice(0, isoMatch.index) + text.slice(isoMatch.index + isoMatch[0].length)).replace(/\s+/g, ' ').trim();
+          dateMatched = true;
+        }
+      }
+    }
+    // MM/DD (assume current year; if in the future, roll back one year)
+    if (!dateMatched) {
+      var mdMatch = text.match(/\b(\d{1,2})\/(\d{1,2})\b/);
+      if (mdMatch) {
+        var mm = parseInt(mdMatch[1], 10), dd = parseInt(mdMatch[2], 10);
+        if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31) {
+          var y = today.getFullYear();
+          var candidate = new Date(y, mm - 1, dd); candidate.setHours(0, 0, 0, 0);
+          if (candidate.getTime() > today.getTime()) candidate.setFullYear(y - 1);
+          result.date = _qcFmtLocalDate(candidate);
+          text = (text.slice(0, mdMatch.index) + text.slice(mdMatch.index + mdMatch[0].length)).replace(/\s+/g, ' ').trim();
+          dateMatched = true;
+        }
+      }
+    }
+
+    // Extract amount (first numeric token, optional $, optional decimals via . or ,)
+    var amtMatch = text.match(/\$?(\d+(?:[.,]\d{1,2})?)/);
+    if (!amtMatch) { result.error = 'no-amount'; return result; }
+    var rawAmt = amtMatch[1].replace(',', '.');
+    var cents = Math.round(parseFloat(rawAmt) * 100);
+    if (!isFinite(cents) || cents <= 0) { result.error = 'no-amount'; return result; }
+    result.amount = result.income ? cents : -cents;
+    text = (text.slice(0, amtMatch.index) + text.slice(amtMatch.index + amtMatch[0].length)).replace(/\s+/g, ' ').trim();
+
+    // Remaining text → payee
+    result.payee = text;
+    return result;
+  }
+
+  function loadExpenseCategories() {
+    if (_qcExpenseCategoriesLoaded) return;
+    if (!window.dmBudget || !expenseCategorySelect) return;
+    if (!window.dmAuth || !window.dmAuth.currentUser) return;
+    _qcExpenseCategoriesLoaded = true;
+    window.dmBudget.getCategories().then(function(cats) {
+      var opts = ['<option value="">— no category —</option>'];
+      cats.forEach(function(c) {
+        if (c.deletedAt || c.archived) return;
+        var label = (c.kind === 'income' ? '+ ' : '') + c.name;
+        opts.push('<option value="' + c.id + '" data-slug="' + (c.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-') + '">' + escapeHtml(label) + '</option>');
+      });
+      expenseCategorySelect.innerHTML = opts.join('');
+    }).catch(function() { _qcExpenseCategoriesLoaded = false; });
+  }
+
+  function findCategoryIdBySlug(slug) {
+    if (!expenseCategorySelect || !slug) return null;
+    var opts = expenseCategorySelect.querySelectorAll('option[data-slug]');
+    for (var i = 0; i < opts.length; i++) {
+      if (opts[i].getAttribute('data-slug') === slug) return opts[i].value;
+    }
+    // Fallback: substring match
+    for (var j = 0; j < opts.length; j++) {
+      var s = opts[j].getAttribute('data-slug') || '';
+      if (s && (s.indexOf(slug) !== -1 || slug.indexOf(s) !== -1)) return opts[j].value;
+    }
+    return null;
+  }
+
+  function updateExpensePreview() {
+    if (!expensePreviewEl || !expenseInput) return;
+    var parsed = parseExpenseText(expenseInput.value);
+    if (parsed.error || !parsed.amount) {
+      expensePreviewEl.textContent = '';
+      return;
+    }
+    var currency = (window.dmBudget && window.dmBudget.getCurrency) ? window.dmBudget.getCurrency() : 'USD';
+    var formatted = (window.dmBudget && window.dmBudget.formatMoney) ? window.dmBudget.formatMoney(parsed.amount, currency) : (parsed.amount / 100).toFixed(2);
+    var parts = [formatted];
+    if (parsed.payee) parts.push('· ' + parsed.payee);
+    if (parsed.date) parts.push('· ' + parsed.date);
+    expensePreviewEl.textContent = parts.join(' ');
+  }
+
+  if (expenseInput) {
+    expenseInput.addEventListener('input', updateExpensePreview);
+  }
+
+  function submitExpense() {
+    var raw = expenseInput ? expenseInput.value.trim() : '';
+    if (!raw) { if (expenseInput) expenseInput.focus(); return; }
+
+    if (!window.dmAuth || !window.dmAuth.currentUser) {
+      showFeedback('error', 'Please sign in with Google to save expenses.');
+      return;
+    }
+    if (!window.dmBudget) {
+      showFeedback('error', 'Budget module not ready. Try again.');
+      return;
+    }
+
+    var parsed = parseExpenseText(raw);
+    if (parsed.error === 'no-amount' || !parsed.amount) {
+      showFeedback('error', 'Could not parse an amount. Try "$12.50 coffee".');
+      return;
+    }
+
+    isSaving = true;
+    submitBtn.disabled = true;
+
+    // Resolve category: hint wins, else dropdown selection
+    var categoryId = null;
+    if (parsed.categoryHint) {
+      categoryId = findCategoryIdBySlug(parsed.categoryHint);
+    }
+    if (!categoryId && expenseCategorySelect && expenseCategorySelect.value) {
+      categoryId = expenseCategorySelect.value;
+    }
+
+    // Ensure default account, then create transaction
+    window.dmBudget.ensureDefaultAccount().then(function(acct) {
+      return window.dmBudget.createTransaction({
+        accountId: acct ? acct.id : '',
+        categoryId: categoryId || null,
+        amount: parsed.amount,
+        date: parsed.date || _qcFmtLocalDate(new Date()),
+        payee: parsed.payee || '',
+        memo: '',
+        source: 'quick-capture'
+      });
+    }).then(function(tx) {
+      isSaving = false;
+      submitBtn.disabled = false;
+      var currency = window.dmBudget.getCurrency();
+      var formatted = window.dmBudget.formatMoney(tx.amount, currency);
+      showFeedback('success', (parsed.income ? 'Income' : 'Expense') + ' added: ' + formatted);
+      if (expenseInput) expenseInput.value = '';
+      if (expensePreviewEl) expensePreviewEl.textContent = '';
+    }).catch(function(err) {
+      console.error('Expense save error:', err);
+      isSaving = false;
+      submitBtn.disabled = false;
+      showFeedback('error', 'Failed to save expense. Please try again.');
+    });
+  }
+
+  // Expose for testing
+  window.dmQuickCaptureParseExpense = parseExpenseText;
+
   btn.addEventListener('click', function() { openModal('ai'); });
   cancelBtn.addEventListener('click', closeModal);
   submitBtn.addEventListener('click', submit);
@@ -2181,6 +2419,7 @@
     if (e.key === 'Escape') {
       // Only close if the active input for the current mode is empty
       var activeInput = currentMode === 'todo' ? todoTitleInput
+                      : currentMode === 'expense' ? expenseInput
                       : currentMode === 'ai' ? qcAiInput
                       : input;
       if (activeInput && activeInput.value.trim()) {
