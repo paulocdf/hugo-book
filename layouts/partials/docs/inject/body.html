@@ -3468,10 +3468,12 @@
     var budgetOverviewActive = (budgetPath === budgetBase || budgetPath === budgetBase.replace(/\/$/, '')) ? ' class="active"' : '';
     var budgetTxActive = budgetPath.indexOf('/docs/budget/transactions') !== -1 ? ' class="active"' : '';
     var budgetRecActive = budgetPath.indexOf('/docs/budget/recurring') !== -1 ? ' class="active"' : '';
+    var budgetImportActive = budgetPath.indexOf('/docs/budget/import') !== -1 ? ' class="active"' : '';
     var budgetChildren = '';
     budgetChildren += '<li class="sidebar-item" data-section="budget-overview"><a href="' + budgetBase + '"' + budgetOverviewActive + '>Overview</a></li>';
     budgetChildren += '<li class="sidebar-item" data-section="budget-transactions"><a href="' + budgetBase + 'transactions/"' + budgetTxActive + '>Transactions</a></li>';
     budgetChildren += '<li class="sidebar-item" data-section="budget-recurring"><a href="' + budgetBase + 'recurring/"' + budgetRecActive + '>Recurring</a></li>';
+    budgetChildren += '<li class="sidebar-item" data-section="budget-import"><a href="' + budgetBase + 'import/"' + budgetImportActive + '>Import</a></li>';
     var budgetOpen = budgetPath.indexOf('/docs/budget') !== -1;
     html += buildSectionHtml('Budget', ICONS.budget, budgetBase, budgetChildren, budgetOpen);
 
@@ -4796,10 +4798,12 @@
     var budgetOverviewActive2 = (budgetPath2 === budgetBase2 || budgetPath2 === budgetBase2.replace(/\/$/, '')) ? ' class="active"' : '';
     var budgetTxActive2 = budgetPath2.indexOf('/docs/budget/transactions') !== -1 ? ' class="active"' : '';
     var budgetRecActive2 = budgetPath2.indexOf('/docs/budget/recurring') !== -1 ? ' class="active"' : '';
+    var budgetImportActive2 = budgetPath2.indexOf('/docs/budget/import') !== -1 ? ' class="active"' : '';
     var budgetChildren2 = '';
     budgetChildren2 += '<li class="sidebar-item" data-section="budget-overview"><a href="' + budgetBase2 + '"' + budgetOverviewActive2 + '>Overview</a></li>';
     budgetChildren2 += '<li class="sidebar-item" data-section="budget-transactions"><a href="' + budgetBase2 + 'transactions/"' + budgetTxActive2 + '>Transactions</a></li>';
     budgetChildren2 += '<li class="sidebar-item" data-section="budget-recurring"><a href="' + budgetBase2 + 'recurring/"' + budgetRecActive2 + '>Recurring</a></li>';
+    budgetChildren2 += '<li class="sidebar-item" data-section="budget-import"><a href="' + budgetBase2 + 'import/"' + budgetImportActive2 + '>Import</a></li>';
     var budgetOpen2 = budgetPath2.indexOf('/docs/budget') !== -1;
     html += buildSectionHtml('Budget', ICONS.budget, budgetBase2, budgetChildren2, budgetOpen2);
 

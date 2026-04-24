@@ -1,0 +1,825 @@
+{{/*
+  budget-import.html — CSV import wizard (Phase 2 Slice D)
+
+  Steps:
+    1. Paste CSV or upload file
+    2. Header detection + column mapping (date/amount/payee/memo/category)
+    3. Preview table with parsed values, duplicate badges, per-row skip
+    4. Import via window.dmBudget.createTransaction()
+
+  Pure CSV parser exposed as window.dmBudgetParseCsv(text) for testability.
+*/}}
+
+<style>
+  .dm-imp-wrap { max-width: 1100px; margin: 0 auto; padding: 12px 0 40px; }
+  .dm-imp-wrap h2 { margin: 0 0 10px 0; font-size: 1.1rem; }
+  .dm-imp-wrap p.desc { margin: 0 0 18px 0; opacity: 0.8; font-size: 0.9rem; }
+
+  .dm-imp-step {
+    background: var(--gray-100);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .dm-imp-step h3 {
+    margin: 0 0 10px 0;
+    font-size: 0.95rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.85;
+  }
+
+  .dm-imp-textarea {
+    width: 100%;
+    min-height: 180px;
+    padding: 10px;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    background: var(--body-background);
+    color: var(--body-font-color);
+    font-family: ui-monospace, monospace;
+    font-size: 0.85rem;
+    resize: vertical;
+  }
+
+  .dm-imp-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .dm-imp-controls button,
+  .dm-imp-controls label.btn-file {
+    padding: 7px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--gray-200);
+    background: var(--body-background);
+    color: var(--body-font-color);
+    cursor: pointer;
+    font-size: 0.88rem;
+  }
+  .dm-imp-controls button.primary {
+    background: var(--color-accent);
+    color: #fff;
+    border-color: var(--color-accent);
+  }
+  .dm-imp-controls button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .dm-imp-mapping {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .dm-imp-mapping label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    opacity: 0.7;
+  }
+  .dm-imp-mapping label select {
+    padding: 6px 8px;
+    border: 1px solid var(--gray-200);
+    border-radius: 5px;
+    background: var(--body-background);
+    color: var(--body-font-color);
+    font-size: 0.9rem;
+  }
+
+  .dm-imp-options {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-bottom: 10px;
+    font-size: 0.88rem;
+  }
+  .dm-imp-options label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  .dm-imp-table-wrap {
+    max-height: 460px;
+    overflow: auto;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+  }
+  .dm-imp-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .dm-imp-table th,
+  .dm-imp-table td {
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    text-align: left;
+    border-bottom: 1px solid var(--gray-200);
+    white-space: nowrap;
+  }
+  .dm-imp-table th {
+    background: var(--gray-100);
+    position: sticky;
+    top: 0;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    opacity: 0.8;
+  }
+  .dm-imp-table td.amt,
+  .dm-imp-table th.amt {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .dm-imp-table td.amt .neg { color: #e53935; }
+  .dm-imp-table td.amt .pos { color: #43a047; }
+  .dm-imp-table tr.skipped td { opacity: 0.4; }
+  .dm-imp-table tr.invalid td { background: rgba(229, 57, 53, 0.08); }
+  .dm-imp-table .badge-dup {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #fb8c00;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .dm-imp-table .badge-err {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: #e53935;
+    color: #fff;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .dm-imp-table select {
+    padding: 4px 6px;
+    border: 1px solid var(--gray-200);
+    border-radius: 4px;
+    background: var(--body-background);
+    color: var(--body-font-color);
+    font-size: 0.82rem;
+  }
+
+  .dm-imp-summary {
+    padding: 10px;
+    margin-bottom: 12px;
+    background: var(--body-background);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    font-size: 0.88rem;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .dm-imp-summary .stat strong {
+    display: block;
+    font-size: 1.1rem;
+  }
+
+  .dm-imp-result {
+    padding: 16px;
+    border-radius: 8px;
+    margin-top: 12px;
+    background: rgba(67, 160, 71, 0.12);
+    border: 1px solid rgba(67, 160, 71, 0.4);
+    font-size: 0.9rem;
+  }
+  .dm-imp-result.error {
+    background: rgba(229, 57, 53, 0.12);
+    border-color: rgba(229, 57, 53, 0.4);
+  }
+
+  .dm-imp-empty {
+    padding: 30px;
+    text-align: center;
+    opacity: 0.7;
+    border: 2px dashed var(--gray-200);
+    border-radius: 8px;
+  }
+</style>
+
+<div class="dm-imp-wrap" id="dm-imp-root">
+  <h2>Import transactions from CSV</h2>
+  <p class="desc">
+    Paste your bank export or upload a CSV file. Map the columns, review the preview (duplicates are flagged automatically), and import.
+  </p>
+
+  <div class="dm-imp-step" id="dm-imp-step-1">
+    <h3>1. CSV input</h3>
+    <textarea id="dm-imp-csv" class="dm-imp-textarea" placeholder="Paste CSV here, e.g.&#10;Date,Amount,Description&#10;2026-04-01,-12.50,Coffee&#10;2026-04-02,-45.00,Groceries"></textarea>
+    <div class="dm-imp-controls">
+      <label class="btn-file">
+        <input type="file" id="dm-imp-file" accept=".csv,text/csv,text/plain" style="display:none">
+        Upload CSV file
+      </label>
+      <button type="button" id="dm-imp-parse">Parse CSV</button>
+      <button type="button" id="dm-imp-clear">Clear</button>
+      <span id="dm-imp-parse-msg" style="margin-left:8px; opacity:0.75; font-size:0.85rem;"></span>
+    </div>
+  </div>
+
+  <div class="dm-imp-step" id="dm-imp-step-2" style="display:none;">
+    <h3>2. Map columns</h3>
+    <div class="dm-imp-options">
+      <label><input type="checkbox" id="dm-imp-has-header" checked> First row is a header</label>
+      <label><input type="checkbox" id="dm-imp-sign-negative" checked> Negative amounts = expense (toggle off if your CSV uses positive for expense)</label>
+    </div>
+    <div class="dm-imp-mapping" id="dm-imp-mapping"></div>
+  </div>
+
+  <div class="dm-imp-step" id="dm-imp-step-3" style="display:none;">
+    <h3>3. Preview &amp; import</h3>
+    <div class="dm-imp-summary" id="dm-imp-summary"></div>
+    <div class="dm-imp-table-wrap">
+      <table class="dm-imp-table" id="dm-imp-preview">
+        <thead></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="dm-imp-controls" style="margin-top:12px;">
+      <button type="button" id="dm-imp-skip-dups">Skip all duplicates</button>
+      <button type="button" id="dm-imp-include-all">Include all</button>
+      <span style="flex:1"></span>
+      <button type="button" id="dm-imp-import" class="primary">Import selected</button>
+    </div>
+    <div id="dm-imp-result-box"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  /**
+   * Pure CSV parser — RFC-4180-ish.
+   *   - Handles quoted fields containing commas, newlines, escaped quotes (`""`)
+   *   - Skips trailing empty line
+   *   - Returns { headers: string[]|null, rows: string[][] }
+   *     If `firstRowIsHeader` is true, headers = first row, rows = remainder.
+   *     Otherwise, headers = null, rows = all rows.
+   */
+  function parseCsv(text, opts) {
+    opts = opts || {};
+    var firstRowIsHeader = opts.firstRowIsHeader !== false;
+    var allRows = [];
+    var current = [];
+    var field = '';
+    var inQuotes = false;
+    var i = 0;
+    var n = text.length;
+    while (i < n) {
+      var c = text.charAt(i);
+      if (inQuotes) {
+        if (c === '"') {
+          if (i + 1 < n && text.charAt(i + 1) === '"') {
+            // Escaped quote
+            field += '"';
+            i += 2;
+            continue;
+          }
+          inQuotes = false;
+          i++;
+          continue;
+        }
+        field += c;
+        i++;
+      } else {
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { current.push(field); field = ''; i++; continue; }
+        if (c === '\r') {
+          // Treat \r\n and bare \r as line break
+          current.push(field); field = '';
+          allRows.push(current); current = [];
+          if (i + 1 < n && text.charAt(i + 1) === '\n') i += 2;
+          else i++;
+          continue;
+        }
+        if (c === '\n') {
+          current.push(field); field = '';
+          allRows.push(current); current = [];
+          i++;
+          continue;
+        }
+        field += c;
+        i++;
+      }
+    }
+    // Flush last field/row
+    if (field.length > 0 || current.length > 0) {
+      current.push(field);
+      allRows.push(current);
+    }
+    // Strip fully-empty trailing rows
+    while (allRows.length && allRows[allRows.length - 1].length === 1 && allRows[allRows.length - 1][0] === '') {
+      allRows.pop();
+    }
+    if (firstRowIsHeader && allRows.length > 0) {
+      return { headers: allRows[0], rows: allRows.slice(1) };
+    }
+    return { headers: null, rows: allRows };
+  }
+
+  /**
+   * Detect a likely mapping from header strings to canonical fields.
+   * Returns { date, amount, payee, memo, category } with index numbers (or -1).
+   */
+  function autoDetectMapping(headers) {
+    var idx = { date: -1, amount: -1, payee: -1, memo: -1, category: -1 };
+    if (!headers) return idx;
+    var rules = {
+      date:     [/^date$/i, /^transaction\s*date$/i, /^posted\s*date$/i, /^posting\s*date$/i],
+      amount:   [/^amount$/i, /^debit$/i, /^value$/i, /^total$/i, /amount/i],
+      payee:    [/^payee$/i, /^description$/i, /^merchant$/i, /^name$/i, /^vendor$/i, /^transaction$/i],
+      memo:     [/^memo$/i, /^note$/i, /^notes$/i, /^details$/i, /^comments?$/i],
+      category: [/^category$/i, /^type$/i, /^categor/i],
+    };
+    Object.keys(rules).forEach(function(field) {
+      for (var i = 0; i < headers.length; i++) {
+        if (idx[field] !== -1) break;
+        var h = (headers[i] || '').trim();
+        for (var j = 0; j < rules[field].length; j++) {
+          if (rules[field][j].test(h)) { idx[field] = i; break; }
+        }
+      }
+    });
+    return idx;
+  }
+
+  /**
+   * Parse a money string into integer cents.
+   *   - "$1,234.56" => 123456
+   *   - "(45.00)"   => -4500   (parentheses = negative)
+   *   - "-12.50"    => -1250
+   *   - "12.50-"    => -1250   (trailing minus)
+   *   - "3,75"      => 375     (comma decimal)
+   * Returns null on parse failure.
+   */
+  function parseMoneyToCents(raw) {
+    if (raw === null || raw === undefined) return null;
+    var s = String(raw).trim();
+    if (!s) return null;
+    var negative = false;
+    if (s.charAt(0) === '(' && s.charAt(s.length - 1) === ')') {
+      negative = true;
+      s = s.slice(1, -1);
+    }
+    if (s.charAt(s.length - 1) === '-') { negative = true; s = s.slice(0, -1); }
+    if (s.charAt(0) === '-') { negative = !negative; s = s.slice(1); }
+    if (s.charAt(0) === '+') s = s.slice(1);
+    s = s.replace(/[$€£¥₹\s]/g, '');
+    // Decide decimal separator
+    var lastDot = s.lastIndexOf('.');
+    var lastComma = s.lastIndexOf(',');
+    var decimalSep = null;
+    if (lastDot === -1 && lastComma === -1) {
+      decimalSep = null;
+    } else if (lastDot > lastComma) {
+      decimalSep = '.';
+    } else {
+      decimalSep = ',';
+    }
+    var intPart = s, fracPart = '';
+    if (decimalSep !== null) {
+      var parts = s.split(decimalSep);
+      fracPart = parts.pop();
+      intPart = parts.join('');
+    }
+    intPart = intPart.replace(/[^\d]/g, '');
+    fracPart = (fracPart || '').replace(/[^\d]/g, '');
+    if (!intPart && !fracPart) return null;
+    intPart = intPart || '0';
+    var cents = parseInt(intPart, 10) * 100;
+    if (fracPart.length === 1) cents += parseInt(fracPart, 10) * 10;
+    else if (fracPart.length >= 2) cents += parseInt(fracPart.slice(0, 2), 10);
+    if (isNaN(cents)) return null;
+    return negative ? -cents : cents;
+  }
+
+  /**
+   * Parse date into 'YYYY-MM-DD' or null. Accepts:
+   *   - YYYY-MM-DD, YYYY/MM/DD
+   *   - MM/DD/YYYY, M/D/YYYY (default US convention)
+   *   - DD/MM/YYYY (heuristic: if first part > 12)
+   *   - YYYY-MM-DD HH:MM:SS (strips time)
+   */
+  function parseDateToYmd(raw) {
+    if (raw === null || raw === undefined) return null;
+    var s = String(raw).trim();
+    if (!s) return null;
+    // Strip time component
+    s = s.split(/[T\s]/)[0];
+    var m;
+    // YYYY-MM-DD or YYYY/MM/DD
+    m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+    if (m) {
+      var ym = parseInt(m[2], 10);
+      var yd = parseInt(m[3], 10);
+      if (ym < 1 || ym > 12 || yd < 1 || yd > 31) return null;
+      return m[1] + '-' + ('0' + ym).slice(-2) + '-' + ('0' + yd).slice(-2);
+    }
+    // M/D/Y or D/M/Y or M-D-Y
+    m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/);
+    if (m) {
+      var a = parseInt(m[1], 10);
+      var b = parseInt(m[2], 10);
+      var y = parseInt(m[3], 10);
+      if (y < 100) y += 2000;
+      // Heuristic: if first part > 12, it must be a day -> DD/MM/YYYY
+      var month, day;
+      if (a > 12 && b <= 12) { day = a; month = b; }
+      else { month = a; day = b; } // default US MM/DD/YYYY
+      if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+      return y + '-' + ('0' + month).slice(-2) + '-' + ('0' + day).slice(-2);
+    }
+    return null;
+  }
+
+  // Expose the pure parser globally for tests + reuse
+  window.dmBudgetParseCsv = parseCsv;
+  window.dmBudgetParseMoney = parseMoneyToCents;
+  window.dmBudgetParseDate = parseDateToYmd;
+  window.dmBudgetAutoDetectMapping = autoDetectMapping;
+
+  // ─── UI controller ────────────────────────────────────────────────────
+
+  var $csv = document.getElementById('dm-imp-csv');
+  var $file = document.getElementById('dm-imp-file');
+  var $parseBtn = document.getElementById('dm-imp-parse');
+  var $clearBtn = document.getElementById('dm-imp-clear');
+  var $parseMsg = document.getElementById('dm-imp-parse-msg');
+  var $step2 = document.getElementById('dm-imp-step-2');
+  var $step3 = document.getElementById('dm-imp-step-3');
+  var $hasHeader = document.getElementById('dm-imp-has-header');
+  var $signNeg = document.getElementById('dm-imp-sign-negative');
+  var $mapping = document.getElementById('dm-imp-mapping');
+  var $previewHead = document.querySelector('#dm-imp-preview thead');
+  var $previewBody = document.querySelector('#dm-imp-preview tbody');
+  var $summary = document.getElementById('dm-imp-summary');
+  var $importBtn = document.getElementById('dm-imp-import');
+  var $skipDupsBtn = document.getElementById('dm-imp-skip-dups');
+  var $includeAllBtn = document.getElementById('dm-imp-include-all');
+  var $resultBox = document.getElementById('dm-imp-result-box');
+
+  if (!$csv) return; // shortcode not on page
+
+  var _state = {
+    parsed: null,    // { headers, rows }
+    mapping: { date: -1, amount: -1, payee: -1, memo: -1, category: -1 },
+    rows: [],        // [{ date, amount, payee, memo, categoryHint, dup, valid, skip, error }]
+    categories: [],
+    existing: [],    // existing transactions (for duplicate detection)
+  };
+
+  function setMsg(text, isError) {
+    $parseMsg.textContent = text || '';
+    $parseMsg.style.color = isError ? '#e53935' : '';
+  }
+
+  $clearBtn.addEventListener('click', function() {
+    $csv.value = '';
+    setMsg('');
+    $step2.style.display = 'none';
+    $step3.style.display = 'none';
+    $resultBox.innerHTML = '';
+  });
+
+  $file.addEventListener('change', function() {
+    var f = $file.files && $file.files[0];
+    if (!f) return;
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      $csv.value = e.target.result || '';
+      setMsg('Loaded ' + f.name + ' (' + Math.round(f.size / 1024) + ' KB).');
+    };
+    reader.onerror = function() { setMsg('Failed to read file.', true); };
+    reader.readAsText(f);
+  });
+
+  $parseBtn.addEventListener('click', function() {
+    parseAndShow();
+  });
+
+  $hasHeader.addEventListener('change', parseAndShow);
+  $signNeg.addEventListener('change', rebuildPreview);
+
+  function parseAndShow() {
+    var text = $csv.value || '';
+    if (!text.trim()) { setMsg('Paste CSV or upload a file first.', true); return; }
+    try {
+      _state.parsed = parseCsv(text, { firstRowIsHeader: $hasHeader.checked });
+      if (!_state.parsed.rows.length) {
+        setMsg('No data rows found.', true);
+        $step2.style.display = 'none';
+        $step3.style.display = 'none';
+        return;
+      }
+      var totalCols = (_state.parsed.headers || _state.parsed.rows[0] || []).length;
+      setMsg('Parsed ' + _state.parsed.rows.length + ' rows, ' + totalCols + ' columns.');
+      _state.mapping = autoDetectMapping(_state.parsed.headers);
+      buildMappingControls(totalCols);
+      $step2.style.display = '';
+      rebuildPreview();
+    } catch (err) {
+      setMsg('Parse error: ' + err.message, true);
+    }
+  }
+
+  function buildMappingControls(colCount) {
+    var fields = [
+      { key: 'date',     label: 'Date *' },
+      { key: 'amount',   label: 'Amount *' },
+      { key: 'payee',    label: 'Payee' },
+      { key: 'memo',     label: 'Memo' },
+      { key: 'category', label: 'Category (optional)' },
+    ];
+    var headers = _state.parsed.headers;
+    var html = '';
+    fields.forEach(function(f) {
+      html += '<label>' + f.label + '<select data-field="' + f.key + '">';
+      html += '<option value="-1">— none —</option>';
+      for (var i = 0; i < colCount; i++) {
+        var lbl = headers ? (headers[i] || ('Column ' + (i + 1))) : ('Column ' + (i + 1));
+        var sel = (_state.mapping[f.key] === i) ? ' selected' : '';
+        html += '<option value="' + i + '"' + sel + '>' + escapeHtml(lbl) + '</option>';
+      }
+      html += '</select></label>';
+    });
+    $mapping.innerHTML = html;
+    var selects = $mapping.querySelectorAll('select');
+    selects.forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        var f = sel.getAttribute('data-field');
+        _state.mapping[f] = parseInt(sel.value, 10);
+        rebuildPreview();
+      });
+    });
+  }
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = String(s == null ? '' : s);
+    return d.innerHTML;
+  }
+
+  function rebuildPreview() {
+    if (!_state.parsed) return;
+    var map = _state.mapping;
+    var signNeg = $signNeg.checked;
+    var rows = _state.parsed.rows.map(function(rawCols, idx) {
+      var dateRaw = map.date >= 0 ? rawCols[map.date] : '';
+      var amtRaw = map.amount >= 0 ? rawCols[map.amount] : '';
+      var payee = (map.payee >= 0 ? rawCols[map.payee] : '') || '';
+      var memo = (map.memo >= 0 ? rawCols[map.memo] : '') || '';
+      var categoryHint = (map.category >= 0 ? rawCols[map.category] : '') || '';
+      var date = parseDateToYmd(dateRaw);
+      var cents = parseMoneyToCents(amtRaw);
+      // Sign convention: if signNeg is OFF, flip sign so positive=expense becomes negative.
+      if (cents !== null && !signNeg) cents = -cents;
+      var error = null;
+      if (!date) error = 'invalid date';
+      else if (cents === null || cents === 0) error = 'invalid amount';
+      return {
+        idx: idx,
+        date: date,
+        amount: cents,
+        payee: String(payee).trim(),
+        memo: String(memo).trim(),
+        categoryHint: String(categoryHint).trim(),
+        categoryId: null,
+        valid: !error,
+        error: error,
+        dup: false,
+        skip: false,
+      };
+    });
+    _state.rows = rows;
+    runDuplicateDetection().then(function() {
+      ensureCategoriesLoaded().then(function() {
+        // Default: skip duplicates and invalid rows
+        _state.rows.forEach(function(r) {
+          if (r.dup || !r.valid) r.skip = true;
+          if (r.categoryHint && !r.categoryId) {
+            // Match category by case-insensitive name
+            var hit = _state.categories.find(function(c) {
+              return c.name && c.name.toLowerCase() === r.categoryHint.toLowerCase();
+            });
+            if (hit) r.categoryId = hit.id;
+          }
+        });
+        renderPreview();
+        $step3.style.display = '';
+      });
+    });
+  }
+
+  function ensureCategoriesLoaded() {
+    if (_state.categories.length) return Promise.resolve();
+    if (!window.dmBudget || !window.dmBudget.getCategories) return Promise.resolve();
+    return window.dmBudget.getCategories().then(function(cats) {
+      _state.categories = (cats || []).slice().sort(function(a, b) {
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    }).catch(function() { _state.categories = []; });
+  }
+
+  function runDuplicateDetection() {
+    if (!window.dmBudget || !window.dmBudget.getTransactions) {
+      _state.existing = [];
+      return Promise.resolve();
+    }
+    return window.dmBudget.getTransactions({}).then(function(txs) {
+      _state.existing = txs || [];
+      _state.rows.forEach(function(r) {
+        if (!r.valid) return;
+        r.dup = isDuplicate(r, _state.existing);
+      });
+    }).catch(function() {
+      _state.existing = [];
+    });
+  }
+
+  /**
+   * Mark a row as duplicate if an existing transaction has the same amount,
+   * same payee (case-insensitive), and date within ±3 days.
+   * Exposed as window.dmBudgetIsDuplicate for tests.
+   */
+  function isDuplicate(row, existing) {
+    if (!row || !row.date || row.amount == null) return false;
+    var rPayee = (row.payee || '').toLowerCase().trim();
+    var rDate = new Date(row.date + 'T00:00:00').getTime();
+    if (isNaN(rDate)) return false;
+    var WINDOW = 3 * 24 * 60 * 60 * 1000;
+    for (var i = 0; i < existing.length; i++) {
+      var t = existing[i];
+      if (!t || t.deletedAt) continue;
+      if (t.amount !== row.amount) continue;
+      var tPayee = (t.payee || '').toLowerCase().trim();
+      if (tPayee !== rPayee) continue;
+      var tDate = new Date((t.date || '') + 'T00:00:00').getTime();
+      if (isNaN(tDate)) continue;
+      if (Math.abs(tDate - rDate) <= WINDOW) return true;
+    }
+    return false;
+  }
+  window.dmBudgetIsDuplicate = isDuplicate;
+
+  function fmtAmount(cents) {
+    if (cents == null || isNaN(cents)) return '';
+    var f = (window.dmBudget && window.dmBudget.formatMoney)
+      ? window.dmBudget.formatMoney
+      : function(c) { return ((c < 0 ? '-' : '') + '$' + (Math.abs(c) / 100).toFixed(2)); };
+    var currency = (window.dmBudget && window.dmBudget.getCurrency) ? window.dmBudget.getCurrency() : 'USD';
+    return f(cents, currency);
+  }
+
+  function renderPreview() {
+    var rows = _state.rows;
+    // Header
+    $previewHead.innerHTML =
+      '<tr>' +
+        '<th style="width:40px"></th>' +
+        '<th>Date</th>' +
+        '<th class="amt">Amount</th>' +
+        '<th>Payee</th>' +
+        '<th>Memo</th>' +
+        '<th>Category</th>' +
+        '<th>Status</th>' +
+      '</tr>';
+    // Rows
+    var html = '';
+    var catOpts = '<option value="">— Uncategorized —</option>';
+    _state.categories.forEach(function(c) {
+      catOpts += '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>';
+    });
+    rows.forEach(function(r) {
+      var cls = '';
+      if (!r.valid) cls = 'invalid';
+      else if (r.skip) cls = 'skipped';
+      var amtCls = r.amount < 0 ? 'neg' : 'pos';
+      var statusBadges = '';
+      if (!r.valid) statusBadges += '<span class="badge-err">' + escapeHtml(r.error) + '</span> ';
+      if (r.dup) statusBadges += '<span class="badge-dup">duplicate</span>';
+      // Category select with selected option
+      var catSelectHtml = '<select data-row="' + r.idx + '" data-action="set-cat">';
+      var hasMatch = false;
+      catSelectHtml += '<option value="">— Uncategorized —</option>';
+      _state.categories.forEach(function(c) {
+        var sel = (r.categoryId === c.id) ? ' selected' : '';
+        if (sel) hasMatch = true;
+        catSelectHtml += '<option value="' + escapeHtml(c.id) + '"' + sel + '>' + escapeHtml(c.name) + '</option>';
+      });
+      catSelectHtml += '</select>';
+      html += '<tr class="' + cls + '" data-row-idx="' + r.idx + '">' +
+        '<td><input type="checkbox" data-action="toggle-skip" ' + (r.skip ? '' : 'checked') + (r.valid ? '' : ' disabled') + '></td>' +
+        '<td>' + escapeHtml(r.date || '?') + '</td>' +
+        '<td class="amt"><span class="' + amtCls + '">' + escapeHtml(fmtAmount(r.amount)) + '</span></td>' +
+        '<td>' + escapeHtml(r.payee) + '</td>' +
+        '<td>' + escapeHtml(r.memo) + '</td>' +
+        '<td>' + catSelectHtml + '</td>' +
+        '<td>' + statusBadges + '</td>' +
+      '</tr>';
+    });
+    $previewBody.innerHTML = html;
+
+    // Wire row controls
+    $previewBody.querySelectorAll('input[data-action="toggle-skip"]').forEach(function(cb) {
+      cb.addEventListener('change', function() {
+        var tr = cb.closest('tr');
+        var idx = parseInt(tr.getAttribute('data-row-idx'), 10);
+        var row = _state.rows.find(function(r) { return r.idx === idx; });
+        if (!row) return;
+        row.skip = !cb.checked;
+        tr.classList.toggle('skipped', row.skip);
+        updateSummary();
+      });
+    });
+    $previewBody.querySelectorAll('select[data-action="set-cat"]').forEach(function(sel) {
+      sel.addEventListener('change', function() {
+        var idx = parseInt(sel.getAttribute('data-row'), 10);
+        var row = _state.rows.find(function(r) { return r.idx === idx; });
+        if (row) row.categoryId = sel.value || null;
+      });
+    });
+    updateSummary();
+  }
+
+  function updateSummary() {
+    var total = _state.rows.length;
+    var invalid = _state.rows.filter(function(r) { return !r.valid; }).length;
+    var dups = _state.rows.filter(function(r) { return r.dup && r.valid; }).length;
+    var toImport = _state.rows.filter(function(r) { return r.valid && !r.skip; }).length;
+    $summary.innerHTML =
+      '<div class="stat"><strong>' + total + '</strong>parsed</div>' +
+      '<div class="stat"><strong>' + invalid + '</strong>invalid</div>' +
+      '<div class="stat"><strong>' + dups + '</strong>duplicates</div>' +
+      '<div class="stat"><strong style="color:var(--color-accent)">' + toImport + '</strong>to import</div>';
+    $importBtn.disabled = toImport === 0;
+  }
+
+  $skipDupsBtn.addEventListener('click', function() {
+    _state.rows.forEach(function(r) { if (r.dup) r.skip = true; });
+    renderPreview();
+  });
+  $includeAllBtn.addEventListener('click', function() {
+    _state.rows.forEach(function(r) { if (r.valid) r.skip = false; });
+    renderPreview();
+  });
+
+  $importBtn.addEventListener('click', function() {
+    if (!window.dmBudget || !window.dmBudget.createTransaction) {
+      $resultBox.innerHTML = '<div class="dm-imp-result error">Budget module not ready.</div>';
+      return;
+    }
+    var toImport = _state.rows.filter(function(r) { return r.valid && !r.skip; });
+    if (!toImport.length) return;
+    $importBtn.disabled = true;
+    $importBtn.textContent = 'Importing…';
+    $resultBox.innerHTML = '';
+    window.dmBudget.ensureDefaultAccount().then(function(acct) {
+      var accountId = acct && acct.id;
+      var ok = 0, fail = 0;
+      var chain = Promise.resolve();
+      toImport.forEach(function(r) {
+        chain = chain.then(function() {
+          return window.dmBudget.createTransaction({
+            accountId: accountId,
+            categoryId: r.categoryId || null,
+            amount: r.amount,
+            date: r.date,
+            payee: r.payee,
+            memo: r.memo,
+            source: 'csv-import',
+          }).then(function() { ok++; }).catch(function() { fail++; });
+        });
+      });
+      return chain.then(function() { return { ok: ok, fail: fail }; });
+    }).then(function(result) {
+      $importBtn.disabled = false;
+      $importBtn.textContent = 'Import selected';
+      var cls = result.fail > 0 ? 'error' : '';
+      $resultBox.innerHTML = '<div class="dm-imp-result ' + cls + '">' +
+        '<strong>' + result.ok + '</strong> transaction' + (result.ok === 1 ? '' : 's') + ' imported' +
+        (result.fail > 0 ? ', <strong>' + result.fail + '</strong> failed' : '') + '.' +
+      '</div>';
+      // Mark imported rows as skipped so re-clicking doesn't double-import
+      _state.rows.forEach(function(r) { if (r.valid && !r.skip) r.skip = true; });
+      renderPreview();
+    }).catch(function(err) {
+      $importBtn.disabled = false;
+      $importBtn.textContent = 'Import selected';
+      $resultBox.innerHTML = '<div class="dm-imp-result error">Import failed: ' + escapeHtml(err && err.message ? err.message : String(err)) + '</div>';
+    });
+  });
+})();
+</script>
