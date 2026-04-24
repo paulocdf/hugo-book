@@ -1,0 +1,377 @@
+{{/*
+  budget-recurring.html — Recurring rules (Phase 2a)
+  - Lists active + inactive rules with next-due date, cadence summary, amount
+  - Add/edit inline form: account, category, amount, frequency, interval,
+    start/end date, payee, memo, auto-post toggle
+  - Delete row (confirmation dialog)
+  - "Post due now" button to manually trigger window.dmBudget.runRecurringDue()
+*/}}
+
+<style>
+  .dm-rec-wrap { max-width: 1100px; margin: 0 auto; padding: 12px 0 40px; }
+  .dm-rec-head {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .dm-rec-head h2 { margin: 0; font-size: 1.1rem; }
+  .dm-rec-head .spacer { flex: 1; }
+  .dm-rec-head .stat { font-size: 0.85rem; opacity: 0.8; }
+  .dm-rec-head button {
+    padding: 7px 12px; border-radius: 6px; border: 1px solid var(--gray-200);
+    background: var(--body-background); color: var(--body-font-color); cursor: pointer;
+    font-size: 0.88rem;
+  }
+  .dm-rec-head button.primary {
+    background: var(--color-accent); color: #fff; border-color: var(--color-accent);
+  }
+  .dm-rec-head button:hover { background: var(--gray-100); }
+  .dm-rec-head button.primary:hover { filter: brightness(0.95); }
+
+  .dm-rec-form {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr auto;
+    gap: 8px; padding: 12px;
+    background: var(--gray-100); border-radius: 8px; margin-bottom: 18px;
+    align-items: end;
+  }
+  .dm-rec-form label {
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7;
+  }
+  .dm-rec-form label input, .dm-rec-form label select {
+    padding: 6px 8px; border: 1px solid var(--gray-200); border-radius: 5px;
+    background: var(--body-background); color: var(--body-font-color); font-size: 0.9rem;
+  }
+  .dm-rec-form .row-full { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; }
+  .dm-rec-form .row-full label { flex: 1; text-transform: none; font-size: 0.85rem; opacity: 1; flex-direction: row; align-items: center; gap: 6px; }
+  .dm-rec-form .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+  .dm-rec-form .btn-row button {
+    padding: 7px 14px; border-radius: 6px; border: 0; cursor: pointer; font-weight: 600;
+  }
+  .dm-rec-form .btn-row button.save { background: var(--color-accent); color: #fff; }
+  .dm-rec-form .btn-row button.cancel { background: var(--gray-200); color: var(--body-font-color); }
+
+  .dm-rec-table {
+    width: 100%; border-collapse: collapse;
+    border: 1px solid var(--gray-200); border-radius: 8px; overflow: hidden;
+  }
+  .dm-rec-table th, .dm-rec-table td {
+    padding: 10px 12px; font-size: 0.88rem; text-align: left;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .dm-rec-table th {
+    background: var(--gray-100); font-weight: 600;
+    text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.05em; opacity: 0.8;
+  }
+  .dm-rec-table tr:last-child td { border-bottom: 0; }
+  .dm-rec-table td.amt, .dm-rec-table th.amt { text-align: right; font-variant-numeric: tabular-nums; }
+  .dm-rec-table td.amt .negative { color: #e53935; }
+  .dm-rec-table td.amt .positive { color: #43a047; }
+  .dm-rec-table tr.inactive { opacity: 0.55; }
+  .dm-rec-table .rec-btn {
+    border: 0; background: transparent; color: var(--body-font-color);
+    opacity: 0.5; cursor: pointer; padding: 4px 6px; border-radius: 4px;
+  }
+  .dm-rec-table tr:hover .rec-btn { opacity: 1; }
+  .dm-rec-table .rec-btn:hover { background: var(--gray-100); }
+
+  .dm-rec-empty {
+    padding: 40px; text-align: center; opacity: 0.7;
+    border: 2px dashed var(--gray-200); border-radius: 10px;
+  }
+  .dm-rec-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .dm-rec-badge.active { background: color-mix(in srgb, #43a047 20%, transparent); color: #2e7d32; }
+  .dm-rec-badge.inactive { background: var(--gray-200); color: var(--body-font-color); }
+</style>
+
+<div class="dm-rec-wrap" id="dm-rec-root">
+  <div class="dm-rec-head">
+    <h2>Recurring rules</h2>
+    <span class="spacer"></span>
+    <span class="stat" id="dm-rec-stat"></span>
+    <button type="button" id="dm-rec-run" title="Post any due rules now">Post due now</button>
+    <button type="button" class="primary" id="dm-rec-add">+ Add rule</button>
+  </div>
+  <div id="dm-rec-form-slot"></div>
+  <div id="dm-rec-body"><div class="dm-rec-empty">Loading rules…</div></div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  function $(s, c) { return (c || document).querySelector(s); }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function(c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function freqLabel(freq, interval) {
+    var n = interval || 1;
+    var base = { daily: 'day', weekly: 'week', monthly: 'month', yearly: 'year' }[freq] || freq;
+    if (n === 1) return 'Every ' + base;
+    return 'Every ' + n + ' ' + base + 's';
+  }
+
+  function formatDate(d) {
+    if (!d) return '';
+    var parts = d.split('-');
+    if (parts.length !== 3) return d;
+    return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10))
+      .toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  var _editingId = null;
+  var _rules = [];
+  var _accounts = [];
+  var _cats = [];
+
+  function showForm(existing) {
+    _editingId = existing ? existing.id : null;
+    var today = new Date().toISOString().substr(0, 10);
+    var r = existing || {
+      name: '', accountId: (_accounts[0] && _accounts[0].id) || '', categoryId: null,
+      amount: 0, frequency: 'monthly', interval: 1,
+      startDate: today, endDate: '', nextDueDate: today,
+      payee: '', memo: '', autoPost: true
+    };
+    var amtStr = ((r.amount || 0) / 100).toFixed(2);
+    var acctOpts = _accounts.map(function(a) {
+      return '<option value="' + escapeHtml(a.id) + '"' + (a.id === r.accountId ? ' selected' : '') + '>' + escapeHtml(a.name) + '</option>';
+    }).join('');
+    var catOpts = '<option value="">—</option>' + _cats.map(function(c) {
+      return '<option value="' + escapeHtml(c.id) + '"' + (c.id === r.categoryId ? ' selected' : '') + '>' + escapeHtml(c.name) + '</option>';
+    }).join('');
+    var freqOpts = ['daily','weekly','monthly','yearly'].map(function(f) {
+      return '<option value="' + f + '"' + (f === r.frequency ? ' selected' : '') + '>' + f.charAt(0).toUpperCase() + f.slice(1) + '</option>';
+    }).join('');
+
+    $('#dm-rec-form-slot').innerHTML =
+      '<div class="dm-rec-form">' +
+        '<label>Payee<input type="text" id="rf-payee" value="' + escapeHtml(r.payee) + '" placeholder="e.g. Rent"></label>' +
+        '<label>Amount<input type="text" id="rf-amount" value="' + escapeHtml(amtStr) + '" inputmode="decimal" placeholder="-100.00"></label>' +
+        '<label>Account<select id="rf-account">' + acctOpts + '</select></label>' +
+        '<label>Category<select id="rf-category">' + catOpts + '</select></label>' +
+        '<label>Frequency<select id="rf-frequency">' + freqOpts + '</select></label>' +
+        '<label>Every<input type="number" id="rf-interval" min="1" value="' + (r.interval || 1) + '"></label>' +
+        '<label>Starts<input type="date" id="rf-start" value="' + escapeHtml(r.startDate) + '"></label>' +
+        '<label>Ends (optional)<input type="date" id="rf-end" value="' + escapeHtml(r.endDate || '') + '"></label>' +
+        '<label>Next due<input type="date" id="rf-next" value="' + escapeHtml(r.nextDueDate || r.startDate) + '"></label>' +
+        '<label>Memo<input type="text" id="rf-memo" value="' + escapeHtml(r.memo) + '" placeholder="Optional"></label>' +
+        '<div class="row-full">' +
+          '<label><input type="checkbox" id="rf-auto" ' + (r.autoPost ? 'checked' : '') + '> Auto-post transactions when due</label>' +
+          '<div class="btn-row">' +
+            '<button type="button" class="cancel" id="rf-cancel">Cancel</button>' +
+            '<button type="button" class="save" id="rf-save">' + (existing ? 'Save changes' : 'Add rule') + '</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+    $('#rf-cancel').addEventListener('click', function() { hideForm(); });
+    $('#rf-save').addEventListener('click', saveForm);
+  }
+
+  function hideForm() {
+    _editingId = null;
+    $('#dm-rec-form-slot').innerHTML = '';
+  }
+
+  function saveForm() {
+    var data = {
+      payee: $('#rf-payee').value.trim(),
+      name: $('#rf-payee').value.trim() || 'Recurring',
+      amount: window.dmBudget.parseMoney($('#rf-amount').value),
+      accountId: $('#rf-account').value,
+      categoryId: $('#rf-category').value || null,
+      frequency: $('#rf-frequency').value,
+      interval: parseInt($('#rf-interval').value, 10) || 1,
+      startDate: $('#rf-start').value,
+      endDate: $('#rf-end').value || null,
+      nextDueDate: $('#rf-next').value,
+      memo: $('#rf-memo').value.trim(),
+      autoPost: $('#rf-auto').checked
+    };
+    if (!data.accountId) {
+      if (window.dmAlert) window.dmAlert({ title: 'Account required', message: 'Create an account before adding a recurring rule.' });
+      return;
+    }
+    var op = _editingId
+      ? window.dmBudget.updateRecurring(_editingId, data)
+      : window.dmBudget.createRecurring(data);
+    op.then(function() {
+      hideForm();
+      refresh();
+    }).catch(function(err) {
+      console.error('[budget/recurring] save failed:', err);
+      if (window.dmAlert) window.dmAlert({ title: 'Save failed', message: err.message || String(err) });
+    });
+  }
+
+  function renderTable() {
+    var body = $('#dm-rec-body');
+    if (_rules.length === 0) {
+      body.innerHTML = '<div class="dm-rec-empty">' +
+        '<div style="margin-bottom:8px; font-weight:500;">No recurring rules yet</div>' +
+        '<div style="font-size:0.88rem;">Click "Add rule" to automate recurring expenses or income like rent, salary, subscriptions.</div>' +
+      '</div>';
+      $('#dm-rec-stat').textContent = '';
+      return;
+    }
+    var catMap = {}; _cats.forEach(function(c) { catMap[c.id] = c; });
+    var acctMap = {}; _accounts.forEach(function(a) { acctMap[a.id] = a; });
+    var fm = function(x) { return window.dmBudget.formatMoney(x, { currency: window.dmBudget.getCurrency() }); };
+    var active = _rules.filter(function(r) { return r.autoPost; }).length;
+    $('#dm-rec-stat').innerHTML = _rules.length + ' rules · <strong>' + active + '</strong> active';
+
+    var rows = _rules.map(function(r) {
+      var amt = r.amount || 0;
+      var amtClass = amt < 0 ? 'negative' : (amt > 0 ? 'positive' : '');
+      var cat = r.categoryId ? (catMap[r.categoryId] ? catMap[r.categoryId].name : '—') : '—';
+      var acct = acctMap[r.accountId] ? acctMap[r.accountId].name : '—';
+      return '<tr data-rec="' + escapeHtml(r.id) + '" class="' + (r.autoPost ? '' : 'inactive') + '">' +
+          '<td><span class="dm-rec-badge ' + (r.autoPost ? 'active' : 'inactive') + '">' + (r.autoPost ? 'Active' : 'Paused') + '</span></td>' +
+          '<td><strong>' + escapeHtml(r.payee || r.name) + '</strong>' +
+            (r.memo ? '<div style="font-size:0.78rem; opacity:0.7;">' + escapeHtml(r.memo) + '</div>' : '') +
+          '</td>' +
+          '<td>' + escapeHtml(freqLabel(r.frequency, r.interval)) + '</td>' +
+          '<td>' + escapeHtml(formatDate(r.nextDueDate)) + '</td>' +
+          '<td>' + escapeHtml(cat) + '</td>' +
+          '<td>' + escapeHtml(acct) + '</td>' +
+          '<td class="amt ' + amtClass + '">' + fm(amt) + '</td>' +
+          '<td style="width:90px; text-align:right; white-space:nowrap;">' +
+            '<button class="rec-btn" data-rec-edit="' + escapeHtml(r.id) + '" title="Edit">' +
+              '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-pencil"/></svg>' +
+            '</button>' +
+            '<button class="rec-btn" data-rec-del="' + escapeHtml(r.id) + '" title="Delete">' +
+              '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>' +
+            '</button>' +
+          '</td>' +
+        '</tr>';
+    }).join('');
+
+    body.innerHTML =
+      '<table class="dm-rec-table">' +
+        '<thead><tr>' +
+          '<th style="width:80px">Status</th>' +
+          '<th>Payee</th>' +
+          '<th style="width:140px">Cadence</th>' +
+          '<th style="width:140px">Next due</th>' +
+          '<th style="width:140px">Category</th>' +
+          '<th style="width:140px">Account</th>' +
+          '<th class="amt" style="width:120px">Amount</th>' +
+          '<th></th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>';
+
+    body.querySelectorAll('[data-rec-edit]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var id = btn.getAttribute('data-rec-edit');
+        var rule = _rules.filter(function(x) { return x.id === id; })[0];
+        if (rule) showForm(rule);
+      });
+    });
+    body.querySelectorAll('[data-rec-del]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var id = btn.getAttribute('data-rec-del');
+        if (window.dmConfirm) {
+          window.dmConfirm({
+            title: 'Delete recurring rule?',
+            message: 'This stops future auto-posts. Past transactions are kept.',
+            confirmLabel: 'Delete',
+            danger: true
+          }).then(function(ok) {
+            if (ok) window.dmBudget.deleteRecurring(id).then(refresh);
+          });
+        } else {
+          window.dmBudget.deleteRecurring(id).then(refresh);
+        }
+      });
+    });
+  }
+
+  var _refreshPending = false;
+  function refresh() {
+    if (_refreshPending) return;
+    _refreshPending = true;
+    Promise.resolve().then(function() {
+      _refreshPending = false;
+      return Promise.all([
+        window.dmBudget.getRecurring(),
+        window.dmBudget.getAccounts(),
+        window.dmBudget.getCategories()
+      ]);
+    }).then(function(r) {
+      _rules = r[0]; _accounts = r[1]; _cats = r[2];
+      renderTable();
+    }).catch(function(err) {
+      console.error('[budget/recurring] refresh failed:', err);
+      var localOnly = window.dmBudget && window.dmBudget.isLocalOnly && window.dmBudget.isLocalOnly();
+      var signedIn = window.dmAuth && window.dmAuth.currentUser;
+      if (!signedIn && !localOnly) {
+        $('#dm-rec-body').innerHTML = '<div class="dm-rec-empty">' +
+          '<div style="margin-bottom:4px;">Sign in to view recurring rules</div>' +
+          '<div style="opacity:0.7; font-size:0.85rem; margin-bottom:10px;">Or enable local-only mode in Settings &rarr; Budget.</div>' +
+          '<button type="button" id="dm-rec-signin" style="padding:8px 16px; border:0; border-radius:6px; background:var(--color-accent); color:#fff; font-weight:600; cursor:pointer;">Sign in with Google</button>' +
+          '</div>';
+        var btn = document.getElementById('dm-rec-signin');
+        if (btn && window.dmSignIn) btn.addEventListener('click', function() { window.dmSignIn(); });
+      } else {
+        $('#dm-rec-body').innerHTML = '<div class="dm-rec-empty">Could not load rules.<br><small>' + escapeHtml(err.message || String(err)) + '</small></div>';
+      }
+    });
+  }
+
+  function init() {
+    $('#dm-rec-add').addEventListener('click', function() { showForm(null); });
+    $('#dm-rec-run').addEventListener('click', function() {
+      var btn = $('#dm-rec-run');
+      btn.disabled = true; btn.textContent = 'Running…';
+      window.dmBudget.runRecurringDue().then(function(r) {
+        btn.disabled = false; btn.textContent = 'Post due now';
+        if (window.dmAlert) {
+          var msg = r.posted === 0
+            ? 'No rules were due.'
+            : 'Posted ' + r.posted + ' transaction' + (r.posted === 1 ? '' : 's') +
+              (r.skipped ? ' (' + r.skipped + ' skipped as duplicates).' : '.');
+          window.dmAlert({ title: 'Recurring posts', message: msg });
+        }
+        refresh();
+      }).catch(function(err) {
+        btn.disabled = false; btn.textContent = 'Post due now';
+        if (window.dmAlert) window.dmAlert({ title: 'Error', message: err.message || String(err) });
+      });
+    });
+    refresh();
+    document.addEventListener('dm-budget-updated', refresh);
+    window.addEventListener('dm-budget-updated', refresh);
+    document.addEventListener('dm-recurring-updated', refresh);
+    document.addEventListener('dm-sync-complete', refresh);
+  }
+
+  function waitForBudget() {
+    return (window.dmAuthReady || Promise.resolve()).then(function() {
+      return new Promise(function(resolve) {
+        var tries = 0;
+        (function spin() {
+          if (window.dmBudget && window.dmBudget.runRecurringDue) return resolve(window.dmBudget);
+          if (++tries > 100) return resolve(null);
+          setTimeout(spin, 50);
+        })();
+      });
+    });
+  }
+
+  waitForBudget().then(function(api) {
+    if (!api) {
+      $('#dm-rec-body').innerHTML = '<div class="dm-rec-empty">Budget data layer not loaded. Please reload.</div>';
+      return;
+    }
+    init();
+  });
+})();
+</script>

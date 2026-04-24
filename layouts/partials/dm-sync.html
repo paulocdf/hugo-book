@@ -5789,6 +5789,201 @@
       if (isNaN(n)) return 0;
       if (negative) n = -Math.abs(n);
       return Math.round(n * 100);
+    },
+
+    // ── Recurring rules (Phase 2a) ──
+    // Fields (see serializeRecurring): name, accountId, categoryId, amount (cents, signed),
+    // frequency ('daily'|'weekly'|'monthly'|'yearly'), interval, byDayOfMonth, byDayOfWeek,
+    // startDate, endDate, nextDueDate (YYYY-MM-DD), autoPost, reminderOffsetDays,
+    // lastPostedDate, payee, memo.
+    getRecurring: function() {
+      return idbGetAll(STORE_RECURRING).then(function(items) {
+        return items.filter(function(r) { return !r.deletedAt; })
+                    .sort(function(a, b) {
+                      // Earliest next-due first; active rules before inactive
+                      if (a.autoPost !== b.autoPost) return a.autoPost ? -1 : 1;
+                      return (a.nextDueDate || '') < (b.nextDueDate || '') ? -1 : 1;
+                    });
+      });
+    },
+    getRecurringById: function(id) { return idbGet(STORE_RECURRING, id); },
+    createRecurring: function(data) {
+      var user = _budgetUser();
+      var id = data.id || _budgetId('rec');
+      var now = _budgetNow();
+      var startDate = data.startDate || new Date().toISOString().substr(0, 10);
+      var rule = {
+        id: id, userId: user.uid,
+        name: data.name || data.payee || 'Recurring',
+        accountId: data.accountId || '',
+        categoryId: data.categoryId || null,
+        amount: typeof data.amount === 'number' ? data.amount : 0,
+        frequency: data.frequency || 'monthly',
+        interval: typeof data.interval === 'number' && data.interval > 0 ? data.interval : 1,
+        byDayOfMonth: data.byDayOfMonth || null,
+        byDayOfWeek: data.byDayOfWeek || null,
+        startDate: startDate,
+        endDate: data.endDate || null,
+        nextDueDate: data.nextDueDate || startDate,
+        autoPost: data.autoPost !== false,
+        reminderOffsetDays: typeof data.reminderOffsetDays === 'number' ? data.reminderOffsetDays : 0,
+        lastPostedDate: null,
+        payee: data.payee || '',
+        memo: data.memo || '',
+        deletedAt: null,
+        createdAt: now, updatedAt: now
+      };
+      var fs = {
+        userId: user.uid, name: rule.name, accountId: rule.accountId, categoryId: rule.categoryId,
+        amount: rule.amount, frequency: rule.frequency, interval: rule.interval,
+        byDayOfMonth: rule.byDayOfMonth, byDayOfWeek: rule.byDayOfWeek,
+        startDate: rule.startDate, endDate: rule.endDate, nextDueDate: rule.nextDueDate,
+        autoPost: rule.autoPost, reminderOffsetDays: rule.reminderOffsetDays,
+        lastPostedDate: rule.lastPostedDate, payee: rule.payee, memo: rule.memo,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'recurring', docId: id, op: 'set', data: fs,
+        localOp: function() { return idbPut(STORE_RECURRING, rule); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-recurring-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+        return rule;
+      });
+    },
+    updateRecurring: function(id, updates) {
+      return idbGet(STORE_RECURRING, id).then(function(rule) {
+        if (!rule) return Promise.reject(new Error('Recurring rule not found'));
+        var fs = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        ['name','accountId','categoryId','amount','frequency','interval','byDayOfMonth','byDayOfWeek',
+         'startDate','endDate','nextDueDate','autoPost','reminderOffsetDays','lastPostedDate',
+         'payee','memo'].forEach(function(k) {
+          if (updates[k] !== undefined) { rule[k] = updates[k]; fs[k] = updates[k]; }
+        });
+        rule.updatedAt = _budgetNow();
+        return firestoreWrite({
+          collection: 'recurring', docId: id, op: 'update', data: fs,
+          localOp: function() { return idbPut(STORE_RECURRING, rule); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-recurring-updated'));
+          window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+          return rule;
+        });
+      });
+    },
+    deleteRecurring: function(id) {
+      // Hard delete (Phase 2a), consistent with categories/transactions.
+      return firestoreWrite({
+        collection: 'recurring', docId: id, op: 'delete', data: null,
+        localOp: function() { return idbDelete(STORE_RECURRING, id); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-recurring-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+      });
+    },
+
+    // Pure function: advance a YYYY-MM-DD date by {frequency, interval}.
+    // Returns the next YYYY-MM-DD. Month arithmetic clamps to last day of month
+    // (e.g. Jan 31 + 1 month → Feb 28/29).
+    computeNextDate: function(dateStr, frequency, interval) {
+      if (!dateStr) return '';
+      var n = (typeof interval === 'number' && interval > 0) ? interval : 1;
+      var parts = dateStr.split('-');
+      var y = parseInt(parts[0], 10);
+      var m = parseInt(parts[1], 10) - 1;
+      var d = parseInt(parts[2], 10);
+      function fmt(date) {
+        // Format from local fields; avoid toISOString which drifts across TZs.
+        var yy = date.getFullYear();
+        var mm = ('0' + (date.getMonth() + 1)).slice(-2);
+        var dd = ('0' + date.getDate()).slice(-2);
+        return yy + '-' + mm + '-' + dd;
+      }
+      if (frequency === 'daily') {
+        return fmt(new Date(y, m, d + n));
+      }
+      if (frequency === 'weekly') {
+        return fmt(new Date(y, m, d + n * 7));
+      }
+      if (frequency === 'yearly') {
+        var yy = new Date(y + n, m, d);
+        // Clamp Feb 29 → Feb 28 on non-leap years (Date auto-rolls to Mar 1,
+        // which would push us out of the target month)
+        if (yy.getMonth() !== m) yy = new Date(y + n, m + 1, 0);
+        return fmt(yy);
+      }
+      // monthly (default): clamp day to last day of target month
+      var targetMonth = m + n;
+      var targetYear = y + Math.floor(targetMonth / 12);
+      targetMonth = ((targetMonth % 12) + 12) % 12;
+      var lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+      var day = Math.min(d, lastDay);
+      return fmt(new Date(targetYear, targetMonth, day));
+    },
+
+    // Auto-post scheduler: iterate active rules and post any due occurrences.
+    // Idempotent — guards against double-posting via recurringId + date match.
+    // Backfills up to 90 days to cap runaway loops on stale rules.
+    runRecurringDue: function(opts) {
+      opts = opts || {};
+      var today = opts.today || new Date().toISOString().substr(0, 10);
+      var backfillCapDays = typeof opts.backfillCapDays === 'number' ? opts.backfillCapDays : 90;
+      var api = window.dmBudget;
+      return api.getRecurring().then(function(rules) {
+        var due = rules.filter(function(r) {
+          return r.autoPost && r.nextDueDate && r.nextDueDate <= today
+                 && (!r.endDate || r.nextDueDate <= r.endDate);
+        });
+        if (due.length === 0) return { posted: 0, skipped: 0 };
+        // Process serially to avoid write contention
+        var posted = 0, skipped = 0;
+        var chain = Promise.resolve();
+        due.forEach(function(rule) {
+          chain = chain.then(function() { return processOneRule(rule, today, backfillCapDays); })
+                       .then(function(r) { posted += r.posted; skipped += r.skipped; });
+        });
+        return chain.then(function() {
+          if (posted > 0) {
+            window.dispatchEvent(new CustomEvent('dm-recurring-updated'));
+            window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+          }
+          return { posted: posted, skipped: skipped };
+        });
+      });
+
+      function processOneRule(rule, todayStr, capDays) {
+        var posted = 0, skipped = 0;
+        var loopCount = 0;
+        var maxLoops = Math.max(1, Math.floor(capDays / 1)) + 5; // hard safety
+        function step() {
+          if (!rule.nextDueDate || rule.nextDueDate > todayStr) return { posted: posted, skipped: skipped };
+          if (rule.endDate && rule.nextDueDate > rule.endDate) return { posted: posted, skipped: skipped };
+          if (++loopCount > maxLoops) return { posted: posted, skipped: skipped };
+          var dueDate = rule.nextDueDate;
+          // Idempotency guard: look for an existing transaction with this recurringId + date
+          return api.getTransactions({}).then(function(txs) {
+            var exists = txs.some(function(t) {
+              return t.recurringId === rule.id && t.date === dueDate;
+            });
+            var postOp = exists
+              ? Promise.resolve().then(function() { skipped++; })
+              : api.createTransaction({
+                  accountId: rule.accountId, categoryId: rule.categoryId,
+                  amount: rule.amount, date: dueDate, payee: rule.payee, memo: rule.memo,
+                  source: 'recurring', recurringId: rule.id
+                }).then(function() { posted++; });
+            return postOp.then(function() {
+              var next = api.computeNextDate(dueDate, rule.frequency, rule.interval);
+              return api.updateRecurring(rule.id, {
+                nextDueDate: next,
+                lastPostedDate: exists ? rule.lastPostedDate : dueDate
+              }).then(function(updated) { rule = updated; return step(); });
+            });
+          });
+        }
+        return step();
+      }
     }
   };
 
@@ -5860,6 +6055,22 @@
             migrateDeduplicateKanbanColumns(user.uid).catch(function(err) {
               console.warn('[dm-sync] Dedup migration error:', err);
             });
+            // Run recurring auto-post scheduler once after sync, then hourly.
+            // Non-blocking — failures are logged but don't block the rest of startup.
+            if (window.dmBudget && window.dmBudget.runRecurringDue) {
+              window.dmBudget.runRecurringDue().catch(function(err) {
+                console.warn('[dm-sync] Recurring auto-post error:', err);
+              });
+              if (!window._dmRecurringInterval) {
+                window._dmRecurringInterval = setInterval(function() {
+                  if (window.dmAuth && window.dmAuth.currentUser && window.dmBudget && window.dmBudget.runRecurringDue) {
+                    window.dmBudget.runRecurringDue().catch(function(err) {
+                      console.warn('[dm-sync] Recurring auto-post error:', err);
+                    });
+                  }
+                }, 60 * 60 * 1000); // every hour
+              }
+            }
             startBackgroundSync(user.uid);
             startSharedTaskListeners(user.uid);
             startSharedNoteListeners(user.uid);
