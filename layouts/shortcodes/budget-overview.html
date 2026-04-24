@@ -86,11 +86,33 @@
   .dm-cat-list { display: flex; flex-direction: column; gap: 6px; }
   .dm-cat-row {
     display: grid;
-    grid-template-columns: 14px minmax(0, 2fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr) auto;
+    grid-template-columns: 14px minmax(0, 2fr) minmax(120px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr) auto auto;
     gap: 10px; align-items: center;
     padding: 10px 12px;
     border: 1px solid var(--gray-200); border-radius: 8px;
     background: var(--body-background);
+  }
+  .dm-cat-budgeted {
+    display: flex; flex-direction: column; align-items: flex-end; gap: 1px;
+  }
+  .dm-cat-rollin {
+    font-size: 0.7rem; opacity: 0.7; font-variant-numeric: tabular-nums;
+    color: var(--color-accent);
+  }
+  .dm-cat-rollin::before { content: '+ '; opacity: 0.6; }
+  .dm-cat-rollover {
+    border: 1px solid var(--gray-200); background: transparent;
+    color: var(--body-font-color);
+    width: 26px; height: 26px; border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0.4; padding: 0;
+    transition: background 0.15s, color 0.15s, opacity 0.15s;
+  }
+  .dm-cat-row:hover .dm-cat-rollover { opacity: 0.75; }
+  .dm-cat-rollover:hover { opacity: 1 !important; }
+  .dm-cat-rollover.active {
+    background: var(--color-accent); color: #fff;
+    border-color: var(--color-accent); opacity: 1;
   }
   .dm-cat-row.over { border-color: #e53935; }
   .dm-cat-swatch { width: 12px; height: 12px; border-radius: 50%; }
@@ -132,7 +154,7 @@
 
   .dm-cat-header {
     display: grid;
-    grid-template-columns: 14px minmax(0, 2fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr) auto;
+    grid-template-columns: 14px minmax(0, 2fr) minmax(120px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr) auto auto;
     gap: 10px; padding: 0 12px 6px;
     font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
     opacity: 0.6;
@@ -260,6 +282,7 @@
         '<span class="h-amt">Budgeted</span>' +
         '<span class="h-amt">Spent</span>' +
         '<span class="h-amt">Remaining</span>' +
+        '<span title="Roll leftover into next month">Rollover</span>' +
         '<span></span>' +
       '</div>' +
       '<div class="dm-cat-list" id="dm-bgt-cats"></div>' +
@@ -320,11 +343,16 @@
     summary.categories.forEach(function(r) {
       if (r.kind !== 'income') totalSpent += r.spent;
     });
+    var effectiveAllocated = (summary.allocated || 0) + (summary.rolledOver || 0);
+    var rolledCard = (summary.rolledOver || 0) > 0
+      ? '<div class="dm-budget-stat"><div class="label">Rolled over</div><div class="value">' + fm(summary.rolledOver) + '</div></div>'
+      : '';
     document.getElementById('dm-bgt-summary').innerHTML = '' +
       '<div class="dm-budget-stat income"><div class="label">Income this month</div><div class="value">' + fm(summary.income) + '</div></div>' +
       '<div class="dm-budget-stat"><div class="label">Allocated</div><div class="value">' + fm(summary.allocated) + '</div></div>' +
+      rolledCard +
       '<div class="dm-budget-stat spent"><div class="label">Spent</div><div class="value">' + fm(totalSpent) + '</div></div>' +
-      '<div class="dm-budget-stat"><div class="label">Left to spend</div><div class="value">' + fm(summary.allocated - totalSpent) + '</div></div>';
+      '<div class="dm-budget-stat"><div class="label">Left to spend</div><div class="value">' + fm(effectiveAllocated - totalSpent) + '</div></div>';
   }
 
   function renderCategories(summary) {
@@ -341,13 +369,26 @@
       var remClass = r.remaining < 0 ? 'dm-cat-remaining neg' : (r.remaining > 0 ? 'dm-cat-remaining pos' : 'dm-cat-remaining');
       var spentClass = r.spent === 0 ? 'dm-cat-spent zero' : 'dm-cat-spent';
       var kindPill = r.kind === 'income' ? '<span class="kind-pill">income</span>' : '';
+      var rollInChip = r.rolledOverCents > 0
+        ? '<span class="dm-cat-rollin" title="Rolled over from prior month">' + fm(r.rolledOverCents) + '</span>'
+        : '';
+      var rollClass = r.rollover ? 'dm-cat-rollover active' : 'dm-cat-rollover';
+      var rollTitle = r.rollover
+        ? 'Rollover on: leftover carries into next month'
+        : 'Rollover off: click to carry leftover to next month';
       return '' +
         '<div class="dm-cat-row' + (over ? ' over' : '') + '" data-cat="' + escapeHtml(r.id) + '">' +
           '<span class="dm-cat-swatch" style="background:' + escapeHtml(r.color) + '"></span>' +
           '<span class="dm-cat-name">' + escapeHtml(r.name) + kindPill + '</span>' +
-          '<input type="text" class="dm-cat-input" data-cat-input="' + escapeHtml(r.id) + '" value="' + (r.allocated / 100).toFixed(2) + '" inputmode="decimal">' +
+          '<span class="dm-cat-budgeted">' +
+            '<input type="text" class="dm-cat-input" data-cat-input="' + escapeHtml(r.id) + '" value="' + (r.allocated / 100).toFixed(2) + '" inputmode="decimal">' +
+            rollInChip +
+          '</span>' +
           '<span class="' + spentClass + '">' + fm(r.spent) + '</span>' +
           '<span class="' + remClass + '">' + fm(r.remaining) + '</span>' +
+          '<button type="button" class="' + rollClass + '" data-cat-rollover="' + escapeHtml(r.id) + '" data-rollover="' + (r.rollover ? '1' : '0') + '" title="' + escapeHtml(rollTitle) + '" aria-pressed="' + (r.rollover ? 'true' : 'false') + '" aria-label="Toggle rollover">' +
+            '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-repeat"/></svg>' +
+          '</button>' +
           '<button class="dm-cat-del" data-cat-del="' + escapeHtml(r.id) + '" title="Delete category">' +
             '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>' +
           '</button>' +
@@ -362,6 +403,9 @@
       input.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
       });
+    });
+    list.querySelectorAll('[data-cat-rollover]').forEach(function(btn) {
+      btn.addEventListener('click', handleRolloverToggle);
     });
     list.querySelectorAll('[data-cat-del]').forEach(function(btn) {
       btn.addEventListener('click', function() {
@@ -398,7 +442,23 @@
     var catId = input.getAttribute('data-cat-input');
     var cents = window.dmBudget.parseMoney(input.value);
     if (cents < 0) cents = 0;
-    window.dmBudget.setBudget(currentMonth, catId, cents).then(refresh);
+    // Preserve existing rollover flag (read from sibling toggle)
+    var row = input.closest('.dm-cat-row');
+    var toggle = row && row.querySelector('[data-cat-rollover]');
+    var rollover = toggle ? toggle.getAttribute('data-rollover') === '1' : false;
+    window.dmBudget.setBudget(currentMonth, catId, cents, { rollover: rollover }).then(refresh);
+  }
+
+  function handleRolloverToggle(e) {
+    var btn = e.currentTarget;
+    var catId = btn.getAttribute('data-cat-rollover');
+    var nextFlag = btn.getAttribute('data-rollover') !== '1';
+    // Preserve current allocation (read from sibling input)
+    var row = btn.closest('.dm-cat-row');
+    var input = row && row.querySelector('[data-cat-input]');
+    var cents = input ? window.dmBudget.parseMoney(input.value) : 0;
+    if (cents < 0) cents = 0;
+    window.dmBudget.setBudget(currentMonth, catId, cents, { rollover: nextFlag }).then(refresh);
   }
 
   function renderCategorySelect(cats) {

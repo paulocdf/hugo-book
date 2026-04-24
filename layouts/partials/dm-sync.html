@@ -5704,43 +5704,109 @@
     },
 
     // ── Month summary (envelope view) ──
-    // Returns: { month, currency, toBeBudgeted, categories: [{id, name, kind, color, allocated, spent, remaining, pctUsed, rollover}] }
+    // Returns: { month, currency, income, allocated, rolledOver, toBeBudgeted,
+    //            categories: [{id, name, kind, color, allocated, rolledOverCents,
+    //                          effectiveAllocated, spent, remaining, pctUsed, rollover}] }
+    //
+    // Rollover logic: if a category's budget doc in month M has `rollover: true`,
+    // its leftover (max(0, allocated + rolloverIn − spent)) carries into M+1.
+    // rolloverIn(M) for a category walks backward through consecutive rollover-true
+    // months (up to 24), then accumulates forward. rolloverIn for the currently
+    // displayed month is exposed as `rolledOverCents` per row and summed into
+    // `effectiveAllocated` (= allocated + rolledOverCents).
     getMonthSummary: function(month) {
       month = month || _currentMonth();
       return Promise.all([
         window.dmBudget.getCategories(),
-        window.dmBudget.getBudgetsForMonth(month),
-        window.dmBudget.getTransactions({ month: month })
+        idbGetAll(STORE_BUDGETS),
+        idbGetAll(STORE_TRANSACTIONS)
       ]).then(function(r) {
-        var cats = r[0], budgets = r[1], txs = r[2];
-        var bgtByCat = {};
-        budgets.forEach(function(b) { bgtByCat[b.categoryId] = b; });
-        var spentByCat = {};
-        var incomeTotal = 0;
-        txs.forEach(function(t) {
-          if (!t.categoryId) return;
-          spentByCat[t.categoryId] = (spentByCat[t.categoryId] || 0) + t.amount;
+        var cats = r[0];
+        var allBudgets = r[1] || [];
+        var allTxs = (r[2] || []).filter(function(t) { return !t.deletedAt; });
+
+        // Index: budgets by "{categoryId}|{month}"
+        var bgtByCatMonth = {};
+        allBudgets.forEach(function(b) {
+          if (b && b.categoryId && b.month) {
+            bgtByCatMonth[b.categoryId + '|' + b.month] = b;
+          }
         });
-        // Income = positive amounts tagged to income-kind categories (or uncategorized positives)
-        txs.forEach(function(t) {
+
+        // Index: per-(cat,month) spent magnitude and raw sum
+        var spendByCatMonth = {};
+        allTxs.forEach(function(t) {
+          if (!t.categoryId || !t.date) return;
+          var m = t.date.substr(0, 7);
+          var key = t.categoryId + '|' + m;
+          if (!spendByCatMonth[key]) spendByCatMonth[key] = { spent: 0, rawSum: 0 };
+          spendByCatMonth[key].rawSum += (t.amount || 0);
+          if (t.amount < 0) spendByCatMonth[key].spent += -t.amount;
+        });
+
+        function prevMonth(ym) {
+          var y = parseInt(ym.substr(0, 4), 10);
+          var mm = parseInt(ym.substr(5, 2), 10);
+          mm--;
+          if (mm === 0) { y--; mm = 12; }
+          return y + '-' + (mm < 10 ? '0' : '') + mm;
+        }
+
+        function computeRolloverIn(catId, curMonth) {
+          // Walk backward while budget exists AND rollover is true,
+          // collecting the chain; stop at first month with no budget or rollover=false.
+          var MAX = 24;
+          var chain = []; // oldest first
+          var m = prevMonth(curMonth);
+          for (var i = 0; i < MAX; i++) {
+            var b = bgtByCatMonth[catId + '|' + m];
+            if (!b || !b.rollover) break;
+            var s = (spendByCatMonth[catId + '|' + m] || { spent: 0 }).spent;
+            chain.unshift({ allocated: b.allocated || 0, spent: s });
+            m = prevMonth(m);
+          }
+          // Walk forward accumulating leftover
+          var leftover = 0;
+          for (var j = 0; j < chain.length; j++) {
+            var row = chain[j];
+            leftover = Math.max(0, row.allocated + leftover - row.spent);
+          }
+          return leftover;
+        }
+
+        // Current-month income: positive amounts tagged to income-kind categories
+        // (or uncategorized positives).
+        var incomeTotal = 0;
+        allTxs.forEach(function(t) {
+          if (!t.date || t.date.substr(0, 7) !== month) return;
           if (t.amount > 0) {
-            var c = t.categoryId ? (cats.filter(function(x){return x.id===t.categoryId;})[0]) : null;
+            var c = t.categoryId ? (cats.filter(function(x) { return x.id === t.categoryId; })[0]) : null;
             if (!c || c.kind === 'income') incomeTotal += t.amount;
           }
         });
+
         var allocatedTotal = 0;
+        var rolledOverTotal = 0;
         var rows = cats.map(function(c) {
-          var b = bgtByCat[c.id];
-          var allocated = b ? b.allocated : 0;
-          // Spending on expense categories is negative; display spent as positive magnitude
-          var raw = spentByCat[c.id] || 0;
-          var spent = c.kind === 'income' ? raw : Math.abs(Math.min(raw, 0));
-          var remaining = allocated - spent;
-          var pct = allocated > 0 ? Math.min(100, Math.round(spent / allocated * 100)) : (spent > 0 ? 100 : 0);
+          var b = bgtByCatMonth[c.id + '|' + month];
+          var allocated = b ? (b.allocated || 0) : 0;
+          var entry = spendByCatMonth[c.id + '|' + month] || { spent: 0, rawSum: 0 };
+          // Expense cats: spent = magnitude of outflows. Income cats: spent mirrors rawSum.
+          var spent = c.kind === 'income' ? entry.rawSum : entry.spent;
+          var rolledOver = computeRolloverIn(c.id, month);
+          var effectiveAllocated = allocated + rolledOver;
+          var remaining = effectiveAllocated - spent;
+          var pct = effectiveAllocated > 0
+            ? Math.min(100, Math.round(spent / effectiveAllocated * 100))
+            : (spent > 0 ? 100 : 0);
           allocatedTotal += allocated;
+          rolledOverTotal += rolledOver;
           return {
             id: c.id, name: c.name, kind: c.kind, color: c.color, parentId: c.parentId,
-            allocated: allocated, spent: spent, remaining: remaining, pctUsed: pct,
+            allocated: allocated,
+            rolledOverCents: rolledOver,
+            effectiveAllocated: effectiveAllocated,
+            spent: spent, remaining: remaining, pctUsed: pct,
             rollover: b ? !!b.rollover : false, note: b ? b.note : ''
           };
         });
@@ -5749,6 +5815,7 @@
           currency: window.dmBudget.getCurrency(),
           income: incomeTotal,
           allocated: allocatedTotal,
+          rolledOver: rolledOverTotal,
           toBeBudgeted: incomeTotal - allocatedTotal,
           categories: rows
         };
