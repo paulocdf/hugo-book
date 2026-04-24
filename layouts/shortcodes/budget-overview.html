@@ -214,7 +214,16 @@
 
   function waitForAuth() {
     return (window.dmAuthReady || Promise.resolve()).then(function() {
-      return window.dmBudget;
+      // dm-sync.html may still be evaluating when dmAuthReady resolves (especially
+      // under fast mock-auth in tests). Poll briefly for window.dmBudget.
+      return new Promise(function(resolve) {
+        var tries = 0;
+        (function spin() {
+          if (window.dmBudget) return resolve(window.dmBudget);
+          if (++tries > 100) return resolve(null); // ~5s max
+          setTimeout(spin, 50);
+        })();
+      });
     });
   }
 

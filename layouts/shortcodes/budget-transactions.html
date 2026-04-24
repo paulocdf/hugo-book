@@ -300,8 +300,24 @@
     document.addEventListener('dm-sync-complete', refresh);
   }
 
-  (window.dmAuthReady || Promise.resolve()).then(function() {
-    if (!window.dmBudget) {
+  function waitForBudget() {
+    return (window.dmAuthReady || Promise.resolve()).then(function() {
+      // dm-sync.html may still be evaluating when dmAuthReady resolves
+      // (especially under fast mock-auth in tests). Poll briefly for
+      // window.dmBudget before giving up.
+      return new Promise(function(resolve) {
+        var tries = 0;
+        (function spin() {
+          if (window.dmBudget) return resolve(window.dmBudget);
+          if (++tries > 100) return resolve(null); // ~5s max
+          setTimeout(spin, 50);
+        })();
+      });
+    });
+  }
+
+  waitForBudget().then(function(api) {
+    if (!api) {
       $('#dm-tx-body').innerHTML = '<div class="dm-tx-empty">Budget data layer not loaded. Please reload.</div>';
       return;
     }
