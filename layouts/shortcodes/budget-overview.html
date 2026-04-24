@@ -358,9 +358,12 @@
       btn.addEventListener('click', function() {
         var catId = btn.getAttribute('data-cat-del');
         if (!window.dmConfirm) return removeCategory(catId);
-        window.dmConfirm('Delete this category? Transactions will be kept but uncategorized.', function() {
-          removeCategory(catId);
-        });
+        window.dmConfirm({
+          title: 'Delete category?',
+          message: 'Transactions will be kept but uncategorized.',
+          confirmLabel: 'Delete',
+          danger: true
+        }).then(function(ok) { if (ok) removeCategory(catId); });
       });
     });
   }
@@ -425,7 +428,7 @@
       refresh();
     }).catch(function(err) {
       console.error('[budget] quick-add failed:', err);
-      if (window.dmAlert) window.dmAlert('Could not save transaction: ' + err.message);
+      if (window.dmAlert) window.dmAlert({ title: 'Could not save transaction', message: err.message || String(err) });
     });
   }
 
@@ -441,7 +444,7 @@
       refresh();
     }).catch(function(err) {
       console.error('[budget] add category failed:', err);
-      if (window.dmAlert) window.dmAlert('Could not add category: ' + err.message);
+      if (window.dmAlert) window.dmAlert({ title: 'Could not add category', message: err.message || String(err) });
     });
   }
 
@@ -466,7 +469,20 @@
     }).catch(function(err) {
       console.error('[budget] refresh failed:', err);
       var body = document.getElementById('dm-budget-body');
-      if (body) body.innerHTML = '<div class="dm-budget-empty">Sign in to start budgeting.<br><small>' + escapeHtml(err.message) + '</small></div>';
+      if (!body) return;
+      var localOnly = window.dmBudget && window.dmBudget.isLocalOnly && window.dmBudget.isLocalOnly();
+      var signedIn = window.dmAuth && window.dmAuth.currentUser;
+      if (!signedIn && !localOnly) {
+        body.innerHTML = '<div class="dm-budget-empty">' +
+          '<div style="font-size:1.05rem; margin-bottom:4px;">Sign in to start budgeting</div>' +
+          '<div style="opacity:0.7; font-size:0.85rem; margin-bottom:10px;">Or enable local-only mode in Settings &rarr; Budget to use without an account.</div>' +
+          '<button type="button" id="dm-bgt-signin">Sign in with Google</button>' +
+          '</div>';
+        var btn = document.getElementById('dm-bgt-signin');
+        if (btn && window.dmSignIn) btn.addEventListener('click', function() { window.dmSignIn(); });
+      } else {
+        body.innerHTML = '<div class="dm-budget-empty">Could not load budget.<br><small>' + escapeHtml(err.message || String(err)) + '</small></div>';
+      }
     });
   }
 

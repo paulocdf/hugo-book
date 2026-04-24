@@ -213,8 +213,13 @@
       btn.addEventListener('click', function() {
         var id = btn.getAttribute('data-tx-del');
         if (window.dmConfirm) {
-          window.dmConfirm('Delete this transaction? This cannot be undone.', function() {
-            window.dmBudget.deleteTransaction(id).then(refresh);
+          window.dmConfirm({
+            title: 'Delete transaction?',
+            message: 'This cannot be undone.',
+            confirmLabel: 'Delete',
+            danger: true
+          }).then(function(ok) {
+            if (ok) window.dmBudget.deleteTransaction(id).then(refresh);
           });
         } else {
           window.dmBudget.deleteTransaction(id).then(refresh);
@@ -268,7 +273,19 @@
       renderTable(applyFilters(_allTx), _allCats);
     }).catch(function(err) {
       console.error('[budget/tx] refresh failed:', err);
-      $('#dm-tx-body').innerHTML = '<div class="dm-tx-empty">Sign in to view transactions.<br><small>' + escapeHtml(err.message) + '</small></div>';
+      var localOnly = window.dmBudget && window.dmBudget.isLocalOnly && window.dmBudget.isLocalOnly();
+      var signedIn = window.dmAuth && window.dmAuth.currentUser;
+      if (!signedIn && !localOnly) {
+        $('#dm-tx-body').innerHTML = '<div class="dm-tx-empty">' +
+          '<div style="margin-bottom:4px;">Sign in to view transactions</div>' +
+          '<div style="opacity:0.7; font-size:0.85rem; margin-bottom:10px;">Or enable local-only mode in Settings &rarr; Budget.</div>' +
+          '<button type="button" id="dm-tx-signin" style="padding:8px 16px; border:0; border-radius:6px; background:var(--color-accent); color:#fff; font-weight:600; cursor:pointer;">Sign in with Google</button>' +
+          '</div>';
+        var btn = document.getElementById('dm-tx-signin');
+        if (btn && window.dmSignIn) btn.addEventListener('click', function() { window.dmSignIn(); });
+      } else {
+        $('#dm-tx-body').innerHTML = '<div class="dm-tx-empty">Could not load transactions.<br><small>' + escapeHtml(err.message || String(err)) + '</small></div>';
+      }
     });
   }
 
