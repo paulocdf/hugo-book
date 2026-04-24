@@ -4790,6 +4790,19 @@
       '<a href="' + sectionUrl('dashboard') + '"' + dashboardActive + '>' + ICONS.dashboard + 'Dashboard</a>' +
       '</li>';
 
+    // Budget section (collapsible)
+    var budgetBase2 = sectionUrl('budget');
+    var budgetPath2 = window.location.pathname;
+    var budgetOverviewActive2 = (budgetPath2 === budgetBase2 || budgetPath2 === budgetBase2.replace(/\/$/, '')) ? ' class="active"' : '';
+    var budgetTxActive2 = budgetPath2.indexOf('/docs/budget/transactions') !== -1 ? ' class="active"' : '';
+    var budgetRecActive2 = budgetPath2.indexOf('/docs/budget/recurring') !== -1 ? ' class="active"' : '';
+    var budgetChildren2 = '';
+    budgetChildren2 += '<li class="sidebar-item" data-section="budget-overview"><a href="' + budgetBase2 + '"' + budgetOverviewActive2 + '>Overview</a></li>';
+    budgetChildren2 += '<li class="sidebar-item" data-section="budget-transactions"><a href="' + budgetBase2 + 'transactions/"' + budgetTxActive2 + '>Transactions</a></li>';
+    budgetChildren2 += '<li class="sidebar-item" data-section="budget-recurring"><a href="' + budgetBase2 + 'recurring/"' + budgetRecActive2 + '>Recurring</a></li>';
+    var budgetOpen2 = budgetPath2.indexOf('/docs/budget') !== -1;
+    html += buildSectionHtml('Budget', ICONS.budget, budgetBase2, budgetChildren2, budgetOpen2);
+
     var aiActive = window.location.pathname.indexOf('/docs/ai') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item sidebar-ai" data-section="ai">' +
       '<a href="' + sectionUrl('ai') + '"' + aiActive + '>' + ICONS.ai + 'AI</a>' +
