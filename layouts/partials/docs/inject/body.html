@@ -799,27 +799,47 @@
   // =========================================================================
   // Feedback (success / error overlay)
   // =========================================================================
-  function showFeedback(type, message) {
+  function showFeedback(type, message, opts) {
     if (!feedbackEl) return;
     feedbackEl.className = 'qc-feedback qc-feedback--' + type;
     feedbackEl.style.display = '';
 
     if (type === 'success') {
       feedbackIconEl.innerHTML = '<svg class="dm-icon dm-icon--check-circle" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check-circle"/></svg>';
+    } else if (type === 'info') {
+      feedbackIconEl.innerHTML = '<svg class="dm-icon dm-icon--sparkles" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-sparkles"/></svg>';
     } else {
       feedbackIconEl.innerHTML = '<svg class="dm-icon dm-icon--x" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-x"/></svg>';
     }
     feedbackTextEl.textContent = message;
+
+    // Optional action button (e.g. "Try AI parse")
+    var existingBtn = feedbackEl.querySelector('.qc-feedback-action');
+    if (existingBtn && existingBtn.parentNode) existingBtn.parentNode.removeChild(existingBtn);
+    if (opts && opts.action && typeof opts.action.handler === 'function') {
+      var btnEl = document.createElement('button');
+      btnEl.type = 'button';
+      btnEl.className = 'qc-feedback-action';
+      btnEl.textContent = opts.action.label || 'Retry';
+      btnEl.style.cssText = 'margin-left:10px;padding:4px 10px;border:1px solid var(--color-accent,#4a90e2);background:transparent;color:var(--color-accent,#4a90e2);border-radius:6px;cursor:pointer;font-size:0.85rem';
+      btnEl.addEventListener('click', function() {
+        feedbackEl.style.display = 'none';
+        opts.action.handler();
+      });
+      feedbackTextEl.appendChild(btnEl);
+    }
 
     if (type === 'success') {
       setTimeout(function() {
         feedbackEl.style.display = 'none';
         closeModal();
       }, 1200);
+    } else if (type === 'info') {
+      // Stay visible until replaced
     } else {
       setTimeout(function() {
         feedbackEl.style.display = 'none';
-      }, 3000);
+      }, opts && opts.action ? 8000 : 3000);
     }
   }
 
@@ -2339,10 +2359,43 @@
 
     var parsed = parseExpenseText(raw);
     if (parsed.error === 'no-amount' || !parsed.amount) {
-      showFeedback('error', 'Could not parse an amount. Try "$12.50 coffee".');
+      // Offer AI fallback when a cloud provider is configured
+      var canAiParse = !!(window.dmAI && typeof window.dmAI.parseExpense === 'function' && typeof window.dmAI.isCloudProvider === 'function' && window.dmAI.isCloudProvider());
+      if (canAiParse) {
+        showFeedback('error', 'Could not parse an amount. Try "$12.50 coffee", or:', {
+          action: { label: 'Try AI parse', handler: function() { aiParseAndSubmit(raw); } }
+        });
+      } else {
+        showFeedback('error', 'Could not parse an amount. Try "$12.50 coffee".');
+      }
       return;
     }
 
+    finalizeExpense(raw, parsed);
+  }
+
+  function aiParseAndSubmit(raw) {
+    if (!window.dmAI || typeof window.dmAI.parseExpense !== 'function') return;
+    isSaving = true;
+    submitBtn.disabled = true;
+    showFeedback('info', 'Asking AI to parse…');
+    window.dmAI.parseExpense(raw).then(function(aiParsed) {
+      if (!aiParsed || !aiParsed.amount) {
+        isSaving = false;
+        submitBtn.disabled = false;
+        showFeedback('error', 'AI could not extract an amount. Please rephrase.');
+        return;
+      }
+      finalizeExpense(raw, aiParsed);
+    }).catch(function(err) {
+      console.error('AI parse error:', err);
+      isSaving = false;
+      submitBtn.disabled = false;
+      showFeedback('error', 'AI parse failed: ' + (err && err.message ? err.message : 'unknown error'));
+    });
+  }
+
+  function finalizeExpense(raw, parsed) {
     isSaving = true;
     submitBtn.disabled = true;
 
@@ -3659,6 +3712,11 @@
     el = document.getElementById('setting-ai-custom-context');
     if (el) el.value = customCtx;
 
+    var includeBudget = false;
+    try { includeBudget = localStorage.getItem('dm-ai-include-budget') === '1'; } catch(e) {}
+    el = document.getElementById('setting-ai-include-budget');
+    if (el) el.checked = includeBudget;
+
     // ─── Budget settings ───
     var budgetCurrency = 'USD';
     try {
@@ -4029,6 +4087,13 @@
               '<label class="settings-modal-label" for="setting-ai-custom-context">Custom context</label>' +
             '</div>' +
             '<textarea class="settings-modal-textarea" id="setting-ai-custom-context" placeholder="e.g. I\'m a software engineer. I prefer short actionable tasks." rows="3"></textarea>' +
+            '<div class="settings-modal-row" style="margin-top:10px">' +
+              '<label class="settings-modal-label" for="setting-ai-include-budget" style="cursor:pointer">Include budget context</label>' +
+              '<div class="settings-modal-control" style="display:flex;gap:8px;align-items:center">' +
+                '<input type="checkbox" id="setting-ai-include-budget" />' +
+                '<span style="font-size:0.8rem;opacity:0.7">Send monthly totals and recent transactions to cloud providers (OpenAI/Gemini only)</span>' +
+              '</div>' +
+            '</div>' +
           '</div>' +
 
           // ─── Google Calendar section ───
@@ -4435,6 +4500,14 @@
           try { localStorage.setItem('dm-ai-custom-context', aiContextEl.value); } catch(e) {}
           _contextSaveTimer = null;
         }, 500);
+      });
+    }
+
+    var aiIncludeBudgetEl = document.getElementById('setting-ai-include-budget');
+    if (aiIncludeBudgetEl) {
+      aiIncludeBudgetEl.addEventListener('change', function() {
+        try { localStorage.setItem('dm-ai-include-budget', aiIncludeBudgetEl.checked ? '1' : '0'); } catch(e) {}
+        document.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-ai-include-budget', value: aiIncludeBudgetEl.checked } }));
       });
     }
 

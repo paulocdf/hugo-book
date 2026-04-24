@@ -836,6 +836,7 @@
   var LS_KEY_OPENAI_MODEL = 'dm-ai-openai-model'; // 'gpt-4o-mini' | 'gpt-4o' | 'gpt-4-turbo'
   var LS_KEY_GEMINI_KEY = 'dm-ai-gemini-key';
   var LS_KEY_GEMINI_MODEL = 'dm-ai-gemini-model'; // 'gemini-2.0-flash' | 'gemini-2.0-flash-lite' | 'gemini-1.5-flash'
+  var LS_KEY_INCLUDE_BUDGET = 'dm-ai-include-budget'; // '1' to include budget summary in cloud system prompt
   var SS_KEY_MESSAGES = 'dm-ai-messages';
   var SS_KEY_PANEL = 'dm-ai-panel-open';
 
@@ -1018,7 +1019,7 @@
   }
 
   // ─── Enhanced system prompt for ChatGPT (richer than Qwen's) ───
-  function buildOpenAISystemPrompt(tasks, projectMap) {
+  function buildOpenAISystemPrompt(tasks, projectMap, budgetCtx) {
     var now = new Date();
     var todayStr = now.toISOString().split('T')[0];
     var dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()];
@@ -1072,8 +1073,7 @@
 
     if (!tasks || tasks.length === 0) {
       prompt += '## Tasks\nThe user has no tasks yet. Suggest they start by adding tasks for today.\n';
-      return prompt;
-    }
+    } else {
 
     // Categorize tasks
     var pending = [];
@@ -1225,8 +1225,196 @@
       });
       if (unscheduled.length > 10) prompt += '- +' + (unscheduled.length - 10) + ' more\n';
     }
+    }
+
+    // ─── Financial context (opt-in, cloud providers only) ───
+    if (budgetCtx && budgetCtx.summary) {
+      var s = budgetCtx.summary;
+      var ccy = s.currency || 'USD';
+      var fm = function(cents) {
+        if (window.dmBudget && window.dmBudget.formatMoney) {
+          return window.dmBudget.formatMoney(cents, { currency: ccy });
+        }
+        return (cents / 100).toFixed(2) + ' ' + ccy;
+      };
+      prompt += '\n## Financial Context (' + s.month + ')\n';
+      prompt += '- Income this month: ' + fm(s.income || 0) + '\n';
+      prompt += '- Allocated: ' + fm(s.allocated || 0);
+      if (s.rolledOver > 0) prompt += ' (+ ' + fm(s.rolledOver) + ' rolled over)';
+      prompt += '\n';
+      var totalSpent = 0;
+      (s.categories || []).forEach(function(c) { if (c.kind !== 'income') totalSpent += (c.spent || 0); });
+      prompt += '- Spent: ' + fm(totalSpent) + '\n';
+      prompt += '- To be budgeted: ' + fm(s.toBeBudgeted || 0) + '\n';
+      var over = (s.categories || []).filter(function(c) {
+        return c.kind !== 'income' && c.remaining < 0;
+      });
+      if (over.length > 0) {
+        prompt += '\n### Over-budget categories\n';
+        over.slice(0, 5).forEach(function(c) {
+          prompt += '- ' + c.name + ': spent ' + fm(c.spent) + ' of ' + fm(c.effectiveAllocated || c.allocated) + ' (over by ' + fm(-c.remaining) + ')\n';
+        });
+      }
+      if (budgetCtx.recentTxs && budgetCtx.recentTxs.length) {
+        prompt += '\n### Recent transactions (last 7 days)\n';
+        budgetCtx.recentTxs.slice(0, 8).forEach(function(t) {
+          prompt += '- ' + t.date + ': ' + fm(t.amount);
+          if (t.payee) prompt += ' — ' + t.payee;
+          if (t.categoryName) prompt += ' [' + t.categoryName + ']';
+          prompt += '\n';
+        });
+      }
+    }
 
     return prompt;
+  }
+
+  // ─── Budget context loader (opt-in via setting) ───
+  // Returns Promise<{summary, recentTxs}|null>. Null when:
+  //   - setting off (default)
+  //   - dmBudget unavailable
+  //   - no auth
+  //   - any fetch fails (swallow errors — budget is best-effort)
+  function loadBudgetContext() {
+    try {
+      if (localStorage.getItem(LS_KEY_INCLUDE_BUDGET) !== '1') return Promise.resolve(null);
+    } catch (e) { return Promise.resolve(null); }
+    if (!window.dmBudget || typeof window.dmBudget.getMonthSummary !== 'function') {
+      return Promise.resolve(null);
+    }
+    if (!window.dmAuth || !window.dmAuth.currentUser) return Promise.resolve(null);
+
+    var month = window.dmBudget.currentMonth();
+    var sevenDaysAgoStr = (function() {
+      var d = new Date(); d.setDate(d.getDate() - 7);
+      return d.toISOString().split('T')[0];
+    })();
+
+    return Promise.all([
+      window.dmBudget.getMonthSummary(month).catch(function() { return null; }),
+      window.dmBudget.getTransactions({ fromDate: sevenDaysAgoStr }).catch(function() { return []; }),
+      window.dmBudget.getCategories().catch(function() { return []; })
+    ]).then(function(r) {
+      var summary = r[0];
+      var txs = r[1] || [];
+      var cats = r[2] || [];
+      if (!summary) return null;
+      // Enrich txs with category names
+      var catById = {};
+      cats.forEach(function(c) { catById[c.id] = c.name; });
+      var recentTxs = txs.slice(0, 12).map(function(t) {
+        return {
+          date: t.date, amount: t.amount, payee: t.payee || '',
+          categoryName: t.categoryId ? (catById[t.categoryId] || '') : ''
+        };
+      });
+      return { summary: summary, recentTxs: recentTxs };
+    }).catch(function() { return null; });
+  }
+
+  // ─── AI-assisted expense parsing (cloud providers only) ───
+  // Input: raw natural-language text. Returns Promise<parsedExpense|null>.
+  // parsedExpense shape: { amount (signed cents), date (YYYY-MM-DD|null),
+  //                        payee (string), income (boolean), categoryHint (string|null) }
+  // Returns null if no cloud provider configured or parsing fails.
+  function aiParseExpense(rawText) {
+    var text = (rawText || '').trim();
+    if (!text) return Promise.resolve(null);
+    if (!isCloudProvider()) return Promise.resolve(null);
+
+    var todayStr = (function() {
+      var d = new Date();
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    })();
+
+    var sys = 'You extract structured expense data from a short user message. ' +
+      'Today is ' + todayStr + '. Reply with ONLY a JSON object on a single line, no code fences, no commentary. ' +
+      'Shape: {"amount_cents": integer (positive), "income": boolean, "date": "YYYY-MM-DD" or null if not specified, "payee": string, "category_hint": string or null}. ' +
+      'If no amount is present, return {"error":"no-amount"}. ' +
+      'amount_cents is the absolute magnitude (always positive); income:true means money coming in. ' +
+      'category_hint is a short slug (1-2 words, lowercase) if the user mentions one (e.g., "food", "groceries", "rent").';
+
+    var user = 'Message: ' + text;
+
+    // Use the appropriate cloud provider via a non-streaming fetch (simpler than SSE for a JSON round-trip).
+    if (isOpenAIProvider()) {
+      var apiKey = getOpenAIKey();
+      if (!apiKey) return Promise.resolve(null);
+      return fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + apiKey
+        },
+        body: JSON.stringify({
+          model: getOpenAIModel(),
+          messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
+          temperature: 0,
+          max_tokens: 200,
+          stream: false
+        })
+      }).then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(j) {
+          if (!j || !j.choices || !j.choices[0]) return null;
+          return _normalizeAiExpense(j.choices[0].message.content);
+        })
+        .catch(function() { return null; });
+    }
+    if (isGeminiProvider()) {
+      var gkey = getGeminiKey();
+      if (!gkey) return Promise.resolve(null);
+      var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+        encodeURIComponent(getGeminiModel()) + ':generateContent?key=' + encodeURIComponent(gkey);
+      return fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: sys }] },
+          contents: [{ role: 'user', parts: [{ text: user }] }],
+          generationConfig: { temperature: 0, maxOutputTokens: 200 }
+        })
+      }).then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(j) {
+          if (!j || !j.candidates || !j.candidates[0]) return null;
+          var parts = (j.candidates[0].content && j.candidates[0].content.parts) || [];
+          var txt = parts.map(function(p) { return p.text || ''; }).join('');
+          return _normalizeAiExpense(txt);
+        })
+        .catch(function() { return null; });
+    }
+    return Promise.resolve(null);
+  }
+
+  function _normalizeAiExpense(raw) {
+    if (!raw) return null;
+    // Strip code fences if the model ignored instructions.
+    var txt = String(raw).replace(/```(?:json)?/gi, '').replace(/```/g, '').trim();
+    // Grab the first {...} block
+    var m = txt.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    var obj;
+    try { obj = JSON.parse(m[0]); } catch (e) { return null; }
+    if (!obj || obj.error === 'no-amount') return null;
+    var cents = parseInt(obj.amount_cents, 10);
+    if (!isFinite(cents) || cents <= 0) return null;
+    var income = !!obj.income;
+    var date = null;
+    if (typeof obj.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(obj.date)) date = obj.date;
+    var payee = (typeof obj.payee === 'string' ? obj.payee : '').trim();
+    var hint = null;
+    if (typeof obj.category_hint === 'string' && obj.category_hint.trim()) {
+      hint = obj.category_hint.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    }
+    return {
+      amount: income ? cents : -cents,
+      date: date,
+      payee: payee,
+      income: income,
+      categoryHint: hint,
+      error: null
+    };
   }
 
   // ─── OpenAI streaming client ───
@@ -1296,28 +1484,30 @@
     getTaskContext().then(function(ctx) {
       var tasks = ctx.tasks || ctx;
       var projectMap = ctx.projectMap || {};
-      var systemPrompt = systemOverride || buildOpenAISystemPrompt(tasks, projectMap);
-      var messages = [{ role: 'system', content: systemPrompt }];
-      var recentHistory = chatHistory.slice(-10);
-      messages = messages.concat(recentHistory);
+      return loadBudgetContext().then(function(budgetCtx) {
+        var systemPrompt = systemOverride || buildOpenAISystemPrompt(tasks, projectMap, budgetCtx);
+        var messages = [{ role: 'system', content: systemPrompt }];
+        var recentHistory = chatHistory.slice(-10);
+        messages = messages.concat(recentHistory);
 
-      var apiKey = getOpenAIKey();
-      var model = getOpenAIModel();
+        var apiKey = getOpenAIKey();
+        var model = getOpenAIModel();
 
-      return fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + apiKey
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: messages,
-          stream: true,
-          temperature: 0.7,
-          max_tokens: 1024
-        }),
-        signal: openaiAbort.signal
+        return fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messages,
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 1024
+          }),
+          signal: openaiAbort.signal
+        });
       });
     }).then(function(response) {
       if (!response.ok) {
@@ -1426,34 +1616,36 @@
     getTaskContext().then(function(ctx) {
       var tasks = ctx.tasks || ctx;
       var projectMap = ctx.projectMap || {};
-      var systemPrompt = systemOverride || buildOpenAISystemPrompt(tasks, projectMap);
+      return loadBudgetContext().then(function(budgetCtx) {
+        var systemPrompt = systemOverride || buildOpenAISystemPrompt(tasks, projectMap, budgetCtx);
 
-      // Convert chat history to Gemini format: role 'assistant' → 'model'
-      var recentHistory = chatHistory.slice(-10);
-      var contents = [];
-      for (var i = 0; i < recentHistory.length; i++) {
-        var msg = recentHistory[i];
-        contents.push({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content }]
+        // Convert chat history to Gemini format: role 'assistant' → 'model'
+        var recentHistory = chatHistory.slice(-10);
+        var contents = [];
+        for (var i = 0; i < recentHistory.length; i++) {
+          var msg = recentHistory[i];
+          contents.push({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+          });
+        }
+
+        var apiKey = getGeminiKey();
+        var model = getGeminiModel();
+
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':streamGenerateContent?alt=sse&key=' + apiKey, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: contents,
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1024
+            }
+          }),
+          signal: geminiAbort.signal
         });
-      }
-
-      var apiKey = getGeminiKey();
-      var model = getGeminiModel();
-
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':streamGenerateContent?alt=sse&key=' + apiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: contents,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024
-          }
-        }),
-        signal: geminiAbort.signal
       });
     }).then(function(response) {
       if (!response.ok) {
@@ -2885,7 +3077,10 @@
     _getGeminiKey: getGeminiKey,
     _getGeminiModel: getGeminiModel,
     _parseSSEStream: parseSSEStream,
-    _getTaskContext: getTaskContext
+    _getTaskContext: getTaskContext,
+    _loadBudgetContext: loadBudgetContext,
+    _normalizeAiExpense: _normalizeAiExpense,
+    parseExpense: aiParseExpense
   };
 
 })();

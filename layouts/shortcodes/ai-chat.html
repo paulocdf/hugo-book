@@ -979,37 +979,41 @@
     }
 
     getTaskContext().then(function(tasks) {
-      var systemPrompt;
-      if (window.dmAI && window.dmAI._buildOpenAISystemPrompt) {
-        systemPrompt = window.dmAI._buildOpenAISystemPrompt(tasks);
-      } else if (window.dmAI && window.dmAI._buildSystemPrompt) {
-        systemPrompt = window.dmAI._buildSystemPrompt(tasks);
-      } else {
-        systemPrompt = 'You are a productivity assistant. Be concise. Use bullet points with dashes. Keep replies under 150 words. When suggesting tasks, wrap each title in **bold**.';
-      }
+      var loadBudget = (window.dmAI && window.dmAI._loadBudgetContext)
+        ? window.dmAI._loadBudgetContext() : Promise.resolve(null);
+      return loadBudget.then(function(budgetCtx) {
+        var systemPrompt;
+        if (window.dmAI && window.dmAI._buildOpenAISystemPrompt) {
+          systemPrompt = window.dmAI._buildOpenAISystemPrompt(tasks, {}, budgetCtx);
+        } else if (window.dmAI && window.dmAI._buildSystemPrompt) {
+          systemPrompt = window.dmAI._buildSystemPrompt(tasks);
+        } else {
+          systemPrompt = 'You are a productivity assistant. Be concise. Use bullet points with dashes. Keep replies under 150 words. When suggesting tasks, wrap each title in **bold**.';
+        }
 
-      var messages = [{ role: 'system', content: systemPrompt }];
-      var recent = chatHistory.slice(-10);
-      messages = messages.concat(recent);
+        var messages = [{ role: 'system', content: systemPrompt }];
+        var recent = chatHistory.slice(-10);
+        messages = messages.concat(recent);
 
-      pageStatus.className = 'ai-page-status loading';
-      pageStatus.textContent = 'Thinking...';
-      pageStatus.style.display = '';
+        pageStatus.className = 'ai-page-status loading';
+        pageStatus.textContent = 'Thinking...';
+        pageStatus.style.display = '';
 
-      return fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + apiKey
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: messages,
-          stream: true,
-          temperature: 0.7,
-          max_tokens: 1024
-        }),
-        signal: openaiAbort.signal
+        return fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messages,
+            stream: true,
+            temperature: 0.7,
+            max_tokens: 1024
+          }),
+          signal: openaiAbort.signal
+        });
       });
     }).then(function(response) {
       if (!response.ok) {
@@ -1168,42 +1172,50 @@
     }
 
     getTaskContext().then(function(tasks) {
-      var systemPrompt;
-      if (window.dmAI && window.dmAI._buildOpenAISystemPrompt) {
-        systemPrompt = window.dmAI._buildOpenAISystemPrompt(tasks);
-      } else if (window.dmAI && window.dmAI._buildSystemPrompt) {
-        systemPrompt = window.dmAI._buildSystemPrompt(tasks);
-      } else {
-        systemPrompt = 'You are a productivity assistant. Be concise. Use bullet points with dashes. Keep replies under 150 words. When suggesting tasks, wrap each title in **bold**.';
-      }
+      var loadBudget = (window.dmAI && window.dmAI._loadBudgetContext)
+        ? window.dmAI._loadBudgetContext() : Promise.resolve(null);
+      return loadBudget.then(function(budgetCtx) {
+        var systemPrompt;
+        if (window.dmAI && window.dmAI._buildOpenAISystemPrompt) {
+          systemPrompt = window.dmAI._buildOpenAISystemPrompt(tasks, {}, budgetCtx);
+        } else if (window.dmAI && window.dmAI._buildSystemPrompt) {
+          systemPrompt = window.dmAI._buildSystemPrompt(tasks);
+        } else {
+          systemPrompt = 'You are a productivity assistant. Be concise. Use bullet points with dashes. Keep replies under 150 words. When suggesting tasks, wrap each title in **bold**.';
+        }
 
-      // Convert chat history to Gemini format: role 'assistant' → 'model'
-      var recent = chatHistory.slice(-10);
-      var contents = [];
-      for (var i = 0; i < recent.length; i++) {
-        var msg = recent[i];
-        contents.push({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content }]
-        });
-      }
+        // Convert chat history to Gemini format: role 'assistant' → 'model'
+        var recent = chatHistory.slice(-10);
+        var contents = [];
+        for (var i = 0; i < recent.length; i++) {
+          var msg = recent[i];
+          contents.push({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.content }]
+          });
+        }
 
       pageStatus.className = 'ai-page-status loading';
       pageStatus.textContent = 'Thinking...';
       pageStatus.style.display = '';
 
-      return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':streamGenerateContent?alt=sse&key=' + apiKey, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: contents,
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024
-          }
-        }),
-        signal: geminiAbort.signal
+      pageStatus.className = 'ai-page-status loading';
+      pageStatus.textContent = 'Thinking...';
+      pageStatus.style.display = '';
+
+        return fetch('https://generativelanguage.googleapis.com/v1beta/models/' + model + ':streamGenerateContent?alt=sse&key=' + apiKey, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: contents,
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 1024
+            }
+          }),
+          signal: geminiAbort.signal
+        });
       });
     }).then(function(response) {
       if (!response.ok) {
