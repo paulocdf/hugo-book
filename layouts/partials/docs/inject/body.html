@@ -3249,7 +3249,8 @@
     board: '<svg class="dm-icon dm-icon--columns sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-columns"/></svg>',
     settings: '<svg class="dm-icon dm-icon--settings sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-settings"/></svg>',
     projects: '<svg class="dm-icon dm-icon--folder sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-folder"/></svg>',
-    calendar: '<svg class="dm-icon dm-icon--calendar sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-calendar"/></svg>'
+    calendar: '<svg class="dm-icon dm-icon--calendar sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-calendar"/></svg>',
+    budget: '<svg class="dm-icon dm-icon--wallet sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-wallet"/></svg>'
   };
 
   function getBaseUrl() {
@@ -3460,6 +3461,19 @@
     html += '<li class="sidebar-item" data-section="dashboard">' +
       '<a href="' + sectionUrl('dashboard') + '"' + dashboardActive + '>' + ICONS.dashboard + 'Dashboard</a>' +
       '</li>';
+
+    // Add Budget section (collapsible, static children)
+    var budgetBase = sectionUrl('budget');
+    var budgetPath = window.location.pathname;
+    var budgetOverviewActive = (budgetPath === budgetBase || budgetPath === budgetBase.replace(/\/$/, '')) ? ' class="active"' : '';
+    var budgetTxActive = budgetPath.indexOf('/docs/budget/transactions') !== -1 ? ' class="active"' : '';
+    var budgetRecActive = budgetPath.indexOf('/docs/budget/recurring') !== -1 ? ' class="active"' : '';
+    var budgetChildren = '';
+    budgetChildren += '<li class="sidebar-item" data-section="budget-overview"><a href="' + budgetBase + '"' + budgetOverviewActive + '>Overview</a></li>';
+    budgetChildren += '<li class="sidebar-item" data-section="budget-transactions"><a href="' + budgetBase + 'transactions/"' + budgetTxActive + '>Transactions</a></li>';
+    budgetChildren += '<li class="sidebar-item" data-section="budget-recurring"><a href="' + budgetBase + 'recurring/"' + budgetRecActive + '>Recurring</a></li>';
+    var budgetOpen = budgetPath.indexOf('/docs/budget') !== -1;
+    html += buildSectionHtml('Budget', ICONS.budget, budgetBase, budgetChildren, budgetOpen);
 
     // Add AI entry (static)
     var aiActive = window.location.pathname.indexOf('/docs/ai') !== -1 ? ' class="active"' : '';
