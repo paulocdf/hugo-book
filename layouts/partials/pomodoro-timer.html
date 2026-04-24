@@ -3561,15 +3561,22 @@
         totalSessions = nextSub.pomodoroCount;
       }
 
-      // Check for prior progress on the next subtask
+      // Check for prior progress on the next subtask.
+      // Preserve accumulated work time and completed-session count even if
+      // pomodoroCount/pomodoroLength were edited on the task.
       var priorProgress = loadTaskProgress(nextSub.id);
       var subRestoredRemaining = 0;
-      if (priorProgress && priorProgress.totalSessions === totalSessions) {
-        sessionCount = priorProgress.sessionsCompleted + 1;
+      if (priorProgress) {
         accumulatedWorkSeconds = priorProgress.accWorkSeconds || 0;
-        if (priorProgress.workSeconds > 0) WORK_SECONDS = priorProgress.workSeconds;
-        if (priorProgress.breakSeconds > 0) BREAK_SECONDS = priorProgress.breakSeconds;
-        if (priorProgress.remainingSeconds > 0 && priorProgress.remainingSeconds <= WORK_SECONDS) {
+        var subPriorDone = priorProgress.sessionsCompleted || 0;
+        if (subPriorDone >= totalSessions) {
+          sessionCount = totalSessions;
+        } else {
+          sessionCount = subPriorDone + 1;
+        }
+        // Only restore exact timer position if the work duration matches.
+        if (priorProgress.workSeconds > 0 && priorProgress.workSeconds === WORK_SECONDS &&
+            priorProgress.remainingSeconds > 0 && priorProgress.remainingSeconds <= WORK_SECONDS) {
           subRestoredRemaining = priorProgress.remainingSeconds;
         }
       } else {
@@ -5577,18 +5584,29 @@
         // Check for prior session progress on this task
         var prior = loadTaskProgress(todoId);
         var restoredRemaining = 0;
-        if (prior && prior.totalSessions === totalSessions) {
-          // Restore: resume from the next uncompleted session
-          sessionCount = prior.sessionsCompleted + 1;
+        if (prior) {
+          // Always preserve accumulated work time and completed-session count,
+          // even if the user edited pomodoroCount/pomodoroLength on the task.
           accumulatedWorkSeconds = prior.accWorkSeconds || 0;
-          // Use stored durations if they match (user may have changed settings)
-          if (prior.workSeconds > 0) WORK_SECONDS = prior.workSeconds;
-          if (prior.breakSeconds > 0) BREAK_SECONDS = prior.breakSeconds;
-          // Restore the exact timer position within the work phase
-          if (prior.remainingSeconds > 0 && prior.remainingSeconds <= WORK_SECONDS) {
+          var priorDone = prior.sessionsCompleted || 0;
+          // Cap at new totalSessions: if user reduced the count below what was
+          // already completed, clamp so sessionCount stays within [1..totalSessions].
+          if (priorDone >= totalSessions) {
+            sessionCount = totalSessions;
+          } else {
+            sessionCount = priorDone + 1;
+          }
+          // Only restore exact timer position if the work duration hasn't changed.
+          // If user edited pomodoroLength, start a fresh work phase at the new length.
+          if (prior.workSeconds > 0 && prior.workSeconds === WORK_SECONDS &&
+              prior.remainingSeconds > 0 && prior.remainingSeconds <= WORK_SECONDS) {
             restoredRemaining = prior.remainingSeconds;
           }
-          console.log('[pomo] Resuming task with ' + prior.sessionsCompleted + '/' + prior.totalSessions + ' sessions completed, ' + (restoredRemaining || WORK_SECONDS) + 's remaining');
+          // Honor stored break duration if the task's break length wasn't changed.
+          if (prior.breakSeconds > 0 && prior.breakSeconds === BREAK_SECONDS) {
+            BREAK_SECONDS = prior.breakSeconds;
+          }
+          console.log('[pomo] Resuming task with ' + priorDone + '/' + totalSessions + ' sessions completed (was ' + prior.totalSessions + '), ' + (restoredRemaining || WORK_SECONDS) + 's remaining');
         } else {
           sessionCount = 1;
           accumulatedWorkSeconds = 0;
