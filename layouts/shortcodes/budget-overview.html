@@ -1,0 +1,492 @@
+{{/*
+  budget-overview.html — Envelope budget view (Phase 1)
+  - Month switcher
+  - Per-category progress bars (budgeted / spent / remaining)
+  - Edit allocation inline
+  - Quick-add expense / income form
+  - Default account auto-created on first load (single-account Phase 1 model)
+  - Respects window.dmBudget.getCurrency() and local-only mode
+*/}}
+
+<style>
+  .dm-budget-wrap { max-width: 960px; margin: 0 auto; padding: 12px 0 40px; }
+  .dm-budget-header {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 18px; flex-wrap: wrap;
+  }
+  .dm-budget-monthnav { display: flex; align-items: center; gap: 8px; }
+  .dm-budget-monthnav button {
+    border: 1px solid var(--gray-200);
+    background: var(--body-background);
+    color: var(--body-font-color);
+    width: 32px; height: 32px; border-radius: 6px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; padding: 0;
+  }
+  .dm-budget-monthnav button:hover { background: var(--gray-100); }
+  .dm-budget-monthlabel { font-size: 1.05rem; font-weight: 600; min-width: 140px; text-align: center; }
+  .dm-budget-tbb {
+    display: inline-flex; align-items: baseline; gap: 6px;
+    padding: 6px 12px; border-radius: 6px;
+    background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+    color: var(--color-accent);
+    font-weight: 600;
+  }
+  .dm-budget-tbb.neg { background: color-mix(in srgb, #e53935 15%, transparent); color: #e53935; }
+  .dm-budget-tbb small { font-weight: 500; opacity: 0.75; font-size: 0.8rem; }
+
+  .dm-budget-summary {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px; margin-bottom: 18px;
+  }
+  .dm-budget-stat {
+    padding: 12px 14px; border: 1px solid var(--gray-200); border-radius: 8px;
+    background: var(--body-background);
+  }
+  .dm-budget-stat .label { font-size: 0.75rem; opacity: 0.7; text-transform: uppercase; letter-spacing: 0.05em; }
+  .dm-budget-stat .value { font-size: 1.25rem; font-weight: 600; margin-top: 4px; }
+  .dm-budget-stat.income .value { color: #43a047; }
+  .dm-budget-stat.spent .value { color: #e53935; }
+
+  .dm-budget-quickadd {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr auto auto;
+    gap: 8px;
+    padding: 12px;
+    background: var(--gray-100);
+    border-radius: 8px;
+    margin-bottom: 18px;
+    align-items: center;
+  }
+  .dm-budget-quickadd input,
+  .dm-budget-quickadd select {
+    padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 6px;
+    background: var(--body-background); color: var(--body-font-color);
+    font-size: 0.9rem; min-width: 0;
+  }
+  .dm-budget-quickadd .seg { display: inline-flex; border: 1px solid var(--gray-200); border-radius: 6px; overflow: hidden; }
+  .dm-budget-quickadd .seg button {
+    border: 0; background: var(--body-background); color: var(--body-font-color);
+    padding: 8px 12px; font-size: 0.85rem; cursor: pointer;
+  }
+  .dm-budget-quickadd .seg button.active {
+    background: var(--color-accent); color: #fff;
+  }
+  .dm-budget-quickadd .add-btn {
+    padding: 8px 16px; border: 0; border-radius: 6px;
+    background: var(--color-accent); color: #fff;
+    font-weight: 600; cursor: pointer;
+  }
+  .dm-budget-quickadd .add-btn:hover { background: var(--color-accent-hover); }
+  @media (max-width: 700px) {
+    .dm-budget-quickadd { grid-template-columns: 1fr 1fr; }
+    .dm-budget-quickadd .seg, .dm-budget-quickadd .add-btn { grid-column: span 2; }
+  }
+
+  .dm-cat-list { display: flex; flex-direction: column; gap: 6px; }
+  .dm-cat-row {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 2fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr) auto;
+    gap: 10px; align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--gray-200); border-radius: 8px;
+    background: var(--body-background);
+  }
+  .dm-cat-row.over { border-color: #e53935; }
+  .dm-cat-swatch { width: 12px; height: 12px; border-radius: 50%; }
+  .dm-cat-name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-cat-name .kind-pill {
+    font-size: 0.65rem; text-transform: uppercase;
+    padding: 1px 6px; border-radius: 4px; margin-left: 6px;
+    background: var(--gray-200); opacity: 0.8;
+    vertical-align: middle;
+  }
+  .dm-cat-input {
+    width: 100%; padding: 6px 8px; border: 1px solid transparent;
+    border-radius: 4px; background: transparent; color: var(--body-font-color);
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .dm-cat-input:focus { outline: none; border-color: var(--color-accent); background: var(--body-background); }
+  .dm-cat-spent, .dm-cat-remaining {
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .dm-cat-spent.zero { opacity: 0.5; }
+  .dm-cat-remaining.neg { color: #e53935; font-weight: 600; }
+  .dm-cat-remaining.pos { color: #43a047; }
+  .dm-cat-bar {
+    grid-column: 2 / -1;
+    height: 5px; border-radius: 3px; background: var(--gray-200); overflow: hidden;
+    margin-top: -2px;
+  }
+  .dm-cat-bar > span {
+    display: block; height: 100%;
+    background: var(--color-accent);
+    transition: width 0.3s ease;
+  }
+  .dm-cat-row.over .dm-cat-bar > span { background: #e53935; }
+  .dm-cat-row .dm-cat-del {
+    border: 0; background: transparent; color: var(--body-font-color);
+    opacity: 0.3; cursor: pointer; padding: 4px;
+  }
+  .dm-cat-row:hover .dm-cat-del { opacity: 0.8; }
+
+  .dm-cat-header {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 2fr) minmax(100px, 1fr) minmax(100px, 1fr) minmax(100px, 1fr) auto;
+    gap: 10px; padding: 0 12px 6px;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    opacity: 0.6;
+  }
+  .dm-cat-header .h-amt { text-align: right; }
+
+  .dm-budget-empty {
+    padding: 30px; text-align: center; opacity: 0.7;
+    border: 2px dashed var(--gray-200); border-radius: 10px;
+    margin: 20px 0;
+  }
+  .dm-budget-empty button {
+    margin-top: 10px; padding: 8px 16px; border: 0; border-radius: 6px;
+    background: var(--color-accent); color: #fff; font-weight: 600; cursor: pointer;
+  }
+
+  .dm-add-cat-row {
+    display: flex; gap: 8px; margin-top: 14px;
+  }
+  .dm-add-cat-row input, .dm-add-cat-row select {
+    flex: 1; padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 6px;
+    background: var(--body-background); color: var(--body-font-color);
+  }
+  .dm-add-cat-row button {
+    padding: 8px 14px; border: 0; border-radius: 6px;
+    background: var(--gray-200); color: var(--body-font-color); cursor: pointer;
+  }
+  .dm-add-cat-row button:hover { background: var(--color-accent); color: #fff; }
+
+  .dm-budget-notice {
+    padding: 8px 12px; margin-bottom: 14px;
+    border-radius: 6px; font-size: 0.85rem;
+    background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+    color: var(--color-accent);
+    border-left: 3px solid var(--color-accent);
+  }
+  .dm-budget-notice.local-only {
+    background: color-mix(in srgb, #fb8c00 12%, transparent);
+    color: #fb8c00; border-color: #fb8c00;
+  }
+</style>
+
+<div class="dm-budget-wrap" id="dm-budget-root">
+  <div id="dm-budget-body">
+    <div class="dm-budget-empty">Loading budget…</div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var root = document.getElementById('dm-budget-root');
+  if (!root) return;
+
+  var currentMonth = null; // 'YYYY-MM'
+
+  function $(sel, ctx) { return (ctx || document).querySelector(sel); }
+
+  function monthLabel(ym) {
+    var parts = ym.split('-');
+    var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
+    return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  }
+  function shiftMonth(ym, delta) {
+    var parts = ym.split('-');
+    var y = parseInt(parts[0], 10);
+    var m = parseInt(parts[1], 10) - 1 + delta;
+    var d = new Date(y, m, 1);
+    var yy = d.getFullYear();
+    var mm = ('0' + (d.getMonth() + 1)).slice(-2);
+    return yy + '-' + mm;
+  }
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function(c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function waitForAuth() {
+    return (window.dmAuthReady || Promise.resolve()).then(function() {
+      return window.dmBudget;
+    });
+  }
+
+  function renderSkeleton() {
+    currentMonth = currentMonth || window.dmBudget.currentMonth();
+    var html = '' +
+      '<div class="dm-budget-header">' +
+        '<div class="dm-budget-monthnav">' +
+          '<button id="dm-bgt-prev" aria-label="Previous month">' +
+            '<svg class="dm-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-left"/></svg>' +
+          '</button>' +
+          '<span class="dm-budget-monthlabel" id="dm-bgt-mlabel">' + escapeHtml(monthLabel(currentMonth)) + '</span>' +
+          '<button id="dm-bgt-next" aria-label="Next month">' +
+            '<svg class="dm-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-right"/></svg>' +
+          '</button>' +
+        '</div>' +
+        '<div id="dm-bgt-tbb"></div>' +
+      '</div>' +
+      '<div id="dm-bgt-notice"></div>' +
+      '<div class="dm-budget-summary" id="dm-bgt-summary"></div>' +
+      '<form class="dm-budget-quickadd" id="dm-bgt-quickadd" autocomplete="off">' +
+        '<div class="seg" role="tablist">' +
+          '<button type="button" class="active" data-kind="expense">Expense</button>' +
+          '<button type="button" data-kind="income">Income</button>' +
+        '</div>' +
+        '<input type="text" id="dm-bgt-qa-amount" placeholder="Amount" inputmode="decimal" required>' +
+        '<input type="text" id="dm-bgt-qa-payee" placeholder="Payee / description">' +
+        '<select id="dm-bgt-qa-category"><option value="">— Category —</option></select>' +
+        '<input type="date" id="dm-bgt-qa-date">' +
+        '<button type="submit" class="add-btn">Add</button>' +
+      '</form>' +
+      '<div class="dm-cat-header">' +
+        '<span></span><span>Category</span>' +
+        '<span class="h-amt">Budgeted</span>' +
+        '<span class="h-amt">Spent</span>' +
+        '<span class="h-amt">Remaining</span>' +
+        '<span></span>' +
+      '</div>' +
+      '<div class="dm-cat-list" id="dm-bgt-cats"></div>' +
+      '<div class="dm-add-cat-row">' +
+        '<input type="text" id="dm-bgt-newcat-name" placeholder="New category name">' +
+        '<select id="dm-bgt-newcat-kind">' +
+          '<option value="expense">Expense</option>' +
+          '<option value="income">Income</option>' +
+        '</select>' +
+        '<button type="button" id="dm-bgt-newcat-add">+ Add category</button>' +
+      '</div>';
+    document.getElementById('dm-budget-body').innerHTML = html;
+
+    document.getElementById('dm-bgt-prev').addEventListener('click', function() {
+      currentMonth = shiftMonth(currentMonth, -1);
+      refresh();
+    });
+    document.getElementById('dm-bgt-next').addEventListener('click', function() {
+      currentMonth = shiftMonth(currentMonth, 1);
+      refresh();
+    });
+
+    // Kind toggle
+    var seg = document.querySelector('#dm-bgt-quickadd .seg');
+    seg.addEventListener('click', function(e) {
+      var btn = e.target.closest('button[data-kind]');
+      if (!btn) return;
+      seg.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+    });
+
+    // Default today
+    document.getElementById('dm-bgt-qa-date').value = new Date().toISOString().substr(0, 10);
+
+    document.getElementById('dm-bgt-quickadd').addEventListener('submit', handleQuickAdd);
+    document.getElementById('dm-bgt-newcat-add').addEventListener('click', handleAddCategory);
+  }
+
+  function renderNotice() {
+    var holder = document.getElementById('dm-bgt-notice');
+    if (!holder) return;
+    var parts = [];
+    if (window.dmBudget.isLocalOnly()) {
+      parts.push('<div class="dm-budget-notice local-only">Local-only mode: budget data is stored on this device only and is not synced to the cloud.</div>');
+    }
+    holder.innerHTML = parts.join('');
+  }
+
+  function renderSummary(summary) {
+    var c = summary.currency;
+    var fm = function(x) { return window.dmBudget.formatMoney(x, { currency: c }); };
+    var tbbEl = document.getElementById('dm-bgt-tbb');
+    var tbbClass = summary.toBeBudgeted < 0 ? 'dm-budget-tbb neg' : 'dm-budget-tbb';
+    var tbbLabel = summary.toBeBudgeted < 0 ? 'Over-allocated' : 'To be budgeted';
+    tbbEl.outerHTML = '<div class="' + tbbClass + '" id="dm-bgt-tbb"><small>' + tbbLabel + '</small> <strong>' + fm(summary.toBeBudgeted) + '</strong></div>';
+
+    var totalSpent = 0;
+    summary.categories.forEach(function(r) {
+      if (r.kind !== 'income') totalSpent += r.spent;
+    });
+    document.getElementById('dm-bgt-summary').innerHTML = '' +
+      '<div class="dm-budget-stat income"><div class="label">Income this month</div><div class="value">' + fm(summary.income) + '</div></div>' +
+      '<div class="dm-budget-stat"><div class="label">Allocated</div><div class="value">' + fm(summary.allocated) + '</div></div>' +
+      '<div class="dm-budget-stat spent"><div class="label">Spent</div><div class="value">' + fm(totalSpent) + '</div></div>' +
+      '<div class="dm-budget-stat"><div class="label">Left to spend</div><div class="value">' + fm(summary.allocated - totalSpent) + '</div></div>';
+  }
+
+  function renderCategories(summary) {
+    var list = document.getElementById('dm-bgt-cats');
+    var c = summary.currency;
+    var fm = function(x) { return window.dmBudget.formatMoney(x, { currency: c }); };
+    if (summary.categories.length === 0) {
+      list.innerHTML = '<div class="dm-budget-empty">No categories yet. Add one below to start budgeting.</div>';
+      return;
+    }
+    var html = summary.categories.map(function(r) {
+      var over = r.kind !== 'income' && r.remaining < 0;
+      var pct = r.pctUsed || 0;
+      var remClass = r.remaining < 0 ? 'dm-cat-remaining neg' : (r.remaining > 0 ? 'dm-cat-remaining pos' : 'dm-cat-remaining');
+      var spentClass = r.spent === 0 ? 'dm-cat-spent zero' : 'dm-cat-spent';
+      var kindPill = r.kind === 'income' ? '<span class="kind-pill">income</span>' : '';
+      return '' +
+        '<div class="dm-cat-row' + (over ? ' over' : '') + '" data-cat="' + escapeHtml(r.id) + '">' +
+          '<span class="dm-cat-swatch" style="background:' + escapeHtml(r.color) + '"></span>' +
+          '<span class="dm-cat-name">' + escapeHtml(r.name) + kindPill + '</span>' +
+          '<input type="text" class="dm-cat-input" data-cat-input="' + escapeHtml(r.id) + '" value="' + (r.allocated / 100).toFixed(2) + '" inputmode="decimal">' +
+          '<span class="' + spentClass + '">' + fm(r.spent) + '</span>' +
+          '<span class="' + remClass + '">' + fm(r.remaining) + '</span>' +
+          '<button class="dm-cat-del" data-cat-del="' + escapeHtml(r.id) + '" title="Delete category">' +
+            '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>' +
+          '</button>' +
+          '<div class="dm-cat-bar"><span style="width:' + pct + '%"></span></div>' +
+        '</div>';
+    }).join('');
+    list.innerHTML = html;
+
+    // Wire up allocation edits
+    list.querySelectorAll('[data-cat-input]').forEach(function(input) {
+      input.addEventListener('blur', handleAllocationChange);
+      input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+      });
+    });
+    list.querySelectorAll('[data-cat-del]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var catId = btn.getAttribute('data-cat-del');
+        if (!window.dmConfirm) return removeCategory(catId);
+        window.dmConfirm('Delete this category? Transactions will be kept but uncategorized.', function() {
+          removeCategory(catId);
+        });
+      });
+    });
+  }
+
+  function removeCategory(catId) {
+    // Also clear categoryId from any tx that referenced it (local-only; Firestore via update chain).
+    window.dmBudget.deleteCategory(catId).then(function() {
+      return window.dmBudget.getTransactions({});
+    }).then(function(txs) {
+      var affected = txs.filter(function(t) { return t.categoryId === catId; });
+      var chain = Promise.resolve();
+      affected.forEach(function(t) {
+        chain = chain.then(function() {
+          return window.dmBudget.updateTransaction(t.id, { categoryId: null });
+        });
+      });
+      return chain;
+    }).then(refresh);
+  }
+
+  function handleAllocationChange(e) {
+    var input = e.target;
+    var catId = input.getAttribute('data-cat-input');
+    var cents = window.dmBudget.parseMoney(input.value);
+    if (cents < 0) cents = 0;
+    window.dmBudget.setBudget(currentMonth, catId, cents).then(refresh);
+  }
+
+  function renderCategorySelect(cats) {
+    var sel = document.getElementById('dm-bgt-qa-category');
+    var prev = sel.value;
+    sel.innerHTML = '<option value="">— Category —</option>' +
+      cats.map(function(c) {
+        return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>';
+      }).join('');
+    if (prev) sel.value = prev;
+  }
+
+  function handleQuickAdd(e) {
+    e.preventDefault();
+    var form = e.currentTarget;
+    var kind = form.querySelector('.seg button.active').getAttribute('data-kind');
+    var cents = window.dmBudget.parseMoney($('#dm-bgt-qa-amount').value);
+    if (!cents) return;
+    var signed = kind === 'income' ? Math.abs(cents) : -Math.abs(cents);
+    var catId = $('#dm-bgt-qa-category').value || null;
+    var date = $('#dm-bgt-qa-date').value || new Date().toISOString().substr(0, 10);
+    var payee = $('#dm-bgt-qa-payee').value.trim();
+
+    window.dmBudget.ensureDefaultAccount().then(function(acc) {
+      return window.dmBudget.createTransaction({
+        accountId: acc.id,
+        categoryId: catId,
+        amount: signed,
+        date: date,
+        payee: payee,
+        source: 'manual'
+      });
+    }).then(function() {
+      $('#dm-bgt-qa-amount').value = '';
+      $('#dm-bgt-qa-payee').value = '';
+      refresh();
+    }).catch(function(err) {
+      console.error('[budget] quick-add failed:', err);
+      if (window.dmAlert) window.dmAlert('Could not save transaction: ' + err.message);
+    });
+  }
+
+  function handleAddCategory() {
+    var nameEl = $('#dm-bgt-newcat-name');
+    var kindEl = $('#dm-bgt-newcat-kind');
+    var name = nameEl.value.trim();
+    if (!name) return;
+    window.dmBudget.createCategory({
+      name: name, kind: kindEl.value
+    }).then(function() {
+      nameEl.value = '';
+      refresh();
+    }).catch(function(err) {
+      console.error('[budget] add category failed:', err);
+      if (window.dmAlert) window.dmAlert('Could not add category: ' + err.message);
+    });
+  }
+
+  var _refreshPending = false;
+  function refresh() {
+    if (_refreshPending) return;
+    _refreshPending = true;
+    Promise.resolve().then(function() {
+      _refreshPending = false;
+      return Promise.all([
+        window.dmBudget.seedDefaultsIfEmpty(),
+        window.dmBudget.ensureDefaultAccount().catch(function() { /* not signed in is OK */ })
+      ]);
+    }).then(function() {
+      return window.dmBudget.getMonthSummary(currentMonth);
+    }).then(function(summary) {
+      document.getElementById('dm-bgt-mlabel').textContent = monthLabel(currentMonth);
+      renderNotice();
+      renderSummary(summary);
+      renderCategories(summary);
+      renderCategorySelect(summary.categories);
+    }).catch(function(err) {
+      console.error('[budget] refresh failed:', err);
+      var body = document.getElementById('dm-budget-body');
+      if (body) body.innerHTML = '<div class="dm-budget-empty">Sign in to start budgeting.<br><small>' + escapeHtml(err.message) + '</small></div>';
+    });
+  }
+
+  function init() {
+    currentMonth = window.dmBudget.currentMonth();
+    renderSkeleton();
+    refresh();
+
+    // Listen for data changes (other tabs / sync)
+    document.addEventListener('dm-budget-updated', refresh);
+    window.addEventListener('dm-budget-updated', refresh);
+    document.addEventListener('dm-sync-complete', refresh);
+  }
+
+  waitForAuth().then(function(api) {
+    if (!api) {
+      document.getElementById('dm-budget-body').innerHTML = '<div class="dm-budget-empty">Budget requires the data layer. Please reload.</div>';
+      return;
+    }
+    init();
+  });
+})();
+</script>

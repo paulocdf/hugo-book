@@ -3419,6 +3419,29 @@
     try { customCtx = localStorage.getItem('dm-ai-custom-context') || ''; } catch(e) {}
     el = document.getElementById('setting-ai-custom-context');
     if (el) el.value = customCtx;
+
+    // ─── Budget settings ───
+    var budgetCurrency = 'USD';
+    try {
+      if (window.dmBudget && typeof window.dmBudget.getCurrency === 'function') {
+        budgetCurrency = window.dmBudget.getCurrency() || 'USD';
+      } else {
+        budgetCurrency = localStorage.getItem('dm-budget-currency') || 'USD';
+      }
+    } catch(e) {}
+    el = document.getElementById('setting-budget-currency');
+    if (el) el.value = budgetCurrency;
+
+    var budgetLocalOnly = false;
+    try {
+      if (window.dmBudget && typeof window.dmBudget.isLocalOnly === 'function') {
+        budgetLocalOnly = !!window.dmBudget.isLocalOnly();
+      } else {
+        budgetLocalOnly = localStorage.getItem('dm-budget-local-only') === '1';
+      }
+    } catch(e) {}
+    el = document.getElementById('setting-budget-local-only');
+    if (el) el.checked = budgetLocalOnly;
   }
 
   function initSettingsModal() {
@@ -3619,6 +3642,57 @@
               '<div class="settings-modal-control settings-modal-volume-control">' +
                 '<input type="range" id="setting-sound-ambient-volume" class="settings-modal-range" min="0" max="100" value="50" step="5">' +
                 '<span class="settings-modal-unit" id="setting-sound-ambient-volume-label">50%</span>' +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+
+          // ── Budget section ──
+          '<div class="settings-modal-section">' +
+            '<div class="settings-modal-section-label">Budget</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-budget-currency">Currency</label>' +
+              '<div class="settings-modal-control">' +
+                '<select id="setting-budget-currency" class="settings-modal-select">' +
+                  '<option value="USD">USD — US Dollar</option>' +
+                  '<option value="EUR">EUR — Euro</option>' +
+                  '<option value="GBP">GBP — British Pound</option>' +
+                  '<option value="JPY">JPY — Japanese Yen</option>' +
+                  '<option value="CAD">CAD — Canadian Dollar</option>' +
+                  '<option value="AUD">AUD — Australian Dollar</option>' +
+                  '<option value="CHF">CHF — Swiss Franc</option>' +
+                  '<option value="CNY">CNY — Chinese Yuan</option>' +
+                  '<option value="INR">INR — Indian Rupee</option>' +
+                  '<option value="BRL">BRL — Brazilian Real</option>' +
+                  '<option value="MXN">MXN — Mexican Peso</option>' +
+                  '<option value="SEK">SEK — Swedish Krona</option>' +
+                  '<option value="NOK">NOK — Norwegian Krone</option>' +
+                  '<option value="DKK">DKK — Danish Krone</option>' +
+                  '<option value="PLN">PLN — Polish Złoty</option>' +
+                  '<option value="SGD">SGD — Singapore Dollar</option>' +
+                  '<option value="HKD">HKD — Hong Kong Dollar</option>' +
+                  '<option value="NZD">NZD — New Zealand Dollar</option>' +
+                  '<option value="ZAR">ZAR — South African Rand</option>' +
+                  '<option value="KRW">KRW — Korean Won</option>' +
+                '</select>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label" for="setting-budget-local-only">Local-only mode</label>' +
+              '<div class="settings-modal-control">' +
+                '<label class="settings-modal-toggle-switch">' +
+                  '<input type="checkbox" id="setting-budget-local-only">' +
+                  '<span class="settings-modal-toggle-slider"></span>' +
+                '</label>' +
+              '</div>' +
+            '</div>' +
+            '<div class="settings-modal-ai-info" style="font-size:0.78rem;opacity:0.78">' +
+              '<p>When enabled, financial data (accounts, categories, budgets, transactions, recurring rules) is stored on this device only and never synced to the cloud.</p>' +
+            '</div>' +
+            '<div class="settings-modal-row">' +
+              '<label class="settings-modal-label">Erase budget data</label>' +
+              '<div class="settings-modal-control" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' +
+                '<button type="button" id="setting-budget-erase-local" class="settings-modal-signout" style="background:#fb8c00">Erase local</button>' +
+                '<button type="button" id="setting-budget-erase-all" class="settings-modal-signout" style="background:#e53935">Erase everywhere</button>' +
               '</div>' +
             '</div>' +
           '</div>' +
@@ -4122,6 +4196,120 @@
           try { localStorage.setItem('dm-ai-custom-context', aiContextEl.value); } catch(e) {}
           _contextSaveTimer = null;
         }, 500);
+      });
+    }
+
+    // ─── Budget: currency ───
+    var budgetCurrencyEl = document.getElementById('setting-budget-currency');
+    if (budgetCurrencyEl) {
+      budgetCurrencyEl.addEventListener('change', function() {
+        var val = budgetCurrencyEl.value || 'USD';
+        try {
+          if (window.dmBudget && typeof window.dmBudget.setCurrency === 'function') {
+            window.dmBudget.setCurrency(val);
+          } else {
+            localStorage.setItem('dm-budget-currency', val);
+          }
+        } catch(e) {}
+        window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-budget-currency', value: val } }));
+      });
+    }
+
+    // ─── Budget: local-only toggle ───
+    var budgetLocalOnlyEl = document.getElementById('setting-budget-local-only');
+    if (budgetLocalOnlyEl) {
+      budgetLocalOnlyEl.addEventListener('change', function() {
+        var on = !!budgetLocalOnlyEl.checked;
+        var apply = function() {
+          try {
+            if (window.dmBudget && typeof window.dmBudget.setLocalOnly === 'function') {
+              window.dmBudget.setLocalOnly(on);
+            } else {
+              if (on) localStorage.setItem('dm-budget-local-only', '1');
+              else localStorage.removeItem('dm-budget-local-only');
+            }
+          } catch(e) {}
+          window.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: 'dm-budget-local-only', value: on } }));
+        };
+        if (on && typeof window.dmConfirm === 'function') {
+          window.dmConfirm({
+            title: 'Enable local-only mode?',
+            message: 'Budget data will stay on this device and will not be synced to the cloud. Existing cloud copies are left untouched — use "Erase everywhere" to remove them.',
+            confirmLabel: 'Enable',
+            cancelLabel: 'Cancel'
+          }).then(function(ok) {
+            if (!ok) { budgetLocalOnlyEl.checked = false; return; }
+            apply();
+          });
+        } else {
+          apply();
+        }
+      });
+    }
+
+    // ─── Budget: erase local ───
+    var budgetEraseLocalBtn = document.getElementById('setting-budget-erase-local');
+    if (budgetEraseLocalBtn) {
+      budgetEraseLocalBtn.addEventListener('click', function() {
+        var doErase = function() {
+          if (!window.dmBudget || typeof window.dmBudget.eraseAllData !== 'function') return;
+          budgetEraseLocalBtn.disabled = true;
+          window.dmBudget.eraseAllData({ eraseCloud: false }).then(function() {
+            budgetEraseLocalBtn.disabled = false;
+            if (typeof window.dmAlert === 'function') {
+              window.dmAlert({ title: 'Local budget data erased', message: 'All accounts, categories, budgets, transactions and recurring rules have been removed from this device. Cloud copies (if any) are untouched.' });
+            }
+          }).catch(function(err) {
+            budgetEraseLocalBtn.disabled = false;
+            if (typeof window.dmAlert === 'function') {
+              window.dmAlert({ title: 'Error', message: 'Could not erase local data: ' + (err && err.message ? err.message : err) });
+            }
+          });
+        };
+        if (typeof window.dmConfirm === 'function') {
+          window.dmConfirm({
+            title: 'Erase local budget data?',
+            message: 'This removes all accounts, categories, budgets, transactions and recurring rules from this device. Cloud copies (if any) remain and may re-sync.',
+            confirmLabel: 'Erase local',
+            cancelLabel: 'Cancel',
+            danger: true
+          }).then(function(ok) { if (ok) doErase(); });
+        } else if (confirm('Erase all budget data from this device?')) {
+          doErase();
+        }
+      });
+    }
+
+    // ─── Budget: erase everywhere ───
+    var budgetEraseAllBtn = document.getElementById('setting-budget-erase-all');
+    if (budgetEraseAllBtn) {
+      budgetEraseAllBtn.addEventListener('click', function() {
+        var doErase = function() {
+          if (!window.dmBudget || typeof window.dmBudget.eraseAllData !== 'function') return;
+          budgetEraseAllBtn.disabled = true;
+          window.dmBudget.eraseAllData({ eraseCloud: true }).then(function() {
+            budgetEraseAllBtn.disabled = false;
+            if (typeof window.dmAlert === 'function') {
+              window.dmAlert({ title: 'Budget data erased', message: 'All budget data has been erased from this device and the cloud.' });
+            }
+          }).catch(function(err) {
+            budgetEraseAllBtn.disabled = false;
+            if (typeof window.dmAlert === 'function') {
+              window.dmAlert({ title: 'Error', message: 'Could not erase data: ' + (err && err.message ? err.message : err) });
+            }
+          });
+        };
+        if (typeof window.dmConfirm === 'function') {
+          window.dmConfirm({
+            title: 'Erase budget data everywhere?',
+            message: 'This permanently deletes all accounts, categories, budgets, transactions and recurring rules from this device AND the cloud. This cannot be undone.',
+            confirmLabel: 'Erase everywhere',
+            cancelLabel: 'Cancel',
+            danger: true
+          }).then(function(ok) { if (ok) doErase(); });
+        } else if (confirm('Permanently erase all budget data from this device AND the cloud? This cannot be undone.')) {
+          doErase();
+        }
       });
     }
 

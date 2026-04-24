@@ -160,8 +160,8 @@
 (function() {
   'use strict';
 
-  var DB_NAME = 'dm-notes';
-   var DB_VERSION = 16;
+   var DB_NAME = 'dm-notes';
+   var DB_VERSION = 17;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -174,6 +174,24 @@
   var STORE_PROJECT_SHARES = 'projectShares';
   var STORE_PROJECTS = 'projects';
   var STORE_KANBAN_COLUMNS = 'kanbanColumns';
+  // v17: Budget / finance stores
+  var STORE_ACCOUNTS = 'accounts';
+  var STORE_CATEGORIES = 'categories';
+  var STORE_BUDGETS = 'budgets';
+  var STORE_TRANSACTIONS = 'transactions';
+  var STORE_RECURRING = 'recurring';
+  // Budget: local-only mode (user opt-in to skip Firestore sync for financial data)
+  var BUDGET_LOCAL_ONLY_KEY = 'dm-budget-local-only';
+  function isBudgetLocalOnly() {
+    try { return localStorage.getItem(BUDGET_LOCAL_ONLY_KEY) === '1'; }
+    catch (e) { return false; }
+  }
+  // Collections considered "budget / finance" data
+  var BUDGET_COLLECTIONS = {
+    accounts: true, categories: true, budgets: true,
+    transactions: true, recurring: true
+  };
+  function isBudgetCollection(name) { return !!BUDGET_COLLECTIONS[name]; }
   var MAX_VERSIONS_PER_NOTE = 50;
   var MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
   var SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
@@ -331,6 +349,44 @@
           projShareStore.createIndex('ownerId', 'ownerId', { unique: false });
           projShareStore.createIndex('inviteeEmail', 'inviteeEmail', { unique: false });
           projShareStore.createIndex('status', 'status', { unique: false });
+        }
+        // Accounts store (v17) — money containers (checking, cash, credit…)
+        if (!db.objectStoreNames.contains(STORE_ACCOUNTS)) {
+          var acctStore = db.createObjectStore(STORE_ACCOUNTS, { keyPath: 'id' });
+          acctStore.createIndex('userId', 'userId', { unique: false });
+          acctStore.createIndex('archived', 'archived', { unique: false });
+          acctStore.createIndex('order', 'order', { unique: false });
+        }
+        // Categories store (v17) — budget envelopes / classification
+        if (!db.objectStoreNames.contains(STORE_CATEGORIES)) {
+          var catStore = db.createObjectStore(STORE_CATEGORIES, { keyPath: 'id' });
+          catStore.createIndex('userId', 'userId', { unique: false });
+          catStore.createIndex('parentId', 'parentId', { unique: false });
+          catStore.createIndex('kind', 'kind', { unique: false });
+          catStore.createIndex('archived', 'archived', { unique: false });
+          catStore.createIndex('order', 'order', { unique: false });
+        }
+        // Budgets store (v17) — per-category per-month allocations
+        if (!db.objectStoreNames.contains(STORE_BUDGETS)) {
+          var bgtStore = db.createObjectStore(STORE_BUDGETS, { keyPath: 'id' });
+          bgtStore.createIndex('userId', 'userId', { unique: false });
+          bgtStore.createIndex('month', 'month', { unique: false });
+          bgtStore.createIndex('categoryId', 'categoryId', { unique: false });
+        }
+        // Transactions store (v17) — income, expenses, transfers
+        if (!db.objectStoreNames.contains(STORE_TRANSACTIONS)) {
+          var txStore = db.createObjectStore(STORE_TRANSACTIONS, { keyPath: 'id' });
+          txStore.createIndex('userId', 'userId', { unique: false });
+          txStore.createIndex('accountId', 'accountId', { unique: false });
+          txStore.createIndex('categoryId', 'categoryId', { unique: false });
+          txStore.createIndex('date', 'date', { unique: false });
+          txStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+        }
+        // Recurring rules store (v17) — auto-post or reminder-based recurring entries
+        if (!db.objectStoreNames.contains(STORE_RECURRING)) {
+          var recStore = db.createObjectStore(STORE_RECURRING, { keyPath: 'id' });
+          recStore.createIndex('userId', 'userId', { unique: false });
+          recStore.createIndex('nextDueDate', 'nextDueDate', { unique: false });
         }
       };
       req.onblocked = function() {
@@ -576,6 +632,11 @@
     var localPromise = opts.localOp ? opts.localOp() : Promise.resolve();
 
     return localPromise.then(function() {
+      // Budget local-only mode: skip Firestore entirely for financial collections
+      if (isBudgetLocalOnly() && isBudgetCollection(opts.collection)) {
+        return;
+      }
+
       // Track in-flight todo writes to prevent snapshot listener from reverting optimistic IDB data
       var isTodoWrite = opts.collection === 'todos' && opts.docId;
       if (isTodoWrite) {
@@ -917,6 +978,113 @@
       isDoneColumn: !!data.isDoneColumn,
       createdAt: createdAt,
       updatedAt: updatedAt
+    };
+  }
+
+  // ─── Budget / Finance Serializers (v17) ───
+
+  function serializeAccount(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      name: data.name || '',
+      type: data.type || 'checking',
+      currency: data.currency || 'USD',
+      openingBalance: typeof data.openingBalance === 'number' ? data.openingBalance : 0,
+      openingDate: data.openingDate || null,
+      color: data.color || '#64b5f6',
+      icon: data.icon || 'wallet',
+      archived: !!data.archived,
+      order: data.order || 0,
+      includeInNetWorth: data.includeInNetWorth !== false,
+      deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  function serializeCategory(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      name: data.name || '',
+      parentId: data.parentId || null,
+      kind: data.kind || 'expense', // 'income' | 'expense' | 'transfer'
+      color: data.color || '#64b5f6',
+      icon: data.icon || null,
+      order: data.order || 0,
+      archived: !!data.archived,
+      deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  function serializeBudget(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      month: data.month || '',            // 'YYYY-MM'
+      categoryId: data.categoryId || '',
+      allocated: typeof data.allocated === 'number' ? data.allocated : 0, // cents
+      rollover: !!data.rollover,
+      note: data.note || '',
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  function serializeTransaction(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      accountId: data.accountId || '',
+      categoryId: data.categoryId || null,
+      amount: typeof data.amount === 'number' ? data.amount : 0, // cents, signed
+      date: data.date || '',               // 'YYYY-MM-DD'
+      payee: data.payee || '',
+      memo: data.memo || '',
+      tags: data.tags || [],
+      cleared: !!data.cleared,
+      reconciled: !!data.reconciled,
+      transferPairId: data.transferPairId || null,
+      recurringId: data.recurringId || null,
+      attachmentIds: data.attachmentIds || [],
+      source: data.source || 'manual',
+      deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  function serializeRecurring(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      name: data.name || '',
+      accountId: data.accountId || '',
+      categoryId: data.categoryId || null,
+      amount: typeof data.amount === 'number' ? data.amount : 0,
+      frequency: data.frequency || 'monthly',
+      interval: data.interval || 1,
+      byDayOfMonth: data.byDayOfMonth || null,
+      byDayOfWeek: data.byDayOfWeek || null,
+      startDate: data.startDate || '',
+      endDate: data.endDate || null,
+      nextDueDate: data.nextDueDate || '',
+      autoPost: data.autoPost !== false,
+      reminderOffsetDays: data.reminderOffsetDays || 0,
+      lastPostedDate: data.lastPostedDate || null,
+      payee: data.payee || '',
+      memo: data.memo || '',
+      deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
     };
   }
 
@@ -1334,6 +1502,98 @@
     return Promise.all([purgeNotes, purgeTodos]);
   }
 
+  // ─── Budget / Finance Sync (v17) ───
+  // Syncs accounts, categories, budgets, transactions and recurring rules.
+  // Skipped entirely when the user enables "local-only" mode.
+
+  function syncOneBudgetStore(userId, collection, storeName, serializer) {
+    return window.dmDb.collection(collection)
+      .where('userId', '==', userId)
+      .get()
+      .then(function(snapshot) {
+        var remote = [];
+        snapshot.forEach(function(doc) { remote.push(serializer(doc)); });
+        return idbGetAll(storeName).then(function(local) {
+          return getAllQueued().then(function(queue) {
+            var pending = {};
+            queue.forEach(function(q) {
+              if (q.collection === collection) pending[q.docId] = true;
+            });
+            var localMap = {};
+            local.forEach(function(x) { localMap[x.id] = x; });
+            var remoteMap = {};
+            remote.forEach(function(x) { remoteMap[x.id] = x; });
+            var toUpsert = [];
+            remote.forEach(function(r) {
+              var l = localMap[r.id];
+              if (!l || l.updatedAt !== r.updatedAt) toUpsert.push(r);
+            });
+            var toDelete = [];
+            local.forEach(function(l) {
+              if (!remoteMap[l.id] && !pending[l.id]) toDelete.push(l.id);
+            });
+            var promises = [];
+            if (toUpsert.length > 0) promises.push(idbPutBatch(storeName, toUpsert));
+            toDelete.forEach(function(id) { promises.push(idbDelete(storeName, id)); });
+            return Promise.all(promises).then(function() {
+              return { upserted: toUpsert.length, deleted: toDelete.length };
+            });
+          });
+        });
+      });
+  }
+
+  function syncBudgetData(userId) {
+    if (!window.dmDb) return Promise.resolve();
+    if (isBudgetLocalOnly()) {
+      console.log('[dm-sync] Budget local-only mode — skipping cloud sync for financial data');
+      return Promise.resolve();
+    }
+    console.log('[dm-sync] Syncing budget data...');
+    var startTime = Date.now();
+    return syncOneBudgetStore(userId, 'accounts', STORE_ACCOUNTS, serializeAccount)
+      .then(function() { return syncOneBudgetStore(userId, 'categories', STORE_CATEGORIES, serializeCategory); })
+      .then(function() { return syncOneBudgetStore(userId, 'budgets', STORE_BUDGETS, serializeBudget); })
+      .then(function() { return syncOneBudgetStore(userId, 'transactions', STORE_TRANSACTIONS, serializeTransaction); })
+      .then(function() { return syncOneBudgetStore(userId, 'recurring', STORE_RECURRING, serializeRecurring); })
+      .then(function() {
+        var elapsed = Date.now() - startTime;
+        console.log('[dm-sync] Budget sync complete in ' + elapsed + 'ms');
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+      });
+  }
+
+  // Wipe all budget data (local, and optionally cloud). Fires dm-budget-updated.
+  function eraseBudgetData(opts) {
+    opts = opts || {};
+    var eraseCloud = !!opts.eraseCloud;
+    var stores = [STORE_ACCOUNTS, STORE_CATEGORIES, STORE_BUDGETS, STORE_TRANSACTIONS, STORE_RECURRING];
+    var collections = ['accounts', 'categories', 'budgets', 'transactions', 'recurring'];
+    var idsByCollection = {};
+    var collectPromises = stores.map(function(storeName, i) {
+      return idbGetAll(storeName).then(function(items) {
+        idsByCollection[collections[i]] = items.map(function(x) { return x.id; });
+      });
+    });
+    return Promise.all(collectPromises).then(function() {
+      return Promise.all(stores.map(function(s) { return idbClear(s); }));
+    }).then(function() {
+      if (!eraseCloud) return;
+      if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) return;
+      var promises = [];
+      collections.forEach(function(c) {
+        (idsByCollection[c] || []).forEach(function(id) {
+          promises.push(window.dmDb.collection(c).doc(id).delete().catch(function(e) {
+            console.warn('[dm-sync] Cloud erase failed for ' + c + '/' + id + ':', e.message);
+          }));
+        });
+      });
+      return Promise.all(promises);
+    }).then(function() {
+      window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+    });
+  }
+
   function syncAll(userId) {
     if (_syncing) return Promise.resolve();
     if (isInQuotaCooldown()) {
@@ -1358,6 +1618,7 @@
       .then(function() { return syncSharedNotes(userId); })
       .then(function() { return syncProjectShares(userId); })
       .then(function() { return syncSharedProjects(userId); })
+      .then(function() { return syncBudgetData(userId); })
       .then(function() {
         _syncing = false;
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -5078,7 +5339,481 @@
     putSearchIndexCache: function(data, noteCount) {
       return idbPut(STORE_META, { key: 'searchIndex', data: data, noteCount: noteCount, updatedAt: Date.now() });
     },
-    clearSearchIndexCache: function() { return idbDelete(STORE_META, 'searchIndex'); }
+    clearSearchIndexCache: function() { return idbDelete(STORE_META, 'searchIndex'); },
+
+    // Budget syncs
+    syncBudgetData: function(userId) { return syncBudgetData(userId); },
+    eraseBudgetData: function(opts) { return eraseBudgetData(opts); },
+    isBudgetLocalOnly: isBudgetLocalOnly
+  };
+
+  // ─── Budget / Finance Public API (window.dmBudget) ───
+  // All money amounts are integer cents. Single currency per user
+  // (localStorage['dm-budget-currency'], default USD).
+
+  function _budgetUser() {
+    var u = window.dmAuth && window.dmAuth.currentUser;
+    if (!u) throw new Error('Not authenticated');
+    return u;
+  }
+
+  function _budgetNow() { return Date.now(); }
+
+  function _budgetId(prefix) {
+    // Client-generated, offline-compatible (same pattern as projects).
+    var uid = (window.dmAuth && window.dmAuth.currentUser) ? window.dmAuth.currentUser.uid : 'local';
+    return uid + '_' + prefix + '_' + _budgetNow() + '_' + Math.random().toString(36).substr(2, 6);
+  }
+
+  function _budgetSerializeTimestamps(obj, fields) {
+    // Replace millis numbers with Firestore Timestamps for createdAt / updatedAt etc.
+    var out = {};
+    Object.keys(obj).forEach(function(k) { out[k] = obj[k]; });
+    fields.forEach(function(f) {
+      if (f === 'createdAt' || f === 'updatedAt') {
+        out[f] = firebase.firestore.FieldValue.serverTimestamp();
+      }
+    });
+    return out;
+  }
+
+  function _currentMonth() {
+    var d = new Date();
+    var y = d.getFullYear();
+    var m = ('0' + (d.getMonth() + 1)).slice(-2);
+    return y + '-' + m;
+  }
+
+  window.dmBudget = {
+    // ── Currency ──
+    getCurrency: function() {
+      try { return localStorage.getItem('dm-budget-currency') || 'USD'; }
+      catch (e) { return 'USD'; }
+    },
+    setCurrency: function(code) {
+      try { localStorage.setItem('dm-budget-currency', code); } catch (e) {}
+      window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+    },
+    isLocalOnly: isBudgetLocalOnly,
+    setLocalOnly: function(on) {
+      try {
+        if (on) localStorage.setItem(BUDGET_LOCAL_ONLY_KEY, '1');
+        else localStorage.removeItem(BUDGET_LOCAL_ONLY_KEY);
+      } catch (e) {}
+      window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+    },
+    eraseAllData: function(opts) { return eraseBudgetData(opts || {}); },
+
+    currentMonth: _currentMonth,
+
+    // ── Accounts ──
+    getAccounts: function() {
+      return idbGetAll(STORE_ACCOUNTS).then(function(items) {
+        return items.filter(function(a) { return !a.deletedAt; })
+                    .sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      });
+    },
+    getAccount: function(id) { return idbGet(STORE_ACCOUNTS, id); },
+    createAccount: function(data) {
+      var user = _budgetUser();
+      var id = data.id || _budgetId('acct');
+      var now = _budgetNow();
+      var account = {
+        id: id,
+        userId: user.uid,
+        name: data.name || 'Account',
+        type: data.type || 'checking',
+        currency: data.currency || window.dmBudget.getCurrency(),
+        openingBalance: typeof data.openingBalance === 'number' ? data.openingBalance : 0,
+        openingDate: data.openingDate || null,
+        color: data.color || '#64b5f6',
+        icon: data.icon || 'wallet',
+        archived: false,
+        order: typeof data.order === 'number' ? data.order : 0,
+        includeInNetWorth: data.includeInNetWorth !== false,
+        deletedAt: null,
+        createdAt: now,
+        updatedAt: now
+      };
+      var fsData = {
+        userId: user.uid, name: account.name, type: account.type, currency: account.currency,
+        openingBalance: account.openingBalance, openingDate: account.openingDate,
+        color: account.color, icon: account.icon, archived: false, order: account.order,
+        includeInNetWorth: account.includeInNetWorth,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'accounts', docId: id, op: 'set', data: fsData,
+        localOp: function() { return idbPut(STORE_ACCOUNTS, account); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-accounts-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+        return account;
+      });
+    },
+    updateAccount: function(id, updates) {
+      return idbGet(STORE_ACCOUNTS, id).then(function(acc) {
+        if (!acc) return Promise.reject(new Error('Account not found'));
+        var fs = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        ['name','type','currency','openingBalance','openingDate','color','icon','archived','order','includeInNetWorth'].forEach(function(k) {
+          if (updates[k] !== undefined) { acc[k] = updates[k]; fs[k] = updates[k]; }
+        });
+        acc.updatedAt = _budgetNow();
+        return firestoreWrite({
+          collection: 'accounts', docId: id, op: 'update', data: fs,
+          localOp: function() { return idbPut(STORE_ACCOUNTS, acc); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-accounts-updated'));
+          window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+          return acc;
+        });
+      });
+    },
+    deleteAccount: function(id) {
+      return firestoreWrite({
+        collection: 'accounts', docId: id, op: 'delete', data: null,
+        localOp: function() { return idbDelete(STORE_ACCOUNTS, id); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-accounts-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+      });
+    },
+    getAccountBalance: function(accountId) {
+      // Opening balance + sum of transactions
+      return Promise.all([
+        idbGet(STORE_ACCOUNTS, accountId),
+        idbGetAll(STORE_TRANSACTIONS)
+      ]).then(function(r) {
+        var acc = r[0];
+        if (!acc) return 0;
+        var txs = r[1].filter(function(t) { return t.accountId === accountId && !t.deletedAt; });
+        var sum = acc.openingBalance || 0;
+        txs.forEach(function(t) { sum += (t.amount || 0); });
+        return sum;
+      });
+    },
+
+    // Ensure a default account exists (Phase 1 single-account model).
+    ensureDefaultAccount: function() {
+      return window.dmBudget.getAccounts().then(function(accts) {
+        if (accts.length > 0) return accts[0];
+        return window.dmBudget.createAccount({
+          name: 'Main',
+          type: 'checking',
+          order: 0,
+          openingBalance: 0
+        });
+      });
+    },
+
+    // ── Categories ──
+    getCategories: function() {
+      return idbGetAll(STORE_CATEGORIES).then(function(items) {
+        return items.filter(function(c) { return !c.deletedAt && !c.archived; })
+                    .sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      });
+    },
+    getAllCategoriesIncludingArchived: function() {
+      return idbGetAll(STORE_CATEGORIES).then(function(items) {
+        return items.filter(function(c) { return !c.deletedAt; });
+      });
+    },
+    getCategory: function(id) { return idbGet(STORE_CATEGORIES, id); },
+    createCategory: function(data) {
+      var user = _budgetUser();
+      var id = data.id || _budgetId('cat');
+      var now = _budgetNow();
+      var cat = {
+        id: id, userId: user.uid,
+        name: data.name || 'Category',
+        parentId: data.parentId || null,
+        kind: data.kind || 'expense',
+        color: data.color || '#64b5f6',
+        icon: data.icon || null,
+        order: typeof data.order === 'number' ? data.order : 0,
+        archived: false, deletedAt: null,
+        createdAt: now, updatedAt: now
+      };
+      var fs = {
+        userId: user.uid, name: cat.name, parentId: cat.parentId, kind: cat.kind,
+        color: cat.color, icon: cat.icon, order: cat.order, archived: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'categories', docId: id, op: 'set', data: fs,
+        localOp: function() { return idbPut(STORE_CATEGORIES, cat); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-categories-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+        return cat;
+      });
+    },
+    updateCategory: function(id, updates) {
+      return idbGet(STORE_CATEGORIES, id).then(function(cat) {
+        if (!cat) return Promise.reject(new Error('Category not found'));
+        var fs = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        ['name','parentId','kind','color','icon','order','archived'].forEach(function(k) {
+          if (updates[k] !== undefined) { cat[k] = updates[k]; fs[k] = updates[k]; }
+        });
+        cat.updatedAt = _budgetNow();
+        return firestoreWrite({
+          collection: 'categories', docId: id, op: 'update', data: fs,
+          localOp: function() { return idbPut(STORE_CATEGORIES, cat); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-categories-updated'));
+          window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+          return cat;
+        });
+      });
+    },
+    deleteCategory: function(id) {
+      return firestoreWrite({
+        collection: 'categories', docId: id, op: 'delete', data: null,
+        localOp: function() { return idbDelete(STORE_CATEGORIES, id); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-categories-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+      });
+    },
+
+    // ── Budgets (monthly allocations) ──
+    // budgetId is deterministic: {month}_{categoryId}
+    _budgetDocId: function(month, categoryId) { return month + '_' + categoryId; },
+    setBudget: function(month, categoryId, allocated, opts) {
+      opts = opts || {};
+      var user = _budgetUser();
+      var id = month + '_' + categoryId;
+      var now = _budgetNow();
+      var budget = {
+        id: id, userId: user.uid, month: month, categoryId: categoryId,
+        allocated: allocated, rollover: !!opts.rollover, note: opts.note || '',
+        createdAt: now, updatedAt: now
+      };
+      var fs = {
+        userId: user.uid, month: month, categoryId: categoryId,
+        allocated: allocated, rollover: budget.rollover, note: budget.note,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'budgets', docId: id, op: 'set', data: fs,
+        localOp: function() { return idbPut(STORE_BUDGETS, budget); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-budgets-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+        return budget;
+      });
+    },
+    getBudgetsForMonth: function(month) {
+      return idbGetAll(STORE_BUDGETS).then(function(items) {
+        return items.filter(function(b) { return b.month === month; });
+      });
+    },
+
+    // ── Transactions ──
+    getTransactions: function(filter) {
+      filter = filter || {};
+      return idbGetAll(STORE_TRANSACTIONS).then(function(items) {
+        return items.filter(function(t) {
+          if (t.deletedAt) return false;
+          if (filter.accountId && t.accountId !== filter.accountId) return false;
+          if (filter.categoryId && t.categoryId !== filter.categoryId) return false;
+          if (filter.fromDate && t.date < filter.fromDate) return false;
+          if (filter.toDate && t.date > filter.toDate) return false;
+          if (filter.month) {
+            if (!t.date || t.date.substr(0, 7) !== filter.month) return false;
+          }
+          return true;
+        }).sort(function(a, b) {
+          // most-recent date first, then most-recent createdAt
+          if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+          return (b.createdAt || 0) - (a.createdAt || 0);
+        });
+      });
+    },
+    getTransaction: function(id) { return idbGet(STORE_TRANSACTIONS, id); },
+    createTransaction: function(data) {
+      var user = _budgetUser();
+      var id = data.id || _budgetId('tx');
+      var now = _budgetNow();
+      var tx = {
+        id: id, userId: user.uid,
+        accountId: data.accountId || '',
+        categoryId: data.categoryId || null,
+        amount: typeof data.amount === 'number' ? data.amount : 0,
+        date: data.date || new Date().toISOString().substr(0, 10),
+        payee: data.payee || '',
+        memo: data.memo || '',
+        tags: data.tags || [],
+        cleared: !!data.cleared,
+        reconciled: !!data.reconciled,
+        transferPairId: data.transferPairId || null,
+        recurringId: data.recurringId || null,
+        attachmentIds: data.attachmentIds || [],
+        source: data.source || 'manual',
+        deletedAt: null,
+        createdAt: now, updatedAt: now
+      };
+      var fs = {
+        userId: user.uid, accountId: tx.accountId, categoryId: tx.categoryId,
+        amount: tx.amount, date: tx.date, payee: tx.payee, memo: tx.memo,
+        tags: tx.tags, cleared: tx.cleared, reconciled: tx.reconciled,
+        transferPairId: tx.transferPairId, recurringId: tx.recurringId,
+        attachmentIds: tx.attachmentIds, source: tx.source,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'transactions', docId: id, op: 'set', data: fs,
+        localOp: function() { return idbPut(STORE_TRANSACTIONS, tx); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-transactions-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+        return tx;
+      });
+    },
+    updateTransaction: function(id, updates) {
+      return idbGet(STORE_TRANSACTIONS, id).then(function(tx) {
+        if (!tx) return Promise.reject(new Error('Transaction not found'));
+        var fs = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        ['accountId','categoryId','amount','date','payee','memo','tags','cleared','reconciled','transferPairId','recurringId','attachmentIds','source'].forEach(function(k) {
+          if (updates[k] !== undefined) { tx[k] = updates[k]; fs[k] = updates[k]; }
+        });
+        tx.updatedAt = _budgetNow();
+        return firestoreWrite({
+          collection: 'transactions', docId: id, op: 'update', data: fs,
+          localOp: function() { return idbPut(STORE_TRANSACTIONS, tx); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-transactions-updated'));
+          window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+          return tx;
+        });
+      });
+    },
+    deleteTransaction: function(id) {
+      // Hard delete (Phase 1). Phase 2+ can switch to soft-delete with undo.
+      return firestoreWrite({
+        collection: 'transactions', docId: id, op: 'delete', data: null,
+        localOp: function() { return idbDelete(STORE_TRANSACTIONS, id); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-transactions-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+      });
+    },
+
+    // ── Month summary (envelope view) ──
+    // Returns: { month, currency, toBeBudgeted, categories: [{id, name, kind, color, allocated, spent, remaining, pctUsed, rollover}] }
+    getMonthSummary: function(month) {
+      month = month || _currentMonth();
+      return Promise.all([
+        window.dmBudget.getCategories(),
+        window.dmBudget.getBudgetsForMonth(month),
+        window.dmBudget.getTransactions({ month: month })
+      ]).then(function(r) {
+        var cats = r[0], budgets = r[1], txs = r[2];
+        var bgtByCat = {};
+        budgets.forEach(function(b) { bgtByCat[b.categoryId] = b; });
+        var spentByCat = {};
+        var incomeTotal = 0;
+        txs.forEach(function(t) {
+          if (!t.categoryId) return;
+          spentByCat[t.categoryId] = (spentByCat[t.categoryId] || 0) + t.amount;
+        });
+        // Income = positive amounts tagged to income-kind categories (or uncategorized positives)
+        txs.forEach(function(t) {
+          if (t.amount > 0) {
+            var c = t.categoryId ? (cats.filter(function(x){return x.id===t.categoryId;})[0]) : null;
+            if (!c || c.kind === 'income') incomeTotal += t.amount;
+          }
+        });
+        var allocatedTotal = 0;
+        var rows = cats.map(function(c) {
+          var b = bgtByCat[c.id];
+          var allocated = b ? b.allocated : 0;
+          // Spending on expense categories is negative; display spent as positive magnitude
+          var raw = spentByCat[c.id] || 0;
+          var spent = c.kind === 'income' ? raw : Math.abs(Math.min(raw, 0));
+          var remaining = allocated - spent;
+          var pct = allocated > 0 ? Math.min(100, Math.round(spent / allocated * 100)) : (spent > 0 ? 100 : 0);
+          allocatedTotal += allocated;
+          return {
+            id: c.id, name: c.name, kind: c.kind, color: c.color, parentId: c.parentId,
+            allocated: allocated, spent: spent, remaining: remaining, pctUsed: pct,
+            rollover: b ? !!b.rollover : false, note: b ? b.note : ''
+          };
+        });
+        return {
+          month: month,
+          currency: window.dmBudget.getCurrency(),
+          income: incomeTotal,
+          allocated: allocatedTotal,
+          toBeBudgeted: incomeTotal - allocatedTotal,
+          categories: rows
+        };
+      });
+    },
+
+    // ── Formatting helper ──
+    formatMoney: function(cents, opts) {
+      opts = opts || {};
+      var currency = opts.currency || window.dmBudget.getCurrency();
+      var amount = (cents || 0) / 100;
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: 'currency', currency: currency,
+          minimumFractionDigits: 2, maximumFractionDigits: 2
+        }).format(amount);
+      } catch (e) {
+        // Fallback for exotic codes
+        return (amount < 0 ? '-' : '') + currency + ' ' + Math.abs(amount).toFixed(2);
+      }
+    },
+    parseMoney: function(str) {
+      // Accepts '12.34', '$12.34', '12,34', '1,234.56', '-12.50', '(12.50)'
+      if (str == null) return 0;
+      var s = String(str).trim();
+      if (!s) return 0;
+      var negative = false;
+      if (/^\(.*\)$/.test(s)) { negative = true; s = s.slice(1, -1); }
+      s = s.replace(/[^\d,.\-]/g, '');
+      // If both . and , present, assume , is thousands sep
+      if (s.indexOf(',') !== -1 && s.indexOf('.') !== -1) {
+        s = s.replace(/,/g, '');
+      } else if (s.indexOf(',') !== -1 && s.indexOf('.') === -1) {
+        // If only comma, treat as decimal
+        s = s.replace(',', '.');
+      }
+      var n = parseFloat(s);
+      if (isNaN(n)) return 0;
+      if (negative) n = -Math.abs(n);
+      return Math.round(n * 100);
+    }
+  };
+
+  // Seed default categories the first time after sign-in, if user has none.
+  window.dmBudget.seedDefaultsIfEmpty = function() {
+    return window.dmBudget.getCategories().then(function(cats) {
+      if (cats.length > 0) return;
+      var defaults = [
+        { name: 'Income',        kind: 'income',  color: '#43a047', order: 0 },
+        { name: 'Housing',       kind: 'expense', color: '#1976d2', order: 10 },
+        { name: 'Groceries',     kind: 'expense', color: '#43a047', order: 20 },
+        { name: 'Dining',        kind: 'expense', color: '#fb8c00', order: 30 },
+        { name: 'Transport',     kind: 'expense', color: '#8e24aa', order: 40 },
+        { name: 'Utilities',     kind: 'expense', color: '#00897b', order: 50 },
+        { name: 'Subscriptions', kind: 'expense', color: '#5e35b1', order: 60 },
+        { name: 'Health',        kind: 'expense', color: '#e53935', order: 70 },
+        { name: 'Entertainment', kind: 'expense', color: '#d81b60', order: 80 },
+        { name: 'Other',         kind: 'expense', color: '#607d8b', order: 90 }
+      ];
+      var chain = Promise.resolve();
+      defaults.forEach(function(d) {
+        chain = chain.then(function() { return window.dmBudget.createCategory(d); });
+      });
+      return chain;
+    });
   };
 
   // ─── Auto-sync on Auth State Change ───

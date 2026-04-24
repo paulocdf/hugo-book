@@ -1,0 +1,294 @@
+{{/*
+  budget-transactions.html — Transaction register (Phase 1)
+  - Lists all transactions sorted by date desc
+  - Inline edit: payee, memo, category, amount
+  - Delete row
+  - Filters: month, category, text search
+*/}}
+
+<style>
+  .dm-tx-wrap { max-width: 1100px; margin: 0 auto; padding: 12px 0 40px; }
+  .dm-tx-toolbar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 14px;
+  }
+  .dm-tx-toolbar input, .dm-tx-toolbar select {
+    padding: 8px 10px; border: 1px solid var(--gray-200); border-radius: 6px;
+    background: var(--body-background); color: var(--body-font-color);
+    font-size: 0.9rem;
+  }
+  .dm-tx-toolbar .spacer { flex: 1; }
+  .dm-tx-toolbar .stat { font-size: 0.85rem; opacity: 0.8; }
+  .dm-tx-toolbar .stat strong { font-variant-numeric: tabular-nums; }
+
+  .dm-tx-table {
+    width: 100%; border-collapse: collapse;
+    border: 1px solid var(--gray-200); border-radius: 8px; overflow: hidden;
+  }
+  .dm-tx-table th, .dm-tx-table td {
+    padding: 8px 10px; font-size: 0.88rem; text-align: left;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .dm-tx-table th {
+    background: var(--gray-100); font-weight: 600;
+    text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.05em;
+    opacity: 0.8;
+  }
+  .dm-tx-table tr:last-child td { border-bottom: 0; }
+  .dm-tx-table td.amt, .dm-tx-table th.amt { text-align: right; font-variant-numeric: tabular-nums; }
+  .dm-tx-table td input, .dm-tx-table td select {
+    width: 100%; padding: 4px 6px;
+    border: 1px solid transparent; border-radius: 4px;
+    background: transparent; color: var(--body-font-color);
+    font-size: inherit; font-family: inherit;
+  }
+  .dm-tx-table td input:focus, .dm-tx-table td select:focus {
+    outline: none; border-color: var(--color-accent); background: var(--body-background);
+  }
+  .dm-tx-table td.amt input { text-align: right; font-variant-numeric: tabular-nums; }
+  .dm-tx-table td.amt .negative { color: #e53935; }
+  .dm-tx-table td.amt .positive { color: #43a047; }
+
+  .dm-tx-table .tx-del {
+    border: 0; background: transparent; color: var(--body-font-color);
+    opacity: 0.3; cursor: pointer; padding: 4px;
+  }
+  .dm-tx-table tr:hover .tx-del { opacity: 0.9; }
+
+  .dm-tx-empty {
+    padding: 40px; text-align: center; opacity: 0.6;
+    border: 2px dashed var(--gray-200); border-radius: 10px;
+  }
+</style>
+
+<div class="dm-tx-wrap" id="dm-tx-root">
+  <div class="dm-tx-toolbar">
+    <select id="dm-tx-month"></select>
+    <select id="dm-tx-category"><option value="">All categories</option></select>
+    <input type="search" id="dm-tx-search" placeholder="Search payee / memo…">
+    <span class="spacer"></span>
+    <span class="stat" id="dm-tx-stat"></span>
+  </div>
+  <div id="dm-tx-body"><div class="dm-tx-empty">Loading transactions…</div></div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var ALL_MONTHS = 'all';
+
+  function $(s, c) { return (c || document).querySelector(s); }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function(c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  function populateMonthSelect(txs) {
+    var months = {};
+    txs.forEach(function(t) { if (t.date) months[t.date.substr(0, 7)] = true; });
+    var keys = Object.keys(months).sort().reverse();
+    var current = window.dmBudget.currentMonth();
+    if (!months[current]) keys.unshift(current);
+    var sel = $('#dm-tx-month');
+    var prev = sel.value || current;
+    sel.innerHTML = '<option value="' + ALL_MONTHS + '">All months</option>' +
+      keys.map(function(m) {
+        var parts = m.split('-');
+        var label = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1)
+          .toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+        return '<option value="' + m + '">' + label + '</option>';
+      }).join('');
+    sel.value = prev;
+  }
+
+  function populateCategorySelect(cats) {
+    var sel = $('#dm-tx-category');
+    var prev = sel.value;
+    sel.innerHTML = '<option value="">All categories</option>' +
+      '<option value="__none__">(Uncategorized)</option>' +
+      cats.map(function(c) {
+        return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>';
+      }).join('');
+    if (prev) sel.value = prev;
+  }
+
+  function applyFilters(txs) {
+    var month = $('#dm-tx-month').value;
+    var category = $('#dm-tx-category').value;
+    var q = $('#dm-tx-search').value.trim().toLowerCase();
+    return txs.filter(function(t) {
+      if (month && month !== ALL_MONTHS) {
+        if (!t.date || t.date.substr(0, 7) !== month) return false;
+      }
+      if (category === '__none__') {
+        if (t.categoryId) return false;
+      } else if (category) {
+        if (t.categoryId !== category) return false;
+      }
+      if (q) {
+        var hay = ((t.payee || '') + ' ' + (t.memo || '')).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderTable(txs, cats) {
+    var body = $('#dm-tx-body');
+    if (txs.length === 0) {
+      body.innerHTML = '<div class="dm-tx-empty">No transactions match these filters.</div>';
+      $('#dm-tx-stat').textContent = '';
+      return;
+    }
+    var currency = window.dmBudget.getCurrency();
+    var fm = function(x) { return window.dmBudget.formatMoney(x, { currency: currency }); };
+    var catMap = {};
+    cats.forEach(function(c) { catMap[c.id] = c; });
+
+    var total = 0;
+    txs.forEach(function(t) { total += (t.amount || 0); });
+    $('#dm-tx-stat').innerHTML = txs.length + ' transactions · net <strong>' + fm(total) + '</strong>';
+
+    var catOptions = cats.map(function(c) {
+      return '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>';
+    }).join('');
+
+    var rows = txs.map(function(t) {
+      var amt = t.amount || 0;
+      var amtClass = amt < 0 ? 'negative' : (amt > 0 ? 'positive' : '');
+      return '' +
+        '<tr data-tx="' + escapeHtml(t.id) + '">' +
+          '<td><input type="date" data-field="date" value="' + escapeHtml(t.date) + '"></td>' +
+          '<td><input type="text" data-field="payee" value="' + escapeHtml(t.payee) + '" placeholder="Payee"></td>' +
+          '<td><input type="text" data-field="memo" value="' + escapeHtml(t.memo) + '" placeholder="Memo"></td>' +
+          '<td>' +
+            '<select data-field="categoryId">' +
+              '<option value="">—</option>' +
+              catOptions +
+            '</select>' +
+          '</td>' +
+          '<td class="amt"><input type="text" data-field="amount" value="' + (amt / 100).toFixed(2) + '" inputmode="decimal" class="' + amtClass + '"></td>' +
+          '<td style="width:32px"><button class="tx-del" data-tx-del="' + escapeHtml(t.id) + '" title="Delete">' +
+            '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>' +
+          '</button></td>' +
+        '</tr>';
+    }).join('');
+
+    body.innerHTML = '' +
+      '<table class="dm-tx-table">' +
+        '<thead><tr>' +
+          '<th style="width:130px">Date</th>' +
+          '<th>Payee</th>' +
+          '<th>Memo</th>' +
+          '<th style="width:180px">Category</th>' +
+          '<th class="amt" style="width:140px">Amount</th>' +
+          '<th></th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody>' +
+      '</table>';
+
+    // Pre-select categories
+    body.querySelectorAll('tr[data-tx]').forEach(function(tr) {
+      var txId = tr.getAttribute('data-tx');
+      var tx = txs.filter(function(x) { return x.id === txId; })[0];
+      if (!tx) return;
+      var catSel = tr.querySelector('[data-field="categoryId"]');
+      if (catSel) catSel.value = tx.categoryId || '';
+    });
+
+    // Bind events
+    body.querySelectorAll('input[data-field], select[data-field]').forEach(function(el) {
+      el.addEventListener('change', handleFieldChange);
+      if (el.tagName === 'INPUT' && el.type !== 'date') {
+        el.addEventListener('blur', handleFieldChange);
+        el.addEventListener('keydown', function(e) {
+          if (e.key === 'Enter') { e.preventDefault(); el.blur(); }
+        });
+      }
+    });
+    body.querySelectorAll('[data-tx-del]').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var id = btn.getAttribute('data-tx-del');
+        if (window.dmConfirm) {
+          window.dmConfirm('Delete this transaction? This cannot be undone.', function() {
+            window.dmBudget.deleteTransaction(id).then(refresh);
+          });
+        } else {
+          window.dmBudget.deleteTransaction(id).then(refresh);
+        }
+      });
+    });
+  }
+
+  var _lastValues = {};
+  function handleFieldChange(e) {
+    var el = e.target;
+    var tr = el.closest('tr[data-tx]');
+    if (!tr) return;
+    var id = tr.getAttribute('data-tx');
+    var field = el.getAttribute('data-field');
+    var value = el.value;
+    var key = id + ':' + field;
+    if (_lastValues[key] === value) return;
+    _lastValues[key] = value;
+
+    var updates = {};
+    if (field === 'amount') {
+      updates.amount = window.dmBudget.parseMoney(value);
+    } else if (field === 'categoryId') {
+      updates.categoryId = value || null;
+    } else {
+      updates[field] = value;
+    }
+    window.dmBudget.updateTransaction(id, updates).catch(function(err) {
+      console.error('[budget] update tx failed:', err);
+    });
+  }
+
+  var _allTx = [];
+  var _allCats = [];
+  var _refreshPending = false;
+
+  function refresh() {
+    if (_refreshPending) return;
+    _refreshPending = true;
+    Promise.resolve().then(function() {
+      _refreshPending = false;
+      return Promise.all([
+        window.dmBudget.getTransactions({}),
+        window.dmBudget.getCategories()
+      ]);
+    }).then(function(r) {
+      _allTx = r[0]; _allCats = r[1];
+      populateMonthSelect(_allTx);
+      populateCategorySelect(_allCats);
+      renderTable(applyFilters(_allTx), _allCats);
+    }).catch(function(err) {
+      console.error('[budget/tx] refresh failed:', err);
+      $('#dm-tx-body').innerHTML = '<div class="dm-tx-empty">Sign in to view transactions.<br><small>' + escapeHtml(err.message) + '</small></div>';
+    });
+  }
+
+  function init() {
+    $('#dm-tx-month').value = window.dmBudget.currentMonth();
+    $('#dm-tx-month').addEventListener('change', function() { renderTable(applyFilters(_allTx), _allCats); });
+    $('#dm-tx-category').addEventListener('change', function() { renderTable(applyFilters(_allTx), _allCats); });
+    $('#dm-tx-search').addEventListener('input', function() { renderTable(applyFilters(_allTx), _allCats); });
+    refresh();
+    document.addEventListener('dm-budget-updated', refresh);
+    window.addEventListener('dm-budget-updated', refresh);
+    document.addEventListener('dm-sync-complete', refresh);
+  }
+
+  (window.dmAuthReady || Promise.resolve()).then(function() {
+    if (!window.dmBudget) {
+      $('#dm-tx-body').innerHTML = '<div class="dm-tx-empty">Budget data layer not loaded. Please reload.</div>';
+      return;
+    }
+    init();
+  });
+})();
+</script>
