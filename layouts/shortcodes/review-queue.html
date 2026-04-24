@@ -1169,13 +1169,14 @@
 
   function loadQueue() {
     if (!window.dmSync) {
-      setTimeout(loadQueue, 100);
-      return;
+      return new Promise(function(resolve) {
+        setTimeout(function() { loadQueue().then(resolve); }, 100);
+      });
     }
 
     showState('loading');
 
-    Promise.all([
+    return Promise.all([
       window.dmSync.getReviewCards(false), // all cards
       window.dmSync.getReviewCards(true)   // due cards only
     ]).then(function(results) {

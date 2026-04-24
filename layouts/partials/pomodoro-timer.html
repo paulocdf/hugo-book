@@ -1702,6 +1702,21 @@
   var WORK_SECONDS = 25 * 60;
   var BREAK_SECONDS = 5 * 60;
 
+  // Read the user-configured short-break default. Honours two localStorage
+  // keys: the user-facing minutes key (`dm-pomo-short-break`, integer ≥ 1)
+  // and an undocumented seconds-granular override (`dm-pomo-short-break-seconds`,
+  // integer ≥ 1) used only by the Playwright suite to keep inter-task-break
+  // tests fast. Returns null when no override is set.
+  function _readShortBreakSecondsOverride() {
+    try {
+      var s = parseInt(localStorage.getItem('dm-pomo-short-break-seconds'), 10);
+      if (s > 0) return s;
+      var m = parseInt(localStorage.getItem('dm-pomo-short-break'), 10);
+      if (m > 0) return m * 60;
+    } catch (e) {}
+    return null;
+  }
+
   var timerEl = document.getElementById('pomodoro-timer');
   var phaseEl = document.getElementById('pomodoro-phase');
   var categoryEl = document.getElementById('pomodoro-category');
@@ -3555,7 +3570,8 @@
         BREAK_SECONDS = nextSub.breakLength * 60;
       } else {
         // Fall back to global short-break default
-        try { var v = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (v > 0) BREAK_SECONDS = v * 60; } catch(e) {}
+        var _sb1 = _readShortBreakSecondsOverride();
+        if (_sb1 !== null) BREAK_SECONDS = _sb1;
       }
       if (nextSub.pomodoroCount && nextSub.pomodoroCount > 0) {
         totalSessions = nextSub.pomodoroCount;
@@ -5139,7 +5155,8 @@
               BREAK_SECONDS = nextSub.breakLength * 60;
             } else {
               BREAK_SECONDS = 5 * 60;
-              try { var bv = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (bv > 0) BREAK_SECONDS = bv * 60; } catch(e) {}
+              var _sb2 = _readShortBreakSecondsOverride();
+              if (_sb2 !== null) BREAK_SECONDS = _sb2;
             }
             totalSessions = (nextSub.pomodoroCount && nextSub.pomodoroCount > 0) ? nextSub.pomodoroCount : 1;
             phase = 'work';
@@ -5670,7 +5687,8 @@
               BREAK_SECONDS = todo.breakLength * 60;
             } else {
               // Fall back to global short-break default
-              try { var v = parseInt(localStorage.getItem('dm-pomo-short-break'), 10); if (v > 0) BREAK_SECONDS = v * 60; } catch(e) {}
+              var _sb3 = _readShortBreakSecondsOverride();
+              if (_sb3 !== null) BREAK_SECONDS = _sb3;
             }
             if (todo.pomodoroCount && todo.pomodoroCount > 0) {
               totalSessions = todo.pomodoroCount;
