@@ -4,10 +4,7 @@
 <div class="history" id="history">
   <div class="history-auth" id="history-auth" style="display: none;">
     <div class="history-auth-card">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-      </svg>
+      <svg class="dm-icon dm-icon--lock" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-lock"/></svg>
       <h3>Sign in to view your history</h3>
       <p>Your task history requires authentication.</p>
       <button type="button" class="history-signin-btn" id="history-signin-btn">
@@ -23,7 +20,7 @@
   </div>
 
   <div class="history-empty" id="history-empty" style="display: none;">
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+    <svg class="dm-icon dm-icon--calendar" width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-calendar"/></svg>
     <p>No task history yet.</p>
     <p class="history-empty-hint">Complete and close days in your <a href="{{ "docs/inbox/" | relURL }}">Inbox</a> to see your history here.</p>
   </div>
@@ -32,11 +29,11 @@
     <!-- Month navigation -->
     <div class="history-month-nav">
       <button type="button" class="history-nav-btn" id="history-prev-month" title="Previous month">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+        <svg class="dm-icon dm-icon--chevron-left" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-left"/></svg>
       </button>
       <span class="history-month-label" id="history-month-label"></span>
       <button type="button" class="history-nav-btn" id="history-next-month" title="Next month">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        <svg class="dm-icon dm-icon--chevron-right" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-right"/></svg>
       </button>
     </div>
 
@@ -728,7 +725,7 @@
     html += '<div class="history-day-detail-header">';
     html += '<span class="history-day-detail-title">' + escapeHtml(headerLabel) + '</span>';
     html += '<button type="button" class="history-day-detail-close" id="history-detail-close" title="Close">';
-    html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+    html += '<svg class="dm-icon dm-icon--x" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-x"/></svg>';
     html += '</button>';
     html += '</div>';
 
@@ -782,9 +779,9 @@
 
     // Bullet
     if (isDone) {
-      html += '<span class="' + bulletClass + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg></span>';
+      html += '<span class="' + bulletClass + '"><svg class="dm-icon dm-icon--check" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check"/></svg></span>';
     } else {
-      html += '<span class="' + bulletClass + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle></svg></span>';
+      html += '<span class="' + bulletClass + '"><svg class="dm-icon dm-icon--circle" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-circle"/></svg></span>';
     }
 
     // Title + category + project

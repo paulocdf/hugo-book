@@ -5,9 +5,7 @@
   <!-- Auth gate -->
   <div class="ai-page-auth" id="ai-page-auth" style="display: none;">
     <div class="ai-page-auth-card">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ai)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
-      </svg>
+      <svg class="dm-icon dm-icon--sparkles" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-sparkles"/></svg>
       <h3>Sign in to use AI Companion</h3>
       <p>AI features require authentication to access your task data.</p>
       <button type="button" class="ai-page-signin-btn" id="ai-page-signin-btn">
@@ -22,9 +20,7 @@
     <!-- Header with toggle and status -->
     <div class="ai-page-header">
       <div class="ai-page-title">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ai)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
-        </svg>
+        <svg class="dm-icon dm-icon--sparkles" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-sparkles"/></svg>
         <div>
           <h2>AI Companion</h2>
           <p class="ai-page-subtitle" id="ai-page-subtitle">Powered by Qwen2.5-0.5B running locally in your browser</p>
@@ -33,7 +29,7 @@
       <div class="ai-page-header-actions">
         <span class="ai-page-status" id="ai-page-status"></span>
         <button type="button" class="ai-page-clear-btn" id="ai-page-clear-btn" title="Clear chat" aria-label="Clear chat">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          <svg class="dm-icon dm-icon--trash" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>
           Clear
         </button>
         <label class="ai-toggle-switch ai-page-toggle">
@@ -45,19 +41,13 @@
 
     <!-- Not supported warning -->
     <div class="ai-page-warning" id="ai-page-warning" style="display:none;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <line x1="12" y1="8" x2="12" y2="12"></line>
-        <line x1="12" y1="16" x2="12.01" y2="16"></line>
-      </svg>
+      <svg class="dm-icon dm-icon--info" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-info"/></svg>
       <span>WebGPU is not supported in your browser. AI Companion requires Chrome 113+ or Edge 113+.</span>
     </div>
 
     <!-- Disabled state -->
     <div class="ai-page-disabled" id="ai-page-disabled" style="display:none;">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
-      </svg>
+      <svg class="dm-icon dm-icon--sparkles" width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-sparkles"/></svg>
       <h3>AI Companion is disabled</h3>
       <p>Enable it with the toggle above to start using AI features.</p>
       <p class="ai-page-disabled-detail">First use downloads ~350 MB (cached for future visits). Requires ~1 GB GPU memory and WebGPU support.</p>
@@ -75,7 +65,7 @@
     <!-- Task context summary -->
     <div class="ai-page-context" id="ai-page-context" style="display:none;">
       <div class="ai-page-context-header">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+        <svg class="dm-icon dm-icon--check-circle" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check-circle"/></svg>
         Task Context
       </div>
       <div class="ai-page-context-body" id="ai-page-context-body"></div>
@@ -84,28 +74,28 @@
     <!-- Quick actions (bigger on full page) -->
     <div class="ai-page-actions" id="ai-page-actions" style="display:none;">
       <button type="button" class="ai-page-action-btn" data-action="plan">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        <svg class="dm-icon dm-icon--calendar" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-calendar"/></svg>
         <div>
           <strong>Plan my day</strong>
           <span>Get a prioritized schedule based on your tasks</span>
         </div>
       </button>
       <button type="button" class="ai-page-action-btn" data-action="suggest">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+        <svg class="dm-icon dm-icon--plus" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-plus"/></svg>
         <div>
           <strong>Suggest tasks</strong>
           <span>Get recommendations based on your task patterns</span>
         </div>
       </button>
       <button type="button" class="ai-page-action-btn" data-action="improve">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+        <svg class="dm-icon dm-icon--pencil" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-pencil"/></svg>
         <div>
           <strong>Improve text</strong>
           <span>Polish and rewrite text for clarity</span>
         </div>
       </button>
       <button type="button" class="ai-page-action-btn" data-action="summarize">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="17" y1="18" x2="3" y2="18"></line></svg>
+        <svg class="dm-icon dm-icon--menu" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-menu"/></svg>
         <div>
           <strong>Summarize</strong>
           <span>Condense long text into key points</span>
@@ -117,9 +107,7 @@
     <div class="ai-page-chat" id="ai-page-chat" style="display:none;">
       <div class="ai-page-messages" id="ai-page-messages">
         <div class="ai-page-welcome" id="ai-page-welcome">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent-ai)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path>
-          </svg>
+          <svg class="dm-icon dm-icon--sparkles" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-sparkles"/></svg>
           <p>I can help you plan your day, suggest tasks, improve text, or answer questions.</p>
           <p class="ai-welcome-hint">Use the quick actions above or type a message below.</p>
         </div>
@@ -132,10 +120,10 @@
         <div class="ai-input-wrap">
           <textarea class="ai-input ai-page-input" id="ai-page-input" placeholder="Ask me anything..." rows="1"></textarea>
           <button type="button" class="ai-mic-btn" id="ai-page-mic-btn" title="Voice input" aria-label="Voice input" style="display:none;">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+            <svg class="dm-icon dm-icon--mic" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-mic"/></svg>
           </button>
           <button type="button" class="ai-send-btn" id="ai-page-send-btn" title="Send" aria-label="Send" disabled>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            <svg class="dm-icon dm-icon--send" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-send"/></svg>
           </button>
         </div>
         <div class="ai-input-hint">

@@ -1,0 +1,26 @@
+{{- /*
+  Lucide icon partial — Digital Memory.
+  Usage: {{ partial "icon" (dict "name" "play" "size" 16) }}
+         {{ partial "icon" "play" }}   (short form, default size 20)
+  Optional: class, title, strokeWidth, solid (bool — uses the "-solid" variant).
+*/ -}}
+{{- $name := "" -}}
+{{- $size := 20 -}}
+{{- $class := "" -}}
+{{- $title := "" -}}
+{{- $sw := "" -}}
+{{- $solid := false -}}
+{{- if reflect.IsMap . -}}
+  {{- $name = .name -}}
+  {{- with .size }}{{ $size = . }}{{ end -}}
+  {{- with .class }}{{ $class = . }}{{ end -}}
+  {{- with .title }}{{ $title = . }}{{ end -}}
+  {{- with .strokeWidth }}{{ $sw = . }}{{ end -}}
+  {{- with .solid }}{{ $solid = . }}{{ end -}}
+{{- else -}}
+  {{- $name = . -}}
+{{- end -}}
+{{- $symbol := printf "icon-%s%s" $name (cond $solid "-solid" "") -}}
+{{- $href := printf "%s#%s" (relURL "icons/sprite.svg") $symbol -}}
+{{- $cls := printf "dm-icon dm-icon--%s%s%s" $name (cond $solid " dm-icon--solid" "") (cond (ne $class "") (printf " %s" $class) "") -}}
+<svg class="{{ $cls }}" width="{{ $size }}" height="{{ $size }}" viewBox="0 0 24 24"{{ with $sw }} style="stroke-width:{{ . }}"{{ end }} aria-hidden="{{ cond (eq $title "") "true" "false" }}"{{ with $title }} role="img" aria-label="{{ . }}"{{ end }}><use href="{{ $href }}"/></svg>

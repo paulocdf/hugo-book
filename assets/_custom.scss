@@ -1,6 +1,27 @@
 /* Digital Memory - Custom Styles */
 
 // ======================================
+// Icon base (Lucide sprite)
+// Consumed via {{ partial "icon" ... }} or window.dmIcon().
+// ======================================
+.dm-icon {
+  display: inline-block;
+  vertical-align: middle;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex-shrink: 0;
+  pointer-events: none; // clicks go to parent button/link
+  overflow: visible;
+}
+.dm-icon--solid {
+  fill: currentColor;
+  stroke: none;
+}
+
+// ======================================
 // Theme toggle button
 // ======================================
 .theme-toggle {
@@ -25,7 +46,7 @@
 
   &:hover {
     background: var(--surface-3);
-    border-color: var(--accent-blue);
+    border-color: var(--color-accent);
     transform: scale(1.08);
     box-shadow: 0 4px 16px var(--shadow-color);
   }
@@ -114,7 +135,7 @@
 
   &:hover {
     background: var(--surface-3);
-    border-color: var(--accent-blue);
+    border-color: var(--color-accent);
     transform: scale(1.08);
     box-shadow: 0 4px 16px var(--shadow-color);
   }
@@ -321,7 +342,7 @@ body {
 
   // Blockquotes
   blockquote {
-    border-inline-start: 3px solid var(--accent-blue);
+    border-inline-start: 3px solid var(--color-accent);
     background: var(--surface-1);
     border-radius: 0 6px 6px 0;
     color: var(--text-secondary);
@@ -363,8 +384,8 @@ body {
     border-bottom: 1px solid var(--border-subtle);
 
     &:hover {
-      color: var(--accent-blue);
-      border-bottom-color: var(--accent-blue);
+      color: var(--color-accent);
+      border-bottom-color: var(--color-accent);
     }
   }
 
@@ -396,7 +417,7 @@ body {
     color: var(--body-font-color);
     margin: 0 0 0.5rem;
     line-height: 1.15;
-    background: linear-gradient(135deg, var(--body-font-color) 0%, var(--accent-blue) 100%);
+    background: linear-gradient(135deg, var(--body-font-color) 0%, var(--color-accent) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -520,7 +541,7 @@ body {
       font-size: 0.85rem;
       flex-shrink: 0;
 
-      &.icon-books { background: rgba(100, 181, 246, 0.12); color: var(--accent-blue); }
+      &.icon-books { background: rgba(100, 181, 246, 0.12); color: var(--color-accent); }
       &.icon-notes { background: rgba(255, 183, 77, 0.12); color: var(--accent-orange); }
       &.icon-tags  { background: rgba(129, 199, 132, 0.12); color: var(--accent-green); }
       &.icon-review { background: rgba(186, 104, 200, 0.12); color: var(--accent-purple); }
@@ -573,7 +594,7 @@ body {
     }
 
     // Category accent stripe on top
-    &.card-books  { border-top: 2px solid var(--accent-blue); }
+    &.card-books  { border-top: 2px solid var(--color-accent); }
     &.card-topics { border-top: 2px solid var(--accent-green); }
     &.card-inbox  { border-top: 2px solid var(--accent-orange); }
 
@@ -589,7 +610,7 @@ body {
         border-bottom: none;
 
         &:hover {
-          color: var(--accent-blue);
+          color: var(--color-accent);
         }
 
         &:visited {
@@ -626,7 +647,7 @@ body {
           border-bottom: none;
 
           &:hover {
-            color: var(--accent-blue);
+            color: var(--color-accent);
           }
         }
       }
@@ -691,15 +712,15 @@ body {
   padding: 0;
 
   &:hover {
-    border-color: var(--accent-blue);
-    color: var(--accent-blue);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
     transform: scale(1.08);
     background: var(--surface-2);
   }
 
   &.active {
-    background: var(--accent-blue);
-    border-color: var(--accent-blue);
+    background: var(--color-accent);
+    border-color: var(--color-accent);
     color: white;
     box-shadow: 0 2px 8px var(--shadow-color);
   }
@@ -739,7 +760,7 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   padding: 1.1rem 1.2rem;
-  border-left: 4px solid var(--accent-blue);
+  border-left: 4px solid var(--color-accent);
   transition: all 0.25s ease;
   cursor: pointer;
 
@@ -751,7 +772,7 @@ body {
   }
 
   &[data-category="books"] {
-    border-left-color: var(--accent-blue);
+    border-left-color: var(--color-accent);
   }
   &[data-category="topics"] {
     border-left-color: var(--accent-green);
@@ -772,7 +793,7 @@ body {
   line-height: 1.3;
 
   &:hover {
-    color: var(--accent-blue);
+    color: var(--color-accent);
     border-bottom: none;
   }
 }
@@ -798,7 +819,7 @@ body {
 
   &.books {
     background: rgba(100, 181, 246, 0.12);
-    color: var(--accent-blue);
+    color: var(--color-accent);
   }
   &.topics {
     background: rgba(129, 199, 132, 0.12);
@@ -972,7 +993,7 @@ body {
   width: 16px;
   height: 16px;
   border: 2px solid transparent;
-  border-top-color: var(--accent-blue);
+  border-top-color: var(--color-accent);
   border-radius: 50%;
   animation: spin 0.6s linear infinite;
 
@@ -1030,14 +1051,14 @@ body {
 
       &:hover {
         background: var(--surface-2);
-        color: var(--accent-blue);
+        color: var(--color-accent);
         text-decoration: none;
       }
     }
 
     &.active a {
       background: var(--surface-2);
-      color: var(--accent-blue);
+      color: var(--color-accent);
       text-decoration: none;
     }
 
@@ -1133,7 +1154,7 @@ aside nav ul a:hover {
       border-radius: 0;
 
       &:hover {
-        color: var(--accent-blue);
+        color: var(--color-accent);
         background: none !important;
       }
     }
@@ -1172,7 +1193,7 @@ aside nav ul a:hover {
 
   // ---- Active page: gradient left border + tinted background ----
   a.active {
-    color: var(--accent-blue);
+    color: var(--color-accent);
     font-weight: 600;
     background: var(--surface-2);
     // Gradient left accent bar
@@ -1184,7 +1205,7 @@ aside nav ul a:hover {
       bottom: 4px;
       width: 3px;
       border-radius: 0 3px 3px 0;
-      background: linear-gradient(180deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+      background: linear-gradient(180deg, var(--color-accent) 0%, var(--accent-purple) 100%);
     }
   }
 
@@ -1201,7 +1222,7 @@ aside nav ul a:hover {
   }
 
   a.active .sidebar-icon {
-    stroke: var(--accent-blue);
+    stroke: var(--color-accent);
   }
 
   // ---- Top-level items: section headers ----
@@ -1244,7 +1265,7 @@ aside nav ul a:hover {
       }
 
       &.active {
-        color: var(--accent-blue);
+        color: var(--color-accent);
         background: transparent;
 
         &::before {
@@ -1319,7 +1340,7 @@ aside nav ul a:hover {
         }
 
         &::before {
-          background: linear-gradient(180deg, var(--accent-purple) 0%, var(--accent-blue) 100%);
+          background: linear-gradient(180deg, var(--accent-purple) 0%, var(--color-accent) 100%);
         }
       }
     }
@@ -1352,7 +1373,7 @@ aside nav ul a:hover {
         }
 
         &::before {
-          background: linear-gradient(180deg, var(--accent-ai) 0%, var(--accent-blue) 100%);
+          background: linear-gradient(180deg, var(--accent-ai) 0%, var(--color-accent) 100%);
         }
       }
     }
@@ -1976,7 +1997,7 @@ aside nav ul a:hover {
     }
 
     a.active {
-      color: var(--accent-blue);
+      color: var(--color-accent);
     }
   }
 
@@ -2088,7 +2109,7 @@ aside nav ul a:hover {
       inset: 0;
       right: auto;
       width: var(--progress);
-      background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+      background: linear-gradient(90deg, var(--color-accent), var(--accent-purple));
       border-radius: 2px;
       transition: width 0.15s ease-out;
     }
@@ -2139,13 +2160,13 @@ aside nav ul a:hover {
 
       // Active heading (set by scroll spy JS)
       &.active {
-        color: var(--accent-blue);
+        color: var(--color-accent);
         background: var(--surface-2);
         font-weight: 500;
         opacity: 1;
 
         // Gradient left accent
-        box-shadow: inset 3px 0 0 var(--accent-blue);
+        box-shadow: inset 3px 0 0 var(--color-accent);
         border-top-left-radius: 0;
         border-bottom-left-radius: 0;
       }
@@ -2215,8 +2236,8 @@ aside nav ul a:hover {
 
   &:hover {
     background: var(--surface-3);
-    border-color: var(--accent-blue);
-    color: var(--accent-blue);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
     transform: translateY(-1px);
     text-decoration: none;
   }
@@ -2237,8 +2258,8 @@ aside nav ul a:hover {
 .tag-pill-active,
 .tag-pill-active:visited,
 .tag-pill-active:hover {
-  background: var(--accent-blue);
-  border-color: var(--accent-blue);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
   color: #fff;
   transform: none;
 
@@ -2402,7 +2423,7 @@ aside nav ul a:hover {
 
 .backlink-explicit {
   background: rgba(0, 105, 255, 0.1);
-  color: var(--accent-blue);
+  color: var(--color-accent);
 }
 
 .backlink-mention {
@@ -2539,7 +2560,7 @@ aside nav ul a:hover {
       transition: color 0.2s ease;
 
       &:hover {
-        color: var(--accent-blue);
+        color: var(--color-accent);
       }
     }
 
@@ -2557,7 +2578,7 @@ aside nav ul a:hover {
 // Tab button that sticks out from the right edge of the sidebar, near the bottom
 .sidebar-toggle {
   position: fixed;
-  left: $menu-width;
+  left: var(--sidebar-width, #{$menu-width});
   bottom: 2rem;
   z-index: 101;
   display: flex;
@@ -2577,8 +2598,8 @@ aside nav ul a:hover {
 
   &:hover {
     background: var(--surface-3);
-    border-color: var(--accent-blue);
-    color: var(--accent-blue);
+    border-color: var(--color-accent);
+    color: var(--color-accent);
     width: 28px;
   }
 
@@ -2604,7 +2625,7 @@ html.sidebar-collapsed {
   }
 
   .book-menu .book-menu-content {
-    transform: translateX(-$menu-width);
+    transform: translateX(calc(-1 * var(--sidebar-width, #{$menu-width})));
     opacity: 0;
     visibility: hidden;
   }
@@ -2627,7 +2648,7 @@ html.sidebar-collapsed {
   // Reset sidebar state on mobile so it works normally with hamburger
   html.sidebar-collapsed {
     .book-menu {
-      flex: 0 0 $menu-width;
+      flex: 0 0 var(--sidebar-width, #{$menu-width});
       overflow: visible;
     }
 
@@ -2656,7 +2677,7 @@ html.sidebar-collapsed {
   height: 52px;
   border: none;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--accent-purple) 100%);
   color: #fff;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
@@ -2670,7 +2691,7 @@ html.sidebar-collapsed {
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    border: 2px solid var(--accent-blue);
+    border: 2px solid var(--color-accent);
     opacity: 0;
     pointer-events: none;
     animation: fab-pulse 3s ease-out infinite;
@@ -2853,7 +2874,7 @@ html.sidebar-collapsed {
     font-size: 1.15rem;
     font-weight: 700;
     color: var(--body-font-color);
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--accent-purple) 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -2861,7 +2882,7 @@ html.sidebar-collapsed {
     svg {
       // SVG won't get the gradient text treatment, so color it explicitly
       -webkit-text-fill-color: initial;
-      stroke: var(--accent-blue);
+      stroke: var(--color-accent);
     }
   }
 
@@ -2911,7 +2932,7 @@ html.sidebar-collapsed {
   }
 
   &.active {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--accent-purple) 100%);
     border-color: transparent;
     color: #fff;
     box-shadow: 0 2px 8px rgba(25, 118, 210, 0.25);
@@ -2953,7 +2974,7 @@ html.sidebar-collapsed {
 
   &:focus-visible {
     outline: none;
-    border-color: var(--accent-blue);
+    border-color: var(--color-accent);
     background: var(--surface-2);
     box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
@@ -2996,7 +3017,7 @@ html.sidebar-collapsed {
   }
 
   &.active {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--accent-purple) 100%);
     border-color: transparent;
     color: #fff;
     font-weight: 600;
@@ -3030,7 +3051,7 @@ html.sidebar-collapsed {
 
   &:focus-visible {
     outline: none;
-    border-color: var(--accent-blue);
+    border-color: var(--color-accent);
     background: var(--surface-2);
     box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
@@ -3063,7 +3084,7 @@ html.sidebar-collapsed {
 
   &:focus-visible {
     outline: none;
-    border-color: var(--accent-blue);
+    border-color: var(--color-accent);
     background: var(--surface-2);
     box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
@@ -3181,7 +3202,7 @@ html.sidebar-collapsed {
 
   &:focus-visible {
     outline: none;
-    border-color: var(--accent-blue);
+    border-color: var(--color-accent);
     box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
 }
@@ -3202,7 +3223,7 @@ html.sidebar-collapsed {
 
   &:focus-visible {
     outline: none;
-    border-color: var(--accent-blue);
+    border-color: var(--color-accent);
     background: var(--surface-2);
     box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
   }
@@ -3253,7 +3274,7 @@ html.sidebar-collapsed {
   }
 
   &.active {
-    background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+    background: linear-gradient(135deg, var(--color-accent) 0%, var(--accent-purple) 100%);
     border-color: transparent;
     color: #fff;
     font-weight: 600;
@@ -3295,7 +3316,7 @@ html.sidebar-collapsed {
   }
 
   &.active {
-    background: var(--accent-blue);
+    background: var(--color-accent);
     border-color: transparent;
     color: #fff;
     box-shadow: 0 1px 4px rgba(25, 118, 210, 0.3);
@@ -3317,7 +3338,7 @@ html.sidebar-collapsed {
   transition: border-color 0.2s ease, background 0.2s ease;
 
   &:focus-within {
-    border-color: var(--accent-blue);
+    border-color: var(--color-accent);
     background: var(--surface-2);
   }
 }
@@ -3411,14 +3432,14 @@ html.sidebar-collapsed {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   background: rgba(0, 85, 187, 0.08);
-  border: 2px dashed var(--accent-blue, #0055bb);
+  border: 2px dashed var(--color-accent, #0055bb);
   border-radius: 0 0 8px 8px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  color: var(--accent-blue, #0055bb);
+  color: var(--color-accent, #0055bb);
   font-size: 0.8rem;
   font-weight: 600;
   z-index: 5;
@@ -3438,7 +3459,7 @@ html.sidebar-collapsed {
   position: absolute;
   top: 0; left: 0; bottom: 0;
   width: 0%;
-  background: var(--accent-blue, #0055bb);
+  background: var(--color-accent, #0055bb);
   opacity: 0.2;
   transition: width 0.2s ease;
 }
@@ -3573,7 +3594,7 @@ html.sidebar-collapsed {
 }
 
 .qc-btn-submit {
-  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--accent-purple) 100%);
   color: #fff;
   box-shadow: 0 2px 8px rgba(25, 118, 210, 0.25);
 
@@ -4620,7 +4641,7 @@ html.sidebar-collapsed {
   }
 
   a {
-    color: var(--accent-blue);
+    color: var(--color-accent);
     text-decoration: underline;
     text-decoration-color: rgba(25, 118, 210, 0.3);
   }
@@ -4649,7 +4670,7 @@ html.sidebar-collapsed {
 
       input[type="checkbox"] {
         margin-right: 0.35rem;
-        accent-color: var(--accent-blue);
+        accent-color: var(--color-accent);
         vertical-align: middle;
         position: relative;
         top: -1px;
@@ -4788,9 +4809,9 @@ html.sidebar-collapsed {
   }
 
   &.active {
-    background: var(--accent-blue);
+    background: var(--color-accent);
     color: #fff;
-    border-color: var(--accent-blue);
+    border-color: var(--color-accent);
   }
 }
 
@@ -4915,7 +4936,7 @@ html.sidebar-collapsed {
 
 .my-notes-tag--code {
   background: rgba(25, 118, 210, 0.1);
-  color: var(--accent-blue);
+  color: var(--color-accent);
 }
 
 .my-notes-text-preview {
@@ -5313,7 +5334,7 @@ html.sidebar-collapsed {
   margin: 0 0 1.25rem;
   font-size: 1.15rem;
   font-weight: 700;
-  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--accent-purple) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -5347,7 +5368,7 @@ html.sidebar-collapsed {
     transition: border-color 0.2s ease, background 0.2s ease;
 
     &:focus {
-      border-color: var(--accent-blue);
+      border-color: var(--color-accent);
       background: var(--surface-2);
       outline: none;
       box-shadow: 0 0 0 2px rgba(100, 181, 246, 0.2);
@@ -5373,7 +5394,7 @@ html.sidebar-collapsed {
   padding: 0.55rem 1.1rem;
   border: none;
   border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+  background: linear-gradient(135deg, var(--color-accent) 0%, var(--accent-purple) 100%);
   color: #fff;
   font-family: inherit;
   font-size: 0.85rem;
@@ -5428,7 +5449,7 @@ button:focus-visible,
 a:focus-visible,
 select:focus-visible,
 [tabindex]:focus-visible {
-  outline: 2px solid var(--accent-blue);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
@@ -5619,7 +5640,7 @@ body.dm-img-resizing {
   z-index: 9999;
   pointer-events: none;
   opacity: 0;
-  background: var(--accent-blue, #3b82f6);
+  background: var(--color-accent, #3b82f6);
   transform: scaleX(0);
   transform-origin: left;
   transition: none;
@@ -5648,7 +5669,7 @@ body.dm-img-resizing {
   gap: 3px;
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--accent-blue, #0069ff);
+  color: var(--color-accent, #0069ff);
   background: rgba(0, 105, 255, 0.08);
   border-radius: 10px;
   padding: 1px 7px 1px 5px;
@@ -5667,10 +5688,10 @@ body.dm-img-resizing {
 // ─── Share button in action bar ───
 .todo-item-action-btn.share {
   &.is-shared {
-    color: var(--accent-blue, #0069ff);
+    color: var(--color-accent, #0069ff);
   }
   &:hover {
-    color: var(--accent-blue, #0069ff);
+    color: var(--color-accent, #0069ff);
     background: rgba(0, 105, 255, 0.08);
   }
 }
@@ -5735,7 +5756,7 @@ body.dm-img-resizing {
   padding: 8px 14px;
   border: none;
   border-radius: 8px;
-  background: var(--accent-blue, #0069ff);
+  background: var(--color-accent, #0069ff);
   color: #fff;
   font-size: 0.82rem;
   font-weight: 600;
@@ -5867,7 +5888,7 @@ body.dm-img-resizing {
   pointer-events: all;
   background: var(--body-background);
   border: 1px solid var(--gray-200);
-  border-left: 3px solid var(--accent-blue, #0069ff);
+  border-left: 3px solid var(--color-accent, #0069ff);
   border-radius: 10px;
   padding: 12px 14px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
@@ -5888,7 +5909,7 @@ body.dm-img-resizing {
   gap: 6px;
   font-size: 0.78rem;
   font-weight: 600;
-  color: var(--accent-blue, #0069ff);
+  color: var(--color-accent, #0069ff);
 
   svg {
     flex-shrink: 0;
@@ -5934,7 +5955,7 @@ body.dm-img-resizing {
 }
 
 .dm-invitation-accept {
-  background: var(--accent-blue, #0069ff);
+  background: var(--color-accent, #0069ff);
   color: #fff;
 
   &:hover:not(:disabled) {
@@ -5993,7 +6014,7 @@ body.dm-img-resizing {
   margin-bottom: 8px;
 
   svg {
-    color: var(--accent-blue, #0069ff);
+    color: var(--color-accent, #0069ff);
     flex-shrink: 0;
   }
 }
@@ -6045,7 +6066,7 @@ body.dm-img-resizing {
   padding: 7px 12px;
   border: none;
   border-radius: 8px;
-  background: var(--accent-blue, #0069ff);
+  background: var(--color-accent, #0069ff);
   color: #fff;
   font-size: 0.78rem;
   font-weight: 600;

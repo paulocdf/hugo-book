@@ -28,6 +28,28 @@
 {{- $styles := resources.Get "book.scss" | resources.ExecuteAsTemplate "book.scss" . | resources.ToCSS | resources.Minify | resources.Fingerprint }}
 <link rel="stylesheet" href="{{ $styles.RelPermalink }}" {{ template "integrity" $styles }}>
 
+<!-- Icon sprite (Lucide) + JS helper. Kept synchronous so dmIcon() is available before other partials execute. -->
+<script>
+  (function () {
+    var SPRITE_URL = {{ (relURL "icons/sprite.svg") | jsonify | safeJS }};
+    window.DM_ICON_SPRITE = SPRITE_URL;
+    // Build an <svg><use> string. opts may be a string (name) or {name,size,class,title,strokeWidth,solid}.
+    window.dmIcon = function (opts, size) {
+      var o = (typeof opts === 'string') ? { name: opts } : (opts || {});
+      if (size !== undefined && o.size === undefined) o.size = size;
+      var name = String(o.name || '');
+      var sz = o.size || 20;
+      var sym = 'icon-' + name + (o.solid ? '-solid' : '');
+      var cls = 'dm-icon dm-icon--' + name + (o.solid ? ' dm-icon--solid' : '') + (o.class ? ' ' + o.class : '');
+      var extra = '';
+      if (o.strokeWidth) extra += ' style="stroke-width:' + o.strokeWidth + '"';
+      if (o.title) extra += ' role="img" aria-label="' + String(o.title).replace(/"/g, '&quot;') + '"';
+      else extra += ' aria-hidden="true"';
+      return '<svg class="' + cls + '" width="' + sz + '" height="' + sz + '" viewBox="0 0 24 24"' + extra + '><use href="' + SPRITE_URL + '#' + sym + '"/></svg>';
+    };
+  })();
+</script>
+
 {{- if default true .Site.Params.BookSearch -}}
   {{- $searchJSFile := printf "%s.search.js" .Language.Lang }}
   {{- $searchJS := resources.Get "search.js" | resources.ExecuteAsTemplate $searchJSFile . | resources.Minify | resources.Fingerprint }}
@@ -824,7 +846,7 @@ window.dmCalculateOrderForPosition = function(containerEl, itemSelector, orderFi
   'use strict';
 
   // SVG icon helpers (Feather-style, stroke="currentColor")
-  var ICON_TRASH = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>';
+  var ICON_TRASH = '<svg class="dm-icon dm-icon--trash" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>';
   var ICON_GRIP = '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="14" y1="2" x2="2" y2="14"/><line x1="14" y1="7" x2="7" y2="14"/><line x1="14" y1="12" x2="12" y2="14"/></svg>';
 
   /**

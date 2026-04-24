@@ -9,6 +9,38 @@
     if (localStorage.getItem('dm-sidebar-collapsed') === '1') {
       document.documentElement.classList.add('sidebar-collapsed');
     }
+
+    // Appearance: apply persisted skin, accent, chrome dims, texture BEFORE paint.
+    // Kept minimal and self-contained — the full window.dmAppearance API lives in
+    // appearance.html and gets hydrated later.
+    try {
+      var root = document.documentElement;
+      var skin = localStorage.getItem('dm-theme-skin');
+      if (skin && skin !== 'default') root.setAttribute('data-skin', skin);
+
+      var accent = localStorage.getItem('dm-theme-accent');
+      if (accent && /^#[0-9a-fA-F]{3,8}$/.test(accent)) {
+        root.style.setProperty('--color-accent', accent);
+        // Derive hover via color-mix (supported in all evergreen browsers).
+        root.style.setProperty('--color-accent-hover',
+          'color-mix(in srgb, ' + accent + ' 82%, black)');
+        // Soft background tint (10% alpha).
+        root.style.setProperty('--color-accent-soft',
+          'color-mix(in srgb, ' + accent + ' 14%, transparent)');
+      }
+
+      var sw = parseFloat(localStorage.getItem('dm-theme-sidebar-width'));
+      if (sw >= 12 && sw <= 24) root.style.setProperty('--sidebar-width', sw + 'rem');
+
+      var hh = parseFloat(localStorage.getItem('dm-theme-header-height'));
+      if (hh >= 2.5 && hh <= 5) root.style.setProperty('--header-height', hh + 'rem');
+
+      var rb = parseFloat(localStorage.getItem('dm-theme-radius'));
+      if (rb >= 0 && rb <= 1.5) root.style.setProperty('--radius-base', rb + 'rem');
+
+      var bg = localStorage.getItem('dm-theme-background');
+      if (bg && bg !== 'none') root.setAttribute('data-bg-texture', bg);
+    } catch (e) {}
   })();
 </script>
 

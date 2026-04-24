@@ -97,11 +97,11 @@ ul.pagination {
 }
 
 .book-menu {
-  flex: 0 0 $menu-width;
+  flex: 0 0 var(--sidebar-width, #{$menu-width});
   font-size: $font-size-14;
 
   .book-menu-content {
-    width: $menu-width;
+    width: var(--sidebar-width, #{$menu-width});
     padding: $padding-16;
     background: var(--body-background);
 
@@ -309,7 +309,7 @@ body[dir="rtl"] .book-menu {
 
   .book-menu {
     visibility: hidden;
-    margin-inline-start: -$menu-width;
+    margin-inline-start: calc(-1 * var(--sidebar-width, #{$menu-width}));
     font-size: $font-size-base;
     z-index: 1;
   }
@@ -332,7 +332,7 @@ body[dir="rtl"] .book-menu {
     }
 
     .book-menu .book-menu-content {
-      transform: translateX($menu-width);
+      transform: translateX(var(--sidebar-width, #{$menu-width}));
       box-shadow: 0 0 $padding-8 rgba(0, 0, 0, 0.1);
     }
 
@@ -363,7 +363,7 @@ body[dir="rtl"] .book-menu {
   // for RTL support
   body[dir="rtl"] #menu-control:checked ~ main {
     .book-menu .book-menu-content {
-      transform: translateX(-$menu-width);
+      transform: translateX(calc(-1 * var(--sidebar-width, #{$menu-width})));
     }
   }
 }

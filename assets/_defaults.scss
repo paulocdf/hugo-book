@@ -65,6 +65,22 @@ $hint-colors: (
   --accent-ai: #00897b;
   --accent-ai-hover: #00796b;
   --ai-accent-bg: rgba(0, 137, 123, 0.08);
+
+  // Semantic accent (user-customizable via Appearance panel).
+  // Overridable at runtime by setting --color-accent on <html>.
+  --color-accent: var(--accent-blue);
+  --color-accent-hover: var(--accent-blue-hover);
+  --color-accent-contrast: #ffffff;
+  --color-accent-soft: rgba(25, 118, 210, 0.1);
+
+  // Chrome dimensions (user-customizable).
+  --sidebar-width: 16rem;
+  --header-height: 3.5rem;
+  --radius-base: 0.25rem;
+
+  // Background texture layer (none by default).
+  --bg-texture: none;
+  --bg-texture-opacity: 1;
   --shadow-color: rgba(0, 0, 0, 0.1);
   --sidebar-bg: #f5f6f8;
   --code-bg: rgba(0, 0, 0, 0.04);
@@ -125,6 +141,21 @@ $hint-colors: (
   --accent-ai: #4db6ac;
   --accent-ai-hover: #26a69a;
   --ai-accent-bg: rgba(77, 182, 172, 0.1);
+
+  // Semantic accent (user-customizable via Appearance panel).
+  --color-accent: var(--accent-blue);
+  --color-accent-hover: var(--accent-blue-hover);
+  --color-accent-contrast: #0b0f19;
+  --color-accent-soft: rgba(100, 181, 246, 0.15);
+
+  // Chrome dimensions (user-customizable).
+  --sidebar-width: 16rem;
+  --header-height: 3.5rem;
+  --radius-base: 0.25rem;
+
+  // Background texture layer.
+  --bg-texture: none;
+  --bg-texture-opacity: 1;
   --shadow-color: rgba(0, 0, 0, 0.3);
   --sidebar-bg: #12151c;
   --code-bg: rgba(255, 255, 255, 0.06);

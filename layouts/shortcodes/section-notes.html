@@ -8,10 +8,7 @@
 <div class="section-notes" id="section-notes-{{ $destination }}" data-destination="{{ $destination }}">
   <div class="section-notes-auth" style="display: none;">
     <div class="section-notes-auth-card">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-      </svg>
+      <svg class="dm-icon dm-icon--lock" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-lock"/></svg>
       <h3>Sign in to view notes</h3>
       <p>Your notes are stored securely and require authentication.</p>
       <button type="button" class="section-notes-signin-btn">
@@ -253,20 +250,11 @@
     }
 
     // SVG icons
-    var editIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-      + '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>'
-      + '<path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>'
-      + '</svg>';
+    var editIcon = '<svg class="dm-icon dm-icon--pencil" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-pencil"/></svg>';
 
-    var deleteIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-      + '<polyline points="3 6 5 6 21 6"></polyline>'
-      + '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>'
-      + '</svg>';
+    var deleteIcon = '<svg class="dm-icon dm-icon--trash" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>';
 
-    var pinIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-      + '<line x1="12" y1="17" x2="12" y2="22"></line>'
-      + '<path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path>'
-      + '</svg>';
+    var pinIcon = '<svg class="dm-icon dm-icon--clock" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-clock"/></svg>';
 
     // ---------------------------------------------------------------
     // Render a clickable card (for Topics, Books, Snippets)
@@ -295,14 +283,14 @@
       return '<a class="section-notes-card' + pinnedClass + '" href="' + viewUrl(note.id) + '">'
         + '<div class="section-notes-card-header">'
         + '<div>'
-        + '<h4 class="section-notes-card-title">' + (note.pinned ? '<svg class="section-notes-pin-indicator" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1"><line x1="12" y1="17" x2="12" y2="22"></line><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"></path></svg> ' : '') + escapeHtml(note.title || 'Untitled') + '</h4>'
+        + '<h4 class="section-notes-card-title">' + (note.pinned ? '<svg class="dm-icon dm-icon--clock section-notes-pin-indicator" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-clock"/></svg> ' : '') + escapeHtml(note.title || 'Untitled') + '</h4>'
         + '<div class="section-notes-card-meta">'
         + '<span class="section-notes-date">' + formatDate(note.createdAt) + '</span>'
         + tagsHtml
         + '</div>'
         + '</div>'
         + '<div class="section-notes-card-actions">'
-        + '<button type="button" class="section-notes-export" data-export-id="' + note.id + '" title="Export note"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>'
+        + '<button type="button" class="section-notes-export" data-export-id="' + note.id + '" title="Export note"><svg class="dm-icon dm-icon--download" width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-download"/></svg></button>'
         + '<button type="button" class="' + pinBtnClass + '" data-pin-id="' + note.id + '" title="' + pinTitle + '">' + pinIcon + '</button>'
         + '<button type="button" class="section-notes-edit" data-id="' + note.id + '" title="Edit note">' + editIcon + '</button>'
         + '<button type="button" class="section-notes-delete" data-id="' + note.id + '" title="Delete note">' + deleteIcon + '</button>'

@@ -24,7 +24,7 @@
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="8" r="5.5"/></svg> Event
               </button>
               <button type="button" class="todo-edit-bujo-btn" data-bujo-type="note" title="Note">
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="8" x2="13" y2="8"/></svg> Note
+                <svg class="dm-icon dm-icon--minus" width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-minus"/></svg> Note
               </button>
             </div>
           </div>
@@ -35,13 +35,13 @@
                 <svg width="10" height="10" viewBox="0 0 16 16"><circle cx="8" cy="8" r="4" fill="currentColor"/></svg> Open
               </button>
               <button type="button" class="todo-edit-bujo-btn" data-bujo-state="done" title="Done">
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,8 7,12 13,4"/></svg> Done
+                <svg class="dm-icon dm-icon--check" width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check"/></svg> Done
               </button>
               <button type="button" class="todo-edit-bujo-btn" data-bujo-state="migrated" title="Migrated">
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 13,8 6,13"/></svg> Migrated
+                <svg class="dm-icon dm-icon--chevron-right" width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-right"/></svg> Migrated
               </button>
               <button type="button" class="todo-edit-bujo-btn" data-bujo-state="scheduled" title="Scheduled">
-                <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="10,3 3,8 10,13"/></svg> Sched.
+                <svg class="dm-icon dm-icon--chevron-left" width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-left"/></svg> Sched.
               </button>
             </div>
           </div>
@@ -61,7 +61,7 @@
       <div class="todo-edit-meta-estimate" data-ref="estimate-field">
         <div class="todo-edit-pomodoro-group">
           <button type="button" class="todo-edit-pomo-minus" data-ref="pomo-minus" title="Remove pomodoro" aria-label="Decrease pomodoro count">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+            <svg class="dm-icon dm-icon--minus" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-minus"/></svg>
           </button>
           <button type="button" class="todo-edit-pomodoro-btn" data-ref="pomo-btn" title="Short session (click tomato to switch)" aria-label="Pomodoro count">
             <span class="todo-edit-pomodoro-icon todo-pomo-icon-short" style="font-size:16px;line-height:1;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;position:relative;top:3px;">&#x1F345;</span>
@@ -69,7 +69,7 @@
             <span class="todo-edit-pomodoro-count" data-ref="pomo-count">1</span>
           </button>
           <button type="button" class="todo-edit-pomo-plus" data-ref="pomo-plus" title="Add pomodoro" aria-label="Increase pomodoro count">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="6" x2="12" y2="18"></line><line x1="6" y1="12" x2="18" y2="12"></line></svg>
+            <svg class="dm-icon dm-icon--plus" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-plus"/></svg>
           </button>
           <input type="number" data-ref="custom-min" class="todo-edit-custom-min" placeholder="min" min="0" max="999" title="Custom time override (minutes)" aria-label="Custom time in minutes">
         </div>
@@ -106,27 +106,27 @@
     <!-- Collapsible "More" section — notes, sharing, AI suggestions -->
     <div class="todo-edit-more-section" data-ref="more-section">
       <button type="button" class="todo-edit-more-toggle" data-ref="more-toggle">
-        <svg class="todo-edit-more-arrow" data-ref="more-arrow" width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6,3 11,8 6,13"/></svg>
+        <svg class="dm-icon dm-icon--chevron-right todo-edit-more-arrow" width="10" height="10" viewBox="0 0 16 16" data-ref="more-arrow" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-right"/></svg>
         More (notes, sharing, AI)
       </button>
       <div class="todo-edit-more-content" data-ref="more-content" style="display: none;">
         <div class="todo-edit-notes-box">
           <div class="todo-edit-notes-label">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+            <svg class="dm-icon dm-icon--file-text" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-file-text"/></svg>
             Notes
           </div>
           <textarea data-ref="notes" class="todo-edit-notes-area" placeholder="Add notes..." rows="3"></textarea>
         </div>
         <div class="todo-edit-ai-section" data-ref="ai-section" style="display: none;">
           <div class="todo-edit-ai-header">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+            <svg class="dm-icon dm-icon--layout" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-layout"/></svg>
             <span>AI Suggestions</span>
           </div>
           <div class="todo-edit-ai-cards" data-ref="ai-cards"></div>
         </div>
         <div class="todo-edit-sharing-section" data-ref="sharing-section" style="display: none;">
           <div class="todo-edit-sharing-header">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+            <svg class="dm-icon dm-icon--users" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-users"/></svg>
             <span>Sharing</span>
           </div>
           <div class="todo-edit-sharing-owner-info" data-ref="share-owner-info" style="display: none;">
@@ -146,7 +146,7 @@
 
     <div class="todo-edit-actions">
       <button type="button" class="todo-edit-btn-delete" data-ref="delete" title="Delete task">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+        <svg class="dm-icon dm-icon--trash" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>
         <span>Delete</span>
       </button>
       <span class="todo-edit-actions-spacer"></span>

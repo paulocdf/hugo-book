@@ -115,7 +115,7 @@
       html += '<div class="dm-invitation-card" data-invitation-id="' + inv.id + '" style="position: relative;">';
       html += '<button type="button" class="dm-invitation-dismiss" data-dismiss-id="' + inv.id + '" title="Dismiss">&times;</button>';
       html += '<div class="dm-invitation-header">';
-      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>';
+      html += '<svg class="dm-icon dm-icon--users" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-users"/></svg>';
       html += 'Task Shared With You';
       html += '</div>';
       html += '<div class="dm-invitation-body">';
@@ -296,7 +296,7 @@
       html += '<div class="dm-invitation-card" data-note-invitation-id="' + inv.id + '" style="position: relative;">';
       html += '<button type="button" class="dm-invitation-dismiss" data-note-dismiss-id="' + inv.id + '" title="Dismiss">&times;</button>';
       html += '<div class="dm-invitation-header">';
-      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>';
+      html += '<svg class="dm-icon dm-icon--file-text" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-file-text"/></svg>';
       html += 'Note Shared With You';
       html += '</div>';
       html += '<div class="dm-invitation-body">';
@@ -475,7 +475,7 @@
       html += '<div class="dm-invitation-card" data-project-invitation-id="' + inv.id + '" style="position: relative;">';
       html += '<button type="button" class="dm-invitation-dismiss" data-project-dismiss-id="' + inv.id + '" title="Dismiss">&times;</button>';
       html += '<div class="dm-invitation-header">';
-      html += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>';
+      html += '<svg class="dm-icon dm-icon--folder" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-folder"/></svg>';
       html += 'Project Shared With You';
       html += '</div>';
       html += '<div class="dm-invitation-body">';
@@ -612,20 +612,13 @@
 
 <!-- Quick Capture FAB (Floating Action Button) -->
 <button class="quick-capture-fab" id="quick-capture-btn" aria-label="Quick Capture (Q)" title="Quick Capture">
-  <svg class="fab-icon" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M12 20h9"></path>
-    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-  </svg>
+  <svg class="dm-icon dm-icon--pencil fab-icon" width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-pencil"/></svg>
   <span class="fab-tooltip">Quick Capture <kbd>Q</kbd></span>
 </button>
 
 <!-- Export button (top-right, next to theme toggle) -->
 <button class="export-toolbar-btn" id="export-toolbar-btn" aria-label="Export" title="Export">
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-    <polyline points="7 10 12 15 17 10"></polyline>
-    <line x1="12" y1="15" x2="12" y2="3"></line>
-  </svg>
+  <svg class="dm-icon dm-icon--download" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-download"/></svg>
 </button>
 
 <script>
@@ -660,6 +653,8 @@
 {{ partial "ai-companion.html" . }}
 
 {{ partial "export-modal.html" . }}
+
+{{ partial "appearance.html" . }}
 
 <!-- Quick Capture modal logic -->
 <script>
@@ -803,9 +798,9 @@
     feedbackEl.style.display = '';
 
     if (type === 'success') {
-      feedbackIconEl.innerHTML = '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>';
+      feedbackIconEl.innerHTML = '<svg class="dm-icon dm-icon--check-circle" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check-circle"/></svg>';
     } else {
-      feedbackIconEl.innerHTML = '<svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+      feedbackIconEl.innerHTML = '<svg class="dm-icon dm-icon--x" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-x"/></svg>';
     }
     feedbackTextEl.textContent = message;
 
@@ -1252,7 +1247,7 @@
       } else {
         var icon = document.createElement('span');
         icon.className = 'qc-attach-icon';
-        icon.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>';
+        icon.innerHTML = '<svg class="dm-icon dm-icon--file" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-file"/></svg>';
         item.appendChild(icon);
       }
 
@@ -1273,7 +1268,7 @@
       removeBtn.type = 'button';
       removeBtn.className = 'qc-attach-remove';
       removeBtn.title = 'Remove';
-      removeBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+      removeBtn.innerHTML = '<svg class="dm-icon dm-icon--x" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-x"/></svg>';
       removeBtn.addEventListener('click', function() {
         // Delete from storage
         if (window.dmSync && window.dmSync.deleteAttachment) {
@@ -2318,14 +2313,14 @@
   function _qcAiAddCopyBtn(bubbleEl, text) {
     var btn = document.createElement('button');
     btn.className = 'qc-ai-copy-btn';
-    btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy';
+    btn.innerHTML = '<svg class="dm-icon dm-icon--copy" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-copy"/></svg> Copy';
     btn.addEventListener('click', function() {
       navigator.clipboard.writeText(text).then(function() {
         btn.classList.add('copied');
-        btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied';
+        btn.innerHTML = '<svg class="dm-icon dm-icon--check" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check"/></svg> Copied';
         setTimeout(function() {
           btn.classList.remove('copied');
-          btn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg> Copy';
+          btn.innerHTML = '<svg class="dm-icon dm-icon--copy" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-copy"/></svg> Copy';
         }, 2000);
       }).catch(function() {});
     });
@@ -2949,20 +2944,20 @@
   })();
 
   var ICONS = {
-    books: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>',
-    topics: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>',
-    inbox: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"></polyline><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"></path></svg>',
-    snippets: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>',
-    tags: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>',
-    dashboard: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"></rect><rect x="14" y="3" width="7" height="7" rx="1"></rect><rect x="3" y="14" width="7" height="7" rx="1"></rect><rect x="14" y="14" width="7" height="7" rx="1"></rect></svg>',
-    review: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 18V5"></path><path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path><path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"></path><path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"></path><path d="M18 18a4 4 0 0 0 2-7.464"></path><path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"></path><path d="M6 18a4 4 0 0 1-2-7.464"></path><path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"></path></svg>',
-    ai: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.912 5.813a2 2 0 0 0 1.275 1.275L21 12l-5.813 1.912a2 2 0 0 0-1.275 1.275L12 21l-1.912-5.813a2 2 0 0 0-1.275-1.275L3 12l5.813-1.912a2 2 0 0 0 1.275-1.275L12 3z"></path></svg>',
-    trash: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
-    history: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>',
-    board: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="5" height="18" rx="1"></rect><rect x="10" y="3" width="5" height="12" rx="1"></rect><rect x="17" y="3" width="5" height="15" rx="1"></rect></svg>',
-    settings: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z"></path></svg>',
-    projects: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>',
-    calendar: '<svg class="sidebar-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line><line x1="3" y1="14" x2="21" y2="14"></line><line x1="3" y1="18" x2="21" y2="18"></line><line x1="7" y1="10" x2="7" y2="22"></line><line x1="12" y1="10" x2="12" y2="22"></line><line x1="17" y1="10" x2="17" y2="22"></line></svg>'
+    books: '<svg class="dm-icon dm-icon--book sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-book"/></svg>',
+    topics: '<svg class="dm-icon dm-icon--star sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-star"/></svg>',
+    inbox: '<svg class="dm-icon dm-icon--coffee sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-coffee"/></svg>',
+    snippets: '<svg class="dm-icon dm-icon--code sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-code"/></svg>',
+    tags: '<svg class="dm-icon dm-icon--tag sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-tag"/></svg>',
+    dashboard: '<svg class="dm-icon dm-icon--grid sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-grid"/></svg>',
+    review: '<svg class="dm-icon dm-icon--brain sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-brain"/></svg>',
+    ai: '<svg class="dm-icon dm-icon--sparkles sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-sparkles"/></svg>',
+    trash: '<svg class="dm-icon dm-icon--trash sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>',
+    history: '<svg class="dm-icon dm-icon--calendar sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-calendar"/></svg>',
+    board: '<svg class="dm-icon dm-icon--columns sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-columns"/></svg>',
+    settings: '<svg class="dm-icon dm-icon--settings sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-settings"/></svg>',
+    projects: '<svg class="dm-icon dm-icon--folder sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-folder"/></svg>',
+    calendar: '<svg class="dm-icon dm-icon--calendar sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-calendar"/></svg>'
   };
 
   function getBaseUrl() {
@@ -3206,7 +3201,7 @@
       var userName = (user && (user.displayName || user.email)) || '';
       var avatarHtml = avatarSrc
         ? '<img class="sidebar-settings-avatar" src="' + avatarSrc + '" alt="' + escapeHtml(userName) + '" referrerpolicy="no-referrer">'
-        : '<svg class="sidebar-settings-avatar-fallback" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+        : '<svg class="dm-icon dm-icon--user sidebar-settings-avatar-fallback" width="28" height="28" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-user"/></svg>';
 
       var footer = document.createElement('div');
       footer.className = 'sidebar-settings-footer';
@@ -3459,6 +3454,12 @@
             '<button type="button" class="settings-modal-signout" id="settings-modal-signout">Sign out</button>' +
           '</div>' +
 
+          // ── Appearance section ──
+          '<div class="settings-modal-section">' +
+            '<div class="settings-modal-section-label">Appearance</div>' +
+            '<div id="settings-modal-appearance"></div>' +
+          '</div>' +
+
           // ── Pomodoro section ──
           '<div class="settings-modal-section">' +
             '<div class="settings-modal-section-label">Pomodoro</div>' +
@@ -3553,7 +3554,7 @@
                   '<option value="none">None</option>' +
                 '</select>' +
                 '<button type="button" class="settings-modal-preview" data-sound-select="setting-sound-work" title="Preview">' +
-                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+                  '<svg class="dm-icon dm-icon--play" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-play"/></svg>' +
                 '</button>' +
               '</div>' +
             '</div>' +
@@ -3571,7 +3572,7 @@
                   '<option value="none">None</option>' +
                 '</select>' +
                 '<button type="button" class="settings-modal-preview" data-sound-select="setting-sound-break" title="Preview">' +
-                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+                  '<svg class="dm-icon dm-icon--play" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-play"/></svg>' +
                 '</button>' +
               '</div>' +
             '</div>' +
@@ -3585,7 +3586,7 @@
                   '<option value="tick-woodblock">Woodblock</option>' +
                 '</select>' +
                 '<button type="button" class="settings-modal-preview" data-sound-select="setting-sound-tick" title="Preview">' +
-                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+                  '<svg class="dm-icon dm-icon--play" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-play"/></svg>' +
                 '</button>' +
               '</div>' +
             '</div>' +
@@ -3602,7 +3603,7 @@
                   '<option value="ambient-campfire">Campfire</option>' +
                 '</select>' +
                 '<button type="button" class="settings-modal-preview" data-sound-select="setting-sound-ambient" title="Preview">' +
-                  '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>' +
+                  '<svg class="dm-icon dm-icon--play" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-play"/></svg>' +
                 '</button>' +
               '</div>' +
             '</div>' +
@@ -3664,9 +3665,7 @@
                 '<div class="settings-modal-control settings-modal-key-control">' +
                   '<input type="password" id="setting-ai-openai-key" class="settings-modal-input settings-modal-key-input" placeholder="sk-..." autocomplete="off" spellcheck="false">' +
                   '<button type="button" id="setting-ai-openai-key-toggle" class="settings-modal-key-toggle" title="Show / hide key">' +
-                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                      '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>' +
-                    '</svg>' +
+                    '<svg class="dm-icon dm-icon--eye" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-eye"/></svg>' +
                   '</button>' +
                 '</div>' +
               '</div>' +
@@ -3698,9 +3697,7 @@
                 '<div class="settings-modal-control settings-modal-key-control">' +
                   '<input type="password" id="setting-ai-gemini-key" class="settings-modal-input settings-modal-key-input" placeholder="AIza..." autocomplete="off" spellcheck="false">' +
                   '<button type="button" id="setting-ai-gemini-key-toggle" class="settings-modal-key-toggle" title="Show / hide key">' +
-                    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
-                      '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>' +
-                    '</svg>' +
+                    '<svg class="dm-icon dm-icon--eye" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-eye"/></svg>' +
                   '</button>' +
                 '</div>' +
               '</div>' +
@@ -3724,12 +3721,7 @@
           // ─── Google Calendar section ───
           '<div class="settings-modal-section">' +
             '<h4 class="settings-modal-section-title">' +
-              '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px">' +
-                '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>' +
-                '<line x1="16" y1="2" x2="16" y2="6"/>' +
-                '<line x1="8" y1="2" x2="8" y2="6"/>' +
-                '<line x1="3" y1="10" x2="21" y2="10"/>' +
-              '</svg>' +
+              '<svg class="dm-icon dm-icon--calendar" width="16" height="16" viewBox="0 0 24 24" style="vertical-align:-2px;margin-right:6px" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-calendar"/></svg>' +
               'Google Calendar' +
             '</h4>' +
             '<p class="settings-modal-ai-info" style="margin-top:0">Sync tasks with scheduled dates to Google Calendar for native phone notifications.</p>' +
@@ -3762,6 +3754,14 @@
 
     // ─── Apply saved values ───
     applySettingsFromStorage();
+
+    // ─── Appearance panel (built on first open, idempotent) ───
+    try {
+      var _appearanceMount = _settingsModalOverlay.querySelector('#settings-modal-appearance');
+      if (_appearanceMount && typeof window.dmAppearanceBuildPanel === 'function') {
+        window.dmAppearanceBuildPanel(_appearanceMount);
+      }
+    } catch (e) { console.warn('[appearance] build panel failed:', e); }
 
     // ─── Bind close handlers ───
     var backdrop = _settingsModalOverlay.querySelector('.settings-modal-backdrop');

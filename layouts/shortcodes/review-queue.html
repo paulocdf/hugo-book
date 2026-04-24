@@ -2,10 +2,7 @@
 <div id="review-queue" class="review-queue">
   <div class="review-auth" id="review-auth" style="display: none;">
     <div class="review-auth-card">
-      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-      </svg>
+      <svg class="dm-icon dm-icon--lock" width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-lock"/></svg>
       <h3>Sign in to review flashcards</h3>
       <p>Your flashcards and review progress are stored securely and require authentication.</p>
       <button type="button" class="review-signin-btn" id="review-signin">
@@ -21,16 +18,7 @@
   </div>
 
   <div class="review-empty" id="review-empty" style="display: none;">
-    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 18V5"></path>
-      <path d="M15 13a4.17 4.17 0 0 1-3-4 4.17 4.17 0 0 1-3 4"></path>
-      <path d="M17.598 6.5A3 3 0 1 0 12 5a3 3 0 1 0-5.598 1.5"></path>
-      <path d="M17.997 5.125a4 4 0 0 1 2.526 5.77"></path>
-      <path d="M18 18a4 4 0 0 0 2-7.464"></path>
-      <path d="M19.967 17.483A4 4 0 1 1 12 18a4 4 0 1 1-7.967-.517"></path>
-      <path d="M6 18a4 4 0 0 1-2-7.464"></path>
-      <path d="M6.003 5.125a4 4 0 0 0-2.526 5.77"></path>
-    </svg>
+    <svg class="dm-icon dm-icon--brain" width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-brain"/></svg>
     <h3 id="review-empty-title">No flashcards yet</h3>
     <p id="review-empty-msg">Create your first flashcard using the button below.</p>
   </div>
@@ -82,7 +70,7 @@
           <div class="review-card-tags" id="review-card-tags"></div>
           <button type="button" class="review-reveal-btn" id="review-reveal-btn">
             Show Answer
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            <svg class="dm-icon dm-icon--chevron-down" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-down"/></svg>
           </button>
         </div>
         <div class="review-card-back" id="review-card-back">
@@ -157,7 +145,7 @@
   <!-- New card form -->
   <div class="review-form-section" id="review-form-section">
     <button type="button" class="review-new-btn" id="review-new-btn" style="display: none;">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      <svg class="dm-icon dm-icon--plus" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-plus"/></svg>
       New Flashcard
     </button>
     <div class="review-form" id="review-form" style="display: none;">
@@ -191,7 +179,7 @@
     <div class="review-schedule-header">
       <h3 class="review-schedule-title">All Flashcards</h3>
       <button type="button" class="review-export-btn" id="review-export-btn" title="Export flashcards">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <svg class="dm-icon dm-icon--download" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-download"/></svg>
       </button>
     </div>
     <div class="review-schedule-list" id="review-schedule-list"></div>
@@ -1581,10 +1569,10 @@
         + '<span class="review-schedule-item-due' + (isDue ? ' review-due-now' : '') + '">' + escapeHtml(dueText) + '</span>'
         + '<span class="review-schedule-item-actions">'
         + '<button type="button" class="review-schedule-item-btn review-item-edit" title="Edit card">'
-        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>'
+        + '<svg class="dm-icon dm-icon--pencil" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-pencil"/></svg>'
         + '</button>'
         + '<button type="button" class="review-schedule-item-btn review-item-delete" title="Delete card">'
-        + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'
+        + '<svg class="dm-icon dm-icon--x" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-x"/></svg>'
         + '</button>'
         + '</span>'
         + '</div>';

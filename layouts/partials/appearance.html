@@ -1,0 +1,699 @@
+{{- /*
+  Digital Memory — Appearance system.
+  Provides:
+    • window.dmAppearance API (setSkin, setAccent, setSidebarWidth, setHeaderHeight, setRadius, setBackground, reset, getState)
+    • Skin presets (applied by setting CSS vars + [data-skin] on <html>)
+    • Background texture layer via a ::before pseudo or root class
+    • Appearance section injected into the Settings modal
+
+  Loaded from inject/body.html alongside other modals.
+*/ -}}
+
+<style>
+  /* ==== Appearance panel UI ==== */
+  .dm-appearance-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.9rem;
+  }
+  .dm-appearance-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .dm-appearance-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .dm-appearance-help {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+  }
+
+  .dm-skin-row, .dm-accent-row, .dm-bg-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+  }
+
+  /* Skin swatch chips */
+  .dm-skin-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.65rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-medium);
+    background: var(--surface-1);
+    color: var(--body-font-color);
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+  }
+  .dm-skin-chip:hover { background: var(--surface-2); }
+  .dm-skin-chip[aria-pressed="true"] {
+    border-color: var(--color-accent);
+    background: var(--color-accent-soft);
+    color: var(--color-accent);
+  }
+  .dm-skin-chip .dm-skin-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--dot, var(--color-accent));
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.06);
+  }
+
+  /* Accent color swatches */
+  .dm-accent-swatch {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    background: var(--swatch, #1976d2);
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+  }
+  .dm-accent-swatch:hover { transform: scale(1.12); }
+  .dm-accent-swatch[aria-pressed="true"] {
+    border-color: var(--body-font-color);
+    box-shadow: 0 0 0 2px var(--body-background), 0 0 0 4px var(--swatch, var(--color-accent));
+  }
+  .dm-accent-custom {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px dashed var(--border-medium);
+    background: conic-gradient(from 0deg, #f43f5e, #f59e0b, #10b981, #3b82f6, #a855f7, #f43f5e);
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    overflow: hidden;
+  }
+  .dm-accent-custom input[type="color"] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+    border: 0;
+    padding: 0;
+  }
+
+  /* Background texture chips */
+  .dm-bg-chip {
+    width: 56px;
+    height: 38px;
+    border-radius: var(--radius-base, 0.25rem);
+    border: 2px solid var(--border-medium);
+    cursor: pointer;
+    padding: 0;
+    position: relative;
+    background: var(--body-background);
+    transition: border-color 0.15s, transform 0.1s;
+    overflow: hidden;
+  }
+  .dm-bg-chip:hover { transform: translateY(-1px); }
+  .dm-bg-chip[aria-pressed="true"] {
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 2px var(--color-accent-soft);
+  }
+  .dm-bg-chip[data-bg="none"]::after { content: "—"; position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-faint); font-size: 0.9rem; }
+  .dm-bg-chip[data-bg="dots"]     { background-image: radial-gradient(circle, var(--text-faint) 1px, transparent 1px); background-size: 10px 10px; }
+  .dm-bg-chip[data-bg="grid"]     { background-image: linear-gradient(var(--text-faint) 1px, transparent 1px), linear-gradient(90deg, var(--text-faint) 1px, transparent 1px); background-size: 12px 12px; opacity: 0.6; }
+  .dm-bg-chip[data-bg="paper"]    { background-image: repeating-linear-gradient(45deg, rgba(0,0,0,0.04) 0, rgba(0,0,0,0.04) 1px, transparent 1px, transparent 4px); background-color: var(--body-background); }
+  .dm-bg-chip[data-bg="noise"]    { background-image: radial-gradient(rgba(0,0,0,0.08) 1px, transparent 0), radial-gradient(rgba(0,0,0,0.06) 1px, transparent 0); background-size: 3px 3px, 5px 5px; background-position: 0 0, 1px 2px; }
+  .dm-bg-chip[data-bg="gradient"] { background-image: radial-gradient(circle at 30% 20%, var(--color-accent-soft), transparent 60%), radial-gradient(circle at 80% 80%, var(--color-accent-soft), transparent 60%); }
+
+  /* Range row (width / height) */
+  .dm-range-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.6rem;
+    align-items: center;
+  }
+  .dm-range-row input[type="range"] { width: 100%; accent-color: var(--color-accent); }
+  .dm-range-value {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+    min-width: 3.8rem;
+    text-align: right;
+  }
+
+  .dm-appearance-reset {
+    align-self: flex-start;
+    margin-top: 0.3rem;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.78rem;
+    border-radius: 999px;
+    background: transparent;
+    border: 1px solid var(--border-medium);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .dm-appearance-reset:hover {
+    background: var(--surface-2);
+    color: var(--body-font-color);
+  }
+
+  /* ==== Skins: scoped CSS variable overrides on <html data-skin="..."> ==== */
+
+  /* Minimal — monochrome, flat. */
+  [data-skin="minimal"] {
+    --color-accent: #111111;
+    --color-accent-hover: #000;
+    --color-accent-contrast: #fff;
+    --color-accent-soft: rgba(17,17,17,0.08);
+    --heading-from: #111;
+    --heading-to: #444;
+    --heading-to-alt: #222;
+    --radius-base: 0;
+  }
+  [data-skin="minimal"][data-theme="dark"] {
+    --color-accent: #f5f5f5;
+    --color-accent-hover: #fff;
+    --color-accent-contrast: #111;
+    --color-accent-soft: rgba(255,255,255,0.1);
+    --heading-from: #fff;
+    --heading-to: #aaa;
+    --heading-to-alt: #eee;
+  }
+
+  /* Warm Paper — cream bg, brown accent, soft shadows. */
+  [data-skin="warm-paper"] {
+    --body-background: #fbf7ef;
+    --sidebar-bg: #f4ece0;
+    --color-accent: #b5651d;
+    --color-accent-hover: #8f4d13;
+    --color-accent-soft: rgba(181,101,29,0.12);
+    --heading-from: #6b3a11;
+    --heading-to: #b5651d;
+    --heading-to-alt: #8b5a2b;
+    --radius-base: 0.5rem;
+  }
+  [data-skin="warm-paper"][data-theme="dark"] {
+    --body-background: #231c14;
+    --sidebar-bg: #1b1510;
+    --color-accent: #d89a5c;
+    --color-accent-hover: #c78646;
+    --color-accent-soft: rgba(216,154,92,0.15);
+    --heading-from: #d89a5c;
+    --heading-to: #f2c48a;
+    --heading-to-alt: #d8c4a0;
+  }
+
+  /* Terminal — dark green-on-black, mono feel. */
+  [data-skin="terminal"] {
+    --body-background: #0b0e0b;
+    --sidebar-bg: #070a07;
+    --body-font-color: #c6e4c6;
+    --color-accent: #00d787;
+    --color-accent-hover: #00b870;
+    --color-accent-contrast: #041006;
+    --color-accent-soft: rgba(0,215,135,0.15);
+    --text-muted: rgba(198,228,198,0.5);
+    --text-faint: rgba(198,228,198,0.35);
+    --text-secondary: rgba(198,228,198,0.75);
+    --heading-from: #00d787;
+    --heading-to: #7fffd4;
+    --heading-to-alt: #a9ff8c;
+    --heading-h3: #9eccb3;
+    --surface-1: rgba(255,255,255,0.03);
+    --surface-2: rgba(255,255,255,0.05);
+    --surface-3: rgba(255,255,255,0.08);
+    --border-subtle: rgba(0,215,135,0.12);
+    --border-medium: rgba(0,215,135,0.22);
+    --radius-base: 0.15rem;
+  }
+
+  /* Neon — saturated pink on dark, with glow. */
+  [data-skin="neon"] {
+    --body-background: #0f0d1a;
+    --sidebar-bg: #0a0815;
+    --color-accent: #ec4899;
+    --color-accent-hover: #db2777;
+    --color-accent-contrast: #fff;
+    --color-accent-soft: rgba(236,72,153,0.2);
+    --heading-from: #ec4899;
+    --heading-to: #8b5cf6;
+    --heading-to-alt: #06b6d4;
+    --radius-base: 0.75rem;
+  }
+  [data-skin="neon"] .btn,
+  [data-skin="neon"] button[data-appearance-glow],
+  [data-skin="neon"] .dm-icon[data-glow] {
+    box-shadow: 0 0 14px var(--color-accent-soft);
+  }
+
+  /* Solarized */
+  [data-skin="solarized"] {
+    --body-background: #fdf6e3;
+    --sidebar-bg: #eee8d5;
+    --body-font-color: #586e75;
+    --color-accent: #268bd2;
+    --color-accent-hover: #1e6ea3;
+    --color-accent-soft: rgba(38,139,210,0.12);
+    --heading-from: #268bd2;
+    --heading-to: #d33682;
+    --heading-to-alt: #859900;
+    --heading-h3: #073642;
+  }
+  [data-skin="solarized"][data-theme="dark"] {
+    --body-background: #002b36;
+    --sidebar-bg: #073642;
+    --body-font-color: #93a1a1;
+    --color-accent: #2aa198;
+    --color-accent-hover: #238e86;
+    --heading-from: #2aa198;
+    --heading-to: #d33682;
+    --heading-to-alt: #b58900;
+    --heading-h3: #eee8d5;
+  }
+
+  /* ==== Background textures, applied when [data-bg-texture] is set ==== */
+  html[data-bg-texture] body { position: relative; }
+  html[data-bg-texture] body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: var(--bg-texture-opacity, 1);
+  }
+  html[data-bg-texture="dots"] body::before {
+    background-image: radial-gradient(circle, var(--text-faint) 1px, transparent 1px);
+    background-size: 20px 20px;
+    opacity: 0.5;
+  }
+  html[data-bg-texture="grid"] body::before {
+    background-image:
+      linear-gradient(var(--text-faint) 1px, transparent 1px),
+      linear-gradient(90deg, var(--text-faint) 1px, transparent 1px);
+    background-size: 32px 32px;
+    opacity: 0.25;
+  }
+  html[data-bg-texture="paper"] body::before {
+    background-image:
+      repeating-linear-gradient(45deg, rgba(0,0,0,0.015) 0, rgba(0,0,0,0.015) 1px, transparent 1px, transparent 6px),
+      repeating-linear-gradient(-45deg, rgba(0,0,0,0.015) 0, rgba(0,0,0,0.015) 1px, transparent 1px, transparent 6px);
+  }
+  html[data-theme="dark"][data-bg-texture="paper"] body::before {
+    background-image:
+      repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 6px),
+      repeating-linear-gradient(-45deg, rgba(255,255,255,0.02) 0, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 6px);
+  }
+  html[data-bg-texture="noise"] body::before {
+    background-image:
+      radial-gradient(rgba(0,0,0,0.04) 1px, transparent 0),
+      radial-gradient(rgba(0,0,0,0.03) 1px, transparent 0);
+    background-size: 3px 3px, 5px 5px;
+    background-position: 0 0, 1px 2px;
+  }
+  html[data-theme="dark"][data-bg-texture="noise"] body::before {
+    background-image:
+      radial-gradient(rgba(255,255,255,0.05) 1px, transparent 0),
+      radial-gradient(rgba(255,255,255,0.04) 1px, transparent 0);
+  }
+  html[data-bg-texture="gradient"] body::before {
+    background-image:
+      radial-gradient(circle at 15% 15%, var(--color-accent-soft), transparent 45%),
+      radial-gradient(circle at 85% 85%, var(--color-accent-soft), transparent 50%);
+  }
+
+  /* Respect reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    .dm-skin-chip, .dm-accent-swatch, .dm-bg-chip { transition: none !important; }
+  }
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  // ---- Config -------------------------------------------------------------
+  var SKIN_PRESETS = [
+    { id: 'default',    name: 'Default',     accent: '#1976d2', dot: '#1976d2' },
+    { id: 'minimal',    name: 'Minimal',     accent: '#111111', dot: '#111111' },
+    { id: 'warm-paper', name: 'Warm Paper',  accent: '#b5651d', dot: '#b5651d' },
+    { id: 'terminal',   name: 'Terminal',    accent: '#00d787', dot: '#00d787' },
+    { id: 'neon',       name: 'Neon',        accent: '#ec4899', dot: '#ec4899' },
+    { id: 'solarized',  name: 'Solarized',   accent: '#268bd2', dot: '#268bd2' }
+  ];
+
+  var ACCENT_PRESETS = [
+    '#1976d2', // Blue (default)
+    '#00897b', // Teal
+    '#388e3c', // Green
+    '#e65100', // Orange
+    '#c2185b', // Pink
+    '#7b1fa2', // Purple
+    '#c62828', // Red
+    '#455a64', // Slate
+    '#111111'  // Ink
+  ];
+
+  var BG_TEXTURES = [
+    { id: 'none',     name: 'None' },
+    { id: 'dots',     name: 'Dots' },
+    { id: 'grid',     name: 'Grid' },
+    { id: 'paper',    name: 'Paper' },
+    { id: 'noise',    name: 'Noise' },
+    { id: 'gradient', name: 'Glow' }
+  ];
+
+  var DEFAULTS = {
+    skin: 'default',
+    accent: null, // null => use skin's default
+    sidebarWidth: 16, // rem
+    headerHeight: 3.5,
+    radius: 0.25,
+    background: 'none'
+  };
+
+  var LS = {
+    skin:         'dm-theme-skin',
+    accent:       'dm-theme-accent',
+    sidebarWidth: 'dm-theme-sidebar-width',
+    headerHeight: 'dm-theme-header-height',
+    radius:       'dm-theme-radius',
+    background:   'dm-theme-background'
+  };
+
+  // ---- State helpers ------------------------------------------------------
+  function readState() {
+    function get(k, d) { try { var v = localStorage.getItem(k); return v == null ? d : v; } catch(e) { return d; } }
+    return {
+      skin:         get(LS.skin, DEFAULTS.skin),
+      accent:       get(LS.accent, DEFAULTS.accent),
+      sidebarWidth: parseFloat(get(LS.sidebarWidth, DEFAULTS.sidebarWidth)),
+      headerHeight: parseFloat(get(LS.headerHeight, DEFAULTS.headerHeight)),
+      radius:       parseFloat(get(LS.radius, DEFAULTS.radius)),
+      background:   get(LS.background, DEFAULTS.background)
+    };
+  }
+
+  function write(k, v) {
+    try {
+      if (v === null || v === undefined || v === '') localStorage.removeItem(k);
+      else localStorage.setItem(k, String(v));
+    } catch(e) {}
+  }
+
+  function fireChanged(key, value) {
+    document.dispatchEvent(new CustomEvent('dm-settings-changed', { detail: { key: key, value: value } }));
+  }
+
+  // ---- Apply functions (no FOUC — also called inline in head.html) -------
+  function applySkin(skin) {
+    var root = document.documentElement;
+    if (!skin || skin === 'default') root.removeAttribute('data-skin');
+    else root.setAttribute('data-skin', skin);
+  }
+
+  function applyAccent(hex) {
+    var root = document.documentElement;
+    if (!hex) {
+      root.style.removeProperty('--color-accent');
+      root.style.removeProperty('--color-accent-hover');
+      root.style.removeProperty('--color-accent-soft');
+      return;
+    }
+    root.style.setProperty('--color-accent', hex);
+    root.style.setProperty('--color-accent-hover', 'color-mix(in srgb, ' + hex + ' 82%, black)');
+    root.style.setProperty('--color-accent-soft',  'color-mix(in srgb, ' + hex + ' 14%, transparent)');
+  }
+
+  function applySidebarWidth(rem) {
+    var v = parseFloat(rem);
+    if (!(v >= 12 && v <= 24)) { document.documentElement.style.removeProperty('--sidebar-width'); return; }
+    document.documentElement.style.setProperty('--sidebar-width', v + 'rem');
+  }
+
+  function applyHeaderHeight(rem) {
+    var v = parseFloat(rem);
+    if (!(v >= 2.5 && v <= 5)) { document.documentElement.style.removeProperty('--header-height'); return; }
+    document.documentElement.style.setProperty('--header-height', v + 'rem');
+  }
+
+  function applyRadius(rem) {
+    var v = parseFloat(rem);
+    if (isNaN(v) || v < 0 || v > 1.5) { document.documentElement.style.removeProperty('--radius-base'); return; }
+    document.documentElement.style.setProperty('--radius-base', v + 'rem');
+  }
+
+  function applyBackground(id) {
+    var root = document.documentElement;
+    if (!id || id === 'none') root.removeAttribute('data-bg-texture');
+    else root.setAttribute('data-bg-texture', id);
+  }
+
+  // ---- Public API ---------------------------------------------------------
+  var Appearance = {
+    SKINS: SKIN_PRESETS,
+    ACCENTS: ACCENT_PRESETS,
+    BACKGROUNDS: BG_TEXTURES,
+    DEFAULTS: DEFAULTS,
+
+    getState: readState,
+
+    setSkin: function(skin) {
+      if (skin === 'default') {
+        write(LS.skin, null);
+      } else {
+        write(LS.skin, skin);
+      }
+      applySkin(skin);
+      fireChanged(LS.skin, skin);
+    },
+
+    setAccent: function(hex) {
+      if (!hex) write(LS.accent, null);
+      else write(LS.accent, hex);
+      applyAccent(hex);
+      fireChanged(LS.accent, hex);
+    },
+
+    setSidebarWidth: function(rem) {
+      write(LS.sidebarWidth, rem);
+      applySidebarWidth(rem);
+      fireChanged(LS.sidebarWidth, rem);
+    },
+
+    setHeaderHeight: function(rem) {
+      write(LS.headerHeight, rem);
+      applyHeaderHeight(rem);
+      fireChanged(LS.headerHeight, rem);
+    },
+
+    setRadius: function(rem) {
+      write(LS.radius, rem);
+      applyRadius(rem);
+      fireChanged(LS.radius, rem);
+    },
+
+    setBackground: function(id) {
+      if (!id || id === 'none') write(LS.background, null);
+      else write(LS.background, id);
+      applyBackground(id);
+      fireChanged(LS.background, id);
+    },
+
+    reset: function() {
+      Object.keys(LS).forEach(function(k) { write(LS[k], null); });
+      applySkin('default');
+      applyAccent(null);
+      applySidebarWidth(DEFAULTS.sidebarWidth);
+      applyHeaderHeight(DEFAULTS.headerHeight);
+      applyRadius(DEFAULTS.radius);
+      applyBackground('none');
+      fireChanged('dm-theme-reset', true);
+    }
+  };
+
+  window.dmAppearance = Appearance;
+
+  // ---- Settings UI injection ---------------------------------------------
+  // Called by body.html after the settings modal is built. Idempotent.
+  window.dmAppearanceBuildPanel = function(container) {
+    if (!container || container.dataset.dmAppearanceBuilt === '1') return;
+    container.dataset.dmAppearanceBuilt = '1';
+
+    var state = readState();
+
+    function chipList(items, selectedId, onPick, renderChip) {
+      var wrap = document.createElement('div');
+      wrap.className = 'dm-skin-row';
+      items.forEach(function(it) {
+        var chip = renderChip(it);
+        chip.setAttribute('aria-pressed', (it.id || it) === selectedId ? 'true' : 'false');
+        chip.addEventListener('click', function() {
+          onPick(it);
+          Array.prototype.forEach.call(wrap.children, function(c) {
+            c.setAttribute('aria-pressed', 'false');
+          });
+          chip.setAttribute('aria-pressed', 'true');
+        });
+        wrap.appendChild(chip);
+      });
+      return wrap;
+    }
+
+    var grid = document.createElement('div');
+    grid.className = 'dm-appearance-grid';
+
+    // Skin row
+    (function() {
+      var row = document.createElement('div');
+      row.className = 'dm-appearance-row';
+      row.innerHTML = '<div class="dm-appearance-label">Skin</div>' +
+                      '<div class="dm-appearance-help">One-click preset combining accent, surfaces, and gradients.</div>';
+      var chips = chipList(SKIN_PRESETS, state.skin, function(skin) {
+        Appearance.setSkin(skin.id);
+        // re-sync accent swatch highlight to skin default if user hasn't picked a custom accent
+        if (!readState().accent) refreshAccentRow();
+      }, function(skin) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dm-skin-chip';
+        b.style.setProperty('--dot', skin.dot);
+        b.innerHTML = '<span class="dm-skin-dot"></span>' + skin.name;
+        return b;
+      });
+      row.appendChild(chips);
+      grid.appendChild(row);
+    })();
+
+    // Accent row (ref kept for refresh)
+    var accentRowWrap;
+    function refreshAccentRow() {
+      if (!accentRowWrap) return;
+      accentRowWrap.innerHTML = '';
+      var current = readState().accent;
+      ACCENT_PRESETS.forEach(function(hex) {
+        var sw = document.createElement('button');
+        sw.type = 'button';
+        sw.className = 'dm-accent-swatch';
+        sw.style.setProperty('--swatch', hex);
+        sw.title = hex;
+        sw.setAttribute('aria-pressed', (current && current.toLowerCase() === hex.toLowerCase()) ? 'true' : 'false');
+        sw.addEventListener('click', function() { Appearance.setAccent(hex); refreshAccentRow(); });
+        accentRowWrap.appendChild(sw);
+      });
+      // Custom color picker
+      var custom = document.createElement('button');
+      custom.type = 'button';
+      custom.className = 'dm-accent-custom';
+      custom.title = 'Custom color';
+      var input = document.createElement('input');
+      input.type = 'color';
+      input.value = current || '#1976d2';
+      input.addEventListener('input', function(e) {
+        Appearance.setAccent(e.target.value);
+      });
+      input.addEventListener('change', function() { refreshAccentRow(); });
+      custom.appendChild(input);
+      accentRowWrap.appendChild(custom);
+      // "Reset accent" if custom
+      if (current) {
+        var reset = document.createElement('button');
+        reset.type = 'button';
+        reset.className = 'dm-appearance-reset';
+        reset.textContent = 'Use skin default';
+        reset.addEventListener('click', function() { Appearance.setAccent(null); refreshAccentRow(); });
+        accentRowWrap.appendChild(reset);
+      }
+    }
+    (function() {
+      var row = document.createElement('div');
+      row.className = 'dm-appearance-row';
+      row.innerHTML = '<div class="dm-appearance-label">Accent color</div>' +
+                      '<div class="dm-appearance-help">Drives buttons, links, focus rings, progress.</div>';
+      accentRowWrap = document.createElement('div');
+      accentRowWrap.className = 'dm-accent-row';
+      refreshAccentRow();
+      row.appendChild(accentRowWrap);
+      grid.appendChild(row);
+    })();
+
+    // Background texture
+    (function() {
+      var row = document.createElement('div');
+      row.className = 'dm-appearance-row';
+      row.innerHTML = '<div class="dm-appearance-label">Background texture</div>';
+      var chips = chipList(BG_TEXTURES, state.background, function(bg) {
+        Appearance.setBackground(bg.id);
+      }, function(bg) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dm-bg-chip';
+        b.dataset.bg = bg.id;
+        b.title = bg.name;
+        return b;
+      });
+      chips.className = 'dm-bg-row';
+      row.appendChild(chips);
+      grid.appendChild(row);
+    })();
+
+    // Sidebar width slider
+    (function() {
+      var row = document.createElement('div');
+      row.className = 'dm-appearance-row';
+      row.innerHTML = '<div class="dm-appearance-label">Sidebar width</div>';
+      var wrap = document.createElement('div');
+      wrap.className = 'dm-range-row';
+      var input = document.createElement('input');
+      input.type = 'range';
+      input.min = '12'; input.max = '22'; input.step = '0.5';
+      input.value = String(state.sidebarWidth);
+      var val = document.createElement('span');
+      val.className = 'dm-range-value';
+      val.textContent = state.sidebarWidth + ' rem';
+      input.addEventListener('input', function() {
+        val.textContent = input.value + ' rem';
+        Appearance.setSidebarWidth(input.value);
+      });
+      wrap.appendChild(input); wrap.appendChild(val);
+      row.appendChild(wrap);
+      grid.appendChild(row);
+    })();
+
+    // Header height slider
+    // (Intentionally omitted — the Hugo book theme's desktop layout has no
+    // persistent header bar, so this control wouldn't have visible effect.
+    // The --header-height CSS var is still set via LS/early-apply for any
+    // future code that wants to honor it.)
+
+    // Corner radius slider
+    // (Intentionally omitted from UI — --radius-base is set by skins but
+    // not yet threaded through every component's border-radius, so exposing
+    // a slider would promise more than it delivers. Can be added back when
+    // components opt into var(--radius-base).)
+
+    // Reset all
+    (function() {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'dm-appearance-reset';
+      btn.textContent = 'Reset appearance to defaults';
+      btn.addEventListener('click', function() {
+        Appearance.reset();
+        // Rebuild panel so controls reflect defaults
+        container.dataset.dmAppearanceBuilt = '0';
+        container.innerHTML = '';
+        window.dmAppearanceBuildPanel(container);
+      });
+      grid.appendChild(btn);
+    })();
+
+    container.appendChild(grid);
+  };
+})();
+</script>

@@ -1249,7 +1249,7 @@
       var emptyMsg = modeLabel ? 'No completed tasks in ' + modeLabel + '.' : 'No completed tasks yet.';
       contentArea.innerHTML =
         '<div class="time-empty-state">' +
-          '<div class="time-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+          '<div class="time-empty-icon"><svg class="dm-icon dm-icon--clock" width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-clock"/></svg></div>' +
           '<div class="time-empty-title">No data</div>' +
           '<div class="time-empty-text">' + emptyMsg + '</div>' +
         '</div>';
@@ -1407,7 +1407,7 @@
   function showTimeEmpty(container, title, text) {
     container.innerHTML =
       '<div class="time-empty-state">' +
-        '<div class="time-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>' +
+        '<div class="time-empty-icon"><svg class="dm-icon dm-icon--clock" width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-clock"/></svg></div>' +
         '<div class="time-empty-title">' + title + '</div>' +
         '<div class="time-empty-text">' + text + '</div>' +
       '</div>';

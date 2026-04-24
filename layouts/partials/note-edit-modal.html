@@ -6,10 +6,7 @@
     <div class="note-edit-header">
       <h3>Edit Note</h3>
       <button type="button" class="note-edit-history-btn" id="note-edit-history" title="Version History">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10"></circle>
-          <polyline points="12 6 12 12 16 14"></polyline>
-        </svg>
+        <svg class="dm-icon dm-icon--clock" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-clock"/></svg>
       </button>
       <button type="button" class="note-edit-close" id="note-edit-close" title="Close (Esc)">&times;</button>
     </div>
@@ -27,23 +24,13 @@
       <div class="note-edit-editor-box" id="note-edit-editor-box">
         <div class="note-edit-toolbar" id="note-edit-toolbar">
         <button type="button" class="qc-toolbar-btn" data-format="bold" title="Bold (Cmd+B)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-            <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z"></path>
-          </svg>
+          <svg class="dm-icon dm-icon--bold" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-bold"/></svg>
         </button>
         <button type="button" class="qc-toolbar-btn" data-format="italic" title="Italic (Cmd+I)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="19" y1="4" x2="10" y2="4"></line>
-            <line x1="14" y1="20" x2="5" y2="20"></line>
-            <line x1="15" y1="4" x2="9" y2="20"></line>
-          </svg>
+          <svg class="dm-icon dm-icon--italic" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-italic"/></svg>
         </button>
         <button type="button" class="qc-toolbar-btn" data-format="code" title="Inline code (Cmd+E)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="16 18 22 12 16 6"></polyline>
-            <polyline points="8 6 2 12 8 18"></polyline>
-          </svg>
+          <svg class="dm-icon dm-icon--code" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-code"/></svg>
         </button>
         <span class="qc-toolbar-sep"></span>
         <button type="button" class="qc-toolbar-btn" data-format="heading" title="Heading (Cmd+Shift+H)">
@@ -52,50 +39,28 @@
           </svg>
         </button>
         <button type="button" class="qc-toolbar-btn" data-format="bullet" title="Bullet list">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="8" y1="6" x2="21" y2="6"></line>
-            <line x1="8" y1="12" x2="21" y2="12"></line>
-            <line x1="8" y1="18" x2="21" y2="18"></line>
-            <line x1="3" y1="6" x2="3.01" y2="6"></line>
-            <line x1="3" y1="12" x2="3.01" y2="12"></line>
-            <line x1="3" y1="18" x2="3.01" y2="18"></line>
-          </svg>
+          <svg class="dm-icon dm-icon--list" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-list"/></svg>
         </button>
         <button type="button" class="qc-toolbar-btn" data-format="todo" title="Todo checkbox (Cmd+Shift+T)">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="3" y="5" width="14" height="14" rx="2" ry="2"></rect>
-            <polyline points="8 11 11 14 17 8"></polyline>
-          </svg>
+          <svg class="dm-icon dm-icon--check-square" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check-square"/></svg>
         </button>
         <span class="qc-toolbar-sep"></span>
         <button type="button" class="qc-toolbar-btn" data-format="link" title="Link">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
-            <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
-          </svg>
+          <svg class="dm-icon dm-icon--link" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-link"/></svg>
         </button>
         <button type="button" class="qc-toolbar-btn" id="note-edit-attach-btn" title="Attach file">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path>
-          </svg>
+          <svg class="dm-icon dm-icon--paperclip" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-paperclip"/></svg>
         </button>
         <input type="file" id="note-edit-file-input" multiple style="display: none;">
         <span class="qc-toolbar-sep"></span>
         <button type="button" class="qc-toolbar-btn note-edit-preview-btn" id="note-edit-preview-toggle" title="Toggle preview">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-            <circle cx="12" cy="12" r="3"></circle>
-          </svg>
+          <svg class="dm-icon dm-icon--eye" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-eye"/></svg>
         </button>
       </div>
       <textarea id="note-edit-content" class="note-edit-textarea" rows="20" placeholder="Write your note..."></textarea>
       <!-- Drop zone overlay -->
       <div class="note-edit-dropzone" id="note-edit-dropzone" style="display: none;">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-          <polyline points="17 8 12 3 7 8"></polyline>
-          <line x1="12" y1="3" x2="12" y2="15"></line>
-        </svg>
+        <svg class="dm-icon dm-icon--upload" width="40" height="40" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-upload"/></svg>
         <span>Drop files to attach</span>
       </div>
       <!-- Upload progress -->
@@ -121,7 +86,7 @@
     <!-- Sharing section -->
     <div class="note-edit-sharing-section" id="note-edit-sharing-section" style="display: none;">
       <div class="note-edit-sharing-header">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <svg class="dm-icon dm-icon--users" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-users"/></svg>
         <span>Sharing</span>
       </div>
       <div class="note-edit-sharing-owner-info" id="note-edit-share-owner-info" style="display: none;">
@@ -1012,8 +977,8 @@
   // ============================
   function showEditFeedback(type, message) {
     var iconSvg = type === 'success'
-      ? '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>'
-      : '<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>';
+      ? '<svg class="dm-icon dm-icon--check-circle" width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check-circle"/></svg>'
+      : '<svg class="dm-icon dm-icon--x" width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-x"/></svg>';
 
     editFeedback.className = 'note-edit-feedback note-edit-feedback--' + type;
     editFeedback.innerHTML =
@@ -1511,7 +1476,7 @@
         } else {
           var icon = document.createElement('span');
           icon.className = 'note-edit-attach-icon';
-          icon.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>';
+          icon.innerHTML = '<svg class="dm-icon dm-icon--file" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-file"/></svg>';
           item.appendChild(icon);
         }
 
@@ -1538,7 +1503,7 @@
         copyBtn.type = 'button';
         copyBtn.className = 'note-edit-attach-action';
         copyBtn.title = 'Insert into note';
-        copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 11 12 6 7 11"></polyline><line x1="12" y1="6" x2="12" y2="18"></line></svg>';
+        copyBtn.innerHTML = '<svg class="dm-icon dm-icon--arrow-up" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-arrow-up"/></svg>';
         copyBtn.addEventListener('click', function() {
           insertAttachmentMarkdown(att);
         });
@@ -1549,7 +1514,7 @@
         delBtn.type = 'button';
         delBtn.className = 'note-edit-attach-action note-edit-attach-action--delete';
         delBtn.title = 'Delete attachment';
-        delBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+        delBtn.innerHTML = '<svg class="dm-icon dm-icon--trash" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>';
         delBtn.addEventListener('click', function() {
           window.dmConfirm({
             title: 'Delete Attachment',
