@@ -3296,6 +3296,35 @@
    * Updates status to 'accepted', adds current user to project's collaborators
    * array, cascades collaborator to all tasks in the project, and fetches the
    * shared project and its tasks into local IDB.
+   *
+   * --- Dual-write exception (documented 2026-04-25) ---
+   * This function intentionally bypasses `firestoreWrite()` and uses direct
+   * Firestore writes for steps 1–2. The reason is a circular dependency in the
+   * security rules:
+   *
+   *   - The rule that allows the invitee to add themselves to a project's
+   *     `collaborators` array (step 2) requires that the matching `projectShares`
+   *     doc *already* has `status === 'accepted'` in Firestore.
+   *   - `firestoreWrite()` is IDB-first and queues the Firestore write — so a
+   *     dual-write here would update IDB first, then race the share update and
+   *     the collaborator update onto the queue. The collaborator write would
+   *     then arrive at Firestore *before* the share status update has been
+   *     persisted, and the security rule would reject it.
+   *
+   * Direct writes ensure step 1 (share status -> accepted) is durable in
+   * Firestore *before* step 2 (collaborator array union) is attempted. We then
+   * mirror to IDB locally afterwards to keep the optimistic-cache invariant.
+   *
+   * Trade-off: this path requires an active Firestore connection (the early
+   * `if (!window.dmDb) ...` reject guard above). Offline accepts are not
+   * supported — by design. Sharing acceptance is a deliberate, low-frequency
+   * action, so requiring connectivity is acceptable.
+   *
+   * If/when the security rules are reworked to use a transaction-style guard
+   * (e.g. checking `request.resource.data` of a single batched write), this
+   * function should be migrated back onto `firestoreWrite()` for consistency.
+   * --- end dual-write exception ---
+   *
    * @param {string} shareId - the projectShares document ID (format: projectId_inviteeUid)
    */
   function acceptProjectShare(shareId) {
