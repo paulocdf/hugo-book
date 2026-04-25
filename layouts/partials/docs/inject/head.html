@@ -75,6 +75,35 @@
     window.dmIsLocalhost = isLocalhost;
     window.dmIsMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
+    // Firebase emulator wiring (devtime only).
+    //
+    // Enable by setting localStorage['dm-use-emulators'] = '1' OR by adding
+    // ?emulators=1 to the page URL. Only active on localhost. Connects to
+    // the standard Firebase Local Emulator Suite ports:
+    //
+    //   Auth      → http://localhost:9099
+    //   Firestore → http://localhost:8080
+    //   Storage   → http://localhost:9199
+    //
+    // Start the emulators in a separate terminal: `npm run emulators`
+    // (requires `firebase-tools` installed globally or as a devDependency).
+    // The query-param form persists the flag so reloads stay on emulators.
+    try {
+      var qsHasEmulators = /[?&]emulators=1\b/.test(window.location.search);
+      if (qsHasEmulators) localStorage.setItem('dm-use-emulators', '1');
+      var useEmulators = isLocalhost && localStorage.getItem('dm-use-emulators') === '1';
+      if (useEmulators) {
+        // Auth emulator — disable warnings since we're explicitly opting in.
+        window.dmAuth.useEmulator('http://localhost:9099', { disableWarnings: true });
+        window.dmDb.useEmulator('localhost', 8080);
+        window.dmStorage.useEmulator('localhost', 9199);
+        window.dmUsingEmulators = true;
+        console.info('[dm-auth] Connected to Firebase emulators (Auth :9099, Firestore :8080, Storage :9199)');
+      }
+    } catch (err) {
+      console.warn('[dm-auth] Emulator wiring failed (will fall back to live Firebase):', err);
+    }
+
     // Global sign-in helper — uses Google Identity Services (GIS).
     //
     // Chrome 145+ (March 2026) broke signInWithPopup/signInWithRedirect
