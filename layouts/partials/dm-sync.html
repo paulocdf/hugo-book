@@ -5960,6 +5960,164 @@
       return Math.round(n * 100);
     },
 
+    // ── Reports / analytics (Phase 3) ──
+    // Resolve a preset string or {from,to} object to canonical { from, to, label }.
+    // Presets: 'this-month' (default), 'last-month', 'last-3-months',
+    //          'last-6-months', 'ytd', 'custom' (requires from+to).
+    // Dates are local YYYY-MM-DD strings; range is inclusive on both ends.
+    // Memoization-friendly: pure function, no IO.
+    resolveReportRange: function(input) {
+      var today = new Date();
+      function fmt(d) {
+        var y = d.getFullYear();
+        var m = ('0' + (d.getMonth() + 1)).slice(-2);
+        var dd = ('0' + d.getDate()).slice(-2);
+        return y + '-' + m + '-' + dd;
+      }
+      function startOfMonth(d) { return new Date(d.getFullYear(), d.getMonth(), 1); }
+      function endOfMonth(d) { return new Date(d.getFullYear(), d.getMonth() + 1, 0); }
+
+      if (input && typeof input === 'object' && input.from && input.to) {
+        return { from: input.from, to: input.to, label: input.label || 'Custom' };
+      }
+      var preset = (typeof input === 'string') ? input : (input && input.preset) || 'this-month';
+      if (preset === 'this-month') {
+        return { from: fmt(startOfMonth(today)), to: fmt(today), label: 'This month', preset: preset };
+      }
+      if (preset === 'last-month') {
+        var lm = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return { from: fmt(startOfMonth(lm)), to: fmt(endOfMonth(lm)), label: 'Last month', preset: preset };
+      }
+      if (preset === 'last-3-months') {
+        var s3 = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+        return { from: fmt(s3), to: fmt(today), label: 'Last 3 months', preset: preset };
+      }
+      if (preset === 'last-6-months') {
+        var s6 = new Date(today.getFullYear(), today.getMonth() - 5, 1);
+        return { from: fmt(s6), to: fmt(today), label: 'Last 6 months', preset: preset };
+      }
+      if (preset === 'ytd') {
+        var soy = new Date(today.getFullYear(), 0, 1);
+        return { from: fmt(soy), to: fmt(today), label: 'Year to date', preset: preset };
+      }
+      // Fallback to this-month
+      return { from: fmt(startOfMonth(today)), to: fmt(today), label: 'This month', preset: 'this-month' };
+    },
+
+    // Given a resolved {from,to}, returns the prior period of equal length
+    // ending one day before `from`.
+    priorReportRange: function(range) {
+      if (!range || !range.from || !range.to) return null;
+      function parse(s) { var p = s.split('-'); return [parseInt(p[0],10), parseInt(p[1],10)-1, parseInt(p[2],10)]; }
+      function fmt(y, m, d) {
+        return y + '-' + ('0' + (m + 1)).slice(-2) + '-' + ('0' + d).slice(-2);
+      }
+      // Compute number of days inclusive: round to nearest because of possible DST
+      // hour shifts between from and to.
+      var f = parse(range.from);
+      var t = parse(range.to);
+      var fromDate = new Date(f[0], f[1], f[2]);
+      var toDate = new Date(t[0], t[1], t[2]);
+      var days = Math.round((toDate - fromDate) / 86400000) + 1;
+      // priorTo = day before from; priorFrom = priorTo - (days - 1)
+      var pt = new Date(f[0], f[1], f[2] - 1);
+      var pf = new Date(pt.getFullYear(), pt.getMonth(), pt.getDate() - (days - 1));
+      return {
+        from: fmt(pf.getFullYear(), pf.getMonth(), pf.getDate()),
+        to: fmt(pt.getFullYear(), pt.getMonth(), pt.getDate()),
+        label: 'Prior period'
+      };
+    },
+
+    // Spending breakdown by category for a date range.
+    // Returns an array of { categoryId, name, color, kind, currentCents, priorCents,
+    // deltaCents, deltaPct, count, currentTotal, priorTotal } sorted by currentCents desc.
+    // - Expenses only (negative-amount transactions); split rows are credited per-split.
+    // - Includes an "Uncategorized" pseudo-row for tx with no categoryId.
+    // - Soft-deleted tx are filtered out by getTransactions.
+    // Range arg: same shape as resolveReportRange input; defaults to 'this-month'.
+    getCategorySpend: function(rangeArg) {
+      var api = window.dmBudget;
+      var range = api.resolveReportRange(rangeArg || 'this-month');
+      var prior = api.priorReportRange(range);
+      return Promise.all([
+        api.getCategories(),
+        api.getTransactions({})
+      ]).then(function(r) {
+        var cats = r[0] || [];
+        var allTxs = r[1] || [];
+        var catById = {};
+        cats.forEach(function(c) { catById[c.id] = c; });
+
+        function inRange(date, lo, hi) {
+          return date && date >= lo && date <= hi;
+        }
+        function bucket(tx, lo, hi, totals, counts, perCat) {
+          if (!inRange(tx.date, lo, hi)) return;
+          // Splits: credit each split's category. Otherwise credit parent.
+          if (Array.isArray(tx.splits) && tx.splits.length > 0) {
+            tx.splits.forEach(function(sp) {
+              var amt = sp.amount || 0;
+              if (amt >= 0) return; // expenses only
+              var cid = sp.categoryId || '__uncat__';
+              perCat[cid] = (perCat[cid] || 0) + (-amt);
+              counts[cid] = (counts[cid] || 0) + 1;
+              totals.spent += -amt;
+            });
+          } else {
+            var amt = tx.amount || 0;
+            if (amt >= 0) return; // expenses only
+            var cid = tx.categoryId || '__uncat__';
+            perCat[cid] = (perCat[cid] || 0) + (-amt);
+            counts[cid] = (counts[cid] || 0) + 1;
+            totals.spent += -amt;
+          }
+        }
+
+        var curPerCat = {}, curCounts = {}, curTotals = { spent: 0 };
+        var prvPerCat = {}, prvCounts = {}, prvTotals = { spent: 0 };
+        allTxs.forEach(function(t) {
+          bucket(t, range.from, range.to, curTotals, curCounts, curPerCat);
+          if (prior) bucket(t, prior.from, prior.to, prvTotals, prvCounts, prvPerCat);
+        });
+
+        // Build rows. Include any cat that appears in either period.
+        var seen = {};
+        Object.keys(curPerCat).forEach(function(k) { seen[k] = true; });
+        Object.keys(prvPerCat).forEach(function(k) { seen[k] = true; });
+        var rows = Object.keys(seen).map(function(cid) {
+          var cat = catById[cid];
+          var name = (cid === '__uncat__') ? 'Uncategorized' : (cat ? cat.name : '(deleted category)');
+          var color = (cid === '__uncat__') ? '#9e9e9e' : (cat ? cat.color : '#bdbdbd');
+          var kind = cat ? cat.kind : 'expense';
+          var cur = curPerCat[cid] || 0;
+          var prv = prvPerCat[cid] || 0;
+          var delta = cur - prv;
+          var deltaPct = prv > 0 ? Math.round((delta / prv) * 100) : (cur > 0 ? null : 0);
+          return {
+            categoryId: (cid === '__uncat__') ? null : cid,
+            name: name,
+            color: color,
+            kind: kind,
+            currentCents: cur,
+            priorCents: prv,
+            deltaCents: delta,
+            deltaPct: deltaPct,
+            count: curCounts[cid] || 0
+          };
+        });
+        rows.sort(function(a, b) { return b.currentCents - a.currentCents; });
+        return {
+          range: range,
+          prior: prior,
+          rows: rows,
+          currentTotal: curTotals.spent,
+          priorTotal: prvTotals.spent,
+          deltaTotal: curTotals.spent - prvTotals.spent
+        };
+      });
+    },
+
     // ── Recurring rules (Phase 2a) ──
     // Fields (see serializeRecurring): name, accountId, categoryId, amount (cents, signed),
     // frequency ('daily'|'weekly'|'monthly'|'yearly'), interval, byDayOfMonth, byDayOfWeek,

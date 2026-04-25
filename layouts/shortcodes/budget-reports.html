@@ -1,0 +1,430 @@
+{{/*
+  budget-reports.html — Reports & analytics page (Phase 3, Slice A)
+
+  This page is built up incrementally across Phase 3 slices:
+    - Slice A (this file, current): Spending by category — donut + bar list
+    - Slice B (planned): Trend line (D / W / M with 7d MA)
+    - Slice C (planned): Calendar heatmap of daily spend
+    - Slice D (planned): Net worth over time + cashflow forecast
+    - Slice E (planned): Insights cards
+
+  All charts share a sticky range selector at the top.
+  Pure data helpers live on window.dmBudget (resolveReportRange,
+  priorReportRange, getCategorySpend) for testability.
+*/}}
+
+<style>
+  .dm-rpt-wrap { max-width: 1100px; margin: 0 auto; padding: 12px 0 40px; }
+  .dm-rpt-header {
+    display: flex; align-items: center; gap: 12px;
+    flex-wrap: wrap; margin-bottom: 18px;
+  }
+  .dm-rpt-header h2 {
+    margin: 0; font-size: 1.1rem; flex: 1;
+  }
+  .dm-rpt-rangebar {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--body-background);
+    padding: 8px 0; margin-bottom: 16px;
+    border-bottom: 1px solid var(--gray-200);
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+  }
+  .dm-rpt-rangebar label {
+    font-size: 0.75rem; opacity: 0.7;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin-right: 4px;
+  }
+  .dm-rpt-rangebar select,
+  .dm-rpt-rangebar input[type="date"] {
+    padding: 6px 10px; border: 1px solid var(--gray-200);
+    border-radius: 6px; background: var(--body-background);
+    color: var(--body-font-color); font-size: 0.9rem;
+  }
+  .dm-rpt-rangebar .dates { display: none; gap: 6px; align-items: center; }
+  .dm-rpt-rangebar .dates.active { display: inline-flex; }
+  .dm-rpt-rangebar .label-suffix {
+    font-size: 0.85rem; opacity: 0.7;
+    margin-left: auto;
+  }
+
+  .dm-rpt-section {
+    background: var(--gray-100);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 20px;
+  }
+  .dm-rpt-section > h3 {
+    margin: 0 0 14px 0; font-size: 0.9rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    opacity: 0.85;
+    display: flex; align-items: baseline; gap: 10px;
+  }
+  .dm-rpt-section h3 .total {
+    margin-left: auto; font-size: 1.05rem; font-weight: 600;
+    text-transform: none; letter-spacing: 0; opacity: 1;
+  }
+  .dm-rpt-section h3 .total .delta {
+    font-size: 0.8rem; margin-left: 6px; font-weight: 500;
+  }
+  .dm-rpt-section h3 .total .delta.up { color: #e53935; }
+  .dm-rpt-section h3 .total .delta.down { color: #43a047; }
+  .dm-rpt-section h3 .total .delta.flat { opacity: 0.6; }
+
+  .dm-rpt-cat-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 240px) 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 720px) {
+    .dm-rpt-cat-grid { grid-template-columns: 1fr; }
+  }
+
+  .dm-rpt-donut {
+    width: 100%; max-width: 240px; aspect-ratio: 1;
+    margin: 0 auto;
+  }
+  .dm-rpt-donut text.center {
+    text-anchor: middle;
+    dominant-baseline: central;
+    fill: var(--body-font-color);
+  }
+  .dm-rpt-donut text.center.amt {
+    font-size: 18px; font-weight: 600;
+  }
+  .dm-rpt-donut text.center.lbl {
+    font-size: 10px; opacity: 0.6;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .dm-rpt-donut path.slice {
+    cursor: default; transition: opacity 0.15s;
+  }
+  .dm-rpt-donut path.slice.dim { opacity: 0.25; }
+
+  .dm-rpt-cat-list {
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .dm-rpt-cat-row {
+    display: grid;
+    grid-template-columns: 14px 1fr auto auto;
+    gap: 8px; align-items: center;
+    padding: 6px 8px; border-radius: 6px;
+    cursor: pointer; transition: background 0.12s;
+  }
+  .dm-rpt-cat-row:hover { background: var(--body-background); }
+  .dm-rpt-cat-row.dim { opacity: 0.4; }
+  .dm-rpt-cat-row .swatch {
+    width: 12px; height: 12px; border-radius: 3px;
+  }
+  .dm-rpt-cat-row .name {
+    font-size: 0.9rem;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .dm-rpt-cat-row .bar-wrap {
+    grid-column: 1 / -1;
+    height: 4px; border-radius: 2px;
+    background: var(--gray-200);
+    overflow: hidden;
+    margin-top: 2px;
+  }
+  .dm-rpt-cat-row .bar-fill {
+    height: 100%; border-radius: 2px;
+    transition: width 0.25s ease;
+  }
+  .dm-rpt-cat-row .amt {
+    font-variant-numeric: tabular-nums;
+    font-size: 0.9rem;
+  }
+  .dm-rpt-cat-row .delta {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    min-width: 56px; text-align: right;
+  }
+  .dm-rpt-cat-row .delta.up { color: #e53935; }
+  .dm-rpt-cat-row .delta.down { color: #43a047; }
+  .dm-rpt-cat-row .delta.flat { opacity: 0.5; }
+
+  .dm-rpt-empty {
+    padding: 30px; text-align: center; opacity: 0.7;
+    border: 2px dashed var(--gray-200); border-radius: 8px;
+    font-size: 0.95rem;
+  }
+
+  .dm-rpt-loading { opacity: 0.55; pointer-events: none; }
+</style>
+
+<div class="dm-rpt-wrap" id="dm-rpt-root">
+  <div class="dm-rpt-header">
+    <h2>Reports</h2>
+  </div>
+
+  <div class="dm-rpt-rangebar" id="dm-rpt-rangebar">
+    <label for="dm-rpt-range">Range</label>
+    <select id="dm-rpt-range">
+      <option value="this-month">This month</option>
+      <option value="last-month">Last month</option>
+      <option value="last-3-months">Last 3 months</option>
+      <option value="last-6-months">Last 6 months</option>
+      <option value="ytd">Year to date</option>
+      <option value="custom">Custom…</option>
+    </select>
+    <span class="dates" id="dm-rpt-custom">
+      <input type="date" id="dm-rpt-from">
+      <span style="opacity:0.6">→</span>
+      <input type="date" id="dm-rpt-to">
+    </span>
+    <span class="label-suffix" id="dm-rpt-range-label"></span>
+  </div>
+
+  <section class="dm-rpt-section" id="dm-rpt-cat-section">
+    <h3>
+      <span>Spending by category</span>
+      <span class="total" id="dm-rpt-cat-total"></span>
+    </h3>
+    <div class="dm-rpt-cat-grid">
+      <div>
+        <svg class="dm-rpt-donut" id="dm-rpt-donut" viewBox="0 0 100 100" aria-hidden="true"></svg>
+      </div>
+      <div class="dm-rpt-cat-list" id="dm-rpt-cat-list"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var $root = document.getElementById('dm-rpt-root');
+  if (!$root) return;
+  var $sel = document.getElementById('dm-rpt-range');
+  var $custom = document.getElementById('dm-rpt-custom');
+  var $from = document.getElementById('dm-rpt-from');
+  var $to = document.getElementById('dm-rpt-to');
+  var $rangeLabel = document.getElementById('dm-rpt-range-label');
+  var $catSection = document.getElementById('dm-rpt-cat-section');
+  var $catList = document.getElementById('dm-rpt-cat-list');
+  var $donut = document.getElementById('dm-rpt-donut');
+  var $catTotal = document.getElementById('dm-rpt-cat-total');
+
+  var _state = {
+    preset: 'this-month',
+    customFrom: '',
+    customTo: '',
+    highlight: null, // categoryId being highlighted
+  };
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.textContent = String(s == null ? '' : s);
+    return d.innerHTML;
+  }
+
+  function fmtMoney(cents) {
+    var b = window.dmBudget;
+    if (!b) return ((cents < 0 ? '-' : '') + '$' + (Math.abs(cents) / 100).toFixed(2));
+    return b.formatMoney(cents, b.getCurrency ? b.getCurrency() : 'USD');
+  }
+
+  function fmtDeltaPct(deltaCents, deltaPct) {
+    if (deltaCents === 0) return { text: 'unchanged', cls: 'flat' };
+    var arrow = deltaCents > 0 ? '↑' : '↓';
+    var cls = deltaCents > 0 ? 'up' : 'down';
+    if (deltaPct === null) return { text: arrow + ' new', cls: cls };
+    return { text: arrow + ' ' + Math.abs(deltaPct) + '%', cls: cls };
+  }
+
+  // ── Donut renderer ─────────────────────────────────────────────────
+  // Pure SVG arc paths; no D3 dependency.
+  function polar(cx, cy, r, angleDeg) {
+    var a = (angleDeg - 90) * Math.PI / 180;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  }
+  function arcPath(cx, cy, rOut, rIn, startDeg, endDeg) {
+    if (endDeg - startDeg >= 359.999) {
+      // Full circle — render as two half arcs to keep valid path
+      return [
+        'M', cx + rOut, cy,
+        'A', rOut, rOut, 0, 1, 1, cx - rOut, cy,
+        'A', rOut, rOut, 0, 1, 1, cx + rOut, cy,
+        'L', cx + rIn, cy,
+        'A', rIn, rIn, 0, 1, 0, cx - rIn, cy,
+        'A', rIn, rIn, 0, 1, 0, cx + rIn, cy,
+        'Z'
+      ].join(' ');
+    }
+    var p1 = polar(cx, cy, rOut, startDeg);
+    var p2 = polar(cx, cy, rOut, endDeg);
+    var p3 = polar(cx, cy, rIn, endDeg);
+    var p4 = polar(cx, cy, rIn, startDeg);
+    var large = (endDeg - startDeg) > 180 ? 1 : 0;
+    return [
+      'M', p1[0], p1[1],
+      'A', rOut, rOut, 0, large, 1, p2[0], p2[1],
+      'L', p3[0], p3[1],
+      'A', rIn, rIn, 0, large, 0, p4[0], p4[1],
+      'Z'
+    ].join(' ');
+  }
+
+  function renderDonut(rows, total) {
+    if (!total || total <= 0 || !rows.length) {
+      $donut.innerHTML = '<text class="center lbl" x="50" y="50">No spending</text>';
+      return;
+    }
+    var cx = 50, cy = 50, rOut = 46, rIn = 30;
+    var html = '';
+    var angle = 0;
+    rows.forEach(function(r) {
+      if (r.currentCents <= 0) return;
+      var sweep = (r.currentCents / total) * 360;
+      // Avoid exact 360 (no zero-width slices)
+      var endA = angle + sweep;
+      var d = arcPath(cx, cy, rOut, rIn, angle, Math.min(endA, angle + 359.99));
+      var dim = (_state.highlight && _state.highlight !== r.categoryId) ? ' dim' : '';
+      html += '<path class="slice' + dim + '" d="' + d +
+        '" fill="' + escapeHtml(r.color) + '"' +
+        ' data-cat="' + escapeHtml(r.categoryId || '') + '">' +
+        '<title>' + escapeHtml(r.name) + ': ' + escapeHtml(fmtMoney(r.currentCents)) + '</title>' +
+        '</path>';
+      angle = endA;
+    });
+    // Center labels
+    html += '<text class="center amt" x="50" y="46">' + escapeHtml(fmtMoney(total)) + '</text>';
+    html += '<text class="center lbl" x="50" y="58">spent</text>';
+    $donut.innerHTML = html;
+
+    // Wire hover highlight from slices to list
+    var paths = $donut.querySelectorAll('path.slice');
+    paths.forEach(function(p) {
+      p.addEventListener('mouseenter', function() { setHighlight(p.getAttribute('data-cat') || null); });
+      p.addEventListener('mouseleave', function() { setHighlight(null); });
+    });
+  }
+
+  function setHighlight(catId) {
+    _state.highlight = catId || null;
+    // Apply dim class to non-matching list rows + slices
+    var rows = $catList.querySelectorAll('.dm-rpt-cat-row');
+    rows.forEach(function(el) {
+      var c = el.getAttribute('data-cat') || '';
+      el.classList.toggle('dim', !!_state.highlight && c !== _state.highlight);
+    });
+    var slices = $donut.querySelectorAll('path.slice');
+    slices.forEach(function(el) {
+      var c = el.getAttribute('data-cat') || '';
+      el.classList.toggle('dim', !!_state.highlight && c !== _state.highlight);
+    });
+  }
+
+  function renderList(rows, total) {
+    if (!rows.length) {
+      $catList.innerHTML = '<div class="dm-rpt-empty">No transactions in this range.</div>';
+      return;
+    }
+    var html = '';
+    rows.forEach(function(r) {
+      if (r.currentCents <= 0 && r.priorCents <= 0) return;
+      var pct = total > 0 ? Math.round((r.currentCents / total) * 100) : 0;
+      var d = fmtDeltaPct(r.deltaCents, r.deltaPct);
+      html += '<div class="dm-rpt-cat-row" data-cat="' + escapeHtml(r.categoryId || '') + '">' +
+        '<span class="swatch" style="background:' + escapeHtml(r.color) + '"></span>' +
+        '<span class="name" title="' + escapeHtml(r.name) + '">' + escapeHtml(r.name) + '</span>' +
+        '<span class="amt">' + escapeHtml(fmtMoney(r.currentCents)) + '</span>' +
+        '<span class="delta ' + d.cls + '">' + escapeHtml(d.text) + '</span>' +
+        '<div class="bar-wrap"><div class="bar-fill" style="width:' + pct + '%; background:' + escapeHtml(r.color) + '"></div></div>' +
+      '</div>';
+    });
+    $catList.innerHTML = html;
+
+    // Wire hover
+    var rowEls = $catList.querySelectorAll('.dm-rpt-cat-row');
+    rowEls.forEach(function(el) {
+      el.addEventListener('mouseenter', function() { setHighlight(el.getAttribute('data-cat') || null); });
+      el.addEventListener('mouseleave', function() { setHighlight(null); });
+    });
+  }
+
+  function renderCategory(result) {
+    var rows = result.rows || [];
+    var total = result.currentTotal || 0;
+    renderDonut(rows, total);
+    renderList(rows, total);
+    // Section header total + delta
+    var d = fmtDeltaPct(result.deltaTotal || 0, (result.priorTotal > 0 ? Math.round((result.deltaTotal / result.priorTotal) * 100) : (total > 0 ? null : 0)));
+    $catTotal.innerHTML = escapeHtml(fmtMoney(total)) +
+      ' <span class="delta ' + d.cls + '">' + escapeHtml(d.text) + ' vs prior</span>';
+  }
+
+  function renderRangeLabel(range) {
+    if (!range) return;
+    $rangeLabel.textContent = range.from + ' → ' + range.to;
+  }
+
+  function refresh() {
+    if (!window.dmBudget || !window.dmBudget.getCategorySpend) return;
+    var rangeArg;
+    if (_state.preset === 'custom') {
+      if (!_state.customFrom || !_state.customTo) {
+        // Default custom to first day of month → today
+        var b = window.dmBudget.resolveReportRange('this-month');
+        _state.customFrom = b.from; _state.customTo = b.to;
+        $from.value = _state.customFrom; $to.value = _state.customTo;
+      }
+      rangeArg = { from: _state.customFrom, to: _state.customTo, label: 'Custom' };
+    } else {
+      rangeArg = _state.preset;
+    }
+    $catSection.classList.add('dm-rpt-loading');
+    window.dmBudget.getCategorySpend(rangeArg).then(function(result) {
+      $catSection.classList.remove('dm-rpt-loading');
+      renderRangeLabel(result.range);
+      renderCategory(result);
+    }).catch(function(err) {
+      $catSection.classList.remove('dm-rpt-loading');
+      console.warn('[reports] getCategorySpend failed', err);
+    });
+  }
+
+  // ── Wiring ─────────────────────────────────────────────────────────
+  $sel.addEventListener('change', function() {
+    _state.preset = $sel.value;
+    if (_state.preset === 'custom') {
+      $custom.classList.add('active');
+    } else {
+      $custom.classList.remove('active');
+    }
+    refresh();
+  });
+  $from.addEventListener('change', function() {
+    _state.customFrom = $from.value || '';
+    if (_state.preset === 'custom' && _state.customFrom && _state.customTo) refresh();
+  });
+  $to.addEventListener('change', function() {
+    _state.customTo = $to.value || '';
+    if (_state.preset === 'custom' && _state.customFrom && _state.customTo) refresh();
+  });
+
+  // React to budget data changes (transaction add/edit/delete, currency switch)
+  document.addEventListener('dm-budget-updated', refresh);
+  document.addEventListener('dm-sync-complete', function() {
+    // First render once data is hydrated
+    if (window.dmBudget && window.dmBudget.getCategorySpend) refresh();
+  });
+
+  // Wait for dmBudget to be ready, then initial render.
+  function tryInit() {
+    if (window.dmBudget && window.dmBudget.getCategorySpend) {
+      refresh();
+      return true;
+    }
+    return false;
+  }
+  if (!tryInit()) {
+    var poll = setInterval(function() {
+      if (tryInit()) clearInterval(poll);
+    }, 200);
+    // Stop polling after 10s
+    setTimeout(function() { clearInterval(poll); }, 10000);
+  }
+})();
+</script>
