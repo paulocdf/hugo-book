@@ -3528,20 +3528,31 @@
   // ─── Modal ───
    function buildColorPicker() {
     var picker = document.getElementById('project-color-picker');
+    picker.setAttribute('role', 'radiogroup');
+    picker.setAttribute('aria-label', 'Project color');
     var html = '';
     COLORS.forEach(function(c) {
       var displayColor = isDark ? c.dark : c.light;
-      html += '<div class="project-color-swatch" data-color="' + c.light + '" style="background:' + displayColor + '" title="' + c.name + '"></div>';
+      html += '<div class="project-color-swatch" role="radio" aria-checked="false" tabindex="-1" data-color="' + c.light + '" style="background:' + displayColor + '" title="' + c.name + '" aria-label="Color: ' + c.name + '"></div>';
     });
     picker.innerHTML = html;
 
-    picker.querySelectorAll('.project-color-swatch').forEach(function(swatch) {
-      swatch.addEventListener('click', function() {
-        _selectedColor = swatch.getAttribute('data-color');
-        picker.querySelectorAll('.project-color-swatch').forEach(function(s) { s.classList.remove('selected'); });
-        swatch.classList.add('selected');
+    function selectSwatch(swatch) {
+      _selectedColor = swatch.getAttribute('data-color');
+      picker.querySelectorAll('.project-color-swatch').forEach(function(s) {
+        var sel = s === swatch;
+        s.classList.toggle('selected', sel);
+        s.setAttribute('aria-checked', sel ? 'true' : 'false');
+        s.setAttribute('tabindex', sel ? '0' : '-1');
       });
+    }
+
+    picker.querySelectorAll('.project-color-swatch').forEach(function(swatch) {
+      swatch.addEventListener('click', function() { selectSwatch(swatch); });
     });
+    if (typeof wireRadioGroupKeys === 'function') {
+      wireRadioGroupKeys(picker, '.project-color-swatch', selectSwatch);
+    }
   }
 
   // ─── Visual Identity (v18) ───
@@ -3707,8 +3718,16 @@
     }
     // Color swatches
     document.querySelectorAll('.project-color-swatch').forEach(function(s) {
-      s.classList.toggle('selected', s.getAttribute('data-color') === _selectedColor);
+      var sel = s.getAttribute('data-color') === _selectedColor;
+      s.classList.toggle('selected', sel);
+      s.setAttribute('aria-checked', sel ? 'true' : 'false');
+      s.setAttribute('tabindex', sel ? '0' : '-1');
     });
+    var colorPicker = document.getElementById('project-color-picker');
+    if (colorPicker && !colorPicker.querySelector('.project-color-swatch[tabindex="0"]')) {
+      var firstColor = colorPicker.querySelector('.project-color-swatch');
+      if (firstColor) firstColor.setAttribute('tabindex', '0');
+    }
     // Icon buttons
     document.querySelectorAll('.pj-icon-btn').forEach(function(b) {
       var sel = b.getAttribute('data-icon') === _selectedIcon;
@@ -3994,10 +4013,10 @@
         html += '<div class="project-kbcol-row" data-col-id="' + escapeHtml(col.id) + '">';
         html += '<span class="project-kbcol-name">' + escapeHtml(col.name) + '</span>';
         html += '<div class="project-kbcol-swatches" role="radiogroup" aria-label="Accent for ' + escapeHtml(col.name) + '">';
-        html += '<button type="button" class="project-kbcol-swatch project-kbcol-swatch-clear' + (!accent ? ' selected' : '') + '" data-kbcol-accent="" title="Use column default" aria-label="Use column default" role="radio" aria-checked="' + (!accent ? 'true' : 'false') + '">×</button>';
+        html += '<button type="button" class="project-kbcol-swatch project-kbcol-swatch-clear' + (!accent ? ' selected' : '') + '" data-kbcol-accent="" title="Use column default" aria-label="Use column default" role="radio" aria-checked="' + (!accent ? 'true' : 'false') + '" tabindex="' + (!accent ? '0' : '-1') + '">×</button>';
         COLORS.forEach(function(c) {
           var sel = (accent === c.light) ? ' selected' : '';
-          html += '<button type="button" class="project-kbcol-swatch' + sel + '" data-kbcol-accent="' + c.light + '" style="background:' + c.light + ';" title="' + c.name + '" aria-label="' + c.name + '" role="radio" aria-checked="' + (sel ? 'true' : 'false') + '"></button>';
+          html += '<button type="button" class="project-kbcol-swatch' + sel + '" data-kbcol-accent="' + c.light + '" style="background:' + c.light + ';" title="' + c.name + '" aria-label="' + c.name + '" role="radio" aria-checked="' + (sel ? 'true' : 'false') + '" tabindex="' + (sel ? '0' : '-1') + '"></button>';
         });
         html += '</div>';
         html += '<input type="text" class="project-kbcol-emoji" data-kbcol-emoji maxlength="2" value="' + escapeHtml(emoji) + '" placeholder="🎯" aria-label="Emoji prefix for ' + escapeHtml(col.name) + '">';
@@ -4007,19 +4026,27 @@
 
       listEl.querySelectorAll('.project-kbcol-row').forEach(function(row) {
         var colId = row.getAttribute('data-col-id');
+        function selectKbcolSwatch(btn) {
+          var accent = btn.getAttribute('data-kbcol-accent') || '';
+          if (!_selectedKanbanColumnStyles[colId]) _selectedKanbanColumnStyles[colId] = { accent: '', emoji: '' };
+          _selectedKanbanColumnStyles[colId].accent = accent;
+          row.querySelectorAll('.project-kbcol-swatch').forEach(function(b) {
+            var isSel = (b === btn);
+            b.classList.toggle('selected', isSel);
+            b.setAttribute('aria-checked', isSel ? 'true' : 'false');
+            b.setAttribute('tabindex', isSel ? '0' : '-1');
+          });
+        }
         row.querySelectorAll('[data-kbcol-accent]').forEach(function(btn) {
           btn.addEventListener('click', function(e) {
             e.preventDefault();
-            var accent = btn.getAttribute('data-kbcol-accent') || '';
-            if (!_selectedKanbanColumnStyles[colId]) _selectedKanbanColumnStyles[colId] = { accent: '', emoji: '' };
-            _selectedKanbanColumnStyles[colId].accent = accent;
-            row.querySelectorAll('.project-kbcol-swatch').forEach(function(b) {
-              var isSel = (b === btn);
-              b.classList.toggle('selected', isSel);
-              b.setAttribute('aria-checked', isSel ? 'true' : 'false');
-            });
+            selectKbcolSwatch(btn);
           });
         });
+        var swatchesEl = row.querySelector('.project-kbcol-swatches');
+        if (swatchesEl && typeof wireRadioGroupKeys === 'function') {
+          wireRadioGroupKeys(swatchesEl, '.project-kbcol-swatch', selectKbcolSwatch);
+        }
         var emojiInput = row.querySelector('[data-kbcol-emoji]');
         if (emojiInput) {
           emojiInput.addEventListener('input', function() {
