@@ -927,7 +927,7 @@
   } catch(e) {}
   if (window.dmAuth) {
     function subscribeNoteViewerAuth() {
-       window.dmAuth.onAuthStateChanged(function(user) {
+       window.dmOnAuth(function(user) {
          if (user || (window.dmDemo && window.dmDemo.isActive())) {
            loadNote();
          } else {

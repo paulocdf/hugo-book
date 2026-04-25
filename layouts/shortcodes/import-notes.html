@@ -56,7 +56,7 @@
   var statsEl = document.getElementById('import-stats');
 
   function subscribeImportAuth() {
-    window.dmAuth.onAuthStateChanged(function(user) {
+    window.dmOnAuth(function(user) {
       if (user) {
         signinView.style.display = 'none';
         contentView.style.display = '';

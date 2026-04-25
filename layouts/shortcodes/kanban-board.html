@@ -4321,7 +4321,7 @@
   } catch(e) {}
   if (window.dmAuth) {
     function subscribeKanbanAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
+      window.dmOnAuth(function(user) {
         if (user || (window.dmDemo && window.dmDemo.isActive())) {
           loadBoard();
         } else {

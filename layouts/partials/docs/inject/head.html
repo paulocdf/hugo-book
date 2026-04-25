@@ -255,6 +255,35 @@
       });
     };
 
+    // dmOnAuth: thin wrapper around onAuthStateChanged that defers
+    // registration until window.dmAuth is initialized. Returns an unsubscribe
+    // function. Use this instead of `window.dmAuth.onAuthStateChanged(...)`
+    // to avoid the `if (window.dmAuth)` guard at every callsite and to handle
+    // ordering when a shortcode runs before head.html's Firebase init has
+    // finished executing.
+    window.dmOnAuth = function(callback) {
+      if (typeof callback !== 'function') return function() {};
+      if (window.dmAuth && typeof window.dmAuth.onAuthStateChanged === 'function') {
+        return window.dmAuth.onAuthStateChanged(callback);
+      }
+      var cancelled = false;
+      var unsub = null;
+      if (window.dmAuthReady && typeof window.dmAuthReady.then === 'function') {
+        window.dmAuthReady.then(function() {
+          if (cancelled) return;
+          if (window.dmAuth && typeof window.dmAuth.onAuthStateChanged === 'function') {
+            unsub = window.dmAuth.onAuthStateChanged(callback);
+          }
+        });
+      } else {
+        console.warn('[dmOnAuth] called before dmAuth/dmAuthReady initialized');
+      }
+      return function() {
+        cancelled = true;
+        if (typeof unsub === 'function') unsub();
+      };
+    };
+
     // dmAuthReady: resolves once Firebase auth state has settled.
     // Prevents the null→user flash on page load (Firebase loads persisted
     // session from IndexedDB asynchronously, causing a brief signed-out state).

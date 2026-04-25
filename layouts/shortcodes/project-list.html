@@ -1878,7 +1878,7 @@
 
     if (window.dmAuthReady) {
       window.dmAuthReady.then(function() {
-        if (window.dmAuth) window.dmAuth.onAuthStateChanged(checkAuth);
+        if (window.dmAuth) window.dmOnAuth(checkAuth);
         checkAuth();
       });
     } else {

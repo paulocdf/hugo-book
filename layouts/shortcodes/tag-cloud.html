@@ -280,7 +280,7 @@
   } catch(e) {}
   if (window.dmAuth) {
     function subscribeTagCloudAuth() {
-       window.dmAuth.onAuthStateChanged(function(user) {
+       window.dmOnAuth(function(user) {
          if (user || (window.dmDemo && window.dmDemo.isActive())) {
            showState('loading');
           // Wait for sync, then load

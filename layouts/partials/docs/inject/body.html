@@ -772,7 +772,7 @@
   // Listen for auth state changes
   if (window.dmAuth) {
     function subscribeSidebarAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
+      window.dmOnAuth(function(user) {
         updateAuthUI(user);
       });
     }
@@ -3145,7 +3145,7 @@
     // Subscribe to auth state changes after dmAuthReady resolves to avoid
     // overwriting the cached-user display with a premature null emission.
     function subscribeAuth() {
-      _gardenAuthUnsub = window.dmAuth.onAuthStateChanged(applyAuthState);
+      _gardenAuthUnsub = window.dmOnAuth(applyAuthState);
     }
     if (window.dmAuthReady) {
       window.dmAuthReady.then(subscribeAuth);
@@ -4931,7 +4931,7 @@
   // Auth state change
   if (window.dmAuth) {
     function subscribeDynSidebarAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
+      window.dmOnAuth(function(user) {
         if (user) {
           _sidebarUser = user;
           // Try to render from cache immediately
@@ -5003,7 +5003,7 @@
   // Initial update after auth settles
   if (window.dmAuth) {
     function subscribeBadgeAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
+      window.dmOnAuth(function(user) {
         if (user) {
           // Small delay to ensure sidebar has rendered
           setTimeout(updateReviewBadge, 500);

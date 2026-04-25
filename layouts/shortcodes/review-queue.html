@@ -1684,7 +1684,7 @@
   } catch(e) {}
   if (window.dmAuth) {
     function subscribeReviewAuth() {
-       window.dmAuth.onAuthStateChanged(function(user) {
+       window.dmOnAuth(function(user) {
          if (user || (window.dmDemo && window.dmDemo.isActive())) {
            loadQueue();
          } else {

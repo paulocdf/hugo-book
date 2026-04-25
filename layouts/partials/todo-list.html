@@ -9992,7 +9992,7 @@
   // Initial load when auth is ready
   if (window.dmAuth) {
     function subscribeAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
+      window.dmOnAuth(function(user) {
         if (user) {
           loadTodos();
         } else if (window.dmDemo && window.dmDemo.isActive()) {

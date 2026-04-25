@@ -136,7 +136,7 @@
 
   if (window.dmAuth) {
     function subscribeGardenSectionsAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
+      window.dmOnAuth(function(user) {
         if (user) {
           updateSections();
         } else if (window.dmDemo && window.dmDemo.isActive()) {

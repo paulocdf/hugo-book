@@ -64,7 +64,7 @@
 
   if (window.dmAuth) {
     function subscribeGardenStatsAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
+      window.dmOnAuth(function(user) {
         if (user || (window.dmDemo && window.dmDemo.isActive())) updateStats();
       });
     }
