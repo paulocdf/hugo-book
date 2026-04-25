@@ -6400,6 +6400,108 @@
       });
     },
 
+    // Daily spend for a calendar year, suitable for a GitHub-style heatmap.
+    // Args: { year } — defaults to current year.
+    // Returns { year, days: [{ date, cents, dow, weekIndex }], totalCents,
+    //           peakCents, avgCents, percentiles: { p50, p75, p90, p95 },
+    //           weekCount, firstDow }.
+    // - Expenses only; splits credited per-split; soft-deleted ignored.
+    // - `days` has one entry per calendar day (zero-filled).
+    // - `weekIndex` is the 0-based column index in a Sunday-anchored grid
+    //    (so column 0 contains Jan 1's week, even if Jan 1 is mid-week).
+    // - `firstDow` is the dow (0=Sun..6=Sat) of Jan 1 — useful for grid offset.
+    // - `percentiles` are computed across NON-ZERO days only (so a sparse year
+    //    doesn't collapse all buckets). Falls back to even quartile of peak
+    //    when there are <4 non-zero days.
+    getDailySpend: function(args) {
+      var api = window.dmBudget;
+      args = args || {};
+      var year = args.year || new Date().getFullYear();
+      var jan1 = new Date(year, 0, 1);
+      var dec31 = new Date(year, 11, 31);
+      var firstDow = jan1.getDay();
+
+      function fmt(d) {
+        return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+      }
+      function inYear(dateStr) {
+        return dateStr && dateStr >= (year + '-01-01') && dateStr <= (year + '-12-31');
+      }
+
+      return api.getTransactions({}).then(function(allTxs) {
+        var byDate = {};
+        (allTxs || []).forEach(function(tx) {
+          if (!inYear(tx.date)) return;
+          if (Array.isArray(tx.splits) && tx.splits.length > 0) {
+            tx.splits.forEach(function(sp) {
+              var amt = sp.amount || 0;
+              if (amt >= 0) return;
+              byDate[tx.date] = (byDate[tx.date] || 0) + (-amt);
+            });
+          } else {
+            var a = tx.amount || 0;
+            if (a >= 0) return;
+            byDate[tx.date] = (byDate[tx.date] || 0) + (-a);
+          }
+        });
+
+        var days = [];
+        var cur = new Date(year, 0, 1);
+        var i = 0;
+        while (cur <= dec31) {
+          var ds = fmt(cur);
+          var dow = cur.getDay();
+          var weekIndex = Math.floor((firstDow + i) / 7);
+          days.push({ date: ds, cents: byDate[ds] || 0, dow: dow, weekIndex: weekIndex });
+          cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+          i++;
+        }
+
+        var total = 0, peak = 0, nonzero = [];
+        days.forEach(function(d) {
+          total += d.cents;
+          if (d.cents > peak) peak = d.cents;
+          if (d.cents > 0) nonzero.push(d.cents);
+        });
+        nonzero.sort(function(a, b) { return a - b; });
+        function pct(arr, p) {
+          if (!arr.length) return 0;
+          var k = Math.floor(arr.length * p);
+          if (k >= arr.length) k = arr.length - 1;
+          return arr[k];
+        }
+        var percentiles;
+        if (nonzero.length >= 4) {
+          percentiles = {
+            p50: pct(nonzero, 0.5),
+            p75: pct(nonzero, 0.75),
+            p90: pct(nonzero, 0.9),
+            p95: pct(nonzero, 0.95),
+          };
+        } else {
+          percentiles = {
+            p50: Math.round(peak * 0.25),
+            p75: Math.round(peak * 0.5),
+            p90: Math.round(peak * 0.75),
+            p95: peak,
+          };
+        }
+        var avg = days.length ? Math.round(total / days.length) : 0;
+        var weekCount = days.length ? (days[days.length - 1].weekIndex + 1) : 0;
+
+        return {
+          year: year,
+          days: days,
+          totalCents: total,
+          peakCents: peak,
+          avgCents: avg,
+          percentiles: percentiles,
+          weekCount: weekCount,
+          firstDow: firstDow,
+        };
+      });
+    },
+
     // ── Recurring rules (Phase 2a) ──
     // Fields (see serializeRecurring): name, accountId, categoryId, amount (cents, signed),
     // frequency ('daily'|'weekly'|'monthly'|'yearly'), interval, byDayOfMonth, byDayOfWeek,

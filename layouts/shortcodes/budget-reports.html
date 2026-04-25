@@ -4,7 +4,7 @@
   This page is built up incrementally across Phase 3 slices:
     - Slice A (this file, current): Spending by category — donut + bar list
     - Slice B (this file, current): Trend line (D / W / M with moving avg)
-    - Slice C (planned): Calendar heatmap of daily spend
+    - Slice C (this file, current): Calendar heatmap of daily spend
     - Slice D (planned): Net worth over time + cashflow forecast
     - Slice E (planned): Insights cards
 
@@ -232,6 +232,95 @@
     opacity: 0.7; font-size: 0.72rem;
   }
   .dm-rpt-trend-wrap { position: relative; }
+
+  /* Calendar heatmap (Slice C) */
+  .dm-rpt-heat-toolbar {
+    display: flex; gap: 14px; align-items: center;
+    flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .dm-rpt-year-nav {
+    display: inline-flex; gap: 6px; align-items: center;
+    border: 1px solid var(--gray-200);
+    border-radius: 6px; padding: 2px;
+  }
+  .dm-rpt-year-nav button {
+    background: transparent; border: 0; cursor: pointer;
+    color: var(--body-font-color);
+    width: 24px; height: 24px; line-height: 1;
+    border-radius: 4px; font-size: 0.9rem;
+  }
+  .dm-rpt-year-nav button:hover { background: var(--gray-200); }
+  .dm-rpt-year-nav button[disabled] { opacity: 0.35; cursor: default; }
+  .dm-rpt-year-nav .yr {
+    padding: 0 8px; font-variant-numeric: tabular-nums;
+    font-weight: 600; min-width: 48px; text-align: center;
+  }
+  .dm-rpt-heat-stats {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    font-size: 0.82rem;
+  }
+  .dm-rpt-heat-stats .stat .lbl {
+    opacity: 0.6; text-transform: uppercase;
+    letter-spacing: 0.05em; font-size: 0.7rem;
+    margin-right: 4px;
+  }
+  .dm-rpt-heat-stats .stat .val {
+    font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .dm-rpt-heat-wrap {
+    position: relative; overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .dm-rpt-heat-svg {
+    display: block;
+    /* SVG sizes itself by viewBox; no max-width to let it scroll on narrow screens. */
+  }
+  .dm-rpt-heat-svg .day {
+    rx: 2; ry: 2;
+    fill: var(--gray-200);
+    stroke: var(--body-background);
+    stroke-width: 1;
+    transition: stroke 0.1s;
+  }
+  .dm-rpt-heat-svg .day.lvl-1 { fill: color-mix(in srgb, var(--color-accent, #1976d2) 25%, var(--gray-200)); }
+  .dm-rpt-heat-svg .day.lvl-2 { fill: color-mix(in srgb, var(--color-accent, #1976d2) 50%, var(--gray-200)); }
+  .dm-rpt-heat-svg .day.lvl-3 { fill: color-mix(in srgb, var(--color-accent, #1976d2) 75%, var(--gray-200)); }
+  .dm-rpt-heat-svg .day.lvl-4 { fill: var(--color-accent, #1976d2); }
+  .dm-rpt-heat-svg .day:hover {
+    stroke: var(--body-font-color); stroke-width: 1.5;
+  }
+  .dm-rpt-heat-svg .month-label,
+  .dm-rpt-heat-svg .dow-label {
+    font-size: 9px; fill: var(--body-font-color); opacity: 0.6;
+  }
+  .dm-rpt-heat-legend {
+    display: flex; gap: 4px; align-items: center;
+    margin-top: 8px;
+    font-size: 0.72rem; opacity: 0.7;
+  }
+  .dm-rpt-heat-legend .swatch {
+    width: 11px; height: 11px; border-radius: 2px;
+    background: var(--gray-200);
+  }
+  .dm-rpt-heat-legend .swatch.lvl-1 { background: color-mix(in srgb, var(--color-accent, #1976d2) 25%, var(--gray-200)); }
+  .dm-rpt-heat-legend .swatch.lvl-2 { background: color-mix(in srgb, var(--color-accent, #1976d2) 50%, var(--gray-200)); }
+  .dm-rpt-heat-legend .swatch.lvl-3 { background: color-mix(in srgb, var(--color-accent, #1976d2) 75%, var(--gray-200)); }
+  .dm-rpt-heat-legend .swatch.lvl-4 { background: var(--color-accent, #1976d2); }
+  .dm-rpt-heat-tooltip {
+    position: absolute; pointer-events: none;
+    background: var(--body-background);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px; padding: 6px 9px;
+    font-size: 0.78rem; white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    opacity: 0; transform: translate(-50%, -120%);
+    transition: opacity 0.1s;
+    z-index: 4;
+  }
+  .dm-rpt-heat-tooltip.active { opacity: 1; }
+  .dm-rpt-heat-tooltip .ttp-amt {
+    font-weight: 600; font-variant-numeric: tabular-nums;
+  }
 </style>
 
 <div class="dm-rpt-wrap" id="dm-rpt-root">
@@ -287,6 +376,33 @@
       <div class="dm-rpt-trend-tooltip" id="dm-rpt-trend-tooltip"></div>
     </div>
   </section>
+
+  <section class="dm-rpt-section" id="dm-rpt-heat-section">
+    <h3>
+      <span>Daily spending heatmap</span>
+    </h3>
+    <div class="dm-rpt-heat-toolbar">
+      <div class="dm-rpt-year-nav" role="group" aria-label="Year">
+        <button type="button" id="dm-rpt-heat-prev" aria-label="Previous year">‹</button>
+        <span class="yr" id="dm-rpt-heat-year"></span>
+        <button type="button" id="dm-rpt-heat-next" aria-label="Next year">›</button>
+      </div>
+      <div class="dm-rpt-heat-stats" id="dm-rpt-heat-stats"></div>
+    </div>
+    <div class="dm-rpt-heat-wrap">
+      <svg class="dm-rpt-heat-svg" id="dm-rpt-heat-svg" aria-hidden="true"></svg>
+      <div class="dm-rpt-heat-tooltip" id="dm-rpt-heat-tooltip"></div>
+    </div>
+    <div class="dm-rpt-heat-legend">
+      <span>Less</span>
+      <span class="swatch"></span>
+      <span class="swatch lvl-1"></span>
+      <span class="swatch lvl-2"></span>
+      <span class="swatch lvl-3"></span>
+      <span class="swatch lvl-4"></span>
+      <span>More</span>
+    </div>
+  </section>
 </div>
 
 <script>
@@ -309,6 +425,13 @@
   var $trendStats = document.getElementById('dm-rpt-trend-stats');
   var $trendTooltip = document.getElementById('dm-rpt-trend-tooltip');
   var $bucketBtns = $trendSection ? $trendSection.querySelectorAll('.dm-rpt-bucket-toggle button') : [];
+  var $heatSection = document.getElementById('dm-rpt-heat-section');
+  var $heatSvg = document.getElementById('dm-rpt-heat-svg');
+  var $heatStats = document.getElementById('dm-rpt-heat-stats');
+  var $heatTooltip = document.getElementById('dm-rpt-heat-tooltip');
+  var $heatYear = document.getElementById('dm-rpt-heat-year');
+  var $heatPrev = document.getElementById('dm-rpt-heat-prev');
+  var $heatNext = document.getElementById('dm-rpt-heat-next');
 
   var _state = {
     preset: 'this-month',
@@ -317,6 +440,7 @@
     highlight: null, // categoryId being highlighted
     bucket: 'auto', // 'day' | 'week' | 'month' | 'auto'
     lastResolvedBucket: null, // what 'auto' resolved to last time
+    heatYear: new Date().getFullYear(),
   };
 
   function escapeHtml(s) {
@@ -637,6 +761,107 @@
     });
   }
 
+  // ── Heatmap (Slice C) ──────────────────────────────────────────────
+  var DOW_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var HEAT_CELL = 11, HEAT_GAP = 2, HEAT_STEP = HEAT_CELL + HEAT_GAP;
+  var HEAT_LEFT = 26, HEAT_TOP = 14;
+
+  function levelFor(cents, p) {
+    if (cents <= 0) return 0;
+    if (p.p50 > 0 && cents <= p.p50) return 1;
+    if (p.p75 > 0 && cents <= p.p75) return 2;
+    if (p.p90 > 0 && cents <= p.p90) return 3;
+    return 4;
+  }
+
+  function renderHeatmap(result) {
+    var thisYear = new Date().getFullYear();
+    if ($heatPrev) $heatPrev.disabled = (result.year <= 2000);
+    if ($heatNext) $heatNext.disabled = (result.year >= thisYear);
+    $heatYear.textContent = result.year;
+
+    $heatStats.innerHTML =
+      '<span class="stat"><span class="lbl">Total</span><span class="val">' + escapeHtml(fmtMoney(result.totalCents)) + '</span></span>' +
+      '<span class="stat"><span class="lbl">Avg / day</span><span class="val">' + escapeHtml(fmtMoney(result.avgCents)) + '</span></span>' +
+      '<span class="stat"><span class="lbl">Peak day</span><span class="val">' + escapeHtml(fmtMoney(result.peakCents)) + '</span></span>';
+
+    var weekCount = result.weekCount || 0;
+    var W = HEAT_LEFT + weekCount * HEAT_STEP + 4;
+    var H = HEAT_TOP + 7 * HEAT_STEP + 4;
+    $heatSvg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    $heatSvg.setAttribute('width', W);
+    $heatSvg.setAttribute('height', H);
+
+    if (result.totalCents === 0) {
+      $heatSvg.innerHTML = '<text x="' + (W / 2) + '" y="' + (H / 2) + '" text-anchor="middle" fill="currentColor" opacity="0.55" font-size="12">No expense data in ' + result.year + '</text>';
+      return;
+    }
+
+    var html = '';
+    // Day-of-week labels (Mon, Wed, Fri to keep it sparse)
+    [1, 3, 5].forEach(function(dow) {
+      var cy = HEAT_TOP + dow * HEAT_STEP + HEAT_CELL - 2;
+      html += '<text class="dow-label" x="0" y="' + cy + '">' + DOW_LABELS[dow] + '</text>';
+    });
+
+    // Month labels — place at the first week-column that contains day 1
+    var monthShown = {};
+    result.days.forEach(function(d) {
+      var m = parseInt(d.date.slice(5, 7), 10) - 1;
+      if (monthShown[m]) return;
+      // Only label on day 1 to keep alignment predictable
+      if (d.date.slice(8, 10) !== '01') return;
+      monthShown[m] = true;
+      var x = HEAT_LEFT + d.weekIndex * HEAT_STEP;
+      html += '<text class="month-label" x="' + x + '" y="' + (HEAT_TOP - 4) + '">' + MONTH_LABELS[m] + '</text>';
+    });
+
+    // Day cells
+    result.days.forEach(function(d) {
+      var x = HEAT_LEFT + d.weekIndex * HEAT_STEP;
+      var y = HEAT_TOP + d.dow * HEAT_STEP;
+      var lvl = levelFor(d.cents, result.percentiles);
+      html += '<rect class="day lvl-' + lvl + '" x="' + x + '" y="' + y + '" width="' + HEAT_CELL + '" height="' + HEAT_CELL + '"' +
+        ' data-date="' + d.date + '" data-cents="' + d.cents + '"></rect>';
+    });
+
+    $heatSvg.innerHTML = html;
+
+    // Hover wiring
+    var rects = $heatSvg.querySelectorAll('rect.day');
+    rects.forEach(function(r) {
+      r.addEventListener('mouseenter', function(e) {
+        var date = r.getAttribute('data-date');
+        var cents = parseInt(r.getAttribute('data-cents'), 10) || 0;
+        var label = cents > 0
+          ? '<div>' + escapeHtml(date) + '</div><div class="ttp-amt">' + escapeHtml(fmtMoney(cents)) + '</div>'
+          : '<div>' + escapeHtml(date) + '</div><div style="opacity:0.6">No spending</div>';
+        $heatTooltip.innerHTML = label;
+        var rect = r.getBoundingClientRect();
+        var wrapRect = $heatSvg.parentElement.getBoundingClientRect();
+        $heatTooltip.style.left = (rect.left + rect.width / 2 - wrapRect.left) + 'px';
+        $heatTooltip.style.top = (rect.top - wrapRect.top) + 'px';
+        $heatTooltip.classList.add('active');
+      });
+      r.addEventListener('mouseleave', function() {
+        $heatTooltip.classList.remove('active');
+      });
+    });
+  }
+
+  function refreshHeat() {
+    if (!window.dmBudget || !window.dmBudget.getDailySpend) return;
+    $heatSection.classList.add('dm-rpt-loading');
+    window.dmBudget.getDailySpend({ year: _state.heatYear }).then(function(result) {
+      $heatSection.classList.remove('dm-rpt-loading');
+      renderHeatmap(result);
+    }).catch(function(err) {
+      $heatSection.classList.remove('dm-rpt-loading');
+      console.warn('[reports] getDailySpend failed', err);
+    });
+  }
+
   function refresh() {
     if (!window.dmBudget || !window.dmBudget.getCategorySpend) return;
     var rangeArg;
@@ -661,9 +886,24 @@
       console.warn('[reports] getCategorySpend failed', err);
     });
     refreshTrend(rangeArg);
+    refreshHeat();
   }
 
   // ── Wiring ─────────────────────────────────────────────────────────
+  if ($heatPrev) {
+    $heatPrev.addEventListener('click', function() {
+      _state.heatYear -= 1;
+      refreshHeat();
+    });
+  }
+  if ($heatNext) {
+    $heatNext.addEventListener('click', function() {
+      var thisYear = new Date().getFullYear();
+      if (_state.heatYear >= thisYear) return;
+      _state.heatYear += 1;
+      refreshHeat();
+    });
+  }
   $bucketBtns.forEach(function(btn) {
     btn.addEventListener('click', function() {
       _state.bucket = btn.getAttribute('data-bucket');
