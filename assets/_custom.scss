@@ -6829,7 +6829,10 @@ html[data-demo-banner="1"] body {
 #dm-demo-banner {
   position: fixed;
   top: 0; left: 0; right: 0;
-  z-index: 9999;
+  // Below modals (quick-capture: 300, settings: 1000, lightbox: 100001)
+  // but above page content and sidebar (100). When modals open they
+  // overlay the banner, allowing backdrop clicks at the top of the page.
+  z-index: 250;
   height: 44px;
   background: linear-gradient(90deg,
     color-mix(in srgb, var(--color-accent) 92%, black) 0%,
