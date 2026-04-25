@@ -1,0 +1,402 @@
+{{/* Spreadsheet workspace (Phase F1 foundation).
+     Loads HyperFormula from CDN for formula evaluation, renders a minimal
+     grid, and autosaves to IDB+Firestore via window.dmSync.{create,update}Sheet.
+     Single-sheet MVP — multi-sheet/named-ranges/shared workspaces are deferred. */}}
+
+<div id="dm-sheet-root" class="dm-sheet-root" data-state="loading">
+  <div class="dm-sheet-toolbar">
+    <input type="text" id="dm-sheet-title" class="dm-sheet-title-input" placeholder="Untitled sheet" aria-label="Sheet title">
+    <span class="dm-sheet-status" id="dm-sheet-status" aria-live="polite"></span>
+    <span class="dm-sheet-spacer"></span>
+    <button type="button" class="dm-sheet-btn" id="dm-sheet-new" title="New sheet">New</button>
+    <select class="dm-sheet-picker" id="dm-sheet-picker" aria-label="Open sheet"></select>
+  </div>
+  <div class="dm-sheet-loading" id="dm-sheet-loading">Loading spreadsheet engine…</div>
+  <div class="dm-sheet-grid-wrap" id="dm-sheet-grid-wrap" hidden>
+    <table class="dm-sheet-grid" id="dm-sheet-grid" role="grid" aria-label="Spreadsheet grid"></table>
+  </div>
+  <div class="dm-sheet-empty" id="dm-sheet-empty" hidden>
+    <p>Sign in to create spreadsheets. Your sheets are stored locally and synced to your account.</p>
+  </div>
+</div>
+
+<style>
+  .dm-sheet-root { display: flex; flex-direction: column; gap: 12px; }
+  .dm-sheet-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .dm-sheet-title-input {
+    font-size: 1.1rem; font-weight: 600; padding: 6px 10px;
+    border: 1px solid transparent; border-radius: 6px; background: transparent;
+    color: var(--body-font-color); min-width: 240px;
+  }
+  .dm-sheet-title-input:hover, .dm-sheet-title-input:focus {
+    border-color: var(--gray-200); outline: none; background: var(--body-background);
+  }
+  .dm-sheet-status { font-size: 0.85rem; color: var(--gray-500); min-width: 80px; }
+  .dm-sheet-spacer { flex: 1; }
+  .dm-sheet-btn {
+    padding: 6px 12px; border: 1px solid var(--gray-200); border-radius: 6px;
+    background: var(--body-background); color: var(--body-font-color); cursor: pointer;
+    font-size: 0.9rem;
+  }
+  .dm-sheet-btn:hover { background: var(--gray-100); }
+  .dm-sheet-picker {
+    padding: 6px 10px; border: 1px solid var(--gray-200); border-radius: 6px;
+    background: var(--body-background); color: var(--body-font-color); font-size: 0.9rem;
+    max-width: 240px;
+  }
+  .dm-sheet-loading, .dm-sheet-empty {
+    padding: 32px; text-align: center; color: var(--gray-500);
+    border: 1px dashed var(--gray-200); border-radius: 8px;
+  }
+  .dm-sheet-grid-wrap {
+    overflow: auto; max-height: 70vh; border: 1px solid var(--gray-200); border-radius: 6px;
+  }
+  .dm-sheet-grid { border-collapse: collapse; font-family: var(--mono-font, monospace); font-size: 0.9rem; }
+  .dm-sheet-grid th, .dm-sheet-grid td {
+    border: 1px solid var(--gray-200); padding: 0; min-width: 90px; height: 28px;
+    background: var(--body-background); position: relative;
+  }
+  .dm-sheet-grid th {
+    background: var(--gray-100); font-weight: 600; text-align: center;
+    position: sticky; top: 0; z-index: 1; min-width: 40px;
+    color: var(--gray-500);
+  }
+  .dm-sheet-grid th.dm-sheet-row-head {
+    left: 0; z-index: 2; min-width: 40px;
+  }
+  .dm-sheet-grid td.dm-sheet-cell {
+    cursor: cell;
+  }
+  .dm-sheet-grid td.dm-sheet-cell.is-active {
+    outline: 2px solid var(--color-accent, #1976d2); outline-offset: -2px;
+  }
+  .dm-sheet-cell-display {
+    padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    line-height: 20px;
+  }
+  .dm-sheet-cell-display.num { text-align: right; }
+  .dm-sheet-cell-display.err { color: #d32f2f; }
+  .dm-sheet-cell-input {
+    width: 100%; height: 100%; border: none; outline: none; padding: 4px 8px;
+    font-family: inherit; font-size: inherit; background: var(--body-background);
+    color: var(--body-font-color);
+  }
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  var HF_CDN = 'https://cdn.jsdelivr.net/npm/hyperformula@2.7.1/dist/hyperformula.full.min.js';
+  var ROWS = 50;
+  var COLS = 26;
+  var AUTOSAVE_DEBOUNCE_MS = 800;
+
+  var state = {
+    hf: null,            // HyperFormula instance
+    sheetId: null,       // current sheet doc id
+    title: 'Untitled sheet',
+    activeCell: { r: 0, c: 0 },
+    saveTimer: null,
+    sheets: [],          // list of all sheets for picker
+    ready: false
+  };
+
+  function $(id) { return document.getElementById(id); }
+  function setStatus(msg) { var el = $('dm-sheet-status'); if (el) el.textContent = msg || ''; }
+
+  function colLetter(c) {
+    var s = '';
+    c = c + 1;
+    while (c > 0) { var m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); }
+    return s;
+  }
+
+  function loadHyperFormula() {
+    return new Promise(function(resolve, reject) {
+      if (window.HyperFormula) return resolve(window.HyperFormula);
+      var s = document.createElement('script');
+      s.src = HF_CDN;
+      s.onload = function() { resolve(window.HyperFormula); };
+      s.onerror = function() { reject(new Error('Failed to load HyperFormula')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function newHf(cellsJson) {
+    var data;
+    try { data = JSON.parse(cellsJson || '[]'); } catch (e) { data = []; }
+    // Normalize to 2D array of strings.
+    var grid = [];
+    for (var r = 0; r < ROWS; r++) {
+      var row = [];
+      for (var c = 0; c < COLS; c++) {
+        row.push((data[r] && data[r][c] != null) ? data[r][c] : null);
+      }
+      grid.push(row);
+    }
+    return window.HyperFormula.buildFromArray(grid, { licenseKey: 'gpl-v3' });
+  }
+
+  function serializeCells() {
+    if (!state.hf) return '[]';
+    var sheetId = state.hf.getSheetId('Sheet1');
+    if (sheetId == null) return '[]';
+    var out = [];
+    for (var r = 0; r < ROWS; r++) {
+      var row = [];
+      var hasContent = false;
+      for (var c = 0; c < COLS; c++) {
+        var formula = state.hf.getCellFormula({ sheet: sheetId, row: r, col: c });
+        var raw = formula != null ? formula : state.hf.getCellSerialized({ sheet: sheetId, row: r, col: c });
+        if (raw != null && raw !== '') hasContent = true;
+        row.push(raw == null ? null : raw);
+      }
+      out.push(row);
+    }
+    // Trim trailing empty rows for compactness.
+    while (out.length > 1) {
+      var last = out[out.length - 1];
+      var empty = last.every(function(v) { return v == null || v === ''; });
+      if (empty) out.pop(); else break;
+    }
+    return JSON.stringify(out);
+  }
+
+  function renderGrid() {
+    var table = $('dm-sheet-grid');
+    if (!table || !state.hf) return;
+    var sheetId = state.hf.getSheetId('Sheet1');
+    var html = '<thead><tr><th class="dm-sheet-row-head"></th>';
+    for (var c = 0; c < COLS; c++) html += '<th>' + colLetter(c) + '</th>';
+    html += '</tr></thead><tbody>';
+    for (var r = 0; r < ROWS; r++) {
+      html += '<tr><th class="dm-sheet-row-head">' + (r + 1) + '</th>';
+      for (var cc = 0; cc < COLS; cc++) {
+        var addr = { sheet: sheetId, row: r, col: cc };
+        var val = state.hf.getCellValue(addr);
+        var display = val;
+        var cls = 'dm-sheet-cell-display';
+        if (val && typeof val === 'object' && val.type === 'ERROR') {
+          display = '#' + (val.value || 'ERR');
+          cls += ' err';
+        } else if (typeof val === 'number') {
+          cls += ' num';
+        } else if (val == null) {
+          display = '';
+        }
+        var active = (state.activeCell.r === r && state.activeCell.c === cc) ? ' is-active' : '';
+        html += '<td class="dm-sheet-cell' + active + '" data-r="' + r + '" data-c="' + cc + '" tabindex="-1">' +
+                '<div class="' + cls + '">' + escapeHtml(String(display == null ? '' : display)) + '</div></td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody>';
+    table.innerHTML = html;
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, function(c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+    });
+  }
+
+  function setActive(r, c) {
+    state.activeCell = { r: Math.max(0, Math.min(ROWS - 1, r)), c: Math.max(0, Math.min(COLS - 1, c)) };
+    renderGrid();
+    var td = document.querySelector('.dm-sheet-cell.is-active');
+    if (td) td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
+  function startEdit(r, c) {
+    var td = document.querySelector('.dm-sheet-cell[data-r="' + r + '"][data-c="' + c + '"]');
+    if (!td) return;
+    var sheetId = state.hf.getSheetId('Sheet1');
+    var formula = state.hf.getCellFormula({ sheet: sheetId, row: r, col: c });
+    var raw = formula != null ? formula : state.hf.getCellSerialized({ sheet: sheetId, row: r, col: c });
+    var initial = raw == null ? '' : String(raw);
+    td.innerHTML = '<input class="dm-sheet-cell-input" type="text" value="' + escapeHtml(initial) + '">';
+    var input = td.querySelector('input');
+    input.focus();
+    input.select();
+    function commit(advance) {
+      var v = input.value;
+      var parsed = v;
+      if (v !== '' && !v.startsWith('=') && !isNaN(Number(v))) parsed = Number(v);
+      else if (v === '') parsed = null;
+      state.hf.setCellContents({ sheet: sheetId, row: r, col: c }, [[parsed]]);
+      scheduleSave();
+      renderGrid();
+      if (advance) setActive(r + 1, c);
+    }
+    input.addEventListener('blur', function() { commit(false); });
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { e.preventDefault(); commit(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); renderGrid(); }
+      else if (e.key === 'Tab') { e.preventDefault(); commit(false); setActive(r, c + (e.shiftKey ? -1 : 1)); }
+    });
+  }
+
+  function scheduleSave() {
+    if (state.saveTimer) clearTimeout(state.saveTimer);
+    setStatus('Saving…');
+    state.saveTimer = setTimeout(saveNow, AUTOSAVE_DEBOUNCE_MS);
+  }
+
+  function saveNow() {
+    if (!state.sheetId || !window.dmSync) return;
+    var cellsJson = serializeCells();
+    window.dmSync.updateSheet(state.sheetId, {
+      title: state.title,
+      cellsJson: cellsJson
+    }).then(function() { setStatus('Saved'); setTimeout(function() { setStatus(''); }, 1200); })
+      .catch(function(err) { console.error('[dm-sheet] save failed', err); setStatus('Save failed'); });
+  }
+
+  function loadSheet(sheet) {
+    if (state.hf) { try { state.hf.destroy(); } catch (e) {} state.hf = null; }
+    state.sheetId = sheet.id;
+    state.title = sheet.title || 'Untitled sheet';
+    $('dm-sheet-title').value = state.title;
+    state.hf = newHf(sheet.cellsJson);
+    state.activeCell = { r: 0, c: 0 };
+    renderGrid();
+    setStatus('');
+  }
+
+  function refreshPicker() {
+    if (!window.dmSync) return Promise.resolve();
+    return window.dmSync.getAllSheets().then(function(sheets) {
+      state.sheets = sheets;
+      var sel = $('dm-sheet-picker');
+      sel.innerHTML = '';
+      if (!sheets.length) {
+        var opt = document.createElement('option');
+        opt.textContent = '(no sheets)'; opt.disabled = true;
+        sel.appendChild(opt);
+      } else {
+        sheets.forEach(function(s) {
+          var opt = document.createElement('option');
+          opt.value = s.id;
+          opt.textContent = s.title || 'Untitled';
+          if (s.id === state.sheetId) opt.selected = true;
+          sel.appendChild(opt);
+        });
+      }
+    });
+  }
+
+  function createNewSheet() {
+    if (!window.dmSync) return;
+    return window.dmSync.createSheet({ title: 'Untitled sheet' }).then(function(sheet) {
+      loadSheet(sheet);
+      return refreshPicker();
+    });
+  }
+
+  function init() {
+    var root = $('dm-sheet-root');
+    var loading = $('dm-sheet-loading');
+    var wrap = $('dm-sheet-grid-wrap');
+    var empty = $('dm-sheet-empty');
+
+    function showAuthRequired() {
+      loading.hidden = true; wrap.hidden = true; empty.hidden = false;
+      root.dataset.state = 'auth-required';
+    }
+
+    if (!window.dmAuthReady) { showAuthRequired(); return; }
+
+    window.dmAuthReady.then(function() {
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      var demo = window.dmDemo && window.dmDemo.isActive();
+      if (!user && !demo) { showAuthRequired(); return; }
+
+      loadHyperFormula().then(function() {
+        return refreshPicker();
+      }).then(function() {
+        if (state.sheets.length) {
+          loadSheet(state.sheets[0]);
+        } else {
+          return createNewSheet();
+        }
+      }).then(function() {
+        loading.hidden = true;
+        wrap.hidden = false;
+        root.dataset.state = 'ready';
+        state.ready = true;
+        wireEvents();
+      }).catch(function(err) {
+        console.error('[dm-sheet] init failed', err);
+        loading.textContent = 'Failed to load: ' + (err && err.message ? err.message : 'unknown error');
+      });
+    });
+  }
+
+  function wireEvents() {
+    var grid = $('dm-sheet-grid');
+    grid.addEventListener('click', function(e) {
+      var td = e.target.closest('.dm-sheet-cell');
+      if (!td) return;
+      var r = parseInt(td.dataset.r, 10);
+      var c = parseInt(td.dataset.c, 10);
+      setActive(r, c);
+    });
+    grid.addEventListener('dblclick', function(e) {
+      var td = e.target.closest('.dm-sheet-cell');
+      if (!td) return;
+      startEdit(parseInt(td.dataset.r, 10), parseInt(td.dataset.c, 10));
+    });
+
+    document.addEventListener('keydown', function(e) {
+      if (!state.ready) return;
+      if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
+      var ac = state.activeCell;
+      if (e.key === 'ArrowUp')      { e.preventDefault(); setActive(ac.r - 1, ac.c); }
+      else if (e.key === 'ArrowDown')  { e.preventDefault(); setActive(ac.r + 1, ac.c); }
+      else if (e.key === 'ArrowLeft')  { e.preventDefault(); setActive(ac.r, ac.c - 1); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); setActive(ac.r, ac.c + 1); }
+      else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(ac.r, ac.c); }
+      else if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        var sheetId = state.hf.getSheetId('Sheet1');
+        state.hf.setCellContents({ sheet: sheetId, row: ac.r, col: ac.c }, [[null]]);
+        scheduleSave();
+        renderGrid();
+      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+        startEdit(ac.r, ac.c);
+        // Replace existing content with the typed character.
+        setTimeout(function() {
+          var input = document.querySelector('.dm-sheet-cell-input');
+          if (input) { input.value = e.key; input.setSelectionRange(1, 1); }
+        }, 0);
+      }
+    });
+
+    $('dm-sheet-title').addEventListener('input', function(e) {
+      state.title = e.target.value || 'Untitled sheet';
+      scheduleSave();
+    });
+
+    $('dm-sheet-new').addEventListener('click', function() {
+      createNewSheet();
+    });
+
+    $('dm-sheet-picker').addEventListener('change', function(e) {
+      var id = e.target.value;
+      var sheet = state.sheets.find(function(s) { return s.id === id; });
+      if (sheet) loadSheet(sheet);
+    });
+
+    window.addEventListener('beforeunload', function() {
+      if (state.saveTimer) { clearTimeout(state.saveTimer); saveNow(); }
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
+</script>

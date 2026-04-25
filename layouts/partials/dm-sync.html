@@ -161,7 +161,7 @@
   'use strict';
 
    var DB_NAME = 'dm-notes';
-   var DB_VERSION = 18;
+   var DB_VERSION = 19;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -180,6 +180,8 @@
   var STORE_BUDGETS = 'budgets';
   var STORE_TRANSACTIONS = 'transactions';
   var STORE_RECURRING = 'recurring';
+  // v19: Spreadsheet workspace (Phase F1 foundation)
+  var STORE_SHEETS = 'sheets';
   // Budget: local-only mode (user opt-in to skip Firestore sync for financial data)
   var BUDGET_LOCAL_ONLY_KEY = 'dm-budget-local-only';
   function isBudgetLocalOnly() {
@@ -387,6 +389,12 @@
           var recStore = db.createObjectStore(STORE_RECURRING, { keyPath: 'id' });
           recStore.createIndex('userId', 'userId', { unique: false });
           recStore.createIndex('nextDueDate', 'nextDueDate', { unique: false });
+        }
+        // Sheets store (v19) — spreadsheet workspace (Phase F1 foundation)
+        if (!db.objectStoreNames.contains(STORE_SHEETS)) {
+          var sheetStore = db.createObjectStore(STORE_SHEETS, { keyPath: 'id' });
+          sheetStore.createIndex('userId', 'userId', { unique: false });
+          sheetStore.createIndex('updatedAt', 'updatedAt', { unique: false });
         }
       };
       req.onblocked = function() {
@@ -1122,6 +1130,25 @@
       lastPostedDate: data.lastPostedDate || null,
       payee: data.payee || '',
       memo: data.memo || '',
+      deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  // Sheets serializer (Phase F1 foundation). Field whitelist — anything not
+  // listed here is silently dropped during Firestore-to-IDB sync. The cell
+  // payload is stored as a JSON-stringified `cellsJson` blob so HyperFormula
+  // can rehydrate it without schema changes.
+  function serializeSheet(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      title: data.title || 'Untitled sheet',
+      cellsJson: typeof data.cellsJson === 'string' ? data.cellsJson : '[]',
+      rowCount: typeof data.rowCount === 'number' ? data.rowCount : 50,
+      colCount: typeof data.colCount === 'number' ? data.colCount : 26,
       deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
       createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
       updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
@@ -5560,7 +5587,84 @@
     // Budget syncs
     syncBudgetData: function(userId) { return syncBudgetData(userId); },
     eraseBudgetData: function(opts) { return eraseBudgetData(opts); },
-    isBudgetLocalOnly: isBudgetLocalOnly
+    isBudgetLocalOnly: isBudgetLocalOnly,
+
+    // ─── Sheets (spreadsheet workspace, Phase F1 foundation) ───
+    // Per-user spreadsheets persisted to Firestore + IDB. Cells are stored as
+    // a JSON-stringified blob (`cellsJson`) so HyperFormula can rehydrate
+    // without schema-driven cell rows. All writes go through firestoreWrite().
+    getSheet: function(id) { return idbGet(STORE_SHEETS, id); },
+    getAllSheets: function() {
+      return idbGetAll(STORE_SHEETS).then(function(items) {
+        return items.filter(function(s) { return !s.deletedAt; })
+                    .sort(function(a, b) { return (b.updatedAt || 0) - (a.updatedAt || 0); });
+      });
+    },
+    createSheet: function(data) {
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      if (!user && window.dmDemo && window.dmDemo.isActive()) user = window.dmDemo.fakeUser();
+      if (!user) return Promise.reject(new Error('Not authenticated'));
+      var id = (data && data.id) || (window.dmDb
+        ? window.dmDb.collection('sheets').doc().id
+        : 'local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9));
+      var now = Date.now();
+      var sheet = {
+        id: id, userId: user.uid,
+        title: (data && data.title) || 'Untitled sheet',
+        cellsJson: (data && typeof data.cellsJson === 'string') ? data.cellsJson : '[]',
+        rowCount: (data && typeof data.rowCount === 'number') ? data.rowCount : 50,
+        colCount: (data && typeof data.colCount === 'number') ? data.colCount : 26,
+        deletedAt: null, createdAt: now, updatedAt: now
+      };
+      var fs = {
+        userId: sheet.userId, title: sheet.title, cellsJson: sheet.cellsJson,
+        rowCount: sheet.rowCount, colCount: sheet.colCount,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'sheets', docId: id, op: 'set', data: fs,
+        localOp: function() { return idbPut(STORE_SHEETS, sheet); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-sheets-updated'));
+        return sheet;
+      });
+    },
+    updateSheet: function(id, updates) {
+      return idbGet(STORE_SHEETS, id).then(function(sheet) {
+        if (!sheet) return Promise.reject(new Error('Sheet not found'));
+        var fs = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        ['title','cellsJson','rowCount','colCount'].forEach(function(k) {
+          if (updates[k] !== undefined) { sheet[k] = updates[k]; fs[k] = updates[k]; }
+        });
+        sheet.updatedAt = Date.now();
+        return firestoreWrite({
+          collection: 'sheets', docId: id, op: 'update', data: fs,
+          localOp: function() { return idbPut(STORE_SHEETS, sheet); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-sheets-updated'));
+          return sheet;
+        });
+      });
+    },
+    deleteSheet: function(id) {
+      // Soft delete via deletedAt to match notes/todos pattern.
+      return idbGet(STORE_SHEETS, id).then(function(sheet) {
+        if (!sheet) return Promise.resolve();
+        sheet.deletedAt = Date.now();
+        sheet.updatedAt = Date.now();
+        return firestoreWrite({
+          collection: 'sheets', docId: id, op: 'update',
+          data: {
+            deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          },
+          localOp: function() { return idbPut(STORE_SHEETS, sheet); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-sheets-updated'));
+        });
+      });
+    }
   };
 
   // ─── Budget / Finance Public API (window.dmBudget) ───
