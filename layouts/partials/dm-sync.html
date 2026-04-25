@@ -424,7 +424,17 @@
     });
   }
 
+  // Demo-mode interception: when window.dmDemo is active, all IDB reads and
+  // writes are routed through in-memory fixtures instead of touching the real
+  // database. This keeps signed-out visitors' demo edits ephemeral and lets
+  // every read API (which is built on these helpers) automatically return
+  // demo data.
+  function _demoActive() {
+    return !!(window.dmDemo && window.dmDemo.isActive && window.dmDemo.isActive());
+  }
+
   function idbPut(storeName, data) {
+    if (_demoActive()) return window.dmDemo.idbPut(storeName, data);
     return openDB().then(function(db) {
       return new Promise(function(resolve, reject) {
         var tx = db.transaction(storeName, 'readwrite');
@@ -436,6 +446,7 @@
   }
 
   function idbGet(storeName, key) {
+    if (_demoActive()) return window.dmDemo.idbGet(storeName, key);
     return openDB().then(function(db) {
       return new Promise(function(resolve, reject) {
         var tx = db.transaction(storeName, 'readonly');
@@ -447,6 +458,7 @@
   }
 
   function idbGetAll(storeName) {
+    if (_demoActive()) return window.dmDemo.idbGetAll(storeName);
     return openDB().then(function(db) {
       return new Promise(function(resolve, reject) {
         var tx = db.transaction(storeName, 'readonly');
@@ -458,6 +470,7 @@
   }
 
   function idbDelete(storeName, key) {
+    if (_demoActive()) return window.dmDemo.idbDelete(storeName, key);
     return openDB().then(function(db) {
       return new Promise(function(resolve, reject) {
         var tx = db.transaction(storeName, 'readwrite');
@@ -469,6 +482,7 @@
   }
 
   function idbClear(storeName) {
+    if (_demoActive()) return window.dmDemo.idbClear(storeName);
     return openDB().then(function(db) {
       return new Promise(function(resolve, reject) {
         var tx = db.transaction(storeName, 'readwrite');
@@ -480,6 +494,7 @@
   }
 
   function idbPutBatch(storeName, items) {
+    if (_demoActive()) return window.dmDemo.idbPutBatch(storeName, items);
     return openDB().then(function(db) {
       return new Promise(function(resolve, reject) {
         var tx = db.transaction(storeName, 'readwrite');
@@ -628,10 +643,16 @@
    * @returns {Promise}
    */
   function firestoreWrite(opts) {
-    // Always apply local operation first (optimistic)
+    // Always apply local operation first (optimistic).
+    // In demo mode this writes to in-memory fixtures via the idb shadows.
     var localPromise = opts.localOp ? opts.localOp() : Promise.resolve();
 
     return localPromise.then(function() {
+      // Demo mode: ephemeral writes only. Skip Firestore entirely; never queue.
+      if (_demoActive()) {
+        return;
+      }
+
       // Budget local-only mode: skip Firestore entirely for financial collections
       if (isBudgetLocalOnly() && isBudgetCollection(opts.collection)) {
         return;
@@ -5102,7 +5123,15 @@
       if (_seedingPromise) return _seedingPromise;
 
       var user = window.dmAuth && window.dmAuth.currentUser;
-      if (!user) return Promise.resolve([]);
+      if (!user) {
+        // Demo mode: fall through to IDB read (intercepted to demo store)
+        if (_demoActive()) {
+          return idbGetAll(STORE_KANBAN_COLUMNS).then(function(local) {
+            return local.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+          });
+        }
+        return Promise.resolve([]);
+      }
 
       var sortByOrder = function(arr) {
         return arr.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });

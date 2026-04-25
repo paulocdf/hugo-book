@@ -889,13 +889,13 @@
   } catch(e) {}
   if (window.dmAuth) {
     function subscribeHistoryAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
-        if (user) {
-          loadHistory();
-        } else {
-          showState('auth');
-        }
-      });
+       window.dmAuth.onAuthStateChanged(function(user) {
+         if (user || (window.dmDemo && window.dmDemo.isActive())) {
+           loadHistory();
+         } else {
+           showState('auth');
+         }
+       });
     }
     if (window.dmAuthReady) {
       window.dmAuthReady.then(subscribeHistoryAuth);

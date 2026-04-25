@@ -1051,7 +1051,7 @@
   if (window.dmAuth) {
     function subscribeDashboardAuth() {
       window.dmAuth.onAuthStateChanged(function(user) {
-        if (user) {
+        if (user || (window.dmDemo && window.dmDemo.isActive())) {
           renderDashboard();
         } else {
           showState('auth');

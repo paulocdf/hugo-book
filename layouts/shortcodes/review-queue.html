@@ -1684,13 +1684,13 @@
   } catch(e) {}
   if (window.dmAuth) {
     function subscribeReviewAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
-        if (user) {
-          loadQueue();
-        } else {
-          showState('auth');
-        }
-      });
+       window.dmAuth.onAuthStateChanged(function(user) {
+         if (user || (window.dmDemo && window.dmDemo.isActive())) {
+           loadQueue();
+         } else {
+           showState('auth');
+         }
+       });
     }
     if (window.dmAuthReady) {
       window.dmAuthReady.then(subscribeReviewAuth);

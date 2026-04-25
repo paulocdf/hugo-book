@@ -1840,7 +1840,8 @@
     // Wait for auth
     function checkAuth() {
       var user = window.dmAuth && window.dmAuth.currentUser;
-      if (user) {
+      var demo = window.dmDemo && window.dmDemo.isActive();
+      if (user || demo) {
         authEl.style.display = 'none';
         loadingEl.style.display = '';
         loadData();
@@ -1854,7 +1855,8 @@
     // Listen for sync complete
     window.addEventListener('dm-sync-complete', function() { checkAuth(); });
     window.addEventListener('dm-projects-updated', function() {
-      if (window.dmAuth && window.dmAuth.currentUser) loadData();
+      if ((window.dmAuth && window.dmAuth.currentUser) ||
+          (window.dmDemo && window.dmDemo.isActive())) loadData();
     });
     window.addEventListener('dm-todos-updated', function() {
       if (_currentProjectId) renderDetail(_currentProjectId);

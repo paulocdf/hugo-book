@@ -4214,6 +4214,8 @@
   window.addEventListener('dm-todos-updated', function() {
     // Reload from IDB to pick up changes from other views
     if (!window.dmSync) return;
+    // Guard against early fires before columns have loaded — fall back to loadBoard()
+    if (!_columnOrder.length) { loadBoard(); return; }
     window.dmSync.getAllTodos().then(function(todos) {
       allTodos = todos || [];
       var visible = allTodos.filter(function(t) {
@@ -4320,7 +4322,7 @@
   if (window.dmAuth) {
     function subscribeKanbanAuth() {
       window.dmAuth.onAuthStateChanged(function(user) {
-        if (user) {
+        if (user || (window.dmDemo && window.dmDemo.isActive())) {
           loadBoard();
         } else {
           _columnsSeeded = false; // Reset so next login re-seeds properly

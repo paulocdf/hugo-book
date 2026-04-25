@@ -541,7 +541,8 @@
       if (!body) return;
       var localOnly = window.dmBudget && window.dmBudget.isLocalOnly && window.dmBudget.isLocalOnly();
       var signedIn = window.dmAuth && window.dmAuth.currentUser;
-      if (!signedIn && !localOnly) {
+      var demo = window.dmDemo && window.dmDemo.isActive();
+      if (!signedIn && !localOnly && !demo) {
         body.innerHTML = '<div class="dm-budget-empty">' +
           '<div style="font-size:1.05rem; margin-bottom:4px;">Sign in to start budgeting</div>' +
           '<div style="opacity:0.7; font-size:0.85rem; margin-bottom:10px;">Or enable local-only mode in Settings &rarr; Budget to use without an account.</div>' +

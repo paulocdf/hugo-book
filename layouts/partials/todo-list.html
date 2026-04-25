@@ -5517,6 +5517,230 @@
   }
 
   function render() {
+    // Helper: build a day group with header, chevron, progress, collapse
+    function buildDayGroup(groupKey, headerInfo, tasksInGroup) {
+      // Calculate progress (count leaf tasks — parent tasks with children are excluded)
+      var doneInGroup = 0;
+      var totalInGroup = 0;
+      var groupEstMin = 0;   // estimated minutes for undone leaf tasks
+      var groupTrackedMin = 0; // actual minutes for done leaf tasks
+      tasksInGroup.forEach(function(p) {
+        var ch = childrenMap[p.id] || [];
+        if (ch.length > 0) {
+          ch.forEach(function(c) {
+            totalInGroup++;
+            if (c.done) {
+              doneInGroup++;
+              if (c.actualMin > 0) groupTrackedMin += c.actualMin;
+            } else {
+              if (c.estimatedMin > 0) groupEstMin += c.estimatedMin;
+            }
+          });
+        } else {
+          totalInGroup++;
+          if (p.done) {
+            doneInGroup++;
+            if (p.actualMin > 0) groupTrackedMin += p.actualMin;
+          } else {
+            if (p.estimatedMin > 0) groupEstMin += p.estimatedMin;
+          }
+        }
+      });
+
+      // Hide entire group when hiding completed and all tasks are done
+      if (_hideCompleted && doneInGroup === totalInGroup && totalInGroup > 0) {
+        return '';
+      }
+
+      // Fix 6: overdue styling only when group has at least one incomplete task
+      var cssClass = headerInfo.cssClass;
+      var badge = headerInfo.badge;
+      if (cssClass === 'overdue' && doneInGroup === totalInGroup) {
+        cssClass = ''; // all done, no overdue accent
+        badge = '';
+      }
+
+      // Fix 3: auto-collapse logic
+      var storageKey = 'dm-todo-daygroup-' + groupKey;
+      var stored = null;
+      try { stored = localStorage.getItem(storageKey); } catch(e) {}
+      var isCollapsed;
+      // Today mode secondary groups default to collapsed
+      if (groupKey === '_today_overdue' || groupKey === '_today_upcoming') {
+        isCollapsed = stored !== null ? stored === '1' : true;
+      // Overdue groups: default to collapsed, but respect explicit user toggle
+      } else if (cssClass === 'overdue') {
+        if (stored !== null) {
+          isCollapsed = stored === '1';
+        } else {
+          isCollapsed = true; // default collapsed to reduce urgency pressure
+        }
+      } else if (stored !== null) {
+        isCollapsed = stored === '1';
+      } else {
+        // Default: collapse future dates, unscheduled, and past dates where all tasks are done
+        if (groupKey === '_unscheduled') {
+          isCollapsed = true;
+        } else if (groupKey < today && doneInGroup === totalInGroup && totalInGroup > 0) {
+          isCollapsed = true;
+        } else {
+          isCollapsed = groupKey > tomorrow;
+        }
+      }
+
+      var g = '<div class="todo-day-group' + (isCollapsed ? ' collapsed' : '') + '" data-day-group="' + escapeHtml(groupKey) + '">';
+      g += '<div class="todo-day-header ' + cssClass + '" data-day-toggle="' + escapeHtml(groupKey) + '">';
+      g += '<span class="todo-day-chevron"><svg class="dm-icon dm-icon--chevron-down" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-down"/></svg></span>';
+      if (badge) {
+        g += '<span class="todo-day-badge">' + escapeHtml(badge) + '</span>';
+      }
+      g += '<span class="todo-day-label">' + escapeHtml(headerInfo.label) + '</span>';
+      // Progress wrapper: count + bar
+      var pct = totalInGroup > 0 ? Math.round(doneInGroup / totalInGroup * 100) : 0;
+      var progressText = doneInGroup + '/' + totalInGroup;
+      if (totalInGroup >= 3) progressText += ' (' + pct + '%)';
+      var fillClass = 'todo-day-progress-fill' + (doneInGroup === totalInGroup && totalInGroup > 0 ? ' complete' : '');
+      g += '<span class="todo-day-progress-wrap">';
+      g += '<span class="todo-day-progress">' + progressText + '</span>';
+      g += '<span class="todo-day-progress-bar"><span class="' + fillClass + '" data-pct="' + pct + '"></span></span>';
+      g += '</span>';
+      // Time summary: Est + Tracked + finish time (for today)
+      if (groupEstMin > 0 || groupTrackedMin > 0) {
+        var timeParts = [];
+        if (groupEstMin > 0) {
+          timeParts.push('Est: ' + formatMinutes(groupEstMin));
+        }
+        if (groupTrackedMin > 0) {
+          timeParts.push('Tracked: ' + formatMinutes(groupTrackedMin));
+        }
+        // Finish time for today's group only
+        if (groupKey === today && groupEstMin > 0) {
+          var remainMin = groupEstMin;
+          // Subtract elapsed pomodoro time if timer is active on a task in this group
+          if (window.dmPomodoro && window.dmPomodoro.isTimerRunning && window.dmPomodoro.isTimerRunning()) {
+            var si = window.dmPomodoro.getSessionInfo ? window.dmPomodoro.getSessionInfo() : null;
+            if (si && si.elapsedSec > 0) {
+              remainMin = Math.max(0, remainMin - Math.floor(si.elapsedSec / 60));
+            }
+          }
+          var finishMs = Date.now() + remainMin * 60000;
+          var fd = new Date(finishMs);
+          var fh = String(fd.getHours()).padStart(2, '0');
+          var fm = String(fd.getMinutes()).padStart(2, '0');
+          timeParts.push('~' + fh + ':' + fm);
+        }
+        g += '<span class="todo-day-time-summary">' + timeParts.join(' · ') + '</span>';
+      }
+      // Migrate to Today button for overdue groups with open tasks
+      if (cssClass === 'overdue' && doneInGroup < totalInGroup) {
+        g += '<button type="button" class="todo-day-migrate-btn" data-migrate-group="' + escapeHtml(groupKey) + '" title="Migrate open tasks to today">';
+        g += '<svg class="dm-icon dm-icon--chevron-right" width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-right"/></svg>';
+        g += ' Migrate to Today';
+        g += '</button>';
+      }
+      // Close Day button for past days where all tasks are done
+      if (groupKey !== '_unscheduled' && groupKey < today && doneInGroup === totalInGroup && totalInGroup > 0) {
+        g += '<button type="button" class="todo-day-close-btn" data-close-day="' + escapeHtml(groupKey) + '" title="Close this day">';
+        g += '<svg class="dm-icon dm-icon--check" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check"/></svg>';
+        g += ' Close Day';
+        g += '</button>';
+      }
+      g += '</div>';
+      g += '<div class="todo-day-group-items">';
+
+      // Compute cumulative finish times for undone tasks in this group
+      var finishAtMap = {}; // { todoId: "Finish at: HH:MM (X.Xh)" }
+      var cumulativeMin = 0;
+      var baseTime = (groupKey === today) ? Date.now() : null;
+
+      // Collect undone leaf tasks in display order (parents then their children)
+      tasksInGroup.forEach(function(parent) {
+        var children = childrenMap[parent.id] || [];
+        if (children.length > 0) {
+          // Parent with children: count children only
+          children.forEach(function(child) {
+            if (!child.done && child.estimatedMin > 0) {
+              var taskMin = child.estimatedMin;
+              // If pomodoro timer is active on this task, subtract elapsed time
+              if (window.dmPomodoro && window.dmPomodoro.isActive(child.id) && window.dmPomodoro.getSessionInfo) {
+                var si = window.dmPomodoro.getSessionInfo();
+                if (si && si.elapsedSec > 0) {
+                  taskMin = Math.max(0, taskMin - Math.floor(si.elapsedSec / 60));
+                }
+              }
+              cumulativeMin += taskMin;
+              if (baseTime) {
+                var finishMs = baseTime + cumulativeMin * 60000;
+                var fd = new Date(finishMs);
+                var hh = String(fd.getHours()).length < 2 ? '0' + fd.getHours() : '' + fd.getHours();
+                var mm = String(fd.getMinutes()).length < 2 ? '0' + fd.getMinutes() : '' + fd.getMinutes();
+                var hrs = (cumulativeMin / 60).toFixed(1);
+                finishAtMap[child.id] = hh + ':' + mm + ' (' + hrs + 'h)';
+              } else {
+                var hrs = (cumulativeMin / 60).toFixed(1);
+                finishAtMap[child.id] = '+' + hrs + 'h';
+              }
+            }
+          });
+        } else {
+          // Leaf parent (no children)
+          if (!parent.done && parent.estimatedMin > 0) {
+            var taskMin = parent.estimatedMin;
+            if (window.dmPomodoro && window.dmPomodoro.isActive(parent.id) && window.dmPomodoro.getSessionInfo) {
+              var si = window.dmPomodoro.getSessionInfo();
+              if (si && si.elapsedSec > 0) {
+                taskMin = Math.max(0, taskMin - Math.floor(si.elapsedSec / 60));
+              }
+            }
+            cumulativeMin += taskMin;
+            if (baseTime) {
+              var finishMs = baseTime + cumulativeMin * 60000;
+              var fd = new Date(finishMs);
+              var hh = String(fd.getHours()).length < 2 ? '0' + fd.getHours() : '' + fd.getHours();
+              var mm = String(fd.getMinutes()).length < 2 ? '0' + fd.getMinutes() : '' + fd.getMinutes();
+              var hrs = (cumulativeMin / 60).toFixed(1);
+              finishAtMap[parent.id] = hh + ':' + mm + ' (' + hrs + 'h)';
+            } else {
+              var hrs = (cumulativeMin / 60).toFixed(1);
+              finishAtMap[parent.id] = '+' + hrs + 'h';
+            }
+          }
+        }
+      });
+
+      tasksInGroup.forEach(function(parent) {
+        // Skip done parent tasks when hiding completed
+        if (_hideCompleted && parent.done) {
+          // Still check: if this parent has undone children, render the parent as a container
+          var ch = childrenMap[parent.id] || [];
+          var hasUndoneChild = ch.some(function(c) { return !c.done; });
+          if (!hasUndoneChild) return; // all children done or no children — skip entirely
+        }
+        var children = childrenMap[parent.id] || [];
+        var doneChildCount = children.filter(function(c) { return c.done; }).length;
+        g += '<div class="todo-item-group" data-group-id="' + parent.id + '">';
+        g += buildTodoItemHtml(parent, false, children.length, doneChildCount, finishAtMap[parent.id] || null);
+        if (children.length > 0) {
+          var visibleChildren = _hideCompleted ? children.filter(function(c) { return !c.done; }) : children;
+          if (visibleChildren.length > 0) {
+            var subCollapsed = false;
+            try { subCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + parent.id) === '1'; } catch(e) {}
+            g += '<div class="todo-subtasks-wrapper' + (subCollapsed ? ' collapsed' : '') + '" data-subtasks-parent="' + parent.id + '">';
+            g += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
+            visibleChildren.forEach(function(child) {
+              g += buildTodoItemHtml(child, true, 0, 0, finishAtMap[child.id] || null);
+            });
+            g += '</div>';
+            g += '</div>';
+          }
+        }
+        g += '</div>';
+      });
+      g += '</div>';
+      g += '</div>';
+      return g;
+    }
+
     container.style.display = '';
 
     // Update project filter bar options (empty set = show all tasks)
@@ -5912,230 +6136,6 @@
           if (fill) fill.style.width = fill.getAttribute('data-focus-pct') + '%';
         });
       }
-    }
-
-    // Helper: build a day group with header, chevron, progress, collapse
-    function buildDayGroup(groupKey, headerInfo, tasksInGroup) {
-      // Calculate progress (count leaf tasks — parent tasks with children are excluded)
-      var doneInGroup = 0;
-      var totalInGroup = 0;
-      var groupEstMin = 0;   // estimated minutes for undone leaf tasks
-      var groupTrackedMin = 0; // actual minutes for done leaf tasks
-      tasksInGroup.forEach(function(p) {
-        var ch = childrenMap[p.id] || [];
-        if (ch.length > 0) {
-          ch.forEach(function(c) {
-            totalInGroup++;
-            if (c.done) {
-              doneInGroup++;
-              if (c.actualMin > 0) groupTrackedMin += c.actualMin;
-            } else {
-              if (c.estimatedMin > 0) groupEstMin += c.estimatedMin;
-            }
-          });
-        } else {
-          totalInGroup++;
-          if (p.done) {
-            doneInGroup++;
-            if (p.actualMin > 0) groupTrackedMin += p.actualMin;
-          } else {
-            if (p.estimatedMin > 0) groupEstMin += p.estimatedMin;
-          }
-        }
-      });
-
-      // Hide entire group when hiding completed and all tasks are done
-      if (_hideCompleted && doneInGroup === totalInGroup && totalInGroup > 0) {
-        return '';
-      }
-
-      // Fix 6: overdue styling only when group has at least one incomplete task
-      var cssClass = headerInfo.cssClass;
-      var badge = headerInfo.badge;
-      if (cssClass === 'overdue' && doneInGroup === totalInGroup) {
-        cssClass = ''; // all done, no overdue accent
-        badge = '';
-      }
-
-      // Fix 3: auto-collapse logic
-      var storageKey = 'dm-todo-daygroup-' + groupKey;
-      var stored = null;
-      try { stored = localStorage.getItem(storageKey); } catch(e) {}
-      var isCollapsed;
-      // Today mode secondary groups default to collapsed
-      if (groupKey === '_today_overdue' || groupKey === '_today_upcoming') {
-        isCollapsed = stored !== null ? stored === '1' : true;
-      // Overdue groups: default to collapsed, but respect explicit user toggle
-      } else if (cssClass === 'overdue') {
-        if (stored !== null) {
-          isCollapsed = stored === '1';
-        } else {
-          isCollapsed = true; // default collapsed to reduce urgency pressure
-        }
-      } else if (stored !== null) {
-        isCollapsed = stored === '1';
-      } else {
-        // Default: collapse future dates, unscheduled, and past dates where all tasks are done
-        if (groupKey === '_unscheduled') {
-          isCollapsed = true;
-        } else if (groupKey < today && doneInGroup === totalInGroup && totalInGroup > 0) {
-          isCollapsed = true;
-        } else {
-          isCollapsed = groupKey > tomorrow;
-        }
-      }
-
-      var g = '<div class="todo-day-group' + (isCollapsed ? ' collapsed' : '') + '" data-day-group="' + escapeHtml(groupKey) + '">';
-      g += '<div class="todo-day-header ' + cssClass + '" data-day-toggle="' + escapeHtml(groupKey) + '">';
-      g += '<span class="todo-day-chevron"><svg class="dm-icon dm-icon--chevron-down" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-down"/></svg></span>';
-      if (badge) {
-        g += '<span class="todo-day-badge">' + escapeHtml(badge) + '</span>';
-      }
-      g += '<span class="todo-day-label">' + escapeHtml(headerInfo.label) + '</span>';
-      // Progress wrapper: count + bar
-      var pct = totalInGroup > 0 ? Math.round(doneInGroup / totalInGroup * 100) : 0;
-      var progressText = doneInGroup + '/' + totalInGroup;
-      if (totalInGroup >= 3) progressText += ' (' + pct + '%)';
-      var fillClass = 'todo-day-progress-fill' + (doneInGroup === totalInGroup && totalInGroup > 0 ? ' complete' : '');
-      g += '<span class="todo-day-progress-wrap">';
-      g += '<span class="todo-day-progress">' + progressText + '</span>';
-      g += '<span class="todo-day-progress-bar"><span class="' + fillClass + '" data-pct="' + pct + '"></span></span>';
-      g += '</span>';
-      // Time summary: Est + Tracked + finish time (for today)
-      if (groupEstMin > 0 || groupTrackedMin > 0) {
-        var timeParts = [];
-        if (groupEstMin > 0) {
-          timeParts.push('Est: ' + formatMinutes(groupEstMin));
-        }
-        if (groupTrackedMin > 0) {
-          timeParts.push('Tracked: ' + formatMinutes(groupTrackedMin));
-        }
-        // Finish time for today's group only
-        if (groupKey === today && groupEstMin > 0) {
-          var remainMin = groupEstMin;
-          // Subtract elapsed pomodoro time if timer is active on a task in this group
-          if (window.dmPomodoro && window.dmPomodoro.isTimerRunning && window.dmPomodoro.isTimerRunning()) {
-            var si = window.dmPomodoro.getSessionInfo ? window.dmPomodoro.getSessionInfo() : null;
-            if (si && si.elapsedSec > 0) {
-              remainMin = Math.max(0, remainMin - Math.floor(si.elapsedSec / 60));
-            }
-          }
-          var finishMs = Date.now() + remainMin * 60000;
-          var fd = new Date(finishMs);
-          var fh = String(fd.getHours()).padStart(2, '0');
-          var fm = String(fd.getMinutes()).padStart(2, '0');
-          timeParts.push('~' + fh + ':' + fm);
-        }
-        g += '<span class="todo-day-time-summary">' + timeParts.join(' · ') + '</span>';
-      }
-      // Migrate to Today button for overdue groups with open tasks
-      if (cssClass === 'overdue' && doneInGroup < totalInGroup) {
-        g += '<button type="button" class="todo-day-migrate-btn" data-migrate-group="' + escapeHtml(groupKey) + '" title="Migrate open tasks to today">';
-        g += '<svg class="dm-icon dm-icon--chevron-right" width="10" height="10" viewBox="0 0 16 16" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-right"/></svg>';
-        g += ' Migrate to Today';
-        g += '</button>';
-      }
-      // Close Day button for past days where all tasks are done
-      if (groupKey !== '_unscheduled' && groupKey < today && doneInGroup === totalInGroup && totalInGroup > 0) {
-        g += '<button type="button" class="todo-day-close-btn" data-close-day="' + escapeHtml(groupKey) + '" title="Close this day">';
-        g += '<svg class="dm-icon dm-icon--check" width="10" height="10" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-check"/></svg>';
-        g += ' Close Day';
-        g += '</button>';
-      }
-      g += '</div>';
-      g += '<div class="todo-day-group-items">';
-
-      // Compute cumulative finish times for undone tasks in this group
-      var finishAtMap = {}; // { todoId: "Finish at: HH:MM (X.Xh)" }
-      var cumulativeMin = 0;
-      var baseTime = (groupKey === today) ? Date.now() : null;
-
-      // Collect undone leaf tasks in display order (parents then their children)
-      tasksInGroup.forEach(function(parent) {
-        var children = childrenMap[parent.id] || [];
-        if (children.length > 0) {
-          // Parent with children: count children only
-          children.forEach(function(child) {
-            if (!child.done && child.estimatedMin > 0) {
-              var taskMin = child.estimatedMin;
-              // If pomodoro timer is active on this task, subtract elapsed time
-              if (window.dmPomodoro && window.dmPomodoro.isActive(child.id) && window.dmPomodoro.getSessionInfo) {
-                var si = window.dmPomodoro.getSessionInfo();
-                if (si && si.elapsedSec > 0) {
-                  taskMin = Math.max(0, taskMin - Math.floor(si.elapsedSec / 60));
-                }
-              }
-              cumulativeMin += taskMin;
-              if (baseTime) {
-                var finishMs = baseTime + cumulativeMin * 60000;
-                var fd = new Date(finishMs);
-                var hh = String(fd.getHours()).length < 2 ? '0' + fd.getHours() : '' + fd.getHours();
-                var mm = String(fd.getMinutes()).length < 2 ? '0' + fd.getMinutes() : '' + fd.getMinutes();
-                var hrs = (cumulativeMin / 60).toFixed(1);
-                finishAtMap[child.id] = hh + ':' + mm + ' (' + hrs + 'h)';
-              } else {
-                var hrs = (cumulativeMin / 60).toFixed(1);
-                finishAtMap[child.id] = '+' + hrs + 'h';
-              }
-            }
-          });
-        } else {
-          // Leaf parent (no children)
-          if (!parent.done && parent.estimatedMin > 0) {
-            var taskMin = parent.estimatedMin;
-            if (window.dmPomodoro && window.dmPomodoro.isActive(parent.id) && window.dmPomodoro.getSessionInfo) {
-              var si = window.dmPomodoro.getSessionInfo();
-              if (si && si.elapsedSec > 0) {
-                taskMin = Math.max(0, taskMin - Math.floor(si.elapsedSec / 60));
-              }
-            }
-            cumulativeMin += taskMin;
-            if (baseTime) {
-              var finishMs = baseTime + cumulativeMin * 60000;
-              var fd = new Date(finishMs);
-              var hh = String(fd.getHours()).length < 2 ? '0' + fd.getHours() : '' + fd.getHours();
-              var mm = String(fd.getMinutes()).length < 2 ? '0' + fd.getMinutes() : '' + fd.getMinutes();
-              var hrs = (cumulativeMin / 60).toFixed(1);
-              finishAtMap[parent.id] = hh + ':' + mm + ' (' + hrs + 'h)';
-            } else {
-              var hrs = (cumulativeMin / 60).toFixed(1);
-              finishAtMap[parent.id] = '+' + hrs + 'h';
-            }
-          }
-        }
-      });
-
-      tasksInGroup.forEach(function(parent) {
-        // Skip done parent tasks when hiding completed
-        if (_hideCompleted && parent.done) {
-          // Still check: if this parent has undone children, render the parent as a container
-          var ch = childrenMap[parent.id] || [];
-          var hasUndoneChild = ch.some(function(c) { return !c.done; });
-          if (!hasUndoneChild) return; // all children done or no children — skip entirely
-        }
-        var children = childrenMap[parent.id] || [];
-        var doneChildCount = children.filter(function(c) { return c.done; }).length;
-        g += '<div class="todo-item-group" data-group-id="' + parent.id + '">';
-        g += buildTodoItemHtml(parent, false, children.length, doneChildCount, finishAtMap[parent.id] || null);
-        if (children.length > 0) {
-          var visibleChildren = _hideCompleted ? children.filter(function(c) { return !c.done; }) : children;
-          if (visibleChildren.length > 0) {
-            var subCollapsed = false;
-            try { subCollapsed = localStorage.getItem('dm-todo-subtask-collapsed-' + parent.id) === '1'; } catch(e) {}
-            g += '<div class="todo-subtasks-wrapper' + (subCollapsed ? ' collapsed' : '') + '" data-subtasks-parent="' + parent.id + '">';
-            g += '<div class="todo-subtasks" data-parent-id="' + parent.id + '">';
-            visibleChildren.forEach(function(child) {
-              g += buildTodoItemHtml(child, true, 0, 0, finishAtMap[child.id] || null);
-            });
-            g += '</div>';
-            g += '</div>';
-          }
-        }
-        g += '</div>';
-      });
-      g += '</div>';
-      g += '</div>';
-      return g;
     }
 
     // ─── Week Summary Bar ───
@@ -8276,6 +8276,8 @@
     var userIdPromise;
     if (window.dmAuth && window.dmAuth.currentUser) {
       userIdPromise = Promise.resolve(window.dmAuth.currentUser.uid);
+    } else if (window.dmDemo && window.dmDemo.isActive()) {
+      userIdPromise = Promise.resolve(window.dmDemo.userId);
     } else {
       userIdPromise = window.dmSync.getCachedUserId();
     }
@@ -9992,6 +9994,8 @@
     function subscribeAuth() {
       window.dmAuth.onAuthStateChanged(function(user) {
         if (user) {
+          loadTodos();
+        } else if (window.dmDemo && window.dmDemo.isActive()) {
           loadTodos();
         } else {
           allTodos = [];

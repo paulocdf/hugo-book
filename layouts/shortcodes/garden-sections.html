@@ -139,6 +139,8 @@
       window.dmAuth.onAuthStateChanged(function(user) {
         if (user) {
           updateSections();
+        } else if (window.dmDemo && window.dmDemo.isActive()) {
+          updateSections();
         } else {
           // If cached user exists, skip "Sign in" messages — user is likely
           // signed in and data is still loading from Firebase/IDB

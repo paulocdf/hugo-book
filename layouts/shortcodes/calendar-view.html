@@ -1354,14 +1354,14 @@
 
   if (window.dmAuth) {
     function subscribeCalendarAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
-        if (user) {
-          loadCalendar();
-          updateGcalButton();
-        } else {
-          showState('auth');
-        }
-      });
+       window.dmAuth.onAuthStateChanged(function(user) {
+         if (user || (window.dmDemo && window.dmDemo.isActive())) {
+           loadCalendar();
+           updateGcalButton();
+         } else {
+           showState('auth');
+         }
+       });
     }
     if (window.dmAuthReady) {
       window.dmAuthReady.then(subscribeCalendarAuth);

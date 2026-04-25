@@ -1,0 +1,809 @@
+<!-- dm-demo: in-memory demo data fixture for signed-out visitors -->
+<script>
+(function() {
+  'use strict';
+
+  // Demo mode shows curated dummy data when nobody is signed in so visitors
+  // can explore the product. Data lives only in memory; ephemeral edits are
+  // allowed but discarded on reload. On real sign-in, demo deactivates and
+  // the normal IDB/Firestore sync flow takes over.
+
+  var DEMO_USER_ID = 'demo-user';
+  var DEMO_USER_EMAIL = 'demo@example.com';
+  var DEMO_USER_NAME = 'Demo Explorer';
+
+  var _active = false;
+  var _stores = null; // { notes: [...], todos: [...], ... } once activated
+  var _dismissed = false;
+  try { _dismissed = localStorage.getItem('dm-demo-banner-dismissed') === '1'; } catch(e) {}
+  var _disabled = false;
+  // Allow tests / users to opt out entirely
+  try { _disabled = localStorage.getItem('dm-demo-disabled') === '1'; } catch(e) {}
+
+  // Dates relative to "now" so timelines always feel current.
+  function dayOffset(days) {
+    var d = new Date();
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + days);
+    return d.getTime();
+  }
+  function dateStr(days) {
+    var d = new Date();
+    d.setDate(d.getDate() + days);
+    var y = d.getFullYear();
+    var m = String(d.getMonth() + 1).padStart(2, '0');
+    var dd = String(d.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + dd;
+  }
+  function monthStr(monthsAgo) {
+    var d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - (monthsAgo || 0));
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function uid(prefix) {
+    return (prefix || 'demo') + '-' + Math.random().toString(36).slice(2, 10);
+  }
+
+  // ─── Fixtures ────────────────────────────────────────────────────────────
+
+  function buildFixtures() {
+    var now = Date.now();
+    var stores = {
+      notes: [], todos: [], projects: [], kanbanColumns: [],
+      reviewCards: [], attachments: [], noteVersions: [],
+      taskShares: [], noteShares: [], projectShares: [],
+      accounts: [], categories: [], budgets: [], transactions: [], recurring: [],
+      meta: [], writeQueue: []
+    };
+
+    // Projects (4)
+    var projGarden = { id: uid('p'), userId: DEMO_USER_ID, name: 'Garden Refresh',
+      color: '#43a047', themeId: 'forest', icon: 'leaf', emoji: '🌿',
+      description: 'Spring planting and patio cleanup',
+      deadline: dateStr(30), archived: false, collaborators: [DEMO_USER_ID],
+      order: 1, createdAt: now - 12 * 86400000, updatedAt: now - 86400000 };
+    var projBooks = { id: uid('p'), userId: DEMO_USER_ID, name: 'Read 12 books in 2026',
+      color: '#7e57c2', themeId: 'lavender', icon: 'book', emoji: '📚',
+      description: 'One book a month — fiction + non-fiction mix',
+      deadline: null, archived: false, collaborators: [DEMO_USER_ID, 'demo-friend'],
+      order: 2, createdAt: now - 60 * 86400000, updatedAt: now - 3 * 86400000 };
+    var projBookshelf = { id: uid('p'), userId: DEMO_USER_ID, name: 'Bookshelf app',
+      color: '#1976d2', themeId: 'ocean', icon: 'layout', emoji: '💻',
+      description: 'Side project: track what I read',
+      deadline: dateStr(60), archived: false, collaborators: [DEMO_USER_ID],
+      order: 3, createdAt: now - 20 * 86400000, updatedAt: now - 2 * 86400000 };
+    var projHome = { id: uid('p'), userId: DEMO_USER_ID, name: 'Home maintenance',
+      color: '#fb8c00', themeId: 'sunset', icon: 'home', emoji: '🏠',
+      description: '', deadline: null, archived: false, collaborators: [DEMO_USER_ID],
+      order: 4, createdAt: now - 90 * 86400000, updatedAt: now - 7 * 86400000 };
+    stores.projects.push(projGarden, projBooks, projBookshelf, projHome);
+
+    // Project share invitation (incoming) — visual demo of sharing UI
+    stores.projectShares.push({
+      id: 'demo-share-incoming-' + DEMO_USER_ID,
+      projectId: 'demo-incoming-project',
+      ownerId: 'demo-friend',
+      ownerEmail: 'sam@example.com',
+      ownerName: 'Sam from Work',
+      inviteeEmail: DEMO_USER_EMAIL,
+      inviteeUid: DEMO_USER_ID,
+      status: 'pending',
+      createdAt: now - 2 * 3600000,
+      updatedAt: now - 2 * 3600000
+    });
+    // Outgoing project share (visual demo)
+    stores.projectShares.push({
+      id: projBooks.id + '_demo-friend',
+      projectId: projBooks.id,
+      ownerId: DEMO_USER_ID,
+      ownerEmail: DEMO_USER_EMAIL,
+      ownerName: DEMO_USER_NAME,
+      inviteeEmail: 'reader@example.com',
+      inviteeUid: 'demo-friend',
+      status: 'accepted',
+      createdAt: now - 14 * 86400000,
+      updatedAt: now - 14 * 86400000
+    });
+    // Outgoing task share (visual demo)
+    var sharedTaskId = uid('t');
+    stores.taskShares.push({
+      id: sharedTaskId + '_demo-friend',
+      todoId: sharedTaskId,
+      ownerId: DEMO_USER_ID, ownerEmail: DEMO_USER_EMAIL, ownerName: DEMO_USER_NAME,
+      inviteeEmail: 'reader@example.com', inviteeUid: 'demo-friend',
+      status: 'accepted',
+      createdAt: now - 3 * 86400000, updatedAt: now - 3 * 86400000
+    });
+
+    // Kanban columns (defaults)
+    stores.kanbanColumns.push(
+      { id: 'kb-todo', userId: DEMO_USER_ID, name: 'To Do', status: 'todo', color: '#42a5f5', order: 0, isDoneColumn: false, createdAt: now - 30 * 86400000, updatedAt: now - 30 * 86400000 },
+      { id: 'kb-progress', userId: DEMO_USER_ID, name: 'In Progress', status: 'in_progress', color: '#ffa726', order: 1, isDoneColumn: false, createdAt: now - 30 * 86400000, updatedAt: now - 30 * 86400000 },
+      { id: 'kb-done', userId: DEMO_USER_ID, name: 'Done', status: 'done', color: '#66bb6a', order: 2, isDoneColumn: true, createdAt: now - 30 * 86400000, updatedAt: now - 30 * 86400000 }
+    );
+
+    // Todos — mix across projects, categories, days, statuses
+    function todo(opts) {
+      return Object.assign({
+        id: uid('t'),
+        userId: DEMO_USER_ID,
+        title: '',
+        estimatedMin: 25, actualMin: null,
+        category: null,
+        pomodoroCount: 1, pomodoroLength: 25, breakLength: 5,
+        projectId: null,
+        done: false, status: 'active',
+        parentId: null, order: 1,
+        scheduledDate: null,
+        reminderAt: null, reminderFired: false,
+        source: null,
+        bujoType: 'task', bujoState: 'open',
+        kanbanStatus: 'todo', kanbanOrder: 1,
+        collaborators: [DEMO_USER_ID],
+        notes: '',
+        color: null, color2: null,
+        icon: null, emoji: null, labels: [], borderStyle: null, priority: null,
+        createdAt: now - 86400000, updatedAt: now - 3600000,
+        completedAt: null, deletedAt: null
+      }, opts);
+    }
+
+    var t1 = todo({ id: sharedTaskId, title: 'Pick paint colors for the patio', projectId: projGarden.id,
+      category: 'Errands', estimatedMin: 30, scheduledDate: dateStr(0),
+      kanbanStatus: 'in_progress', priority: 'med', emoji: '🎨',
+      collaborators: [DEMO_USER_ID, 'demo-friend'],
+      notes: 'Looking at sage green and warm cream. Compare swatches in afternoon light.' });
+    var t2 = todo({ title: 'Order replacement seedlings', projectId: projGarden.id,
+      category: 'Shopping', estimatedMin: 15, scheduledDate: dateStr(0), priority: 'low' });
+    var t3 = todo({ title: 'Weed back bed', projectId: projGarden.id,
+      category: 'Garden', estimatedMin: 45, scheduledDate: dateStr(1) });
+    var t4 = todo({ title: 'Finish chapter 4 of "Annihilation"', projectId: projBooks.id,
+      category: 'Reading', estimatedMin: 50, scheduledDate: dateStr(0),
+      pomodoroCount: 2, priority: 'high', emoji: '📖' });
+    var t5 = todo({ title: 'Write March book reflection', projectId: projBooks.id,
+      category: 'Writing', estimatedMin: 30, scheduledDate: dateStr(2) });
+
+    var t6 = todo({ title: 'Wireframe the home view', projectId: projBookshelf.id,
+      category: 'Design', estimatedMin: 60, pomodoroCount: 2,
+      scheduledDate: dateStr(0), kanbanStatus: 'in_progress',
+      priority: 'high', icon: 'layout',
+      labels: ['ux', 'phase-1'] });
+    var t7 = todo({ title: 'Sketch data model', projectId: projBookshelf.id,
+      parentId: t6.id, estimatedMin: 20, scheduledDate: dateStr(0), order: 1,
+      done: true, status: 'done', bujoState: 'done',
+      kanbanStatus: 'done', actualMin: 22,
+      completedAt: now - 4 * 3600000 });
+    var t8 = todo({ title: 'List MVP screens', projectId: projBookshelf.id,
+      parentId: t6.id, estimatedMin: 15, scheduledDate: dateStr(0), order: 2,
+      done: true, status: 'done', bujoState: 'done',
+      kanbanStatus: 'done', actualMin: 18,
+      completedAt: now - 2 * 3600000 });
+    var t9 = todo({ title: 'Choose stack: vanilla vs framework', projectId: projBookshelf.id,
+      category: 'Decisions', estimatedMin: 30, scheduledDate: dateStr(1),
+      bujoType: 'note', priority: 'med',
+      notes: 'Leaning vanilla for simplicity. Vue would be nice for forms.' });
+
+    var t10 = todo({ title: 'Replace kitchen filter', projectId: projHome.id,
+      category: 'Maintenance', estimatedMin: 10, scheduledDate: dateStr(3),
+      bujoType: 'task' });
+    var t11 = todo({ title: 'Schedule HVAC checkup', projectId: projHome.id,
+      category: 'Errands', estimatedMin: 5, scheduledDate: dateStr(7),
+      bujoType: 'event' });
+
+    // Standalone (no project) inbox tasks
+    var t12 = todo({ title: 'Inbox: review weekly notes', category: 'Review',
+      estimatedMin: 25, scheduledDate: dateStr(0), priority: 'med' });
+    var t13 = todo({ title: 'Reply to dentist about appt', category: 'Personal',
+      estimatedMin: 5, scheduledDate: dateStr(0), bujoType: 'task' });
+    var t14 = todo({ title: 'Quote for new bike rack', category: 'Errands',
+      estimatedMin: 15, scheduledDate: dateStr(2) });
+
+    // Completed (history / dashboard)
+    var t15 = todo({ title: 'Morning planning', category: 'Routine',
+      estimatedMin: 15, actualMin: 14, scheduledDate: dateStr(0),
+      done: true, status: 'done', bujoState: 'done', kanbanStatus: 'done',
+      completedAt: now - 6 * 3600000 });
+    var t16 = todo({ title: 'Email cleanup', category: 'Admin',
+      estimatedMin: 30, actualMin: 38, scheduledDate: dateStr(-1),
+      done: true, status: 'done', bujoState: 'done', kanbanStatus: 'done',
+      completedAt: dayOffset(-1) + 10 * 3600000 });
+    var t17 = todo({ title: 'Plant tomato starts', projectId: projGarden.id,
+      category: 'Garden', estimatedMin: 60, actualMin: 75, scheduledDate: dateStr(-2),
+      done: true, status: 'done', bujoState: 'done', kanbanStatus: 'done',
+      completedAt: dayOffset(-2) + 14 * 3600000 });
+    var t18 = todo({ title: 'Read 30 pages', projectId: projBooks.id, category: 'Reading',
+      estimatedMin: 30, actualMin: 28, scheduledDate: dateStr(-3),
+      done: true, status: 'done', bujoState: 'done', kanbanStatus: 'done',
+      completedAt: dayOffset(-3) + 21 * 3600000 });
+    var t19 = todo({ title: 'Repo scaffold', projectId: projBookshelf.id, category: 'Design',
+      estimatedMin: 45, actualMin: 50, scheduledDate: dateStr(-4),
+      done: true, status: 'done', bujoState: 'done', kanbanStatus: 'done',
+      completedAt: dayOffset(-4) + 11 * 3600000 });
+    var t20 = todo({ title: 'Buy potting soil', projectId: projGarden.id, category: 'Shopping',
+      estimatedMin: 20, actualMin: 25, scheduledDate: dateStr(-5),
+      done: true, status: 'done', bujoState: 'done', kanbanStatus: 'done',
+      completedAt: dayOffset(-5) + 16 * 3600000 });
+    var t21 = todo({ title: 'Tidy desk', category: 'Routine',
+      estimatedMin: 10, actualMin: 12, scheduledDate: dateStr(-6),
+      done: true, status: 'done', bujoState: 'done', kanbanStatus: 'done',
+      completedAt: dayOffset(-6) + 9 * 3600000 });
+
+    // Trashed item (for Trash page)
+    var t22 = todo({ title: 'Old idea: paint the shed neon',
+      status: 'deleted', deletedAt: now - 5 * 86400000 });
+
+    // Migrated bujo entry
+    var t23 = todo({ title: 'Read climate report', bujoType: 'task', bujoState: 'migrated',
+      scheduledDate: dateStr(-7), category: 'Reading', estimatedMin: 30 });
+
+    stores.todos.push(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13, t14,
+      t15, t16, t17, t18, t19, t20, t21, t22, t23);
+
+    // ─── Notes ─────────────────────────────────────────────────────────────
+    function note(opts) {
+      return Object.assign({
+        id: uid('n'),
+        userId: DEMO_USER_ID,
+        userEmail: DEMO_USER_EMAIL,
+        userName: DEMO_USER_NAME,
+        title: '', content: '',
+        mode: 'note', language: '',
+        destination: 'inbox', bookTitle: '',
+        tags: [], pinned: false, deletedAt: null,
+        createdAt: now - 7 * 86400000, updatedAt: now - 86400000
+      }, opts);
+    }
+
+    // Books (with multiple notes per book)
+    var nBookA1 = note({ destination: 'book-note', bookTitle: 'Annihilation',
+      title: 'Annihilation — opening notes',
+      content: '# The shimmer\n\nFirst impressions of Area X. Slow dread, lush detail. Reminds me of [[Roadside Picnic]] in tone.\n\n- Biologist as protagonist\n- Tower vs lighthouse imagery\n- Trust as the slowest casualty',
+      tags: ['fiction', 'weird-fic'], pinned: true,
+      createdAt: now - 10 * 86400000, updatedAt: now - 86400000 });
+    var nBookA2 = note({ destination: 'book-note', bookTitle: 'Annihilation',
+      title: 'Themes & symbols',
+      content: '## Symbols\n\n- The lighthouse vs the tower (inverted twin)\n- Words on the wall — biology overwhelmed by language\n- Mirrors and doubles\n\nSee also [[The Southern Reach]].',
+      tags: ['fiction', 'analysis'],
+      createdAt: now - 8 * 86400000, updatedAt: now - 2 * 86400000 });
+    var nBookB = note({ destination: 'book-note', bookTitle: 'Roadside Picnic',
+      title: 'Roadside Picnic — first half',
+      content: '## Stalkers and zones\n\nThe Strugatsky brothers anticipate so much modern weird-fic. Compare with [[Annihilation]]: similar dread, very different prose.',
+      tags: ['fiction', 'sci-fi'],
+      createdAt: now - 35 * 86400000, updatedAt: now - 14 * 86400000 });
+    var nBookC = note({ destination: 'book-note', bookTitle: 'The Southern Reach',
+      title: 'Trilogy: read in order?',
+      content: 'Author intends them as one work. Don\'t skip *Authority*.\n\nReading log:\n- [x] Annihilation\n- [ ] Authority\n- [ ] Acceptance',
+      tags: ['fiction'],
+      createdAt: now - 40 * 86400000, updatedAt: now - 20 * 86400000 });
+
+    // Topics
+    var nTopic1 = note({ destination: 'topic',
+      title: 'Local-first software',
+      content: '# Local-first software\n\nKey idea: the canonical copy lives on the device, sync is the layer not the source of truth. Implications:\n\n- Offline by default\n- Conflict resolution becomes a UX problem\n- Data ownership returns to the user\n\nRelated: [[CRDTs]] [[Annihilation]] (no relation, just testing wikilinks).',
+      tags: ['software', 'philosophy'], pinned: true,
+      createdAt: now - 50 * 86400000, updatedAt: now - 5 * 86400000 });
+    var nTopic2 = note({ destination: 'topic',
+      title: 'CRDTs',
+      content: '## Conflict-free replicated data types\n\nFamilies: state-based (CvRDTs), op-based (CmRDTs).\n\nExamples:\n- G-Counter\n- LWW-Register\n- OR-Set\n\nUseful for [[Local-first software]] sync.',
+      tags: ['software', 'distributed-systems'],
+      createdAt: now - 45 * 86400000, updatedAt: now - 12 * 86400000 });
+    var nTopic3 = note({ destination: 'topic',
+      title: 'Garden notes',
+      content: '## Spring planning\n\n- Tomatoes after last frost (~mid-April)\n- Cilantro hates heat — sow weekly through May\n- Companion plants: basil + tomato; carrots + onions',
+      tags: ['garden', 'reference'],
+      createdAt: now - 25 * 86400000, updatedAt: now - 86400000 });
+    var nTopic4 = note({ destination: 'topic',
+      title: 'Pomodoro workflow',
+      content: '## My current loop\n\n- 25 min focus / 5 min break\n- Long break every 4 sessions\n- Visualize phase with ambient mode\n- Track actual vs estimated to recalibrate',
+      tags: ['productivity'],
+      createdAt: now - 60 * 86400000, updatedAt: now - 30 * 86400000 });
+
+    // Snippets
+    var nSnip1 = note({ destination: 'snippets', mode: 'code', language: 'javascript',
+      title: 'Debounce',
+      content: '```javascript\nfunction debounce(fn, wait) {\n  var t;\n  return function() {\n    var args = arguments;\n    clearTimeout(t);\n    t = setTimeout(function() { fn.apply(null, args); }, wait);\n  };\n}\n```',
+      tags: ['javascript', 'utility'],
+      createdAt: now - 15 * 86400000, updatedAt: now - 15 * 86400000 });
+    var nSnip2 = note({ destination: 'snippets', mode: 'code', language: 'javascript',
+      title: 'IndexedDB getAll',
+      content: '```javascript\nfunction idbGetAll(db, storeName) {\n  return new Promise(function(resolve, reject) {\n    var tx = db.transaction(storeName, "readonly");\n    var req = tx.objectStore(storeName).getAll();\n    req.onsuccess = function() { resolve(req.result || []); };\n    req.onerror = function(e) { reject(e.target.error); };\n  });\n}\n```',
+      tags: ['javascript', 'indexeddb'],
+      createdAt: now - 22 * 86400000, updatedAt: now - 22 * 86400000 });
+    var nSnip3 = note({ destination: 'snippets', mode: 'code', language: 'css',
+      title: 'Color-mix tint',
+      content: '```css\n.tint {\n  background: color-mix(in srgb, var(--accent) 14%, transparent);\n  border-color: color-mix(in srgb, var(--accent) 40%, transparent);\n}\n```',
+      tags: ['css', 'design'],
+      createdAt: now - 30 * 86400000, updatedAt: now - 30 * 86400000 });
+    var nSnip4 = note({ destination: 'snippets', mode: 'code', language: 'python',
+      title: 'Fibonacci memoized',
+      content: '```python\nfrom functools import lru_cache\n\n@lru_cache(maxsize=None)\ndef fib(n):\n    return n if n < 2 else fib(n-1) + fib(n-2)\n```',
+      tags: ['python', 'algorithms'],
+      createdAt: now - 75 * 86400000, updatedAt: now - 75 * 86400000 });
+
+    // Inbox notes
+    var nIn1 = note({ destination: 'inbox',
+      title: 'Quick capture: ideas pile',
+      content: '- Bookshelf app could pull from Open Library by ISBN\n- Try lavender along the south fence\n- Re-read [[Local-first software]] sections 3 & 4\n- Subscribe to one new newsletter',
+      tags: ['ideas'],
+      createdAt: now - 86400000, updatedAt: now - 3600000 });
+    var nIn2 = note({ destination: 'inbox',
+      title: 'Weekly review — last week',
+      content: '## What worked\n- Time-blocking the morning\n\n## What didn\'t\n- Late-evening reading slot\n\n## Next week\n- Move reading to 6pm before dinner',
+      tags: ['weekly-review'],
+      createdAt: now - 4 * 86400000, updatedAt: now - 4 * 86400000 });
+
+    // Trashed note (for Trash page)
+    var nTrash = note({ destination: 'inbox',
+      title: 'Old draft I deleted',
+      content: 'Half-baked thoughts.', tags: [],
+      deletedAt: now - 3 * 86400000 });
+
+    stores.notes.push(nBookA1, nBookA2, nBookB, nBookC, nTopic1, nTopic2, nTopic3, nTopic4,
+      nSnip1, nSnip2, nSnip3, nSnip4, nIn1, nIn2, nTrash);
+
+    // Note version (one example)
+    stores.noteVersions.push({
+      id: uid('v'),
+      noteId: nTopic1.id,
+      userId: DEMO_USER_ID,
+      title: nTopic1.title,
+      content: '# Local-first software\n\nKey idea: the canonical copy lives on the device.',
+      tags: ['software'],
+      createdAt: now - 30 * 86400000
+    });
+
+    // ─── Review cards ──────────────────────────────────────────────────────
+    function rc(opts) {
+      return Object.assign({
+        id: uid('rc'), userId: DEMO_USER_ID,
+        front: '', back: '', tags: [],
+        easeFactor: 2.5, interval: 0, repetitions: 0,
+        nextReviewAt: now, lastReviewedAt: null,
+        createdAt: now - 30 * 86400000, updatedAt: now - 30 * 86400000
+      }, opts);
+    }
+    stores.reviewCards.push(
+      rc({ front: 'What is a CRDT?',
+        back: 'A conflict-free replicated data type — a structure designed for safe concurrent edits without coordination.',
+        tags: ['software'], nextReviewAt: now - 86400000, repetitions: 1, interval: 1 }),
+      rc({ front: 'Local-first software: who owns the canonical copy?',
+        back: 'The device. Sync is a layer, not the source of truth.',
+        tags: ['software'], nextReviewAt: now - 2 * 86400000, repetitions: 2, interval: 6 }),
+      rc({ front: 'When should you sow cilantro?',
+        back: 'Weekly through cool weather — it bolts in heat.',
+        tags: ['garden'], nextReviewAt: now + 86400000, repetitions: 3, interval: 6, easeFactor: 2.6 }),
+      rc({ front: 'SM-2: what happens if quality < 3?',
+        back: 'Repetition count resets, interval back to 1 day. EF still adjusts down.',
+        tags: ['productivity'], nextReviewAt: now, repetitions: 0, interval: 0 }),
+      rc({ front: 'Pomodoro: long break frequency?',
+        back: 'Every 4 sessions.',
+        tags: ['productivity'], nextReviewAt: now + 3 * 86400000, repetitions: 4, interval: 14 }),
+      rc({ front: 'What\'s the tower in Annihilation?',
+        back: 'An inverted lighthouse — language and biology fused into a slow descent.',
+        tags: ['fiction'], nextReviewAt: now + 7 * 86400000, repetitions: 5, interval: 30 }),
+      rc({ front: 'IndexedDB: how to get all entries from a store?',
+        back: 'Open a readonly transaction, call objectStore.getAll().',
+        tags: ['software'], nextReviewAt: now, repetitions: 0, interval: 0 }),
+      rc({ front: 'Companion planting: tomato + ?',
+        back: 'Basil — improves flavor and repels some pests.',
+        tags: ['garden'], nextReviewAt: now - 3 * 3600000, repetitions: 1, interval: 1 })
+    );
+
+    // ─── Budget ────────────────────────────────────────────────────────────
+    var accountId = uid('acc');
+    stores.accounts.push({
+      id: accountId, userId: DEMO_USER_ID, name: 'Main',
+      type: 'checking', currency: 'USD', openingBalance: 250000,
+      archived: false, order: 1,
+      createdAt: now - 90 * 86400000, updatedAt: now - 90 * 86400000, deletedAt: null
+    });
+
+    function cat(opts) {
+      return Object.assign({
+        id: uid('cat'), userId: DEMO_USER_ID,
+        name: '', kind: 'expense', color: '#90a4ae', icon: '',
+        archived: false, order: 1,
+        createdAt: now - 90 * 86400000, updatedAt: now - 90 * 86400000, deletedAt: null
+      }, opts);
+    }
+    var cGroceries = cat({ name: 'Groceries', color: '#43a047', icon: 'shopping-cart', order: 1 });
+    var cRent = cat({ name: 'Rent', color: '#7e57c2', icon: 'home', order: 2 });
+    var cUtilities = cat({ name: 'Utilities', color: '#26a69a', icon: 'zap', order: 3 });
+    var cDining = cat({ name: 'Dining', color: '#ef5350', icon: 'utensils', order: 4 });
+    var cTransit = cat({ name: 'Transit', color: '#1976d2', icon: 'bus', order: 5 });
+    var cSubs = cat({ name: 'Subscriptions', color: '#fb8c00', icon: 'repeat', order: 6 });
+    var cFun = cat({ name: 'Entertainment', color: '#ec407a', icon: 'film', order: 7 });
+    var cMisc = cat({ name: 'Misc', color: '#9e9e9e', icon: 'more-horizontal', order: 8 });
+    var cSalary = cat({ name: 'Salary', kind: 'income', color: '#2e7d32', icon: 'briefcase', order: 1 });
+    var cSide = cat({ name: 'Side income', kind: 'income', color: '#558b2f', icon: 'plus-circle', order: 2 });
+    stores.categories.push(cGroceries, cRent, cUtilities, cDining, cTransit,
+      cSubs, cFun, cMisc, cSalary, cSide);
+
+    // Budgets — current and previous month
+    function budget(month, category, amountCents, rollover) {
+      return {
+        id: month + '_' + category.id, userId: DEMO_USER_ID,
+        month: month, categoryId: category.id, amount: amountCents,
+        rollover: !!rollover,
+        createdAt: now - 30 * 86400000, updatedAt: now - 7 * 86400000, deletedAt: null
+      };
+    }
+    var thisMonth = monthStr(0);
+    var lastMonth = monthStr(1);
+    [cGroceries, cRent, cUtilities, cDining, cTransit, cSubs, cFun, cMisc].forEach(function(c) {
+      var amt = ({
+        Groceries: 60000, Rent: 180000, Utilities: 18000, Dining: 25000,
+        Transit: 12000, Subscriptions: 8000, Entertainment: 15000, Misc: 10000
+      })[c.name] || 10000;
+      stores.budgets.push(budget(thisMonth, c, amt, c.name === 'Misc'));
+      stores.budgets.push(budget(lastMonth, c, amt, c.name === 'Misc'));
+    });
+
+    // Transactions — 3 months of plausible activity
+    function tx(opts) {
+      var d = opts.date;
+      var month = d.slice(0, 7);
+      return Object.assign({
+        id: uid('tx'), userId: DEMO_USER_ID,
+        accountId: accountId, categoryId: null,
+        amount: 0, currency: 'USD',
+        date: d, month: month,
+        payee: '', memo: '', cleared: true,
+        recurringId: null, splits: [], source: null,
+        createdAt: new Date(d).getTime(), updatedAt: new Date(d).getTime(), deletedAt: null
+      }, opts);
+    }
+
+    function pushExpenses() {
+      // Generate roughly realistic expense pattern over the last ~75 days
+      var entries = [
+        // Recurring rent
+        { d: -2, c: cRent, amt: -180000, p: 'Landlord LLC', m: 'April rent' },
+        { d: -33, c: cRent, amt: -180000, p: 'Landlord LLC', m: 'March rent' },
+        { d: -63, c: cRent, amt: -180000, p: 'Landlord LLC', m: 'February rent' },
+        // Utilities
+        { d: -5, c: cUtilities, amt: -8400, p: 'PG&E', m: 'Electric' },
+        { d: -7, c: cUtilities, amt: -4500, p: 'City Water', m: '' },
+        { d: -10, c: cUtilities, amt: -6000, p: 'Comcast', m: 'Internet' },
+        { d: -36, c: cUtilities, amt: -9100, p: 'PG&E', m: 'Electric' },
+        { d: -38, c: cUtilities, amt: -4200, p: 'City Water', m: '' },
+        { d: -41, c: cUtilities, amt: -6000, p: 'Comcast', m: 'Internet' },
+        // Subscriptions
+        { d: -3, c: cSubs, amt: -1599, p: 'Netflix', m: '' },
+        { d: -12, c: cSubs, amt: -999, p: 'Spotify', m: '' },
+        { d: -22, c: cSubs, amt: -2500, p: 'NYTimes', m: '' },
+        { d: -34, c: cSubs, amt: -1599, p: 'Netflix', m: '' },
+        { d: -42, c: cSubs, amt: -999, p: 'Spotify', m: '' },
+        // Groceries — many small
+        { d: -1, c: cGroceries, amt: -4250, p: 'Trader Joe\'s', m: '' },
+        { d: -4, c: cGroceries, amt: -8750, p: 'Whole Foods', m: 'Weekly' },
+        { d: -8, c: cGroceries, amt: -3120, p: 'Local Market', m: '' },
+        { d: -11, c: cGroceries, amt: -6480, p: 'Trader Joe\'s', m: '' },
+        { d: -15, c: cGroceries, amt: -7900, p: 'Whole Foods', m: '' },
+        { d: -22, c: cGroceries, amt: -5320, p: 'Trader Joe\'s', m: '' },
+        { d: -29, c: cGroceries, amt: -8210, p: 'Whole Foods', m: '' },
+        { d: -36, c: cGroceries, amt: -4470, p: 'Local Market', m: '' },
+        { d: -43, c: cGroceries, amt: -7600, p: 'Trader Joe\'s', m: '' },
+        { d: -50, c: cGroceries, amt: -8950, p: 'Whole Foods', m: 'Big shop' },
+        // Dining
+        { d: -2, c: cDining, amt: -2450, p: 'Tartine', m: 'Coffee + pastry' },
+        { d: -6, c: cDining, amt: -3800, p: 'Sushi Spot', m: 'Lunch' },
+        { d: -9, c: cDining, amt: -1200, p: 'Blue Bottle', m: '' },
+        { d: -14, c: cDining, amt: -5400, p: 'Pizza Place', m: 'Friday night' },
+        { d: -17, c: cDining, amt: -2200, p: 'Tartine', m: '' },
+        { d: -25, c: cDining, amt: -4600, p: 'Sushi Spot', m: '' },
+        { d: -32, c: cDining, amt: -3100, p: 'Pho 88', m: '' },
+        { d: -45, c: cDining, amt: -5800, p: 'Italian Place', m: 'Anniversary' },
+        // Transit
+        { d: -1, c: cTransit, amt: -650, p: 'Muni', m: '' },
+        { d: -4, c: cTransit, amt: -1850, p: 'Uber', m: '' },
+        { d: -8, c: cTransit, amt: -650, p: 'Muni', m: '' },
+        { d: -15, c: cTransit, amt: -3200, p: 'Gas', m: '' },
+        { d: -28, c: cTransit, amt: -3400, p: 'Gas', m: '' },
+        { d: -45, c: cTransit, amt: -2800, p: 'Gas', m: '' },
+        // Entertainment
+        { d: -7, c: cFun, amt: -2400, p: 'Alamo Drafthouse', m: 'Dune Part Two' },
+        { d: -19, c: cFun, amt: -3500, p: 'Concert venue', m: '' },
+        { d: -33, c: cFun, amt: -1800, p: 'Bookstore', m: '' },
+        // Misc
+        { d: -3, c: cMisc, amt: -1750, p: 'Hardware store', m: 'Patio supplies' },
+        { d: -16, c: cMisc, amt: -2600, p: 'Pharmacy', m: '' },
+        // Uncategorized
+        { d: -12, c: null, amt: -2200, p: 'Cash withdrawal', m: '' },
+        { d: -40, c: null, amt: -3500, p: 'Cash withdrawal', m: '' },
+        // Income
+        { d: -1, c: cSalary, amt: 480000, p: 'Acme Corp', m: 'Bi-weekly' },
+        { d: -15, c: cSalary, amt: 480000, p: 'Acme Corp', m: 'Bi-weekly' },
+        { d: -29, c: cSalary, amt: 480000, p: 'Acme Corp', m: 'Bi-weekly' },
+        { d: -43, c: cSalary, amt: 480000, p: 'Acme Corp', m: 'Bi-weekly' },
+        { d: -8, c: cSide, amt: 32000, p: 'Freelance project', m: 'Logo design' }
+      ];
+      entries.forEach(function(e) {
+        stores.transactions.push(tx({
+          date: dateStr(e.d), categoryId: e.c ? e.c.id : null,
+          amount: e.amt, payee: e.p, memo: e.m
+        }));
+      });
+
+      // One split transaction (Costco run with mixed groceries + misc)
+      stores.transactions.push(tx({
+        date: dateStr(-18), categoryId: null,
+        amount: -12450, payee: 'Costco', memo: 'Mixed shop',
+        splits: [
+          { categoryId: cGroceries.id, amount: -9450, memo: 'Food' },
+          { categoryId: cMisc.id, amount: -3000, memo: 'Household' }
+        ]
+      }));
+    }
+    pushExpenses();
+
+    // Recurring rules
+    stores.recurring.push({
+      id: uid('rec'), userId: DEMO_USER_ID,
+      name: 'Monthly rent', payee: 'Landlord LLC', memo: 'Auto-pay',
+      accountId: accountId, categoryId: cRent.id,
+      amount: -180000, frequency: 'monthly', interval: 1,
+      byDayOfMonth: 1, byDayOfWeek: null,
+      startDate: dateStr(-90), endDate: null,
+      nextDueDate: dateStr(28),
+      autoPost: true, reminderOffsetDays: 0,
+      lastPostedDate: dateStr(-2),
+      deletedAt: null,
+      createdAt: now - 90 * 86400000, updatedAt: now - 86400000
+    });
+    stores.recurring.push({
+      id: uid('rec'), userId: DEMO_USER_ID,
+      name: 'Weekly groceries', payee: 'Trader Joe\'s', memo: '',
+      accountId: accountId, categoryId: cGroceries.id,
+      amount: -7000, frequency: 'weekly', interval: 1,
+      byDayOfMonth: null, byDayOfWeek: 6,
+      startDate: dateStr(-60), endDate: null,
+      nextDueDate: dateStr(3),
+      autoPost: false, reminderOffsetDays: 0,
+      lastPostedDate: dateStr(-4),
+      deletedAt: null,
+      createdAt: now - 60 * 86400000, updatedAt: now - 4 * 86400000
+    });
+
+    // Closed days (history page)
+    var closedDays = [dateStr(-9), dateStr(-16), dateStr(-23)];
+    stores.meta.push({ key: 'closedDays', value: closedDays });
+
+    // Currency setting
+    stores.meta.push({ key: 'currentUserId', value: DEMO_USER_ID });
+
+    return stores;
+  }
+
+  // ─── Active state management ─────────────────────────────────────────────
+
+  function fireRefreshEvents() {
+    // Mirror the events fired by handleSyncAuth so all UIs re-render
+    var events = [
+      'dm-sync-complete', 'dm-todos-updated', 'dm-projects-updated',
+      'dm-kanban-columns-updated', 'dm-attachments-updated', 'dm-review-updated',
+      'dm-task-shares-updated', 'dm-note-shares-updated', 'dm-project-shares-updated',
+      'dm-budget-updated', 'dm-accounts-updated', 'dm-categories-updated',
+      'dm-budgets-updated', 'dm-transactions-updated', 'dm-recurring-updated',
+      'dm-sync-complete'
+    ];
+    events.forEach(function(name) {
+      try { window.dispatchEvent(new CustomEvent(name)); } catch(e) {}
+    });
+  }
+
+  function activate() {
+    if (_active) return;
+    if (_disabled) return;
+    try {
+      _stores = buildFixtures();
+    } catch (err) {
+      console.error('[dm-demo] buildFixtures failed:', err);
+      _stores = { notes: [], todos: [], projects: [], kanbanColumns: [],
+        reviewCards: [], attachments: [], noteVersions: [],
+        taskShares: [], noteShares: [], projectShares: [],
+        accounts: [], categories: [], budgets: [], transactions: [], recurring: [],
+        meta: [], writeQueue: [] };
+    }
+    _active = true;
+    document.documentElement.setAttribute('data-demo', '1');
+    showBanner();
+    // Async so listeners attached during the same tick fire properly
+    setTimeout(fireRefreshEvents, 0);
+  }
+
+  function deactivate() {
+    if (!_active) return;
+    _active = false;
+    _stores = null;
+    document.documentElement.removeAttribute('data-demo');
+    hideBanner();
+    setTimeout(fireRefreshEvents, 0);
+  }
+
+  // ─── IDB shadow methods ──────────────────────────────────────────────────
+
+  function getStore(name) {
+    if (!_stores) return [];
+    if (!_stores[name]) _stores[name] = [];
+    return _stores[name];
+  }
+
+  function shadowGetAll(name) {
+    return Promise.resolve(getStore(name).map(function(o) { return clone(o); }));
+  }
+  function shadowGet(name, key) {
+    var keyField = (name === 'meta') ? 'key' : 'id';
+    var rec = getStore(name).filter(function(o) { return o[keyField] === key; })[0];
+    return Promise.resolve(rec ? clone(rec) : undefined);
+  }
+  function shadowPut(name, data) {
+    var keyField = (name === 'meta') ? 'key' : 'id';
+    var arr = getStore(name);
+    var idx = -1;
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i][keyField] === data[keyField]) { idx = i; break; }
+    }
+    if (idx >= 0) arr[idx] = clone(data);
+    else arr.push(clone(data));
+    return Promise.resolve();
+  }
+  function shadowDelete(name, key) {
+    var keyField = (name === 'meta') ? 'key' : 'id';
+    var arr = getStore(name);
+    for (var i = arr.length - 1; i >= 0; i--) {
+      if (arr[i][keyField] === key) arr.splice(i, 1);
+    }
+    return Promise.resolve();
+  }
+  function shadowClear(name) {
+    // No-op in demo mode. The only callers of idbClear are sign-out cleanup
+    // paths in dm-sync (clearCache, sign-out auth handler). When demo is
+    // active, the user is signed-out — wiping fixtures here would defeat the
+    // whole point of demo mode. Demo data is reset by reload (buildFixtures
+    // runs fresh on each activate()), not by sign-out cleanup.
+    return Promise.resolve();
+  }
+  function shadowPutBatch(name, items) {
+    items.forEach(function(item) { shadowPut(name, item); });
+    return Promise.resolve();
+  }
+  function clone(obj) {
+    if (!obj || typeof obj !== 'object') return obj;
+    try { return JSON.parse(JSON.stringify(obj)); } catch(e) { return obj; }
+  }
+
+  // ─── Banner UI ───────────────────────────────────────────────────────────
+
+  var _bannerEl = null;
+
+  function buildBanner() {
+    if (_bannerEl) return _bannerEl;
+    var el = document.createElement('div');
+    el.id = 'dm-demo-banner';
+    el.innerHTML =
+      '<div class="dm-demo-banner-inner">' +
+        '<span class="dm-demo-banner-chip">Demo</span>' +
+        '<span class="dm-demo-banner-text">' +
+          'You\'re exploring with sample data. ' +
+          '<strong>Sign in to start your own digital memory.</strong>' +
+        '</span>' +
+        '<button type="button" class="dm-demo-banner-signin" id="dm-demo-signin">Sign in with Google</button>' +
+        '<button type="button" class="dm-demo-banner-dismiss" id="dm-demo-dismiss" aria-label="Dismiss">&times;</button>' +
+      '</div>';
+    document.body.appendChild(el);
+    el.querySelector('#dm-demo-signin').addEventListener('click', function() {
+      if (typeof window.dmSignIn === 'function') window.dmSignIn();
+    });
+    el.querySelector('#dm-demo-dismiss').addEventListener('click', function() {
+      _dismissed = true;
+      try { localStorage.setItem('dm-demo-banner-dismissed', '1'); } catch(e) {}
+      el.classList.add('dm-demo-banner--hidden');
+      document.documentElement.removeAttribute('data-demo-banner');
+    });
+    _bannerEl = el;
+    return el;
+  }
+
+  function showBanner() {
+    if (_dismissed) return;
+    if (!document.body) {
+      document.addEventListener('DOMContentLoaded', showBanner, { once: true });
+      return;
+    }
+    var el = buildBanner();
+    el.classList.remove('dm-demo-banner--hidden');
+    document.documentElement.setAttribute('data-demo-banner', '1');
+  }
+  function hideBanner() {
+    if (_bannerEl) _bannerEl.classList.add('dm-demo-banner--hidden');
+    document.documentElement.removeAttribute('data-demo-banner');
+  }
+
+  // ─── Public API ──────────────────────────────────────────────────────────
+
+  window.dmDemo = {
+    isActive: function() { return _active; },
+    isDisabled: function() { return _disabled; },
+    activate: activate,
+    deactivate: deactivate,
+    userId: DEMO_USER_ID,
+    fakeUser: function() {
+      if (!_active) return null;
+      return {
+        uid: DEMO_USER_ID, email: DEMO_USER_EMAIL,
+        displayName: DEMO_USER_NAME, photoURL: null,
+        isAnonymous: true, _demo: true
+      };
+    },
+    idbGet: shadowGet,
+    idbGetAll: shadowGetAll,
+    idbPut: shadowPut,
+    idbDelete: shadowDelete,
+    idbClear: shadowClear,
+    idbPutBatch: shadowPutBatch,
+    queueWrite: function() { return Promise.resolve(); }, // no-op in demo
+    drainQueue: function() { return Promise.resolve(); },
+    getAllQueued: function() { return Promise.resolve([]); }
+  };
+
+  // ─── Auto-activate on load when nobody is signed in ──────────────────────
+
+  // We want demo to be ready BEFORE any shortcode reads. This runs synchronously
+  // at parse time (the script is inline). If a cached user exists in
+  // localStorage we hold off — Firebase will rehydrate the session and show
+  // the user's real data.
+  function shouldActivateNow() {
+    if (_disabled) return false;
+    try {
+      var cached = localStorage.getItem('dm-cached-user');
+      if (cached) return false;
+    } catch(e) {}
+    // If Firebase already has a current user (rare at parse time), skip.
+    if (window.dmAuth && window.dmAuth.currentUser) return false;
+    return true;
+  }
+
+  if (shouldActivateNow()) {
+    activate();
+  }
+
+  // Listen to auth state to flip demo on/off after Firebase resolves.
+  function bindAuth() {
+    if (!window.dmAuth) return;
+    var lastUser = window.dmAuth.currentUser || null;
+    window.dmAuth.onAuthStateChanged(function(user) {
+      if (user) {
+        if (_active) deactivate();
+        lastUser = user;
+      } else {
+        // Transition from signed-in to signed-out: dm-sync clears real IDB
+        // asynchronously and fires dm-sync-complete when done. Wait for that
+        // before activating demo so our shadowed idbClear isn't called against
+        // the in-memory fixtures we just built.
+        if (lastUser) {
+          var onCleared = function() {
+            window.removeEventListener('dm-sync-complete', onCleared);
+            if (!window.dmAuth.currentUser && !_active) activate();
+          };
+          window.addEventListener('dm-sync-complete', onCleared);
+          // Safety: activate after 1.5s even if event never fires
+          setTimeout(function() {
+            window.removeEventListener('dm-sync-complete', onCleared);
+            if (!window.dmAuth.currentUser && !_active) activate();
+          }, 1500);
+        } else if (!_active) {
+          activate();
+        }
+        lastUser = null;
+      }
+    });
+  }
+  if (window.dmAuthReady) {
+    window.dmAuthReady.then(bindAuth);
+  } else {
+    bindAuth();
+  }
+})();
+</script>

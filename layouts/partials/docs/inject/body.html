@@ -1947,8 +1947,9 @@
       return;
     }
 
-    // Check auth
-    if (!window.dmAuth || !window.dmAuth.currentUser) {
+    // Check auth (demo mode allowed)
+    var __demoActive = window.dmDemo && window.dmDemo.isActive();
+    if ((!window.dmAuth || !window.dmAuth.currentUser) && !__demoActive) {
       showFeedback('error', 'Please sign in with Google to save notes.');
       return;
     }
@@ -1956,7 +1957,7 @@
     isSaving = true;
     submitBtn.disabled = true;
 
-    var user = window.dmAuth.currentUser;
+    var user = (window.dmAuth && window.dmAuth.currentUser) || window.dmDemo.fakeUser();
     var now = new Date();
     var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     var displayDate = months[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear();
@@ -2087,12 +2088,13 @@
       return;
     }
 
-    if (!window.dmAuth || !window.dmAuth.currentUser) {
+    var __demoActive = window.dmDemo && window.dmDemo.isActive();
+    if ((!window.dmAuth || !window.dmAuth.currentUser) && !__demoActive) {
       showFeedback('error', 'Please sign in with Google to save tasks.');
       return;
     }
 
-    if (!window.dmDb) {
+    if (!window.dmDb && !__demoActive) {
       showFeedback('error', 'Database not ready. Try again.');
       return;
     }
@@ -2132,7 +2134,7 @@
       }
     }
 
-    var user = window.dmAuth.currentUser;
+    var user = (window.dmAuth && window.dmAuth.currentUser) || (window.dmDemo && window.dmDemo.fakeUser());
     var est = nlpEstimate || 25;
     var scheduledDate = nlpScheduledDate;
     var reminderAtMs = (_qcTodoReminderMs && _qcTodoReminderMs > Date.now()) ? _qcTodoReminderMs : null;
@@ -2348,7 +2350,7 @@
     var raw = expenseInput ? expenseInput.value.trim() : '';
     if (!raw) { if (expenseInput) expenseInput.focus(); return; }
 
-    if (!window.dmAuth || !window.dmAuth.currentUser) {
+    if ((!window.dmAuth || !window.dmAuth.currentUser) && !(window.dmDemo && window.dmDemo.isActive())) {
       showFeedback('error', 'Please sign in with Google to save expenses.');
       return;
     }
@@ -2647,7 +2649,8 @@
       addBtn.innerHTML = '+';
       addBtn.title = 'Add as task';
       addBtn.addEventListener('click', function() {
-        if (!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
+        var __demoActive = window.dmDemo && window.dmDemo.isActive();
+        if ((!window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) && !__demoActive) {
           _qcAiAddMessage('assistant', 'Please sign in to add tasks.');
           return;
         }
@@ -2869,7 +2872,7 @@
           // Check for multi-action tasks
           if (window.dmAI._detectMultipleActions) {
             var multiActions = window.dmAI._detectMultipleActions(rawTitle);
-            if (multiActions && multiActions.length >= 2 && window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
+            if (multiActions && multiActions.length >= 2 && (((window.dmDb && window.dmAuth && window.dmAuth.currentUser)) || (window.dmDemo && window.dmDemo.isActive()))) {
               var sharedDate = window.dmAI._parseDate ? window.dmAI._parseDate(rawTitle) : null;
               var sharedScheduledDate = sharedDate ? sharedDate.date : null;
               var confirmParts = [];
@@ -2902,7 +2905,7 @@
 
           // Single task creation
           var details = window.dmAI._parseTaskDetails(rawTitle);
-          if (window.dmDb && window.dmAuth && window.dmAuth.currentUser) {
+          if ((window.dmDb && window.dmAuth && window.dmAuth.currentUser) || (window.dmDemo && window.dmDemo.isActive())) {
             window.dispatchEvent(new CustomEvent('dm-ai-create-task', {
               detail: {
                 title: details.title,
@@ -4888,8 +4891,13 @@
       refreshSidebarProjects()
     ]).then(function(results) {
       var notes = results[0];
-      if (notes.length > 0 || _sidebarUser) {
-        renderDynamicSidebar(notes, _sidebarUser);
+      var u = _sidebarUser;
+      if (!u && window.dmDemo && window.dmDemo.isActive()) {
+        u = window.dmDemo.fakeUser();
+        _sidebarUser = u;
+      }
+      if (notes.length > 0 || u) {
+        renderDynamicSidebar(notes, u);
       }
     });
   });
@@ -4937,6 +4945,14 @@
               // so settings footer trigger and modal are initialized
               renderDynamicSidebar(notes, user);
               // Sync will fire dm-sync-complete which will re-render
+            });
+          }
+        } else if (window.dmDemo && window.dmDemo.isActive()) {
+          var demoUser = window.dmDemo.fakeUser();
+          _sidebarUser = demoUser;
+          if (window.dmSync) {
+            window.dmSync.getAllNotes().then(function(notes) {
+              renderDynamicSidebar(notes, demoUser);
             });
           }
         } else {

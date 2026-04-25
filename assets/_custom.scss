@@ -6818,3 +6818,119 @@ body.dm-img-resizing {
   z-index: 1;
 }
 
+// ─── Demo Mode Banner ────────────────────────────────────────────────────
+// Shown when nobody is signed in and we're displaying dummy data so visitors
+// can explore the product. Reserved space pre-paint via data-demo-banner on
+// <html> to avoid layout flash.
+html[data-demo-banner="1"] body {
+  padding-top: 44px;
+}
+
+#dm-demo-banner {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9999;
+  height: 44px;
+  background: linear-gradient(90deg,
+    color-mix(in srgb, var(--color-accent) 92%, black) 0%,
+    var(--color-accent) 100%);
+  color: #fff;
+  font-size: 0.88rem;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  transition: transform 0.25s ease, opacity 0.25s ease;
+
+  &.dm-demo-banner--hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+}
+
+.dm-demo-banner-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+}
+
+.dm-demo-banner-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.22);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+
+.dm-demo-banner-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  strong {
+    font-weight: 600;
+  }
+}
+
+.dm-demo-banner-signin {
+  flex-shrink: 0;
+  background: #fff;
+  color: var(--color-accent);
+  border: 0;
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.92);
+  }
+  &:active {
+    transform: translateY(1px);
+  }
+}
+
+.dm-demo-banner-dismiss {
+  flex-shrink: 0;
+  background: transparent;
+  color: #fff;
+  border: 0;
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 4px 10px;
+  cursor: pointer;
+  opacity: 0.75;
+  border-radius: 6px;
+
+  &:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.14);
+  }
+}
+
+// On mobile keep the banner readable by hiding the chip and shrinking gap
+@media (max-width: 600px) {
+  .dm-demo-banner-inner {
+    gap: 8px;
+    padding: 0 10px;
+  }
+  .dm-demo-banner-chip { display: none; }
+  .dm-demo-banner-text {
+    font-size: 0.78rem;
+  }
+  .dm-demo-banner-signin {
+    padding: 5px 10px;
+    font-size: 0.75rem;
+  }
+}

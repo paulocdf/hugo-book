@@ -927,13 +927,13 @@
   } catch(e) {}
   if (window.dmAuth) {
     function subscribeNoteViewerAuth() {
-      window.dmAuth.onAuthStateChanged(function(user) {
-        if (user) {
-          loadNote();
-        } else {
-          showState('auth');
-        }
-      });
+       window.dmAuth.onAuthStateChanged(function(user) {
+         if (user || (window.dmDemo && window.dmDemo.isActive())) {
+           loadNote();
+         } else {
+           showState('auth');
+         }
+       });
     }
     if (window.dmAuthReady) {
       window.dmAuthReady.then(subscribeNoteViewerAuth);

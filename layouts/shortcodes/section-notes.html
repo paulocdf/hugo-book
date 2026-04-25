@@ -493,13 +493,13 @@
     } catch(e) {}
     if (window.dmAuth) {
       function subscribeSectionNotesAuth() {
-        window.dmAuth.onAuthStateChanged(function(user) {
-          if (user) {
-            loadFromCache();
-          } else {
-            showState('auth');
-          }
-        });
+         window.dmAuth.onAuthStateChanged(function(user) {
+           if (user || (window.dmDemo && window.dmDemo.isActive())) {
+             loadFromCache();
+           } else {
+             showState('auth');
+           }
+         });
       }
       if (window.dmAuthReady) {
         window.dmAuthReady.then(subscribeSectionNotesAuth);

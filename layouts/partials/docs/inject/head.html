@@ -40,6 +40,17 @@
 
       var bg = localStorage.getItem('dm-theme-background');
       if (bg && bg !== 'none') root.setAttribute('data-bg-texture', bg);
+
+      // Demo mode: pre-paint flag so the banner reserves space without flash.
+      // Active when there's no cached signed-in user and demo isn't disabled.
+      var demoDisabled = localStorage.getItem('dm-demo-disabled') === '1';
+      var cachedUser = localStorage.getItem('dm-cached-user');
+      if (!demoDisabled && !cachedUser) {
+        root.setAttribute('data-demo', '1');
+        if (localStorage.getItem('dm-demo-banner-dismissed') !== '1') {
+          root.setAttribute('data-demo-banner', '1');
+        }
+      }
     } catch (e) {}
   })();
 </script>
