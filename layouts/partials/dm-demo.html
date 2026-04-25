@@ -54,6 +54,7 @@
       reviewCards: [], attachments: [], noteVersions: [],
       taskShares: [], noteShares: [], projectShares: [],
       accounts: [], categories: [], budgets: [], transactions: [], recurring: [],
+      categoryRules: [],
       meta: [], writeQueue: []
     };
 
@@ -566,6 +567,32 @@
       createdAt: now - 60 * 86400000, updatedAt: now - 4 * 86400000
     });
 
+    // Category rules (auto-categorization examples)
+    stores.categoryRules.push({
+      id: uid('rule'), userId: DEMO_USER_ID,
+      matchType: 'payee-contains', pattern: 'starbucks',
+      categoryId: cDining.id, priority: 10, enabled: true,
+      matchCount: 12, lastMatchedAt: now - 3 * 86400000,
+      deletedAt: null,
+      createdAt: now - 45 * 86400000, updatedAt: now - 3 * 86400000
+    });
+    stores.categoryRules.push({
+      id: uid('rule'), userId: DEMO_USER_ID,
+      matchType: 'payee-contains', pattern: 'whole foods',
+      categoryId: cGroceries.id, priority: 20, enabled: true,
+      matchCount: 6, lastMatchedAt: now - 5 * 86400000,
+      deletedAt: null,
+      createdAt: now - 30 * 86400000, updatedAt: now - 5 * 86400000
+    });
+    stores.categoryRules.push({
+      id: uid('rule'), userId: DEMO_USER_ID,
+      matchType: 'memo-contains', pattern: 'uber',
+      categoryId: cMisc.id, priority: 30, enabled: false,
+      matchCount: 0, lastMatchedAt: null,
+      deletedAt: null,
+      createdAt: now - 7 * 86400000, updatedAt: now - 7 * 86400000
+    });
+
     // Closed days (history page)
     var closedDays = [dateStr(-9), dateStr(-16), dateStr(-23)];
     stores.meta.push({ key: 'closedDays', value: closedDays });
@@ -586,6 +613,7 @@
       'dm-task-shares-updated', 'dm-note-shares-updated', 'dm-project-shares-updated',
       'dm-budget-updated', 'dm-accounts-updated', 'dm-categories-updated',
       'dm-budgets-updated', 'dm-transactions-updated', 'dm-recurring-updated',
+      'dm-category-rules-updated',
       'dm-sync-complete'
     ];
     events.forEach(function(name) {
@@ -604,6 +632,7 @@
         reviewCards: [], attachments: [], noteVersions: [],
         taskShares: [], noteShares: [], projectShares: [],
         accounts: [], categories: [], budgets: [], transactions: [], recurring: [],
+        categoryRules: [],
         meta: [], writeQueue: [] };
     }
     _active = true;

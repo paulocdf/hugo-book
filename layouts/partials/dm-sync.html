@@ -161,7 +161,7 @@
   'use strict';
 
    var DB_NAME = 'dm-notes';
-   var DB_VERSION = 19;
+   var DB_VERSION = 20;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -174,7 +174,7 @@
   var STORE_PROJECT_SHARES = 'projectShares';
   var STORE_PROJECTS = 'projects';
   var STORE_KANBAN_COLUMNS = 'kanbanColumns';
-  // v17: Budget / finance stores
+   // v17: Budget / finance stores
   var STORE_ACCOUNTS = 'accounts';
   var STORE_CATEGORIES = 'categories';
   var STORE_BUDGETS = 'budgets';
@@ -182,6 +182,8 @@
   var STORE_RECURRING = 'recurring';
   // v19: Spreadsheet workspace (Phase F1 foundation)
   var STORE_SHEETS = 'sheets';
+  // v20: Auto-categorization rules (Phase 3 Slice F)
+  var STORE_CATEGORY_RULES = 'categoryRules';
   // Budget: local-only mode (user opt-in to skip Firestore sync for financial data)
   var BUDGET_LOCAL_ONLY_KEY = 'dm-budget-local-only';
   function isBudgetLocalOnly() {
@@ -191,7 +193,7 @@
   // Collections considered "budget / finance" data
   var BUDGET_COLLECTIONS = {
     accounts: true, categories: true, budgets: true,
-    transactions: true, recurring: true
+    transactions: true, recurring: true, categoryRules: true
   };
   function isBudgetCollection(name) { return !!BUDGET_COLLECTIONS[name]; }
   var MAX_VERSIONS_PER_NOTE = 50;
@@ -395,6 +397,13 @@
           var sheetStore = db.createObjectStore(STORE_SHEETS, { keyPath: 'id' });
           sheetStore.createIndex('userId', 'userId', { unique: false });
           sheetStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+        }
+        // Category rules store (v20) — auto-categorization rules (Phase 3 Slice F)
+        if (!db.objectStoreNames.contains(STORE_CATEGORY_RULES)) {
+          var ruleStore = db.createObjectStore(STORE_CATEGORY_RULES, { keyPath: 'id' });
+          ruleStore.createIndex('userId', 'userId', { unique: false });
+          ruleStore.createIndex('priority', 'priority', { unique: false });
+          ruleStore.createIndex('deletedAt', 'deletedAt', { unique: false });
         }
       };
       req.onblocked = function() {
@@ -1103,6 +1112,7 @@
       attachmentIds: data.attachmentIds || [],
       splits: Array.isArray(data.splits) ? data.splits : [],
       source: data.source || 'manual',
+      appliedRuleId: data.appliedRuleId || null,
       deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
       createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
       updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
@@ -1130,6 +1140,27 @@
       lastPostedDate: data.lastPostedDate || null,
       payee: data.payee || '',
       memo: data.memo || '',
+      deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
+      createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
+      updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
+    };
+  }
+
+  // Category rule serializer (Phase 3 Slice F). Field whitelist for auto-
+  // categorization rules. Rules match transactions by payee/memo and assign
+  // a category. See applyCategoryRules() for evaluation order.
+  function serializeCategoryRule(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      matchType: data.matchType || 'payee-contains',
+      pattern: data.pattern || '',
+      categoryId: data.categoryId || '',
+      priority: typeof data.priority === 'number' ? data.priority : 100,
+      enabled: data.enabled !== false,
+      matchCount: typeof data.matchCount === 'number' ? data.matchCount : 0,
+      lastMatchedAt: data.lastMatchedAt ? (data.lastMatchedAt.toMillis ? data.lastMatchedAt.toMillis() : data.lastMatchedAt) : null,
       deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
       createdAt: data.createdAt ? data.createdAt.toMillis() : 0,
       updatedAt: data.updatedAt ? data.updatedAt.toMillis() : 0
@@ -1623,6 +1654,7 @@
       .then(function() { return syncOneBudgetStore(userId, 'budgets', STORE_BUDGETS, serializeBudget); })
       .then(function() { return syncOneBudgetStore(userId, 'transactions', STORE_TRANSACTIONS, serializeTransaction); })
       .then(function() { return syncOneBudgetStore(userId, 'recurring', STORE_RECURRING, serializeRecurring); })
+      .then(function() { return syncOneBudgetStore(userId, 'categoryRules', STORE_CATEGORY_RULES, serializeCategoryRule); })
       .then(function() {
         var elapsed = Date.now() - startTime;
         console.log('[dm-sync] Budget sync complete in ' + elapsed + 'ms');
@@ -1634,8 +1666,8 @@
   function eraseBudgetData(opts) {
     opts = opts || {};
     var eraseCloud = !!opts.eraseCloud;
-    var stores = [STORE_ACCOUNTS, STORE_CATEGORIES, STORE_BUDGETS, STORE_TRANSACTIONS, STORE_RECURRING];
-    var collections = ['accounts', 'categories', 'budgets', 'transactions', 'recurring'];
+    var stores = [STORE_ACCOUNTS, STORE_CATEGORIES, STORE_BUDGETS, STORE_TRANSACTIONS, STORE_RECURRING, STORE_CATEGORY_RULES];
+    var collections = ['accounts', 'categories', 'budgets', 'transactions', 'recurring', 'categoryRules'];
     var idsByCollection = {};
     var collectPromises = stores.map(function(storeName, i) {
       return idbGetAll(storeName).then(function(items) {
@@ -5729,6 +5761,39 @@
     return normalized;
   }
 
+  // Pure rule-matching helper (Phase 3 Slice F).
+  // Returns true if `rule` matches `tx`. Case-insensitive for non-regex types.
+  // Invalid regexes return false silently (no throw).
+  function _ruleMatchesTx(tx, rule) {
+    if (!rule || rule.enabled === false || rule.deletedAt) return false;
+    var pattern = (rule.pattern || '').trim();
+    if (!pattern) return false;
+    var payee = (tx.payee || '').toLowerCase().trim();
+    var memo = (tx.memo || '').toLowerCase().trim();
+    var lcPattern = pattern.toLowerCase();
+    switch (rule.matchType) {
+      case 'payee-equals':   return payee === lcPattern;
+      case 'payee-contains': return payee.indexOf(lcPattern) !== -1;
+      case 'memo-equals':    return memo === lcPattern;
+      case 'memo-contains':  return memo.indexOf(lcPattern) !== -1;
+      case 'payee-regex':
+        try { return new RegExp(pattern, 'i').test(tx.payee || ''); }
+        catch (e) { return false; }
+      default: return false;
+    }
+  }
+
+  // Sort rules into evaluation order: enabled & non-deleted first,
+  // then by priority asc, then createdAt asc.
+  function _sortRules(rules) {
+    return rules.slice().sort(function(a, b) {
+      var pa = typeof a.priority === 'number' ? a.priority : 100;
+      var pb = typeof b.priority === 'number' ? b.priority : 100;
+      if (pa !== pb) return pa - pb;
+      return (a.createdAt || 0) - (b.createdAt || 0);
+    });
+  }
+
   window.dmBudget = {
     // ── Currency ──
     getCurrency: function() {
@@ -6021,32 +6086,60 @@
         attachmentIds: data.attachmentIds || [],
         splits: splits,
         source: data.source || 'manual',
+        appliedRuleId: data.appliedRuleId || null,
         deletedAt: null,
         createdAt: now, updatedAt: now
       };
-      var fs = {
-        userId: user.uid, accountId: tx.accountId, categoryId: tx.categoryId,
-        amount: tx.amount, date: tx.date, payee: tx.payee, memo: tx.memo,
-        tags: tx.tags, cleared: tx.cleared, reconciled: tx.reconciled,
-        transferPairId: tx.transferPairId, recurringId: tx.recurringId,
-        attachmentIds: tx.attachmentIds, splits: tx.splits, source: tx.source,
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-      return firestoreWrite({
-        collection: 'transactions', docId: id, op: 'set', data: fs,
-        localOp: function() { return idbPut(STORE_TRANSACTIONS, tx); }
-      }).then(function() {
-        window.dispatchEvent(new CustomEvent('dm-transactions-updated'));
-        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
-        return tx;
+      // Auto-categorization rules (Phase 3 Slice F): only fire when tx has no
+      // categoryId, no splits, and no recurringId (recurring auto-posts already
+      // carry their target category from the rule definition). Caller can pass
+      // {skipRules: true} to bypass.
+      var shouldApplyRules = !tx.categoryId
+        && splits.length === 0
+        && !tx.recurringId
+        && data.skipRules !== true;
+      var rulePromise = shouldApplyRules
+        ? window.dmBudget.applyCategoryRules(tx).then(function(match) {
+            if (match) {
+              tx.categoryId = match.categoryId;
+              tx.appliedRuleId = match.ruleId;
+              // Fire-and-forget rule stat bump (don't block tx create)
+              idbGet(STORE_CATEGORY_RULES, match.ruleId).then(function(rule) {
+                if (!rule) return;
+                window.dmBudget.updateCategoryRule(match.ruleId, {
+                  matchCount: (rule.matchCount || 0) + 1,
+                  lastMatchedAt: _budgetNow()
+                }).catch(function() {});
+              }).catch(function() {});
+            }
+          })
+        : Promise.resolve();
+      return rulePromise.then(function() {
+        var fs = {
+          userId: user.uid, accountId: tx.accountId, categoryId: tx.categoryId,
+          amount: tx.amount, date: tx.date, payee: tx.payee, memo: tx.memo,
+          tags: tx.tags, cleared: tx.cleared, reconciled: tx.reconciled,
+          transferPairId: tx.transferPairId, recurringId: tx.recurringId,
+          attachmentIds: tx.attachmentIds, splits: tx.splits, source: tx.source,
+          appliedRuleId: tx.appliedRuleId,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        return firestoreWrite({
+          collection: 'transactions', docId: id, op: 'set', data: fs,
+          localOp: function() { return idbPut(STORE_TRANSACTIONS, tx); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-transactions-updated'));
+          window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+          return tx;
+        });
       });
     },
     updateTransaction: function(id, updates) {
       return idbGet(STORE_TRANSACTIONS, id).then(function(tx) {
         if (!tx) return Promise.reject(new Error('Transaction not found'));
         var fs = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
-        ['accountId','categoryId','amount','date','payee','memo','tags','cleared','reconciled','transferPairId','recurringId','attachmentIds','source'].forEach(function(k) {
+        ['accountId','categoryId','amount','date','payee','memo','tags','cleared','reconciled','transferPairId','recurringId','attachmentIds','source','appliedRuleId'].forEach(function(k) {
           if (updates[k] !== undefined) { tx[k] = updates[k]; fs[k] = updates[k]; }
         });
         if (updates.splits !== undefined) {
@@ -7281,6 +7374,148 @@
         }
         return step();
       }
+    },
+
+    // ── Auto-categorization rules (Phase 3 Slice F) ──
+    // Rules let users define `if payee/memo matches X → categorize as Y`.
+    // Applied automatically in createTransaction() when categoryId is null
+    // and there are no splits. First-match-wins after sorting by priority asc,
+    // createdAt asc. See _ruleMatchesTx() for match semantics.
+    getCategoryRules: function(opts) {
+      opts = opts || {};
+      return idbGetAll(STORE_CATEGORY_RULES).then(function(items) {
+        var filtered = items.filter(function(r) {
+          return opts.includeDeleted || !r.deletedAt;
+        });
+        return _sortRules(filtered);
+      });
+    },
+    getCategoryRule: function(id) { return idbGet(STORE_CATEGORY_RULES, id); },
+    createCategoryRule: function(data) {
+      var user = _budgetUser();
+      var id = data.id || _budgetId('rule');
+      var now = _budgetNow();
+      var rule = {
+        id: id, userId: user.uid,
+        matchType: data.matchType || 'payee-contains',
+        pattern: data.pattern || '',
+        categoryId: data.categoryId || '',
+        priority: typeof data.priority === 'number' ? data.priority : 100,
+        enabled: data.enabled !== false,
+        matchCount: 0,
+        lastMatchedAt: null,
+        deletedAt: null,
+        createdAt: now, updatedAt: now
+      };
+      var fs = {
+        userId: user.uid, matchType: rule.matchType, pattern: rule.pattern,
+        categoryId: rule.categoryId, priority: rule.priority, enabled: rule.enabled,
+        matchCount: 0, lastMatchedAt: null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'categoryRules', docId: id, op: 'set', data: fs,
+        localOp: function() { return idbPut(STORE_CATEGORY_RULES, rule); }
+      }).then(function() {
+        window.dispatchEvent(new CustomEvent('dm-category-rules-updated'));
+        window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+        return rule;
+      });
+    },
+    updateCategoryRule: function(id, updates) {
+      return idbGet(STORE_CATEGORY_RULES, id).then(function(rule) {
+        if (!rule) return Promise.reject(new Error('Rule not found'));
+        var fs = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        ['matchType','pattern','categoryId','priority','enabled','matchCount','lastMatchedAt'].forEach(function(k) {
+          if (updates[k] !== undefined) { rule[k] = updates[k]; fs[k] = updates[k]; }
+        });
+        rule.updatedAt = _budgetNow();
+        return firestoreWrite({
+          collection: 'categoryRules', docId: id, op: 'update', data: fs,
+          localOp: function() { return idbPut(STORE_CATEGORY_RULES, rule); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-category-rules-updated'));
+          window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+          return rule;
+        });
+      });
+    },
+    deleteCategoryRule: function(id) {
+      // Soft delete (recover from trash not yet implemented; keep history for audit).
+      return idbGet(STORE_CATEGORY_RULES, id).then(function(rule) {
+        if (!rule) return;
+        rule.deletedAt = _budgetNow();
+        rule.updatedAt = _budgetNow();
+        var fs = {
+          deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        return firestoreWrite({
+          collection: 'categoryRules', docId: id, op: 'update', data: fs,
+          localOp: function() { return idbPut(STORE_CATEGORY_RULES, rule); }
+        }).then(function() {
+          window.dispatchEvent(new CustomEvent('dm-category-rules-updated'));
+          window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+        });
+      });
+    },
+    // Pure helper: takes a partial tx ({payee, memo}), returns the first
+    // matching rule's {categoryId, ruleId} or null. Skips disabled and
+    // soft-deleted rules. First-match-wins after priority sort.
+    applyCategoryRules: function(tx) {
+      var api = window.dmBudget;
+      return api.getCategoryRules().then(function(rules) {
+        for (var i = 0; i < rules.length; i++) {
+          var r = rules[i];
+          if (_ruleMatchesTx(tx, r)) {
+            return { categoryId: r.categoryId, ruleId: r.id };
+          }
+        }
+        return null;
+      });
+    },
+    // Bulk-apply rules to all uncategorized transactions. Skips:
+    //  - tx with non-null categoryId (already categorized)
+    //  - tx with non-empty splits (multi-category — don't overwrite)
+    //  - tx with non-null recurringId (auto-posted from a recurring rule)
+    //  - tx with deletedAt set
+    // Returns { scanned, updated }.
+    bulkApplyRulesToUncategorized: function() {
+      var api = window.dmBudget;
+      return Promise.all([api.getCategoryRules(), idbGetAll(STORE_TRANSACTIONS)])
+        .then(function(results) {
+          var rules = results[0];
+          var txs = results[1].filter(function(t) {
+            return !t.deletedAt
+              && !t.categoryId
+              && (!t.splits || t.splits.length === 0)
+              && !t.recurringId;
+          });
+          var scanned = txs.length;
+          var updated = 0;
+          var chain = Promise.resolve();
+          txs.forEach(function(tx) {
+            chain = chain.then(function() {
+              for (var i = 0; i < rules.length; i++) {
+                var r = rules[i];
+                if (_ruleMatchesTx(tx, r)) {
+                  updated++;
+                  return api.updateTransaction(tx.id, {
+                    categoryId: r.categoryId, appliedRuleId: r.id
+                  }).then(function() {
+                    // Fire-and-forget rule stat bump
+                    api.updateCategoryRule(r.id, {
+                      matchCount: (r.matchCount || 0) + 1,
+                      lastMatchedAt: _budgetNow()
+                    }).catch(function() {});
+                  });
+                }
+              }
+            });
+          });
+          return chain.then(function() { return { scanned: scanned, updated: updated }; });
+        });
     }
   };
 

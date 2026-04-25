@@ -1,0 +1,483 @@
+{{/*
+  budget-rules.html — Auto-categorization rules (Phase 3 Slice F)
+  - Add/edit form: matchType, pattern, target category, priority, enabled
+  - Rules list table with inline edit, enabled toggle, delete
+  - "Apply rules to existing uncategorized" bulk action
+  - Test-match panel (optional payee/memo input → preview which rule fires)
+*/}}
+
+<style>
+  .dm-rule-wrap { max-width: 1100px; margin: 0 auto; padding: 12px 0 40px; }
+  .dm-rule-head {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  .dm-rule-head h2 { margin: 0; font-size: 1.1rem; }
+  .dm-rule-head .spacer { flex: 1; }
+  .dm-rule-head .stat { font-size: 0.85rem; opacity: 0.8; }
+  .dm-rule-head button {
+    padding: 7px 12px; border-radius: 6px; border: 1px solid var(--gray-200);
+    background: var(--body-background); color: var(--body-font-color); cursor: pointer;
+    font-size: 0.88rem;
+  }
+  .dm-rule-head button.primary {
+    background: var(--color-accent); color: #fff; border-color: var(--color-accent);
+  }
+  .dm-rule-head button:hover { background: var(--gray-100); }
+  .dm-rule-head button.primary:hover { filter: brightness(0.95); }
+
+  .dm-rule-form {
+    display: grid;
+    grid-template-columns: 1.2fr 2fr 1.5fr 0.7fr auto;
+    gap: 8px; padding: 12px;
+    background: var(--gray-100); border-radius: 8px; margin-bottom: 18px;
+    align-items: end;
+  }
+  .dm-rule-form label {
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7;
+  }
+  .dm-rule-form label input, .dm-rule-form label select {
+    padding: 6px 8px; border: 1px solid var(--gray-200); border-radius: 5px;
+    background: var(--body-background); color: var(--body-font-color); font-size: 0.9rem;
+  }
+  .dm-rule-form .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+  .dm-rule-form .btn-row button {
+    padding: 7px 14px; border-radius: 6px; border: 0; cursor: pointer; font-weight: 600;
+  }
+  .dm-rule-form .btn-row button.save { background: var(--color-accent); color: #fff; }
+  .dm-rule-form .btn-row button.cancel { background: var(--gray-200); color: var(--body-font-color); }
+
+  .dm-rule-table {
+    width: 100%; border-collapse: collapse;
+    border: 1px solid var(--gray-200); border-radius: 8px; overflow: hidden;
+  }
+  .dm-rule-table th, .dm-rule-table td {
+    padding: 10px 12px; font-size: 0.88rem; text-align: left;
+    border-bottom: 1px solid var(--gray-200);
+  }
+  .dm-rule-table th {
+    background: var(--gray-100); font-weight: 600;
+    text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.05em; opacity: 0.8;
+  }
+  .dm-rule-table tr:last-child td { border-bottom: 0; }
+  .dm-rule-table tr.disabled { opacity: 0.55; }
+  .dm-rule-table .rule-btn {
+    border: 0; background: transparent; color: var(--body-font-color);
+    opacity: 0.5; cursor: pointer; padding: 4px 6px; border-radius: 4px;
+  }
+  .dm-rule-table tr:hover .rule-btn { opacity: 1; }
+  .dm-rule-table .rule-btn:hover { background: var(--gray-100); }
+  .dm-rule-table .cat-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .dm-rule-table .cat-dot {
+    width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+  }
+  .dm-rule-table .stat-cell {
+    font-size: 0.78rem; opacity: 0.7; font-variant-numeric: tabular-nums;
+  }
+
+  .dm-rule-empty {
+    padding: 40px; text-align: center; opacity: 0.7;
+    border: 2px dashed var(--gray-200); border-radius: 10px;
+  }
+
+  .dm-rule-test {
+    margin-top: 28px; padding: 14px;
+    border: 1px solid var(--gray-200); border-radius: 8px;
+    background: var(--body-background);
+  }
+  .dm-rule-test summary {
+    cursor: pointer; font-weight: 600; font-size: 0.9rem;
+    user-select: none; outline: none;
+  }
+  .dm-rule-test-form {
+    display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px;
+    margin-top: 12px; align-items: end;
+  }
+  .dm-rule-test-form label {
+    display: flex; flex-direction: column; gap: 3px;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.7;
+  }
+  .dm-rule-test-form input {
+    padding: 6px 8px; border: 1px solid var(--gray-200); border-radius: 5px;
+    background: var(--body-background); color: var(--body-font-color); font-size: 0.9rem;
+  }
+  .dm-rule-test-form button {
+    padding: 7px 14px; border-radius: 6px; border: 0; cursor: pointer;
+    font-weight: 600; background: var(--color-accent); color: #fff;
+  }
+  .dm-rule-test-result {
+    margin-top: 10px; padding: 10px 12px;
+    border-radius: 6px; font-size: 0.88rem;
+    background: var(--gray-100);
+  }
+  .dm-rule-test-result.match { background: rgba(67, 160, 71, 0.12); }
+  .dm-rule-test-result.nomatch { background: rgba(229, 57, 53, 0.08); }
+  .dm-rule-test-result.empty { opacity: 0.7; }
+
+  .dm-rule-bulk-result {
+    margin-top: 10px; padding: 8px 12px;
+    border-radius: 6px; font-size: 0.88rem;
+    background: rgba(25, 118, 210, 0.1);
+  }
+</style>
+
+<div class="dm-rule-wrap" id="dm-rule-wrap">
+  <div class="dm-rule-head">
+    <h2>Auto-categorization rules</h2>
+    <span class="stat" id="dm-rule-stat"></span>
+    <span class="spacer"></span>
+    <button id="dm-rule-bulk-btn" type="button" title="Apply current rules to all uncategorized transactions">Apply to existing</button>
+    <button id="dm-rule-add-btn" type="button" class="primary">+ New rule</button>
+  </div>
+
+  <div id="dm-rule-bulk-result-wrap"></div>
+
+  <div id="dm-rule-form-wrap" style="display:none;">
+    <form class="dm-rule-form" id="dm-rule-form">
+      <input type="hidden" id="dm-rule-id" value="" />
+      <label>
+        Match type
+        <select id="dm-rule-match-type">
+          <option value="payee-contains">Payee contains</option>
+          <option value="payee-equals">Payee equals</option>
+          <option value="payee-regex">Payee regex</option>
+          <option value="memo-contains">Memo contains</option>
+          <option value="memo-equals">Memo equals</option>
+        </select>
+      </label>
+      <label>
+        Pattern
+        <input type="text" id="dm-rule-pattern" placeholder="e.g. starbucks" required maxlength="500" />
+      </label>
+      <label>
+        Category
+        <select id="dm-rule-category" required>
+          <option value="">Select…</option>
+        </select>
+      </label>
+      <label>
+        Priority
+        <input type="number" id="dm-rule-priority" value="100" step="10" min="0" max="9999" />
+      </label>
+      <div class="btn-row">
+        <button type="button" class="cancel" id="dm-rule-cancel">Cancel</button>
+        <button type="submit" class="save" id="dm-rule-save">Save</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="dm-rule-list-wrap"></div>
+
+  <details class="dm-rule-test">
+    <summary>Test a rule match</summary>
+    <p style="margin: 10px 0 0; opacity: 0.75; font-size: 0.85rem;">
+      Enter a sample payee and/or memo to see which rule (if any) would fire.
+    </p>
+    <form class="dm-rule-test-form" id="dm-rule-test-form">
+      <label>
+        Payee
+        <input type="text" id="dm-rule-test-payee" placeholder="e.g. Starbucks Reserve" />
+      </label>
+      <label>
+        Memo
+        <input type="text" id="dm-rule-test-memo" placeholder="e.g. coffee" />
+      </label>
+      <button type="submit">Test</button>
+    </form>
+    <div id="dm-rule-test-result-wrap"></div>
+  </details>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  var $wrap = document.getElementById('dm-rule-wrap');
+  if (!$wrap) return;
+  var $stat = document.getElementById('dm-rule-stat');
+  var $list = document.getElementById('dm-rule-list-wrap');
+  var $formWrap = document.getElementById('dm-rule-form-wrap');
+  var $form = document.getElementById('dm-rule-form');
+  var $idInput = document.getElementById('dm-rule-id');
+  var $matchType = document.getElementById('dm-rule-match-type');
+  var $pattern = document.getElementById('dm-rule-pattern');
+  var $categorySelect = document.getElementById('dm-rule-category');
+  var $priority = document.getElementById('dm-rule-priority');
+  var $addBtn = document.getElementById('dm-rule-add-btn');
+  var $cancelBtn = document.getElementById('dm-rule-cancel');
+  var $bulkBtn = document.getElementById('dm-rule-bulk-btn');
+  var $bulkResultWrap = document.getElementById('dm-rule-bulk-result-wrap');
+  var $testForm = document.getElementById('dm-rule-test-form');
+  var $testPayee = document.getElementById('dm-rule-test-payee');
+  var $testMemo = document.getElementById('dm-rule-test-memo');
+  var $testResultWrap = document.getElementById('dm-rule-test-result-wrap');
+
+  var _categories = [];
+  var _categoryById = {};
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function matchTypeLabel(t) {
+    return ({
+      'payee-contains': 'payee contains',
+      'payee-equals':   'payee equals',
+      'payee-regex':    'payee matches /…/',
+      'memo-contains':  'memo contains',
+      'memo-equals':    'memo equals'
+    }[t]) || t;
+  }
+
+  function formatRelative(ms) {
+    if (!ms) return 'never';
+    var diff = Date.now() - ms;
+    if (diff < 60_000) return 'just now';
+    if (diff < 3_600_000) return Math.floor(diff / 60_000) + 'm ago';
+    if (diff < 86_400_000) return Math.floor(diff / 3_600_000) + 'h ago';
+    if (diff < 604_800_000) return Math.floor(diff / 86_400_000) + 'd ago';
+    return new Date(ms).toLocaleDateString();
+  }
+
+  function loadCategories() {
+    if (!window.dmBudget) return Promise.resolve([]);
+    return window.dmBudget.getCategories().then(function(cats) {
+      _categories = cats || [];
+      _categoryById = {};
+      _categories.forEach(function(c) { _categoryById[c.id] = c; });
+      // Populate the form select. Expense first, then income.
+      var expenseCats = _categories.filter(function(c) { return c.kind === 'expense'; });
+      var incomeCats = _categories.filter(function(c) { return c.kind === 'income'; });
+      var html = '<option value="">Select…</option>';
+      if (expenseCats.length) {
+        html += '<optgroup label="Expense">';
+        expenseCats.forEach(function(c) {
+          html += '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>';
+        });
+        html += '</optgroup>';
+      }
+      if (incomeCats.length) {
+        html += '<optgroup label="Income">';
+        incomeCats.forEach(function(c) {
+          html += '<option value="' + escapeHtml(c.id) + '">' + escapeHtml(c.name) + '</option>';
+        });
+        html += '</optgroup>';
+      }
+      $categorySelect.innerHTML = html;
+      return _categories;
+    });
+  }
+
+  function renderList(rules) {
+    if (!rules.length) {
+      $list.innerHTML = '<div class="dm-rule-empty">'
+        + '<p>No rules yet.</p>'
+        + '<p style="font-size:0.85rem;">Click <strong>+ New rule</strong> to set up your first auto-categorization rule.</p>'
+        + '</div>';
+      $stat.textContent = '';
+      return;
+    }
+    var enabledCount = rules.filter(function(r) { return r.enabled !== false; }).length;
+    $stat.textContent = rules.length + (rules.length === 1 ? ' rule' : ' rules')
+      + ' · ' + enabledCount + ' active';
+
+    var html = '<table class="dm-rule-table"><thead><tr>'
+      + '<th style="width:60px;">Pri</th>'
+      + '<th>Match</th>'
+      + '<th>Category</th>'
+      + '<th style="width:80px;">Enabled</th>'
+      + '<th style="width:140px;">Matches</th>'
+      + '<th style="width:90px;"></th>'
+      + '</tr></thead><tbody>';
+    rules.forEach(function(r) {
+      var cat = _categoryById[r.categoryId];
+      var catHtml = cat
+        ? '<span class="cat-chip"><span class="cat-dot" style="background:' + escapeHtml(cat.color || '#999') + '"></span>'
+          + escapeHtml(cat.name) + '</span>'
+        : '<em style="opacity:0.6;">unknown</em>';
+      var disabledClass = r.enabled === false ? ' class="disabled"' : '';
+      html += '<tr' + disabledClass + ' data-id="' + escapeHtml(r.id) + '">'
+        + '<td>' + r.priority + '</td>'
+        + '<td>' + matchTypeLabel(r.matchType) + ' &ldquo;<strong>' + escapeHtml(r.pattern) + '</strong>&rdquo;</td>'
+        + '<td>' + catHtml + '</td>'
+        + '<td><label style="cursor:pointer;"><input type="checkbox" data-action="toggle"'
+          + (r.enabled !== false ? ' checked' : '') + '/></label></td>'
+        + '<td class="stat-cell">'
+          + (r.matchCount || 0) + ' match' + ((r.matchCount === 1) ? '' : 'es')
+          + (r.lastMatchedAt ? '<br/><span style="opacity:0.7;">' + formatRelative(r.lastMatchedAt) + '</span>' : '')
+        + '</td>'
+        + '<td>'
+          + '<button class="rule-btn" data-action="edit" type="button" title="Edit">' + (window.dmIcon ? window.dmIcon('pencil', 14) : '✎') + '</button>'
+          + '<button class="rule-btn" data-action="delete" type="button" title="Delete">' + (window.dmIcon ? window.dmIcon('trash', 14) : '🗑') + '</button>'
+        + '</td>'
+      + '</tr>';
+    });
+    html += '</tbody></table>';
+    $list.innerHTML = html;
+  }
+
+  function refresh() {
+    if (!window.dmBudget) return;
+    loadCategories().then(function() {
+      return window.dmBudget.getCategoryRules();
+    }).then(renderList);
+  }
+
+  function showForm(rule) {
+    $formWrap.style.display = '';
+    if (rule) {
+      $idInput.value = rule.id;
+      $matchType.value = rule.matchType || 'payee-contains';
+      $pattern.value = rule.pattern || '';
+      $categorySelect.value = rule.categoryId || '';
+      $priority.value = typeof rule.priority === 'number' ? rule.priority : 100;
+    } else {
+      $idInput.value = '';
+      $matchType.value = 'payee-contains';
+      $pattern.value = '';
+      $categorySelect.value = '';
+      // Default priority = max + 10
+      window.dmBudget.getCategoryRules().then(function(rules) {
+        var maxPriority = rules.reduce(function(m, r) {
+          return Math.max(m, typeof r.priority === 'number' ? r.priority : 0);
+        }, 0);
+        $priority.value = (maxPriority || 0) + 10;
+      });
+    }
+    setTimeout(function() { $pattern.focus(); }, 50);
+  }
+
+  function hideForm() {
+    $formWrap.style.display = 'none';
+    $form.reset();
+    $idInput.value = '';
+  }
+
+  $addBtn.addEventListener('click', function() { showForm(null); });
+  $cancelBtn.addEventListener('click', hideForm);
+
+  $form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var pattern = ($pattern.value || '').trim();
+    var categoryId = $categorySelect.value;
+    if (!pattern || !categoryId) return;
+    var data = {
+      matchType: $matchType.value,
+      pattern: pattern,
+      categoryId: categoryId,
+      priority: parseInt($priority.value, 10) || 100,
+      enabled: true
+    };
+    var existingId = $idInput.value;
+    var op = existingId
+      ? window.dmBudget.updateCategoryRule(existingId, data)
+      : window.dmBudget.createCategoryRule(data);
+    op.then(function() {
+      hideForm();
+      refresh();
+    }).catch(function(err) {
+      console.error('[dm-rules] save failed', err);
+      if (window.dmAlert) window.dmAlert('Failed to save rule: ' + (err && err.message || 'unknown error'));
+    });
+  });
+
+  // Event delegation for list rows
+  $list.addEventListener('click', function(e) {
+    var btn = e.target.closest('button[data-action], input[data-action]');
+    if (!btn) return;
+    var row = btn.closest('tr[data-id]');
+    if (!row) return;
+    var id = row.getAttribute('data-id');
+    var action = btn.getAttribute('data-action');
+    if (action === 'edit') {
+      window.dmBudget.getCategoryRule(id).then(function(rule) {
+        if (rule) showForm(rule);
+      });
+    } else if (action === 'delete') {
+      var doDelete = function() {
+        window.dmBudget.deleteCategoryRule(id).then(refresh);
+      };
+      if (window.dmConfirm) {
+        window.dmConfirm('Delete this rule? Existing transactions categorized by it stay categorized.', doDelete);
+      } else if (confirm('Delete this rule?')) {
+        doDelete();
+      }
+    }
+  });
+  $list.addEventListener('change', function(e) {
+    var input = e.target;
+    if (input.tagName !== 'INPUT' || input.getAttribute('data-action') !== 'toggle') return;
+    var row = input.closest('tr[data-id]');
+    if (!row) return;
+    var id = row.getAttribute('data-id');
+    window.dmBudget.updateCategoryRule(id, { enabled: input.checked }).then(refresh);
+  });
+
+  // Bulk apply
+  $bulkBtn.addEventListener('click', function() {
+    $bulkBtn.disabled = true;
+    $bulkBtn.textContent = 'Applying…';
+    window.dmBudget.bulkApplyRulesToUncategorized().then(function(result) {
+      $bulkResultWrap.innerHTML = '<div class="dm-rule-bulk-result">'
+        + 'Updated <strong>' + result.updated + '</strong> of ' + result.scanned
+        + ' uncategorized transaction' + (result.scanned === 1 ? '' : 's') + '.'
+        + '</div>';
+    }).catch(function(err) {
+      console.error('[dm-rules] bulk apply failed', err);
+      $bulkResultWrap.innerHTML = '<div class="dm-rule-bulk-result" style="background:rgba(229,57,53,0.1);">'
+        + 'Bulk apply failed: ' + escapeHtml(err && err.message || 'unknown error')
+        + '</div>';
+    }).then(function() {
+      $bulkBtn.disabled = false;
+      $bulkBtn.textContent = 'Apply to existing';
+    });
+  });
+
+  // Test-match panel
+  $testForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    var fakeTx = { payee: $testPayee.value, memo: $testMemo.value };
+    if (!fakeTx.payee && !fakeTx.memo) {
+      $testResultWrap.innerHTML = '<div class="dm-rule-test-result empty">Enter a payee or memo to test.</div>';
+      return;
+    }
+    window.dmBudget.applyCategoryRules(fakeTx).then(function(match) {
+      if (!match) {
+        $testResultWrap.innerHTML = '<div class="dm-rule-test-result nomatch">No rule matches this combination.</div>';
+        return;
+      }
+      var cat = _categoryById[match.categoryId];
+      $testResultWrap.innerHTML = '<div class="dm-rule-test-result match">'
+        + 'Would categorize as <strong>' + escapeHtml(cat ? cat.name : match.categoryId) + '</strong>'
+        + ' (rule <code>' + escapeHtml(match.ruleId) + '</code>)'
+        + '</div>';
+    });
+  });
+
+  // React to data changes
+  document.addEventListener('dm-category-rules-updated', refresh);
+  window.addEventListener('dm-category-rules-updated', refresh);
+  document.addEventListener('dm-categories-updated', loadCategories);
+  window.addEventListener('dm-categories-updated', loadCategories);
+  document.addEventListener('dm-sync-complete', refresh);
+
+  // Initial render — wait for sync to complete so data is available
+  function init() {
+    if (window.dmBudget) {
+      refresh();
+    } else {
+      setTimeout(init, 200);
+    }
+  }
+  if (window.dmAuthReady && window.dmAuthReady.then) {
+    window.dmAuthReady.then(init);
+  } else {
+    init();
+  }
+})();
+</script>
