@@ -6502,6 +6502,237 @@
       });
     },
 
+    // Net worth time-series. Walks accounts (opening balances) + all transactions
+    // and produces a running balance series. Memoized by latest tx updatedAt so
+    // repeated calls in the same session are O(1).
+    //
+    // Args: { from, to, bucket } — all optional.
+    //   from: YYYY-MM-DD (defaults to earliest tx date, or today if no txs)
+    //   to:   YYYY-MM-DD (defaults to today)
+    //   bucket: 'day' | 'week' | 'auto' (default 'auto' — day if ≤365 days else week)
+    //
+    // Returns:
+    //   { range: { from, to }, bucket, points: [{ date, label, cents }],
+    //     earliestDate, currentCents, startCents, deltaCents }
+    //
+    // Accounts with includeInNetWorth === false are excluded.
+    // Soft-deleted txs and txs in excluded accounts are ignored.
+    getNetWorthSeries: function(args) {
+      args = args || {};
+      var api = window.dmBudget;
+      return Promise.all([api.getAccounts(), api.getTransactions({})])
+        .then(function(r) {
+          var accounts = r[0] || [];
+          var allTxs = r[1] || [];
+          var includedAccts = {};
+          var openingTotal = 0;
+          accounts.forEach(function(a) {
+            if (a.includeInNetWorth === false) return;
+            includedAccts[a.id] = true;
+            openingTotal += (a.openingBalance || 0);
+          });
+          var txs = allTxs.filter(function(t) { return includedAccts[t.accountId]; });
+
+          // Memoization key — depends on latest tx updatedAt + accounts updatedAt + args
+          var maxUpdated = 0;
+          accounts.forEach(function(a) { if (a.updatedAt > maxUpdated) maxUpdated = a.updatedAt; });
+          txs.forEach(function(t) { if (t.updatedAt > maxUpdated) maxUpdated = t.updatedAt; });
+          var cacheKey = JSON.stringify({
+            f: args.from || '', t: args.to || '', b: args.bucket || 'auto',
+            u: maxUpdated, n: txs.length, a: accounts.length
+          });
+          api._netWorthCache = api._netWorthCache || {};
+          if (api._netWorthCache[cacheKey]) {
+            return api._netWorthCache[cacheKey];
+          }
+
+          var today = new Date();
+          function fmt(d) {
+            return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+          }
+          var todayStr = fmt(today);
+
+          // Earliest tx date
+          var earliestDate = null;
+          txs.forEach(function(t) {
+            if (t.date && (!earliestDate || t.date < earliestDate)) earliestDate = t.date;
+          });
+          if (!earliestDate) earliestDate = todayStr;
+
+          var from = args.from || earliestDate;
+          var to = args.to || todayStr;
+          if (from > to) from = to;
+
+          // Compute starting balance at `from` = opening balance + sum of txs with date < from
+          var startBal = openingTotal;
+          txs.forEach(function(t) {
+            if (t.date && t.date < from) startBal += (t.amount || 0);
+          });
+
+          // Group txs in [from, to] by date
+          var deltaByDate = {};
+          txs.forEach(function(t) {
+            if (!t.date || t.date < from || t.date > to) return;
+            deltaByDate[t.date] = (deltaByDate[t.date] || 0) + (t.amount || 0);
+          });
+
+          // Determine bucket
+          function dayDiff(a, b) {
+            var pa = a.split('-'), pb = b.split('-');
+            var da = new Date(parseInt(pa[0],10), parseInt(pa[1],10)-1, parseInt(pa[2],10));
+            var db = new Date(parseInt(pb[0],10), parseInt(pb[1],10)-1, parseInt(pb[2],10));
+            return Math.round((db - da) / 86400000);
+          }
+          var spanDays = dayDiff(from, to) + 1;
+          var bucket = args.bucket || 'auto';
+          if (bucket === 'auto') bucket = spanDays <= 365 ? 'day' : 'week';
+
+          // Walk daily, accumulating
+          var dailyPoints = [];
+          var cur = (function(){ var p = from.split('-'); return new Date(parseInt(p[0],10), parseInt(p[1],10)-1, parseInt(p[2],10)); })();
+          var endD = (function(){ var p = to.split('-'); return new Date(parseInt(p[0],10), parseInt(p[1],10)-1, parseInt(p[2],10)); })();
+          var bal = startBal;
+          while (cur <= endD) {
+            var ds = fmt(cur);
+            bal += (deltaByDate[ds] || 0);
+            dailyPoints.push({ date: ds, cents: bal });
+            cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+          }
+
+          // Bucket
+          var points;
+          if (bucket === 'day') {
+            points = dailyPoints.map(function(p) { return { date: p.date, label: p.date.slice(5), cents: p.cents }; });
+          } else if (bucket === 'week') {
+            // Sample end-of-week balance every 7 days
+            points = [];
+            for (var i = 0; i < dailyPoints.length; i += 7) {
+              var endIdx = Math.min(i + 6, dailyPoints.length - 1);
+              var p = dailyPoints[endIdx];
+              points.push({ date: p.date, label: p.date.slice(5), cents: p.cents });
+            }
+          } else { // month
+            points = [];
+            var seen = {};
+            dailyPoints.forEach(function(p) {
+              var key = p.date.slice(0, 7);
+              seen[key] = p; // overwrite — last day of month wins
+            });
+            Object.keys(seen).sort().forEach(function(k) {
+              points.push({ date: seen[k].date, label: k, cents: seen[k].cents });
+            });
+          }
+
+          var currentCents = dailyPoints.length ? dailyPoints[dailyPoints.length - 1].cents : startBal;
+          var result = {
+            range: { from: from, to: to },
+            bucket: bucket,
+            points: points,
+            earliestDate: earliestDate,
+            currentCents: currentCents,
+            startCents: startBal,
+            deltaCents: currentCents - startBal,
+          };
+          api._netWorthCache[cacheKey] = result;
+          return result;
+        });
+    },
+
+    // Cashflow forecast: project upcoming income/expense events from active recurring
+    // rules over the next N days, plus a running projected balance.
+    //
+    // Args: { days = 90, today = YYYY-MM-DD }
+    // Returns:
+    //   { days, range: { from, to }, points: [{ date, incomeCents, expenseCents,
+    //     netCents, balanceCents, eventCount }],
+    //     startBalanceCents, endBalanceCents, totalIncomeCents, totalExpenseCents,
+    //     ruleCount, eventCount }
+    getCashflowForecast: function(args) {
+      args = args || {};
+      var api = window.dmBudget;
+      var days = typeof args.days === 'number' && args.days > 0 ? args.days : 90;
+      function fmt(d) {
+        return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+      }
+      var todayStr = args.today || fmt(new Date());
+      var todayParts = todayStr.split('-');
+      var endD = new Date(parseInt(todayParts[0],10), parseInt(todayParts[1],10)-1, parseInt(todayParts[2],10) + days - 1);
+      var endStr = fmt(endD);
+
+      return Promise.all([
+        api.getNetWorthSeries({ to: todayStr }),
+        api.getRecurring()
+      ]).then(function(r) {
+        var nw = r[0];
+        var rules = (r[1] || []).filter(function(rule) {
+          if (!rule.autoPost) return false;
+          if (rule.endDate && rule.endDate < todayStr) return false;
+          return true;
+        });
+
+        // Generate events per rule within window
+        var byDate = {};
+        var totalEvents = 0;
+        rules.forEach(function(rule) {
+          var d = rule.nextDueDate || rule.startDate;
+          if (!d) return;
+          // If nextDueDate is in the past, advance forward to today
+          var safety = 0;
+          while (d < todayStr && safety < 1000) {
+            d = api.computeNextDate(d, rule.frequency, rule.interval);
+            safety++;
+          }
+          while (d <= endStr && safety < 2000) {
+            if (rule.endDate && d > rule.endDate) break;
+            var amt = rule.amount || 0;
+            byDate[d] = byDate[d] || { incomeCents: 0, expenseCents: 0, eventCount: 0 };
+            if (amt >= 0) byDate[d].incomeCents += amt;
+            else byDate[d].expenseCents += (-amt);
+            byDate[d].eventCount += 1;
+            totalEvents++;
+            d = api.computeNextDate(d, rule.frequency, rule.interval);
+            safety++;
+          }
+        });
+
+        // Build daily points with running balance
+        var startBal = nw.currentCents || 0;
+        var bal = startBal;
+        var totalIncome = 0, totalExpense = 0;
+        var points = [];
+        var cur = new Date(parseInt(todayParts[0],10), parseInt(todayParts[1],10)-1, parseInt(todayParts[2],10));
+        for (var i = 0; i < days; i++) {
+          var ds = fmt(cur);
+          var bucket = byDate[ds] || { incomeCents: 0, expenseCents: 0, eventCount: 0 };
+          var net = bucket.incomeCents - bucket.expenseCents;
+          bal += net;
+          totalIncome += bucket.incomeCents;
+          totalExpense += bucket.expenseCents;
+          points.push({
+            date: ds,
+            incomeCents: bucket.incomeCents,
+            expenseCents: bucket.expenseCents,
+            netCents: net,
+            balanceCents: bal,
+            eventCount: bucket.eventCount,
+          });
+          cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+        }
+
+        return {
+          days: days,
+          range: { from: todayStr, to: endStr },
+          points: points,
+          startBalanceCents: startBal,
+          endBalanceCents: bal,
+          totalIncomeCents: totalIncome,
+          totalExpenseCents: totalExpense,
+          ruleCount: rules.length,
+          eventCount: totalEvents,
+        };
+      });
+    },
+
     // ── Recurring rules (Phase 2a) ──
     // Fields (see serializeRecurring): name, accountId, categoryId, amount (cents, signed),
     // frequency ('daily'|'weekly'|'monthly'|'yearly'), interval, byDayOfMonth, byDayOfWeek,

@@ -5,7 +5,7 @@
     - Slice A (this file, current): Spending by category — donut + bar list
     - Slice B (this file, current): Trend line (D / W / M with moving avg)
     - Slice C (this file, current): Calendar heatmap of daily spend
-    - Slice D (planned): Net worth over time + cashflow forecast
+    - Slice D (this file, current): Net worth over time + cashflow forecast
     - Slice E (planned): Insights cards
 
   All charts share a sticky range selector at the top.
@@ -321,6 +321,77 @@
   .dm-rpt-heat-tooltip .ttp-amt {
     font-weight: 600; font-variant-numeric: tabular-nums;
   }
+
+  /* Net worth + cashflow (Slice D) */
+  .dm-rpt-nw-stats, .dm-rpt-cf-stats {
+    display: flex; gap: 18px; flex-wrap: wrap;
+    font-size: 0.82rem; margin-bottom: 10px;
+  }
+  .dm-rpt-nw-stats .stat .lbl, .dm-rpt-cf-stats .stat .lbl {
+    opacity: 0.6; text-transform: uppercase;
+    letter-spacing: 0.05em; font-size: 0.7rem;
+    margin-right: 4px;
+  }
+  .dm-rpt-nw-stats .stat .val, .dm-rpt-cf-stats .stat .val {
+    font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .dm-rpt-nw-stats .stat .val.up { color: #2e7d32; }
+  .dm-rpt-nw-stats .stat .val.down { color: #c62828; }
+  .dm-rpt-nw-wrap, .dm-rpt-cf-wrap { position: relative; }
+  .dm-rpt-nw-svg, .dm-rpt-cf-svg {
+    width: 100%; max-width: 100%;
+    height: 220px;
+    display: block;
+  }
+  .dm-rpt-nw-svg .grid line, .dm-rpt-cf-svg .grid line {
+    stroke: var(--gray-200); stroke-width: 1;
+  }
+  .dm-rpt-nw-svg .axis text, .dm-rpt-cf-svg .axis text {
+    font-size: 10px; fill: var(--body-font-color); opacity: 0.7;
+  }
+  .dm-rpt-nw-svg .area {
+    fill: var(--color-accent, #1976d2); opacity: 0.18;
+  }
+  .dm-rpt-nw-svg .line {
+    stroke: var(--color-accent, #1976d2); stroke-width: 2; fill: none;
+  }
+  .dm-rpt-cf-svg .area-pos {
+    fill: #2e7d32; opacity: 0.16;
+  }
+  .dm-rpt-cf-svg .area-neg {
+    fill: #c62828; opacity: 0.18;
+  }
+  .dm-rpt-cf-svg .line {
+    stroke: var(--color-accent, #1976d2); stroke-width: 2; fill: none;
+  }
+  .dm-rpt-cf-svg .zero-line {
+    stroke: var(--body-font-color); stroke-width: 1;
+    stroke-dasharray: 3 3; opacity: 0.4;
+  }
+  .dm-rpt-nw-svg .point, .dm-rpt-cf-svg .point {
+    fill: var(--color-accent, #1976d2);
+  }
+  .dm-rpt-nw-tooltip, .dm-rpt-cf-tooltip {
+    position: absolute; pointer-events: none;
+    background: var(--body-background);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px; padding: 6px 9px;
+    font-size: 0.78rem; white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    opacity: 0; transform: translate(-50%, -120%);
+    transition: opacity 0.1s;
+    z-index: 4;
+  }
+  .dm-rpt-nw-tooltip.active, .dm-rpt-cf-tooltip.active { opacity: 1; }
+  .dm-rpt-nw-tooltip .ttp-amt, .dm-rpt-cf-tooltip .ttp-amt {
+    font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .dm-rpt-nw-caption, .dm-rpt-cf-caption {
+    font-size: 0.75rem; opacity: 0.65; margin-top: 6px;
+  }
+  .dm-rpt-cf-empty {
+    padding: 28px; text-align: center; opacity: 0.6; font-size: 0.85rem;
+  }
 </style>
 
 <div class="dm-rpt-wrap" id="dm-rpt-root">
@@ -403,6 +474,30 @@
       <span>More</span>
     </div>
   </section>
+
+  <section class="dm-rpt-section" id="dm-rpt-nw-section">
+    <h3>
+      <span>Net worth over time</span>
+    </h3>
+    <div class="dm-rpt-nw-stats" id="dm-rpt-nw-stats"></div>
+    <div class="dm-rpt-nw-wrap">
+      <svg class="dm-rpt-nw-svg" id="dm-rpt-nw-svg" viewBox="0 0 600 220" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div class="dm-rpt-nw-tooltip" id="dm-rpt-nw-tooltip"></div>
+    </div>
+    <div class="dm-rpt-nw-caption" id="dm-rpt-nw-caption"></div>
+  </section>
+
+  <section class="dm-rpt-section" id="dm-rpt-cf-section">
+    <h3>
+      <span>90-day cashflow forecast</span>
+    </h3>
+    <div class="dm-rpt-cf-stats" id="dm-rpt-cf-stats"></div>
+    <div class="dm-rpt-cf-wrap">
+      <svg class="dm-rpt-cf-svg" id="dm-rpt-cf-svg" viewBox="0 0 600 220" preserveAspectRatio="none" aria-hidden="true"></svg>
+      <div class="dm-rpt-cf-tooltip" id="dm-rpt-cf-tooltip"></div>
+    </div>
+    <div class="dm-rpt-cf-caption" id="dm-rpt-cf-caption"></div>
+  </section>
 </div>
 
 <script>
@@ -432,6 +527,16 @@
   var $heatYear = document.getElementById('dm-rpt-heat-year');
   var $heatPrev = document.getElementById('dm-rpt-heat-prev');
   var $heatNext = document.getElementById('dm-rpt-heat-next');
+  var $nwSection = document.getElementById('dm-rpt-nw-section');
+  var $nwSvg = document.getElementById('dm-rpt-nw-svg');
+  var $nwStats = document.getElementById('dm-rpt-nw-stats');
+  var $nwTooltip = document.getElementById('dm-rpt-nw-tooltip');
+  var $nwCaption = document.getElementById('dm-rpt-nw-caption');
+  var $cfSection = document.getElementById('dm-rpt-cf-section');
+  var $cfSvg = document.getElementById('dm-rpt-cf-svg');
+  var $cfStats = document.getElementById('dm-rpt-cf-stats');
+  var $cfTooltip = document.getElementById('dm-rpt-cf-tooltip');
+  var $cfCaption = document.getElementById('dm-rpt-cf-caption');
 
   var _state = {
     preset: 'this-month',
@@ -862,6 +967,239 @@
     });
   }
 
+  // ── Net worth + Cashflow forecast (Slice D) ────────────────────────
+  function niceCeilCents(v) {
+    if (v <= 0) return 100;
+    var pow = Math.pow(10, Math.floor(Math.log10(v)));
+    var n = v / pow;
+    var step = n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10;
+    return step * pow;
+  }
+  function niceFloorCents(v) {
+    if (v >= 0) return 0;
+    return -niceCeilCents(-v);
+  }
+
+  function renderNetWorth(result) {
+    var pts = result.points || [];
+    var deltaCls = result.deltaCents > 0 ? 'up' : (result.deltaCents < 0 ? 'down' : '');
+    $nwStats.innerHTML =
+      '<span class="stat"><span class="lbl">Current</span><span class="val">' + escapeHtml(fmtMoney(result.currentCents)) + '</span></span>' +
+      '<span class="stat"><span class="lbl">Start</span><span class="val">' + escapeHtml(fmtMoney(result.startCents)) + '</span></span>' +
+      '<span class="stat"><span class="lbl">Change</span><span class="val ' + deltaCls + '">' + escapeHtml((result.deltaCents >= 0 ? '+' : '') + fmtMoney(result.deltaCents)) + '</span></span>';
+
+    if (result.earliestDate) {
+      $nwCaption.textContent = 'Tracking since ' + result.earliestDate + ' · bucket: ' + result.bucket;
+    } else {
+      $nwCaption.textContent = '';
+    }
+
+    if (!pts.length) {
+      $nwSvg.innerHTML = '<text x="300" y="110" text-anchor="middle" fill="currentColor" opacity="0.55" font-size="13">No transactions yet — net worth will appear here once you add some.</text>';
+      return;
+    }
+
+    var W = 600, H = 220, padL = 50, padR = 12, padT = 12, padB = 28;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var minC = Infinity, maxC = -Infinity;
+    pts.forEach(function(p) { if (p.cents < minC) minC = p.cents; if (p.cents > maxC) maxC = p.cents; });
+    var yMax = niceCeilCents(maxC > 0 ? maxC * 1.05 : 100);
+    var yMin = minC < 0 ? niceFloorCents(minC * 1.05) : 0;
+    if (yMax === yMin) yMax = yMin + 100;
+
+    function x(i) {
+      if (pts.length === 1) return padL + iw / 2;
+      return padL + (i / (pts.length - 1)) * iw;
+    }
+    function y(c) { return padT + (1 - ((c - yMin) / (yMax - yMin))) * ih; }
+
+    var grid = '<g class="grid">';
+    var axis = '<g class="axis">';
+    for (var g = 0; g <= 4; g++) {
+      var gy = padT + (g / 4) * ih;
+      var gv = yMax - (g / 4) * (yMax - yMin);
+      grid += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + gy.toFixed(1) + '"/>';
+      axis += '<text x="' + (padL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end">' + escapeHtml(fmtMoney(Math.round(gv))) + '</text>';
+    }
+    grid += '</g>';
+    var ticks = Math.min(6, pts.length);
+    for (var ti = 0; ti < ticks; ti++) {
+      var idx = Math.round((ti / (ticks - 1 || 1)) * (pts.length - 1));
+      var p = pts[idx];
+      axis += '<text x="' + x(idx).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + escapeHtml(p.label) + '</text>';
+    }
+    axis += '</g>';
+
+    var linePts = pts.map(function(p, i) { return x(i).toFixed(1) + ',' + y(p.cents).toFixed(1); });
+    var lineD = 'M ' + linePts.join(' L ');
+    var baseY = y(Math.max(yMin, 0));
+    var areaD = lineD + ' L ' + x(pts.length - 1).toFixed(1) + ',' + baseY.toFixed(1) +
+                ' L ' + x(0).toFixed(1) + ',' + baseY.toFixed(1) + ' Z';
+
+    var hoverRects = '';
+    var bw = pts.length > 1 ? iw / (pts.length - 1) : iw;
+    for (var hi = 0; hi < pts.length; hi++) {
+      var rx = (pts.length === 1) ? padL : (padL + Math.max(0, (hi - 0.5)) * bw);
+      var rw = (pts.length === 1) ? iw : bw;
+      if (hi === 0 || hi === pts.length - 1) rw = bw / 2;
+      if (hi === 0) rx = padL;
+      hoverRects += '<rect x="' + rx.toFixed(1) + '" y="' + padT + '" width="' + Math.max(1, rw).toFixed(1) + '" height="' + ih + '" fill="transparent" data-i="' + hi + '"/>';
+    }
+
+    $nwSvg.innerHTML =
+      grid + axis +
+      '<path class="area" d="' + areaD + '"/>' +
+      '<path class="line" d="' + lineD + '"/>' +
+      hoverRects;
+
+    $nwSvg.querySelectorAll('rect[data-i]').forEach(function(rc) {
+      rc.addEventListener('mouseenter', function() {
+        var i = parseInt(rc.getAttribute('data-i'), 10);
+        var p = pts[i]; if (!p) return;
+        var svgRect = $nwSvg.getBoundingClientRect();
+        var wrapRect = $nwSvg.parentElement.getBoundingClientRect();
+        var pixelX = svgRect.left + (x(i) / W) * svgRect.width - wrapRect.left;
+        var pixelY = svgRect.top + (y(p.cents) / H) * svgRect.height - wrapRect.top;
+        $nwTooltip.style.left = pixelX + 'px';
+        $nwTooltip.style.top = pixelY + 'px';
+        $nwTooltip.innerHTML = '<div>' + escapeHtml(p.date) + '</div><div class="ttp-amt">' + escapeHtml(fmtMoney(p.cents)) + '</div>';
+        $nwTooltip.classList.add('active');
+      });
+      rc.addEventListener('mouseleave', function() { $nwTooltip.classList.remove('active'); });
+    });
+  }
+
+  function refreshNetWorth() {
+    if (!window.dmBudget || !window.dmBudget.getNetWorthSeries) return;
+    $nwSection.classList.add('dm-rpt-loading');
+    window.dmBudget.getNetWorthSeries({}).then(function(result) {
+      $nwSection.classList.remove('dm-rpt-loading');
+      renderNetWorth(result);
+    }).catch(function(err) {
+      $nwSection.classList.remove('dm-rpt-loading');
+      console.warn('[reports] getNetWorthSeries failed', err);
+    });
+  }
+
+  function renderCashflow(result) {
+    var pts = result.points || [];
+    var endDelta = result.endBalanceCents - result.startBalanceCents;
+    var endCls = endDelta > 0 ? 'up' : (endDelta < 0 ? 'down' : '');
+    $cfStats.innerHTML =
+      '<span class="stat"><span class="lbl">Start</span><span class="val">' + escapeHtml(fmtMoney(result.startBalanceCents)) + '</span></span>' +
+      '<span class="stat"><span class="lbl">End (proj)</span><span class="val ' + endCls + '">' + escapeHtml(fmtMoney(result.endBalanceCents)) + '</span></span>' +
+      '<span class="stat"><span class="lbl">Income</span><span class="val">' + escapeHtml(fmtMoney(result.totalIncomeCents)) + '</span></span>' +
+      '<span class="stat"><span class="lbl">Expense</span><span class="val">' + escapeHtml(fmtMoney(result.totalExpenseCents)) + '</span></span>' +
+      '<span class="stat"><span class="lbl">Events</span><span class="val">' + result.eventCount + '</span></span>';
+
+    if (result.ruleCount === 0) {
+      $cfSvg.innerHTML = '';
+      $cfCaption.innerHTML = '';
+      $cfSvg.insertAdjacentHTML('afterend', '');
+      $cfSvg.innerHTML = '<text x="300" y="110" text-anchor="middle" fill="currentColor" opacity="0.55" font-size="13">No active recurring rules — set up some at /docs/budget/recurring/ to see a forecast.</text>';
+      return;
+    }
+
+    $cfCaption.textContent = result.range.from + ' → ' + result.range.to + ' · ' + result.ruleCount + ' active rule' + (result.ruleCount === 1 ? '' : 's');
+
+    var W = 600, H = 220, padL = 50, padR = 12, padT = 12, padB = 28;
+    var iw = W - padL - padR, ih = H - padT - padB;
+    var minB = Math.min(result.startBalanceCents, result.endBalanceCents);
+    var maxB = Math.max(result.startBalanceCents, result.endBalanceCents);
+    pts.forEach(function(p) { if (p.balanceCents < minB) minB = p.balanceCents; if (p.balanceCents > maxB) maxB = p.balanceCents; });
+    var yMax = niceCeilCents(maxB > 0 ? maxB * 1.05 : 100);
+    var yMin = minB < 0 ? niceFloorCents(minB * 1.05) : 0;
+    if (yMax === yMin) yMax = yMin + 100;
+
+    function x(i) {
+      if (pts.length === 1) return padL + iw / 2;
+      return padL + (i / (pts.length - 1)) * iw;
+    }
+    function y(c) { return padT + (1 - ((c - yMin) / (yMax - yMin))) * ih; }
+
+    var grid = '<g class="grid">';
+    var axis = '<g class="axis">';
+    for (var g = 0; g <= 4; g++) {
+      var gy = padT + (g / 4) * ih;
+      var gv = yMax - (g / 4) * (yMax - yMin);
+      grid += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + gy.toFixed(1) + '"/>';
+      axis += '<text x="' + (padL - 6) + '" y="' + (gy + 3).toFixed(1) + '" text-anchor="end">' + escapeHtml(fmtMoney(Math.round(gv))) + '</text>';
+    }
+    grid += '</g>';
+    var ticks = Math.min(6, pts.length);
+    for (var ti = 0; ti < ticks; ti++) {
+      var idx = Math.round((ti / (ticks - 1 || 1)) * (pts.length - 1));
+      var p = pts[idx];
+      axis += '<text x="' + x(idx).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' + escapeHtml(p.date.slice(5)) + '</text>';
+    }
+    axis += '</g>';
+
+    var linePts = pts.map(function(p, i) { return x(i).toFixed(1) + ',' + y(p.balanceCents).toFixed(1); });
+    var lineD = 'M ' + linePts.join(' L ');
+    var zeroY = y(Math.max(yMin, Math.min(yMax, 0)));
+    // Build pos area (above zero) + neg area (below zero) by clipping
+    var areaPosD = lineD + ' L ' + x(pts.length - 1).toFixed(1) + ',' + zeroY.toFixed(1) +
+                   ' L ' + x(0).toFixed(1) + ',' + zeroY.toFixed(1) + ' Z';
+
+    var zeroLine = (yMin < 0 && yMax > 0)
+      ? '<line class="zero-line" x1="' + padL + '" y1="' + zeroY.toFixed(1) + '" x2="' + (W - padR) + '" y2="' + zeroY.toFixed(1) + '"/>'
+      : '';
+
+    var hoverRects = '';
+    var bw = pts.length > 1 ? iw / (pts.length - 1) : iw;
+    for (var hi = 0; hi < pts.length; hi++) {
+      var rx = (pts.length === 1) ? padL : (padL + Math.max(0, (hi - 0.5)) * bw);
+      var rw = (pts.length === 1) ? iw : bw;
+      if (hi === 0 || hi === pts.length - 1) rw = bw / 2;
+      if (hi === 0) rx = padL;
+      hoverRects += '<rect x="' + rx.toFixed(1) + '" y="' + padT + '" width="' + Math.max(1, rw).toFixed(1) + '" height="' + ih + '" fill="transparent" data-i="' + hi + '"/>';
+    }
+
+    $cfSvg.innerHTML =
+      grid + axis +
+      '<path class="area-pos" d="' + areaPosD + '"/>' +
+      zeroLine +
+      '<path class="line" d="' + lineD + '"/>' +
+      hoverRects;
+
+    $cfSvg.querySelectorAll('rect[data-i]').forEach(function(rc) {
+      rc.addEventListener('mouseenter', function() {
+        var i = parseInt(rc.getAttribute('data-i'), 10);
+        var p = pts[i]; if (!p) return;
+        var svgRect = $cfSvg.getBoundingClientRect();
+        var wrapRect = $cfSvg.parentElement.getBoundingClientRect();
+        var pixelX = svgRect.left + (x(i) / W) * svgRect.width - wrapRect.left;
+        var pixelY = svgRect.top + (y(p.balanceCents) / H) * svgRect.height - wrapRect.top;
+        $cfTooltip.style.left = pixelX + 'px';
+        $cfTooltip.style.top = pixelY + 'px';
+        var eventLine = p.eventCount > 0
+          ? '<div style="opacity:0.7">' + p.eventCount + ' event' + (p.eventCount === 1 ? '' : 's') +
+            (p.incomeCents ? ' · +' + escapeHtml(fmtMoney(p.incomeCents)) : '') +
+            (p.expenseCents ? ' · -' + escapeHtml(fmtMoney(p.expenseCents)) : '') +
+            '</div>'
+          : '';
+        $cfTooltip.innerHTML =
+          '<div>' + escapeHtml(p.date) + '</div>' +
+          '<div class="ttp-amt">' + escapeHtml(fmtMoney(p.balanceCents)) + '</div>' +
+          eventLine;
+        $cfTooltip.classList.add('active');
+      });
+      rc.addEventListener('mouseleave', function() { $cfTooltip.classList.remove('active'); });
+    });
+  }
+
+  function refreshCashflow() {
+    if (!window.dmBudget || !window.dmBudget.getCashflowForecast) return;
+    $cfSection.classList.add('dm-rpt-loading');
+    window.dmBudget.getCashflowForecast({ days: 90 }).then(function(result) {
+      $cfSection.classList.remove('dm-rpt-loading');
+      renderCashflow(result);
+    }).catch(function(err) {
+      $cfSection.classList.remove('dm-rpt-loading');
+      console.warn('[reports] getCashflowForecast failed', err);
+    });
+  }
+
   function refresh() {
     if (!window.dmBudget || !window.dmBudget.getCategorySpend) return;
     var rangeArg;
@@ -887,6 +1225,8 @@
     });
     refreshTrend(rangeArg);
     refreshHeat();
+    refreshNetWorth();
+    refreshCashflow();
   }
 
   // ── Wiring ─────────────────────────────────────────────────────────
