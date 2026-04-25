@@ -6202,6 +6202,153 @@
       });
     },
 
+    // Expense trend over a date range, bucketed by day/week/month.
+    // Args: { from, to, bucket } where bucket in 'day'|'week'|'month'|'auto'.
+    //   - 'auto' picks: <=45 days -> day, <=180 days -> week, else month.
+    // Returns { range, bucket, points: [{ key, label, cents, movingAvgCents }],
+    //           totalCents, peakCents, avgCents, maWindow }.
+    // - Expenses only (negative amounts; split rows credited per-split).
+    // - Soft-deleted tx already filtered out by getTransactions.
+    // - Missing buckets are filled with cents:0 so the line stays continuous.
+    // - Trailing moving average (window 7 day / 4 week / 3 month).
+    getExpenseTrend: function(args) {
+      var api = window.dmBudget;
+      args = args || {};
+      var range = api.resolveReportRange(
+        (args.from && args.to) ? { from: args.from, to: args.to, label: args.label }
+                               : (args.preset || 'this-month')
+      );
+      function parseYMD(s) { var p = s.split('-'); return [parseInt(p[0],10), parseInt(p[1],10)-1, parseInt(p[2],10)]; }
+      function fmtYMD(y, m, d) { return y + '-' + ('0'+(m+1)).slice(-2) + '-' + ('0'+d).slice(-2); }
+      var f = parseYMD(range.from), t = parseYMD(range.to);
+      var fromDate = new Date(f[0], f[1], f[2]);
+      var toDate = new Date(t[0], t[1], t[2]);
+      var spanDays = Math.round((toDate - fromDate) / 86400000) + 1;
+
+      var bucket = args.bucket || 'auto';
+      if (bucket === 'auto') {
+        bucket = spanDays <= 45 ? 'day' : (spanDays <= 180 ? 'week' : 'month');
+      }
+      var maWindow = bucket === 'day' ? 7 : (bucket === 'week' ? 4 : 3);
+
+      // Monday-anchored ISO week start.
+      function mondayOf(y, m, d) {
+        var dt = new Date(y, m, d);
+        var dow = dt.getDay(); // 0=Sun..6=Sat
+        var delta = (dow === 0 ? -6 : (1 - dow)); // shift back to Monday
+        return new Date(y, m, d + delta);
+      }
+      function bucketKeyForDate(dateStr) {
+        var p = parseYMD(dateStr);
+        if (bucket === 'day') return dateStr;
+        if (bucket === 'week') {
+          var mo = mondayOf(p[0], p[1], p[2]);
+          return fmtYMD(mo.getFullYear(), mo.getMonth(), mo.getDate());
+        }
+        // month
+        return p[0] + '-' + ('0' + (p[1] + 1)).slice(-2);
+      }
+
+      // Build the ordered list of bucket keys spanning [from, to].
+      function buildKeys() {
+        var keys = [];
+        if (bucket === 'day') {
+          for (var i = 0; i < spanDays; i++) {
+            var dt = new Date(f[0], f[1], f[2] + i);
+            keys.push(fmtYMD(dt.getFullYear(), dt.getMonth(), dt.getDate()));
+          }
+        } else if (bucket === 'week') {
+          var startMon = mondayOf(f[0], f[1], f[2]);
+          var endMon = mondayOf(t[0], t[1], t[2]);
+          var cur = new Date(startMon.getFullYear(), startMon.getMonth(), startMon.getDate());
+          // Walk by 7 days until past endMon
+          while (cur <= endMon) {
+            keys.push(fmtYMD(cur.getFullYear(), cur.getMonth(), cur.getDate()));
+            cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 7);
+          }
+        } else {
+          // month: walk year/month
+          var y = f[0], m = f[1];
+          var ey = t[0], em = t[1];
+          while (y < ey || (y === ey && m <= em)) {
+            keys.push(y + '-' + ('0' + (m + 1)).slice(-2));
+            m++;
+            if (m > 11) { m = 0; y++; }
+          }
+        }
+        return keys;
+      }
+
+      function labelForKey(k) {
+        if (bucket === 'day') return k.slice(5); // MM-DD
+        if (bucket === 'month') {
+          var parts = k.split('-');
+          var ym = parseInt(parts[0],10), mm = parseInt(parts[1],10) - 1;
+          var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+          return months[mm] + ' ' + ym;
+        }
+        // week: "Mon DD"
+        var p = parseYMD(k);
+        var months2 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return months2[p[1]] + ' ' + p[2];
+      }
+
+      function inRange(date, lo, hi) { return date && date >= lo && date <= hi; }
+
+      return api.getTransactions({}).then(function(allTxs) {
+        var byKey = {};
+        (allTxs || []).forEach(function(tx) {
+          if (!inRange(tx.date, range.from, range.to)) return;
+          var key = bucketKeyForDate(tx.date);
+          if (Array.isArray(tx.splits) && tx.splits.length > 0) {
+            tx.splits.forEach(function(sp) {
+              var amt = sp.amount || 0;
+              if (amt >= 0) return;
+              byKey[key] = (byKey[key] || 0) + (-amt);
+            });
+          } else {
+            var a = tx.amount || 0;
+            if (a >= 0) return;
+            byKey[key] = (byKey[key] || 0) + (-a);
+          }
+        });
+
+        var keys = buildKeys();
+        var points = keys.map(function(k) {
+          return { key: k, label: labelForKey(k), cents: byKey[k] || 0, movingAvgCents: 0 };
+        });
+
+        // Trailing moving average; only emit MA once we've seen >=window points.
+        var sum = 0;
+        for (var i = 0; i < points.length; i++) {
+          sum += points[i].cents;
+          if (i >= maWindow) sum -= points[i - maWindow].cents;
+          if (i >= maWindow - 1) {
+            points[i].movingAvgCents = Math.round(sum / maWindow);
+          } else {
+            points[i].movingAvgCents = null;
+          }
+        }
+
+        var total = 0, peak = 0;
+        points.forEach(function(p) {
+          total += p.cents;
+          if (p.cents > peak) peak = p.cents;
+        });
+        var avg = points.length > 0 ? Math.round(total / points.length) : 0;
+
+        return {
+          range: range,
+          bucket: bucket,
+          points: points,
+          totalCents: total,
+          peakCents: peak,
+          avgCents: avg,
+          maWindow: maWindow
+        };
+      });
+    },
+
     // ── Recurring rules (Phase 2a) ──
     // Fields (see serializeRecurring): name, accountId, categoryId, amount (cents, signed),
     // frequency ('daily'|'weekly'|'monthly'|'yearly'), interval, byDayOfMonth, byDayOfWeek,
