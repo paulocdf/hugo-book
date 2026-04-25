@@ -4752,11 +4752,24 @@
     getProject: function(id) {
       return idbGet(STORE_PROJECTS, id);
     },
-    createProject: function(projectData) {
+     createProject: function(projectData) {
       var user = window.dmAuth && window.dmAuth.currentUser;
       if (!user) return Promise.reject(new Error('Not authenticated'));
       var id = projectData.id || (user.uid + '_proj_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6));
       var now = Date.now();
+      var visualFields = {
+        themeId: projectData.themeId || null,
+        icon: projectData.icon || null,
+        emoji: projectData.emoji || null,
+        accent: projectData.accent || null,
+        accent2: projectData.accent2 || null,
+        bannerStyle: projectData.bannerStyle || null,
+        pattern: projectData.pattern || null,
+        density: projectData.density || null,
+        cardShape: projectData.cardShape || null,
+        fontFamily: projectData.fontFamily || null,
+        kanbanColumnStyles: (projectData.kanbanColumnStyles && typeof projectData.kanbanColumnStyles === 'object') ? projectData.kanbanColumnStyles : null
+      };
       var project = {
         id: id,
         userId: user.uid,
@@ -4767,6 +4780,17 @@
         archived: false,
         order: projectData.order || 0,
         collaborators: projectData.collaborators || [],
+        themeId: visualFields.themeId,
+        icon: visualFields.icon,
+        emoji: visualFields.emoji,
+        accent: visualFields.accent,
+        accent2: visualFields.accent2,
+        bannerStyle: visualFields.bannerStyle,
+        pattern: visualFields.pattern,
+        density: visualFields.density,
+        cardShape: visualFields.cardShape,
+        fontFamily: visualFields.fontFamily,
+        kanbanColumnStyles: visualFields.kanbanColumnStyles,
         createdAt: now,
         updatedAt: now
       };
@@ -4779,6 +4803,17 @@
         archived: false,
         order: project.order,
         collaborators: project.collaborators,
+        themeId: visualFields.themeId,
+        icon: visualFields.icon,
+        emoji: visualFields.emoji,
+        accent: visualFields.accent,
+        accent2: visualFields.accent2,
+        bannerStyle: visualFields.bannerStyle,
+        pattern: visualFields.pattern,
+        density: visualFields.density,
+        cardShape: visualFields.cardShape,
+        fontFamily: visualFields.fontFamily,
+        kanbanColumnStyles: visualFields.kanbanColumnStyles,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       };
@@ -4804,6 +4839,22 @@
         if (updates.archived !== undefined) { project.archived = updates.archived; firestoreUpdates.archived = updates.archived; }
         if (updates.order !== undefined) { project.order = updates.order; firestoreUpdates.order = updates.order; }
         if (updates.collaborators !== undefined) { project.collaborators = updates.collaborators; firestoreUpdates.collaborators = updates.collaborators; }
+        // Visual identity fields (Phase 1–6)
+        if (updates.themeId !== undefined)     { project.themeId     = updates.themeId;     firestoreUpdates.themeId     = updates.themeId; }
+        if (updates.icon !== undefined)        { project.icon        = updates.icon;        firestoreUpdates.icon        = updates.icon; }
+        if (updates.emoji !== undefined)       { project.emoji       = updates.emoji;       firestoreUpdates.emoji       = updates.emoji; }
+        if (updates.accent !== undefined)      { project.accent      = updates.accent;      firestoreUpdates.accent      = updates.accent; }
+        if (updates.accent2 !== undefined)     { project.accent2     = updates.accent2;     firestoreUpdates.accent2     = updates.accent2; }
+        if (updates.bannerStyle !== undefined) { project.bannerStyle = updates.bannerStyle; firestoreUpdates.bannerStyle = updates.bannerStyle; }
+        if (updates.pattern !== undefined)     { project.pattern     = updates.pattern;     firestoreUpdates.pattern     = updates.pattern; }
+        if (updates.density !== undefined)     { project.density     = updates.density;     firestoreUpdates.density     = updates.density; }
+        if (updates.cardShape !== undefined)   { project.cardShape   = updates.cardShape;   firestoreUpdates.cardShape   = updates.cardShape; }
+        if (updates.fontFamily !== undefined)  { project.fontFamily  = updates.fontFamily;  firestoreUpdates.fontFamily  = updates.fontFamily; }
+        if (updates.kanbanColumnStyles !== undefined) {
+          var kbcs = (updates.kanbanColumnStyles && typeof updates.kanbanColumnStyles === 'object') ? updates.kanbanColumnStyles : null;
+          project.kanbanColumnStyles = kbcs;
+          firestoreUpdates.kanbanColumnStyles = kbcs;
+        }
         project.updatedAt = Date.now();
         return firestoreWrite({
           collection: 'projects',

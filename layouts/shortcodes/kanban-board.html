@@ -1571,6 +1571,20 @@
     opacity: 0.4;
   }
 }
+
+/* Per-project column accent + emoji overrides (Phase 6) */
+.kanban-column[data-pj-col-style="1"] {
+  border-top: 3px solid var(--kb-col-accent, var(--color-accent, #1976d2));
+}
+.kanban-column[data-pj-col-style="1"] > .kanban-column-header {
+  background: color-mix(in srgb, var(--kb-col-accent, var(--color-accent, #1976d2)) 12%, transparent);
+}
+.kanban-col-name[data-emoji]::before {
+  content: attr(data-emoji);
+  margin-right: 0.4em;
+  font-size: 1.1em;
+  display: inline-block;
+}
 </style>
 
 <div class="kanban" id="kanban">
@@ -2607,6 +2621,10 @@
       var targetStatus = overlay.querySelector('.kanban-col-delete-target').value;
       overlay.remove();
       window.dmSync.deleteKanbanColumn(colId, targetStatus).then(function() {
+        // Strip orphan kanbanColumnStyles entries from any project that
+        // referenced the deleted column.
+        return cleanupOrphanColumnStyles(colId);
+      }).then(function() {
         return window.dmSync.getAllKanbanColumns();
       }).then(function(cols) {
         _kanbanColumns = cols;
@@ -2618,6 +2636,28 @@
         renderBoard();
       });
     });
+  }
+
+  // Remove orphan entries in project.kanbanColumnStyles that reference
+  // a deleted kanban column. Best-effort: failures are swallowed so the
+  // column-delete flow itself never breaks.
+  function cleanupOrphanColumnStyles(deletedColId) {
+    if (!window.dmSync || !window.dmSync.getAllProjects || !window.dmSync.updateProject) {
+      return Promise.resolve();
+    }
+    return window.dmSync.getAllProjects().then(function(projects) {
+      var promises = (projects || []).map(function(p) {
+        if (!p || !p.kanbanColumnStyles || typeof p.kanbanColumnStyles !== 'object') return null;
+        if (!Object.prototype.hasOwnProperty.call(p.kanbanColumnStyles, deletedColId)) return null;
+        var cleaned = {};
+        Object.keys(p.kanbanColumnStyles).forEach(function(k) {
+          if (k !== deletedColId) cleaned[k] = p.kanbanColumnStyles[k];
+        });
+        var nextValue = Object.keys(cleaned).length > 0 ? cleaned : null;
+        return window.dmSync.updateProject(p.id, { kanbanColumnStyles: nextValue }).catch(function(){});
+      }).filter(Boolean);
+      return Promise.all(promises);
+    }).catch(function() { /* swallow */ });
   }
 
   function filterDoneTodos(doneTodos) {
@@ -2840,6 +2880,34 @@
     return html;
   }
 
+  // Apply per-column accent + emoji overrides from a project's
+  // kanbanColumnStyles map. Pass null to clear.
+  function applyProjectColumnStyles(project) {
+    if (!boardEl) return;
+    var styles = (project && project.kanbanColumnStyles) || {};
+    boardEl.querySelectorAll('.kanban-column').forEach(function(colEl) {
+      var colId = colEl.getAttribute('data-kanban-col-id');
+      var override = colId ? styles[colId] : null;
+      var nameEl = colEl.querySelector('.kanban-col-name');
+      if (override && (override.accent || override.emoji)) {
+        colEl.setAttribute('data-pj-col-style', '1');
+        if (override.accent) {
+          colEl.style.setProperty('--kb-col-accent', override.accent);
+        } else {
+          colEl.style.removeProperty('--kb-col-accent');
+        }
+        if (nameEl) {
+          if (override.emoji) nameEl.setAttribute('data-emoji', override.emoji);
+          else nameEl.removeAttribute('data-emoji');
+        }
+      } else {
+        colEl.removeAttribute('data-pj-col-style');
+        colEl.style.removeProperty('--kb-col-accent');
+        if (nameEl) nameEl.removeAttribute('data-emoji');
+      }
+    });
+  }
+
   function renderBoard() {
     // Defer re-renders while a drag is in progress to prevent SortableJS errors
     if (_isDragging) {
@@ -2867,15 +2935,17 @@
 
     // Apply project theme when exactly one project is selected
     var kanbanContainer = document.getElementById('kanban');
+    var _activeThemeProj = null;
     if (kanbanContainer && window.dmApplyProjectTheme) {
       var _selIds = Array.from(_kanbanFilterProjectIds).filter(function(id) { return id !== '__none__'; });
       if (_selIds.length === 1) {
-        var _themeProj = _kanbanProjectMap[_selIds[0]];
-        window.dmApplyProjectTheme(kanbanContainer, _themeProj || null);
+        _activeThemeProj = _kanbanProjectMap[_selIds[0]] || null;
+        window.dmApplyProjectTheme(kanbanContainer, _activeThemeProj);
       } else {
         window.dmApplyProjectTheme(kanbanContainer, null);
       }
     }
+    applyProjectColumnStyles(_activeThemeProj);
 
     // Backfill kanbanStatus for legacy tasks
     var firstDone = getFirstDoneColumnStatus();

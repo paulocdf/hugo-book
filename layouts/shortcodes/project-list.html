@@ -1365,6 +1365,68 @@
   .project-detail-actions { margin-top: 8px; }
   .project-header { flex-wrap: wrap; }
 }
+
+/* Kanban column overrides editor (project modal) */
+.project-kbcol-section {
+  margin-top: 0.75rem;
+  border-top: 1px solid var(--gray-200, #e0e0e0);
+  padding-top: 0.6rem;
+}
+.project-kbcol-section .pj-section-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.project-kbcol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  flex-wrap: wrap;
+}
+.project-kbcol-name {
+  min-width: 96px;
+  font-size: 0.85rem;
+  color: var(--body-font-color);
+}
+.project-kbcol-swatches {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.project-kbcol-swatch {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  background-clip: padding-box;
+  outline: none;
+}
+.project-kbcol-swatch:focus-visible {
+  box-shadow: 0 0 0 2px var(--color-accent, #1976d2);
+}
+.project-kbcol-swatch.selected {
+  border-color: var(--body-font-color);
+  transform: scale(1.18);
+}
+.project-kbcol-swatch-clear {
+  background: transparent !important;
+  color: var(--gray-500, #888);
+  border: 1px dashed var(--gray-400, #bbb);
+  font-size: 12px;
+  line-height: 1;
+}
+.project-kbcol-emoji {
+  width: 44px;
+  padding: 3px 4px;
+  text-align: center;
+  font-size: 1rem;
+  border: 1px solid var(--gray-300, #ccc);
+  border-radius: 6px;
+  background: var(--body-background);
+  color: var(--body-font-color);
+}
 </style>
 
 <div class="project-list" id="project-list-root">
@@ -1631,6 +1693,11 @@
         <div class="project-share-feedback" id="project-share-feedback" style="display: none;"></div>
       </div>
       <div class="project-share-list" id="project-share-list"></div>
+    </div>
+    <div class="project-kbcol-section" id="project-kbcol-section" style="display: none;">
+      <div class="pj-section-title">Kanban column accents</div>
+      <div class="project-kbcol-help" style="font-size:0.78rem;color:var(--gray-400);margin:-2px 0 8px 0;">Override the column accent and add an emoji prefix when this project is the only one selected on the Board.</div>
+      <div class="project-kbcol-list" id="project-kbcol-list"></div>
     </div>
     <div class="project-modal-actions">
       <button class="project-modal-cancel" id="project-modal-cancel">Cancel</button>
@@ -3603,6 +3670,7 @@
       _selectedShape     = project.cardShape  || 'rounded';
       _selectedFont      = project.fontFamily || 'sans';
       initProjectSharingSection(project);
+      renderKbcolSection(project);
     } else {
       // Create mode
       title.textContent = 'New Project';
@@ -3620,6 +3688,7 @@
       _selectedShape = 'rounded';
       _selectedFont = 'sans';
       cleanupProjectSharingSection();
+      cleanupKbcolSection();
     }
 
     // Highlight selected color
@@ -3634,6 +3703,7 @@
 
   function closeModal() {
     cleanupProjectSharingSection();
+    cleanupKbcolSection();
     modalOverlay.classList.remove('active');
     _editingProjectId = null;
   }
@@ -3786,6 +3856,109 @@
     clearTimeout(_projShareFeedbackTimer);
   }
 
+  // ============================
+  // Kanban Columns appearance section
+  // ============================
+  var _selectedKanbanColumnStyles = {};
+
+  function renderKbcolSection(project) {
+    var sectionEl = document.getElementById('project-kbcol-section');
+    var listEl = document.getElementById('project-kbcol-list');
+    if (!sectionEl || !listEl) return;
+    if (!project || !window.dmSync || !window.dmSync.getAllKanbanColumns) {
+      sectionEl.style.display = 'none';
+      _selectedKanbanColumnStyles = {};
+      return;
+    }
+    sectionEl.style.display = '';
+    // Deep-copy so edits don't mutate the cached project until save
+    _selectedKanbanColumnStyles = {};
+    var existing = project.kanbanColumnStyles || {};
+    Object.keys(existing).forEach(function(k) {
+      var v = existing[k] || {};
+      _selectedKanbanColumnStyles[k] = { accent: v.accent || '', emoji: v.emoji || '' };
+    });
+
+    window.dmSync.getAllKanbanColumns().then(function(cols) {
+      cols = cols || [];
+      if (cols.length === 0) {
+        listEl.innerHTML = '<div class="project-kbcol-empty" style="font-size:0.8rem;color:var(--gray-400);">No kanban columns yet.</div>';
+        return;
+      }
+      var html = '';
+      cols.forEach(function(col) {
+        var override = _selectedKanbanColumnStyles[col.id] || {};
+        var accent = override.accent || '';
+        var emoji = override.emoji || '';
+        html += '<div class="project-kbcol-row" data-col-id="' + escapeHtml(col.id) + '">';
+        html += '<span class="project-kbcol-name">' + escapeHtml(col.name) + '</span>';
+        html += '<div class="project-kbcol-swatches" role="radiogroup" aria-label="Accent for ' + escapeHtml(col.name) + '">';
+        html += '<button type="button" class="project-kbcol-swatch project-kbcol-swatch-clear' + (!accent ? ' selected' : '') + '" data-kbcol-accent="" title="Use column default" aria-label="Use column default" role="radio" aria-checked="' + (!accent ? 'true' : 'false') + '">×</button>';
+        COLORS.forEach(function(c) {
+          var sel = (accent === c.light) ? ' selected' : '';
+          html += '<button type="button" class="project-kbcol-swatch' + sel + '" data-kbcol-accent="' + c.light + '" style="background:' + c.light + ';" title="' + c.name + '" aria-label="' + c.name + '" role="radio" aria-checked="' + (sel ? 'true' : 'false') + '"></button>';
+        });
+        html += '</div>';
+        html += '<input type="text" class="project-kbcol-emoji" data-kbcol-emoji maxlength="2" value="' + escapeHtml(emoji) + '" placeholder="🎯" aria-label="Emoji prefix for ' + escapeHtml(col.name) + '">';
+        html += '</div>';
+      });
+      listEl.innerHTML = html;
+
+      listEl.querySelectorAll('.project-kbcol-row').forEach(function(row) {
+        var colId = row.getAttribute('data-col-id');
+        row.querySelectorAll('[data-kbcol-accent]').forEach(function(btn) {
+          btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            var accent = btn.getAttribute('data-kbcol-accent') || '';
+            if (!_selectedKanbanColumnStyles[colId]) _selectedKanbanColumnStyles[colId] = { accent: '', emoji: '' };
+            _selectedKanbanColumnStyles[colId].accent = accent;
+            row.querySelectorAll('.project-kbcol-swatch').forEach(function(b) {
+              var isSel = (b === btn);
+              b.classList.toggle('selected', isSel);
+              b.setAttribute('aria-checked', isSel ? 'true' : 'false');
+            });
+          });
+        });
+        var emojiInput = row.querySelector('[data-kbcol-emoji]');
+        if (emojiInput) {
+          emojiInput.addEventListener('input', function() {
+            var val = emojiInput.value.trim();
+            if (!_selectedKanbanColumnStyles[colId]) _selectedKanbanColumnStyles[colId] = { accent: '', emoji: '' };
+            _selectedKanbanColumnStyles[colId].emoji = val;
+          });
+        }
+      });
+    });
+  }
+
+  function cleanupKbcolSection() {
+    var sectionEl = document.getElementById('project-kbcol-section');
+    var listEl = document.getElementById('project-kbcol-list');
+    if (listEl) listEl.innerHTML = '';
+    if (sectionEl) sectionEl.style.display = 'none';
+    _selectedKanbanColumnStyles = {};
+  }
+
+  // Returns a clean kanbanColumnStyles object suitable for save:
+  // strips empty entries, returns null if nothing to persist.
+  function collectKanbanColumnStyles() {
+    var clean = {};
+    var any = false;
+    Object.keys(_selectedKanbanColumnStyles).forEach(function(colId) {
+      var v = _selectedKanbanColumnStyles[colId] || {};
+      var accent = (v.accent || '').trim();
+      var emoji = (v.emoji || '').trim();
+      if (accent || emoji) {
+        var entry = {};
+        if (accent) entry.accent = accent;
+        if (emoji) entry.emoji = emoji;
+        clean[colId] = entry;
+        any = true;
+      }
+    });
+    return any ? clean : null;
+  }
+
   function handleSave() {
     var nameInput = document.getElementById('project-modal-name');
     var descInput = document.getElementById('project-modal-desc');
@@ -3812,7 +3985,8 @@
       pattern: _selectedPattern,
       density: _selectedDensity,
       cardShape: _selectedShape,
-      fontFamily: _selectedFont
+      fontFamily: _selectedFont,
+      kanbanColumnStyles: _editingProjectId ? collectKanbanColumnStyles() : null
     };
 
     var promise;
