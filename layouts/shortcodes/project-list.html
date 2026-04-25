@@ -2200,7 +2200,7 @@
         if (t.priority) taskAttrs += ' data-priority="' + escapeHtml(t.priority) + '"';
         var taskFlairPrefix = '';
         if (t.priority) {
-          taskFlairPrefix += '<span class="todo-priority-dot priority-' + escapeHtml(t.priority) + '" aria-hidden="true"></span>';
+          taskFlairPrefix += '<span class="todo-priority-dot" data-priority="' + escapeHtml(t.priority) + '" aria-hidden="true"></span>';
         }
         if (t.emoji) {
           taskFlairPrefix += '<span class="todo-item-icon todo-item-emoji" aria-hidden="true">' + escapeHtml(t.emoji) + '</span>';

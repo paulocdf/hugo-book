@@ -5296,7 +5296,7 @@
     html += '<div class="todo-item-content">';
     html += '<div class="todo-item-title">';
     if (todo.priority) {
-      html += '<span class="todo-priority-dot priority-' + escapeHtml(todo.priority) + '" title="Priority: ' + escapeHtml(todo.priority) + '" aria-hidden="true"></span>';
+      html += '<span class="todo-priority-dot" data-priority="' + escapeHtml(todo.priority) + '" title="Priority: ' + escapeHtml(todo.priority) + '" aria-hidden="true"></span>';
     }
     if (todo.emoji) {
       html += '<span class="todo-item-icon todo-item-emoji" aria-hidden="true">' + escapeHtml(todo.emoji) + '</span>';

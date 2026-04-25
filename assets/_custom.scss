@@ -6565,20 +6565,28 @@ body.dm-img-resizing {
   50%      { box-shadow: 0 0 0 5px rgba(211, 47, 47, 0.05); }
 }
 
-.todo-item[data-border-style="full"] {
+.todo-item[data-border-style="full"],
+.project-task-item[data-border-style="full"],
+.kanban-card[data-border-style="full"] {
   border: 1.5px solid var(--task-accent, var(--gray-200)) !important;
 }
 
-.todo-item[data-border-style="dashed"] {
+.todo-item[data-border-style="dashed"],
+.project-task-item[data-border-style="dashed"],
+.kanban-card[data-border-style="dashed"] {
   border: 1.5px dashed var(--task-accent, var(--gray-300)) !important;
 }
 
-.todo-item[data-border-style="glow"] {
+.todo-item[data-border-style="glow"],
+.project-task-item[data-border-style="glow"],
+.kanban-card[data-border-style="glow"] {
   box-shadow: 0 0 0 1px var(--task-accent, var(--color-link)),
               0 0 12px color-mix(in srgb, var(--task-accent, var(--color-link)) 35%, transparent) !important;
 }
 
-.todo-item[data-border-style="rail"] {
+.todo-item[data-border-style="rail"],
+.project-task-item[data-border-style="rail"],
+.kanban-card[data-border-style="rail"] {
   border-left: 4px solid var(--task-accent, var(--color-link)) !important;
 }
 
