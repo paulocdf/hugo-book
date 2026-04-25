@@ -5173,6 +5173,18 @@
     return 'rgba(' + r + ',' + g + ',' + b + ',' + alpha + ')';
   }
 
+  // Resolve a project's effective accent color (Phase 9):
+  //   project.accent override → theme preset accent (via themeId) → legacy color → null
+  function _resolveProjectAccent(p) {
+    if (!p) return null;
+    if (p.accent) return p.accent;
+    if (p.themeId && window.dmGetProjectTheme) {
+      var t = window.dmGetProjectTheme(p.themeId);
+      if (t && t.accent) return t.accent;
+    }
+    return p.color || null;
+  }
+
   // ─── Render ───
   function buildTodoItemHtml(todo, isSubtask, childCount, doneChildCount, finishAtLabel) {
     var hasChildren = childCount > 0;
@@ -5216,7 +5228,17 @@
       var _catHexColor = _getCategoryColor(todo.category);
       if (_catHexColor) _bgTint = _computeSubtleTint(_catHexColor, todo.done, 0.08, 0.04);
     }
-    if (_bgTint) html += ' style="background:' + _bgTint + '"';
+    // Phase 9: project accent indicator (left-edge strip + faint bg via CSS).
+    // Skipped when the task has its own color (per-task user color wins).
+    var _projAccent = null;
+    if (!todo.color && todo.projectId && _projectMap[todo.projectId]) {
+      _projAccent = _resolveProjectAccent(_projectMap[todo.projectId]);
+    }
+    if (_projAccent) html += ' data-has-project-theme="1"';
+    var _styleParts = [];
+    if (_bgTint) _styleParts.push('background:' + _bgTint);
+    if (_projAccent) _styleParts.push('--task-project-accent:' + _projAccent);
+    if (_styleParts.length) html += ' style="' + _styleParts.join(';') + '"';
     html += '>';
 
     // Drag handle (all tasks are draggable)
@@ -9806,7 +9828,14 @@
     var projectsPromise = window.dmSync.getAllProjects().then(function(projects) {
       _projectMap = {};
       projects.forEach(function(p) {
-        _projectMap[p.id] = { name: p.name || '', color: p.color || '', collaborators: p.collaborators || [] };
+        _projectMap[p.id] = {
+          name: p.name || '',
+          color: p.color || '',
+          collaborators: p.collaborators || [],
+          themeId: p.themeId || null,
+          accent: p.accent || null,
+          color2: p.color2 || null
+        };
       });
       // Restore saved filter from IDB/Firestore before rendering
       return window.dmSync.getPageFilterProjectIds('inbox').then(function(saved) {

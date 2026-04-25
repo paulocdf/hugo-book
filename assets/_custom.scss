@@ -6635,6 +6635,18 @@ body.dm-img-resizing {
   border-left: 4px solid var(--task-accent, var(--color-link)) !important;
 }
 
+/* ─── Phase 9: inbox tasks pick up project accent when no task color is set ─── */
+.todo-item[data-has-project-theme="1"] {
+  // Left-edge accent strip (3px inset, layers on top of any inline background).
+  box-shadow: inset 3px 0 0 var(--task-project-accent, transparent);
+}
+
+// Faint background tint, only when no inline background is set.
+// Tasks with their own color/project-color tint already have inline `style="background: ..."`.
+.todo-item[data-has-project-theme="1"]:not([style*="background"]) {
+  background: color-mix(in srgb, var(--task-project-accent) 4%, transparent);
+}
+
 /* ─── Theme picker UI (project edit modal) ─── */
 .pj-theme-picker {
   display: grid;
