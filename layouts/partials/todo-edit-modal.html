@@ -93,7 +93,7 @@
       </div>
     </div>
 
-    <div class="todo-edit-field">
+     <div class="todo-edit-field">
       <label>Color</label>
       <div class="todo-edit-color-row" data-ref="color-row"></div>
       <div class="todo-edit-gradient-preview" data-ref="gradient-preview">
@@ -101,6 +101,40 @@
         <span class="todo-edit-gradient-preview-label">Gradient preview</span>
       </div>
       <div class="todo-edit-recent-row" data-ref="recent-row"></div>
+    </div>
+
+    <!-- ─── Task visual flair (v18) ─── -->
+    <div class="todo-edit-field-row">
+      <div class="todo-edit-field todo-edit-field-shrink">
+        <label>Priority</label>
+        <div class="pj-segmented" data-ref="priority-seg">
+          <button type="button" data-priority="">None</button>
+          <button type="button" data-priority="low">Low</button>
+          <button type="button" data-priority="med">Med</button>
+          <button type="button" data-priority="high">High</button>
+          <button type="button" data-priority="urgent">!</button>
+        </div>
+      </div>
+      <div class="todo-edit-field todo-edit-field-shrink">
+        <label>Border</label>
+        <div class="pj-segmented" data-ref="border-seg">
+          <button type="button" data-border="">None</button>
+          <button type="button" data-border="rail">Rail</button>
+          <button type="button" data-border="full">Full</button>
+          <button type="button" data-border="dashed">Dashed</button>
+          <button type="button" data-border="glow">Glow</button>
+        </div>
+      </div>
+      <div class="todo-edit-field todo-edit-field-shrink">
+        <label>Emoji</label>
+        <input type="text" data-ref="emoji" class="pj-emoji-input" maxlength="2" placeholder="✨">
+      </div>
+    </div>
+    <div class="todo-edit-field">
+      <label>Labels</label>
+      <div class="todo-edit-labels" data-ref="labels">
+        <input type="text" data-ref="label-input" class="todo-edit-label-input" placeholder="+ label name, color (e.g. urgent #d32f2f)">
+      </div>
     </div>
 
     <!-- Collapsible "More" section — notes, sharing, AI suggestions -->
@@ -1190,8 +1224,14 @@
   var _editPomoMode = 'short';
   var _shareFeedbackTimer = null;
   var _moreExpanded = false;
-  var _editColor = null;
+   var _editColor = null;
   var _editColor2 = null;
+  // Visual flair (v18)
+  var _editIcon = null;
+  var _editEmoji = null;
+  var _editBorderStyle = '';
+  var _editPriority = '';
+  var _editLabels = [];
 
   // Element refs (populated from cloned template)
   var $ = {};
@@ -1813,10 +1853,117 @@
 
   // ─── Wire up events on a freshly cloned panel ───
 
+   function wireFlairControls() {
+    var prioSeg = ref('priority-seg');
+    if (prioSeg) {
+      prioSeg.querySelectorAll('button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          _editPriority = btn.getAttribute('data-priority') || '';
+          updatePrioritySegUI();
+        });
+      });
+    }
+    var bordSeg = ref('border-seg');
+    if (bordSeg) {
+      bordSeg.querySelectorAll('button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          _editBorderStyle = btn.getAttribute('data-border') || '';
+          updateBorderSegUI();
+        });
+      });
+    }
+    var emojiInput = ref('emoji');
+    if (emojiInput) {
+      emojiInput.addEventListener('input', function() {
+        _editEmoji = (emojiInput.value || '').trim() || null;
+      });
+    }
+    var labelInput = ref('label-input');
+    if (labelInput) {
+      labelInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          var raw = labelInput.value.trim();
+          if (!raw) return;
+          // Format: "name #color" or just "name" → palette
+          var parts = raw.split(/\s+/);
+          var color = '#1976d2';
+          var name = raw;
+          var hexMatch = raw.match(/(#[0-9a-fA-F]{3,8})\s*$/);
+          if (hexMatch) {
+            color = hexMatch[1];
+            name = raw.slice(0, hexMatch.index).trim();
+          } else if (parts.length > 1 && parts[parts.length - 1].startsWith('#')) {
+            color = parts.pop();
+            name = parts.join(' ');
+          } else {
+            // Auto-pick a stable color from the palette based on name hash
+            var palette = ['#1976d2', '#388e3c', '#e65100', '#7b1fa2', '#00897b', '#c62828', '#f9a825', '#ad1457', '#283593'];
+            var h = 0; for (var i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+            color = palette[Math.abs(h) % palette.length];
+          }
+          if (!name) return;
+          if (_editLabels.some(function(l) { return l.name.toLowerCase() === name.toLowerCase(); })) {
+            labelInput.value = '';
+            return;
+          }
+          _editLabels.push({ id: 'lbl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6), name: name, color: color });
+          labelInput.value = '';
+          renderLabelChips();
+        } else if (e.key === 'Backspace' && !labelInput.value && _editLabels.length > 0) {
+          _editLabels.pop();
+          renderLabelChips();
+        }
+      });
+    }
+  }
+
+  function updatePrioritySegUI() {
+    var seg = ref('priority-seg');
+    if (!seg) return;
+    seg.querySelectorAll('button').forEach(function(b) {
+      b.classList.toggle('active', (b.getAttribute('data-priority') || '') === (_editPriority || ''));
+    });
+  }
+  function updateBorderSegUI() {
+    var seg = ref('border-seg');
+    if (!seg) return;
+    seg.querySelectorAll('button').forEach(function(b) {
+      b.classList.toggle('active', (b.getAttribute('data-border') || '') === (_editBorderStyle || ''));
+    });
+  }
+  function renderLabelChips() {
+    var container = ref('labels');
+    if (!container) return;
+    var input = ref('label-input');
+    // Remove any existing chips
+    container.querySelectorAll('.todo-edit-label-chip').forEach(function(el) { el.remove(); });
+    _editLabels.forEach(function(lbl) {
+      var chip = document.createElement('span');
+      chip.className = 'todo-edit-label-chip';
+      chip.style.background = lbl.color;
+      chip.textContent = lbl.name;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '×';
+      btn.addEventListener('click', function() {
+        _editLabels = _editLabels.filter(function(l) { return l.id !== lbl.id; });
+        renderLabelChips();
+      });
+      chip.appendChild(btn);
+      if (input) container.insertBefore(chip, input);
+      else container.appendChild(chip);
+    });
+  }
+
   function wirePanel() {
     // Title auto-grow
     var titleEl = ref('title');
     if (titleEl) titleEl.addEventListener('input', autoGrowTitle);
+
+    // ─── Visual flair (v18) ───
+    wireFlairControls();
+
 
     // BuJo pill toggle
     var bujoPill = ref('bujo-pill');
@@ -2248,9 +2395,15 @@
       bujoType: _editBujoType,
       bujoState: _editBujoState,
       notes: notesInput ? notesInput.value.trim() : '',
-      kanbanStatus: kanbanSelect ? (kanbanSelect.value || undefined) : undefined,
+       kanbanStatus: kanbanSelect ? (kanbanSelect.value || undefined) : undefined,
       color: _editColor || null,
-      color2: _editColor2 || null
+      color2: _editColor2 || null,
+      // Visual flair (v18)
+      icon: _editIcon || null,
+      emoji: _editEmoji || null,
+      borderStyle: _editBorderStyle || null,
+      priority: _editPriority || null,
+      labels: _editLabels.slice()
     };
 
     // Persist custom (non-palette) colors to localStorage
@@ -2370,9 +2523,21 @@
     if (categoryInput) categoryInput.value = '';
     hideDropdown();
 
-    // Color
+     // Color
     _editColor = todo.color || null;
     _editColor2 = todo.color2 || null;
+
+    // Visual flair (v18)
+    _editIcon = todo.icon || null;
+    _editEmoji = todo.emoji || null;
+    _editBorderStyle = todo.borderStyle || '';
+    _editPriority = todo.priority || '';
+    _editLabels = Array.isArray(todo.labels) ? todo.labels.slice() : [];
+    var emojiInput = ref('emoji');
+    if (emojiInput) emojiInput.value = _editEmoji || '';
+    updatePrioritySegUI();
+    updateBorderSegUI();
+    renderLabelChips();
 
     // Project selector
     var projectSelect = ref('project-select');
@@ -2465,8 +2630,13 @@
     _dropdownActiveIdx = -1;
     _dropdownJustClosed = false;
     _moreExpanded = false;
-    _editColor = null;
+     _editColor = null;
     _editColor2 = null;
+    _editIcon = null;
+    _editEmoji = null;
+    _editBorderStyle = '';
+    _editPriority = '';
+    _editLabels = [];
     $ = {};
   }
 

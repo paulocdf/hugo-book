@@ -5201,6 +5201,8 @@
       }
     }
     var html = '<div class="todo-item' + doneClass + justCompletedClass + justAddedClass + stateClass + priorityClass + '" data-todo-id="' + todo.id + '"';
+    if (todo.borderStyle) html += ' data-border-style="' + escapeHtml(todo.borderStyle) + '"';
+    if (todo.priority) html += ' data-priority="' + escapeHtml(todo.priority) + '"';
     // Card background tint cascade: user color > project color > category color
     var _bgTint = '';
     if (todo.color && window.dmTaskColors) {
@@ -5293,6 +5295,14 @@
     html += '<button type="button" class="' + bulletClass + '" data-bullet-id="' + todo.id + '" title="' + bulletTitle + '" aria-label="' + bulletTitle + '">' + bulletSvg + '</button>';
     html += '<div class="todo-item-content">';
     html += '<div class="todo-item-title">';
+    if (todo.priority) {
+      html += '<span class="todo-priority-dot priority-' + escapeHtml(todo.priority) + '" title="Priority: ' + escapeHtml(todo.priority) + '" aria-hidden="true"></span>';
+    }
+    if (todo.emoji) {
+      html += '<span class="todo-item-icon todo-item-emoji" aria-hidden="true">' + escapeHtml(todo.emoji) + '</span>';
+    } else if (todo.icon) {
+      html += '<span class="todo-item-icon" aria-hidden="true"><svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24"><use href="/digital-memory/icons/sprite.svg#icon-' + escapeHtml(todo.icon) + '"/></svg></span>';
+    }
     if (todo.source === 'ai') {
       html += '<span class="todo-item-ai-badge" title="Created by AI"><svg class="dm-icon dm-icon--sparkles" width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-sparkles"/></svg></span>';
     }
@@ -5421,7 +5431,15 @@
       html += '</span>';
     }
 
-    html += '</div></div>';
+    html += '</div>';
+    if (todo.labels && todo.labels.length) {
+      html += '<div class="todo-labels">';
+      for (var _li = 0; _li < todo.labels.length; _li++) {
+        html += '<span class="todo-label-chip">' + escapeHtml(String(todo.labels[_li])) + '</span>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
 
     // Action buttons
     html += '<div class="todo-item-actions">';

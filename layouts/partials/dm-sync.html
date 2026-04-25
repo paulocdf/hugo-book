@@ -161,7 +161,7 @@
   'use strict';
 
    var DB_NAME = 'dm-notes';
-   var DB_VERSION = 17;
+   var DB_VERSION = 18;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -933,12 +933,18 @@
       createdAt: createdAt,
       updatedAt: updatedAt,
       completedAt: completedAt,
-      collaborators: data.collaborators || [],
+       collaborators: data.collaborators || [],
       sharedTaskId: data.sharedTaskId || null,
       projectId: data.projectId || null,
       color: data.color || null,
       color2: data.color2 || null,
-      calendarEventId: data.calendarEventId || null
+      calendarEventId: data.calendarEventId || null,
+      // ─── Visual identity (v18) ───
+      icon: data.icon || null,
+      emoji: data.emoji || null,
+      labels: Array.isArray(data.labels) ? data.labels : [],
+      borderStyle: data.borderStyle || null,
+      priority: data.priority || null
     };
   }
 
@@ -957,8 +963,20 @@
       description: data.description || '',
       deadline: deadline,
       archived: !!data.archived,
-      order: data.order || 0,
+       order: data.order || 0,
       collaborators: data.collaborators || [],
+      // ─── Visual identity (v18) ───
+      themeId: data.themeId || null,
+      icon: data.icon || null,
+      emoji: data.emoji || null,
+      accent: data.accent || null,
+      accent2: data.accent2 || null,
+      bannerStyle: data.bannerStyle || null,
+      pattern: data.pattern || null,
+      density: data.density || null,
+      cardShape: data.cardShape || null,
+      fontFamily: data.fontFamily || null,
+      kanbanColumnStyles: (data.kanbanColumnStyles && typeof data.kanbanColumnStyles === 'object') ? data.kanbanColumnStyles : null,
       createdAt: createdAt,
       updatedAt: updatedAt
     };
@@ -4501,6 +4519,72 @@
       console.warn('[dm-sync] Failed to sync budget currency:', err);
     });
   }
+
+  // ─── Project Theme Registry (v18) ───
+  // Curated visual identity presets for projects. Applying a theme writes
+  // resolved values into the project document, so subsequent edits to
+  // individual fields don't break the link (themeId stays so we can offer
+  // "Reset to theme"). Themes are static client-side definitions.
+  window.dmProjectThemes = Object.freeze({
+    default:  { name: 'Default',  icon: 'folder',   accent: '#1976d2', accent2: '#42a5f5', pattern: 'none',     density: 'comfy',    cardShape: 'rounded', fontFamily: 'sans',    bannerStyle: 'solid'    },
+    ocean:    { name: 'Ocean',    icon: 'waves',    accent: '#0288d1', accent2: '#4fc3f7', pattern: 'dots',     density: 'comfy',    cardShape: 'rounded', fontFamily: 'sans',    bannerStyle: 'gradient' },
+    sunset:   { name: 'Sunset',   icon: 'sun',      accent: '#f57c00', accent2: '#ff8a65', pattern: 'noise',    density: 'comfy',    cardShape: 'rounded', fontFamily: 'serif',   bannerStyle: 'gradient' },
+    forest:   { name: 'Forest',   icon: 'leaf',     accent: '#2e7d32', accent2: '#81c784', pattern: 'paper',    density: 'spacious', cardShape: 'rounded', fontFamily: 'serif',   bannerStyle: 'pattern'  },
+    mono:     { name: 'Mono',     icon: 'square',   accent: '#424242', accent2: '#757575', pattern: 'grid',     density: 'compact',  cardShape: 'sharp',   fontFamily: 'mono',    bannerStyle: 'solid'    },
+    neon:     { name: 'Neon',     icon: 'zap',      accent: '#e91e63', accent2: '#7c4dff', pattern: 'noise',    density: 'comfy',    cardShape: 'rounded', fontFamily: 'display', bannerStyle: 'gradient' },
+    paper:    { name: 'Paper',    icon: 'book',     accent: '#8d6e63', accent2: '#bcaaa4', pattern: 'paper',    density: 'spacious', cardShape: 'rounded', fontFamily: 'serif',   bannerStyle: 'pattern'  },
+    terminal: { name: 'Terminal', icon: 'terminal', accent: '#1b5e20', accent2: '#00c853', pattern: 'grid',     density: 'compact',  cardShape: 'sharp',   fontFamily: 'mono',    bannerStyle: 'solid'    },
+    lavender: { name: 'Lavender', icon: 'flower',   accent: '#7b1fa2', accent2: '#ce93d8', pattern: 'dots',     density: 'comfy',    cardShape: 'pill',    fontFamily: 'sans',    bannerStyle: 'gradient' },
+    citrus:   { name: 'Citrus',   icon: 'sun',      accent: '#f9a825', accent2: '#fdd835', pattern: 'diagonal', density: 'comfy',    cardShape: 'rounded', fontFamily: 'sans',    bannerStyle: 'gradient' }
+  });
+
+  window.dmGetProjectTheme = function(themeId) {
+    if (!themeId) return null;
+    return window.dmProjectThemes[themeId] || null;
+  };
+
+  // Returns a partial update for window.dmSync.updateProject() that resolves
+  // a theme id to all its visual fields.
+  window.dmResolveProjectTheme = function(themeId) {
+    var t = window.dmGetProjectTheme(themeId);
+    if (!t) return { themeId: null };
+    return {
+      themeId: themeId,
+      icon: t.icon || null,
+      accent: t.accent || null,
+      accent2: t.accent2 || null,
+      pattern: t.pattern || null,
+      density: t.density || null,
+      cardShape: t.cardShape || null,
+      fontFamily: t.fontFamily || null,
+      bannerStyle: t.bannerStyle || null
+    };
+  };
+
+  // Apply a project's visual identity to a DOM root by setting CSS
+  // variables and data-* attributes. Used by detail/board views to scope
+  // styling to a project. Pass `null` project to clear.
+  window.dmApplyProjectTheme = function(rootEl, project) {
+    if (!rootEl) return;
+    if (!project) {
+      rootEl.removeAttribute('data-project-theme');
+      rootEl.removeAttribute('data-pj-pattern');
+      rootEl.removeAttribute('data-pj-density');
+      rootEl.removeAttribute('data-pj-shape');
+      rootEl.removeAttribute('data-pj-font');
+      rootEl.style.removeProperty('--pj-accent');
+      rootEl.style.removeProperty('--pj-accent2');
+      return;
+    }
+    rootEl.setAttribute('data-project-theme', project.themeId || 'custom');
+    if (project.pattern)    rootEl.setAttribute('data-pj-pattern', project.pattern); else rootEl.removeAttribute('data-pj-pattern');
+    if (project.density)    rootEl.setAttribute('data-pj-density', project.density); else rootEl.removeAttribute('data-pj-density');
+    if (project.cardShape)  rootEl.setAttribute('data-pj-shape',   project.cardShape); else rootEl.removeAttribute('data-pj-shape');
+    if (project.fontFamily) rootEl.setAttribute('data-pj-font',    project.fontFamily); else rootEl.removeAttribute('data-pj-font');
+    var accent = project.accent || project.color || null;
+    if (accent) rootEl.style.setProperty('--pj-accent', accent); else rootEl.style.removeProperty('--pj-accent');
+    if (project.accent2) rootEl.style.setProperty('--pj-accent2', project.accent2); else rootEl.style.removeProperty('--pj-accent2');
+  };
 
   window.dmSync = {
     // IndexedDB operations — Notes

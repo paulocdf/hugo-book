@@ -1411,11 +1411,17 @@
   </div>
 
   <!-- Detail view -->
-  <div class="project-detail" id="project-detail-view">
+   <div class="project-detail" id="project-detail-view">
     <button class="project-detail-back" id="project-detail-back">
       <svg class="dm-icon dm-icon--chevron-left" width="2" height="2" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-left"/></svg>
       Back to Projects
     </button>
+    <div class="pj-banner" id="pj-detail-banner" style="display:none;">
+      <div class="pj-banner-inner">
+        <div class="pj-banner-icon" id="pj-detail-banner-icon"></div>
+        <h2 class="pj-banner-title" id="pj-detail-banner-title"></h2>
+      </div>
+    </div>
     <div class="project-detail-header">
       <div class="project-detail-color" id="project-detail-color"></div>
       <div class="project-detail-info">
@@ -1538,9 +1544,71 @@
       <label for="project-modal-desc">Description <span style="font-weight:normal;color:var(--gray-400)">(optional)</span></label>
       <textarea id="project-modal-desc" placeholder="What is this project about?" maxlength="1000"></textarea>
     </div>
-    <div class="project-modal-field">
+     <div class="project-modal-field">
       <label>Color</label>
       <div class="project-color-picker" id="project-color-picker"></div>
+    </div>
+
+    <!-- ─── Visual Identity (v18) ─── -->
+    <div class="project-modal-field">
+      <div class="pj-section-title">Theme</div>
+      <div class="pj-theme-picker" id="pj-theme-picker"></div>
+    </div>
+    <div class="project-modal-field">
+      <div class="pj-section-title">Icon &amp; Emoji</div>
+      <div style="display:flex;gap:8px;align-items:flex-start;">
+        <div class="pj-icon-grid" id="pj-icon-grid" style="flex:1;"></div>
+        <input type="text" id="pj-emoji-input" class="pj-emoji-input" maxlength="2" placeholder="🚀" title="Emoji (overrides icon)">
+      </div>
+    </div>
+    <div class="project-modal-field" style="display:flex;gap:14px;flex-wrap:wrap;">
+      <div>
+        <div class="pj-section-title">Banner</div>
+        <div class="pj-segmented" id="pj-banner-style">
+          <button type="button" data-banner-style="solid">Solid</button>
+          <button type="button" data-banner-style="gradient">Gradient</button>
+          <button type="button" data-banner-style="pattern">Pattern</button>
+          <button type="button" data-banner-style="none">None</button>
+        </div>
+      </div>
+      <div>
+        <div class="pj-section-title">Pattern</div>
+        <div class="pj-segmented" id="pj-pattern">
+          <button type="button" data-pattern="none">—</button>
+          <button type="button" data-pattern="dots">Dots</button>
+          <button type="button" data-pattern="grid">Grid</button>
+          <button type="button" data-pattern="paper">Paper</button>
+          <button type="button" data-pattern="noise">Noise</button>
+          <button type="button" data-pattern="diagonal">Diag</button>
+        </div>
+      </div>
+    </div>
+    <div class="project-modal-field" style="display:flex;gap:14px;flex-wrap:wrap;">
+      <div>
+        <div class="pj-section-title">Density</div>
+        <div class="pj-segmented" id="pj-density">
+          <button type="button" data-density="compact">Compact</button>
+          <button type="button" data-density="comfy">Comfy</button>
+          <button type="button" data-density="spacious">Spacious</button>
+        </div>
+      </div>
+      <div>
+        <div class="pj-section-title">Card shape</div>
+        <div class="pj-segmented" id="pj-shape">
+          <button type="button" data-shape="rounded">Rounded</button>
+          <button type="button" data-shape="sharp">Sharp</button>
+          <button type="button" data-shape="pill">Pill</button>
+        </div>
+      </div>
+      <div>
+        <div class="pj-section-title">Font</div>
+        <div class="pj-segmented" id="pj-font">
+          <button type="button" data-font="sans">Sans</button>
+          <button type="button" data-font="serif">Serif</button>
+          <button type="button" data-font="mono">Mono</button>
+          <button type="button" data-font="display">Display</button>
+        </div>
+      </div>
     </div>
     <div class="project-modal-field">
       <label for="project-modal-deadline">Deadline <span style="font-weight:normal;color:var(--gray-400)">(optional)</span></label>
@@ -1665,7 +1733,16 @@
   var _showArchived = false;
   var _currentProjectId = null;
   var _editingProjectId = null; // null = create, string = edit
-  var _selectedColor = COLORS[0].light;
+   var _selectedColor = COLORS[0].light;
+  // Visual identity (v18)
+  var _selectedThemeId = null;
+  var _selectedIcon = null;
+  var _selectedEmoji = null;
+  var _selectedBannerStyle = 'gradient';
+  var _selectedPattern = 'none';
+  var _selectedDensity = 'comfy';
+  var _selectedShape = 'rounded';
+  var _selectedFont = 'sans';
   var _todoCounts = {}; // projectId -> { total, done }
   var _projectSortable = null; // SortableJS instance for project task list
   var _gridSortable = null;    // SortableJS instance for project card grid
@@ -1749,8 +1826,11 @@
     document.getElementById('project-confirm-delete').addEventListener('click', handleDelete);
     confirmOverlay.addEventListener('click', function(e) { if (e.target === confirmOverlay) closeConfirm(); });
 
-    // Build color picker
+     // Build color picker
     buildColorPicker();
+    buildThemePicker();
+    buildIconGrid();
+    bindAppearanceSegments();
 
     // Keyboard
     document.addEventListener('keydown', function(e) {
@@ -1787,9 +1867,10 @@
   }
 
   // ─── List View ───
-  function showList() {
+   function showList() {
     _currentProjectId = null;
     detailView.classList.remove('active');
+    if (window.dmApplyProjectTheme) window.dmApplyProjectTheme(detailView, null);
     listView.style.display = '';
     renderList();
   }
@@ -1830,12 +1911,23 @@
         }
       }
 
-      var cardPct = counts.total > 0 ? Math.round((counts.done / counts.total) * 100) : 0;
+       var cardPct = counts.total > 0 ? Math.round((counts.done / counts.total) * 100) : 0;
+
+      // Visual identity icon (v18) — render emoji or icon glyph if set
+      var pIconHtml = '';
+      var pAccent = p.accent || color;
+      if (p.emoji) {
+        pIconHtml = '<span class="project-card-icon" style="--pj-card-accent:' + pAccent + ';">' + escapeHtml(p.emoji) + '</span>';
+      } else if (p.icon) {
+        pIconHtml = '<span class="project-card-icon" style="--pj-card-accent:' + pAccent + ';">' +
+          '<svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + p.icon + '"/></svg>' +
+          '</span>';
+      }
 
       html += '<div class="project-card' + archivedClass + '" data-project-id="' + p.id + '">' +
         '<div class="project-card-top">' +
           '<span class="project-card-drag-handle" title="Drag to reorder"><svg class="dm-icon dm-icon--grip" width="8" height="14" viewBox="0 0 10 14" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-grip"/></svg></span>' +
-          '<div class="project-color-dot" style="background:' + color + '"></div>' +
+          (pIconHtml || '<div class="project-color-dot" style="background:' + color + '"></div>') +
           '<span class="project-card-name">' + escapeHtml(p.name) + '</span>' +
           countdownHtml +
           (p.archived ? '<span style="font-size:0.72rem;color:var(--gray-400);padding:1px 6px;border:1px solid var(--gray-200);border-radius:4px;">Archived</span>' : '') +
@@ -1913,11 +2005,38 @@
       return;
     }
 
-    var color = getColor(project.color);
+     var color = getColor(project.color);
     document.getElementById('project-detail-color').style.background = color;
     document.getElementById('project-detail-name').textContent = project.name;
     document.getElementById('project-detail-desc').textContent = project.description || '';
     document.getElementById('project-detail-desc').style.display = project.description ? '' : 'none';
+
+    // Apply per-project theme to the detail container (sets CSS vars + data-* attrs)
+    if (window.dmApplyProjectTheme) {
+      window.dmApplyProjectTheme(detailView, project);
+    }
+
+    // Render the banner
+    var bannerEl = document.getElementById('pj-detail-banner');
+    var bannerIconEl = document.getElementById('pj-detail-banner-icon');
+    var bannerTitleEl = document.getElementById('pj-detail-banner-title');
+    if (bannerEl) {
+      var bs = project.bannerStyle || 'gradient';
+      bannerEl.setAttribute('data-banner-style', bs);
+      if (project.pattern && project.pattern !== 'none') bannerEl.setAttribute('data-pj-pattern', project.pattern);
+      else bannerEl.removeAttribute('data-pj-pattern');
+      var iconHtml = '';
+      if (project.emoji) {
+        iconHtml = '<span class="pj-banner-emoji">' + escapeHtml(project.emoji) + '</span>';
+      } else if (project.icon) {
+        iconHtml = '<svg class="dm-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + project.icon + '"/></svg>';
+      } else {
+        iconHtml = '<svg class="dm-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-folder"/></svg>';
+      }
+      if (bannerIconEl) bannerIconEl.innerHTML = iconHtml;
+      if (bannerTitleEl) bannerTitleEl.textContent = project.name;
+      bannerEl.style.display = (bs === 'none') ? 'none' : '';
+    }
 
     // Tint detail header with project color (J — project color theme)
     var headerEl = document.querySelector('.project-detail-header');
@@ -2009,10 +2128,32 @@
         if (t.color && window.dmTaskColors) {
           taskBgStyle = ' style="background:' + window.dmTaskColors.tint(t.color, !!t.done, t.color2) + '"';
         }
-        html += '<div class="project-task-item"' + taskBgStyle + ' data-todo-id="' + t.id + '">' +
+        var taskAttrs = '';
+        if (t.borderStyle) taskAttrs += ' data-border-style="' + escapeHtml(t.borderStyle) + '"';
+        if (t.priority) taskAttrs += ' data-priority="' + escapeHtml(t.priority) + '"';
+        var taskFlairPrefix = '';
+        if (t.priority) {
+          taskFlairPrefix += '<span class="todo-priority-dot priority-' + escapeHtml(t.priority) + '" aria-hidden="true"></span>';
+        }
+        if (t.emoji) {
+          taskFlairPrefix += '<span class="todo-item-icon todo-item-emoji" aria-hidden="true">' + escapeHtml(t.emoji) + '</span>';
+        } else if (t.icon) {
+          taskFlairPrefix += '<span class="todo-item-icon" aria-hidden="true"><svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24"><use href="/digital-memory/icons/sprite.svg#icon-' + escapeHtml(t.icon) + '"/></svg></span>';
+        }
+        var taskLabelsSuffix = '';
+        if (t.labels && t.labels.length) {
+          taskLabelsSuffix = '<div class="todo-labels">';
+          for (var _li = 0; _li < t.labels.length; _li++) {
+            taskLabelsSuffix += '<span class="todo-label-chip">' + escapeHtml(String(t.labels[_li])) + '</span>';
+          }
+          taskLabelsSuffix += '</div>';
+        }
+        html += '<div class="project-task-item"' + taskBgStyle + taskAttrs + ' data-todo-id="' + t.id + '">' +
           '<span class="project-task-drag-handle" title="Drag to reorder"><svg class="dm-icon dm-icon--grip" width="10" height="14" viewBox="0 0 10 14" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-grip"/></svg></span>' +
           '<div class="project-task-checkbox' + doneClass + '" data-todo-id="' + t.id + '"></div>' +
+          taskFlairPrefix +
           '<span class="project-task-title' + titleClass + '">' + escapeHtml(t.title) + '</span>' +
+          taskLabelsSuffix +
           '<div class="project-task-meta">';
 
         // Timer status indicators (active / prior progress)
@@ -3281,7 +3422,7 @@
   });
 
   // ─── Modal ───
-  function buildColorPicker() {
+   function buildColorPicker() {
     var picker = document.getElementById('project-color-picker');
     var html = '';
     COLORS.forEach(function(c) {
@@ -3299,6 +3440,142 @@
     });
   }
 
+  // ─── Visual Identity (v18) ───
+  var THEME_ICON_OPTIONS = [
+    'folder','target','rocket','star','heart','flag','book','bookmark',
+    'briefcase','code','terminal','flask','flower','leaf','tree','sun',
+    'moon','cloud','waves','mountain','zap','flame','coffee','music',
+    'camera','image','pencil','edit-3','square','circle','triangle','grid',
+    'layers','users','user','home','calendar','clock','check-circle','globe'
+  ];
+
+   function getThemes() {
+    return window.dmProjectThemes || {};
+  }
+
+  // When user picked a theme + maybe overrode color, derive a sensible accent2.
+  // If theme is unchanged, use the theme's accent2; otherwise mix accent toward white.
+  function themeAccent2For(themeId, color) {
+    var t = getThemes()[themeId];
+    if (t && t.accent === color) return t.accent2;
+    return color; // fall back to same color → solid feel
+  }
+
+  function buildThemePicker() {
+    var picker = document.getElementById('pj-theme-picker');
+    if (!picker) return;
+    var themes = getThemes();
+    var html = '';
+    Object.keys(themes).forEach(function(id) {
+      var t = themes[id];
+      var bg = 'linear-gradient(135deg,' + t.accent + ' 0%,' + t.accent2 + ' 100%)';
+      html += '<div class="pj-theme-swatch" data-theme-id="' + id + '" style="background:' + bg + ';" title="' + t.name + '">' + t.name + '</div>';
+    });
+    picker.innerHTML = html;
+    picker.querySelectorAll('.pj-theme-swatch').forEach(function(sw) {
+      sw.addEventListener('click', function() {
+        applyThemeToForm(sw.getAttribute('data-theme-id'));
+      });
+    });
+  }
+
+  function applyThemeToForm(themeId) {
+    var t = getThemes()[themeId];
+    if (!t) return;
+    _selectedThemeId = themeId;
+    _selectedColor = t.accent;
+    _selectedIcon = t.icon;
+    _selectedBannerStyle = t.bannerStyle;
+    _selectedPattern = t.pattern;
+    _selectedDensity = t.density;
+    _selectedShape = t.cardShape;
+    _selectedFont = t.fontFamily;
+    refreshAppearanceUI();
+  }
+
+  function buildIconGrid() {
+    var grid = document.getElementById('pj-icon-grid');
+    if (!grid) return;
+    var html = '';
+    THEME_ICON_OPTIONS.forEach(function(name) {
+      html += '<button type="button" class="pj-icon-btn" data-icon="' + name + '" title="' + name + '">' +
+        '<svg class="dm-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + name + '"/></svg>' +
+        '</button>';
+    });
+    grid.innerHTML = html;
+    grid.querySelectorAll('.pj-icon-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _selectedIcon = btn.getAttribute('data-icon');
+        _selectedThemeId = null; // user diverged from theme
+        refreshAppearanceUI();
+      });
+    });
+    var emojiInput = document.getElementById('pj-emoji-input');
+    if (emojiInput) {
+      emojiInput.addEventListener('input', function() {
+        _selectedEmoji = (emojiInput.value || '').trim() || null;
+        _selectedThemeId = null;
+      });
+    }
+  }
+
+   function bindAppearanceSegments() {
+    var groups = [
+      { id: 'pj-banner-style', attr: 'data-banner-style', set: function(v){ _selectedBannerStyle = v; } },
+      { id: 'pj-pattern',      attr: 'data-pattern',      set: function(v){ _selectedPattern = v; } },
+      { id: 'pj-density',      attr: 'data-density',      set: function(v){ _selectedDensity = v; } },
+      { id: 'pj-shape',        attr: 'data-shape',        set: function(v){ _selectedShape = v; } },
+      { id: 'pj-font',         attr: 'data-font',         set: function(v){ _selectedFont = v; } }
+    ];
+    groups.forEach(function(g) {
+      var container = document.getElementById(g.id);
+      if (!container) return;
+      container.querySelectorAll('button').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          var val = btn.getAttribute(g.attr);
+          g.set(val);
+          _selectedThemeId = null;
+          container.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+          btn.classList.add('active');
+        });
+      });
+    });
+  }
+
+   function refreshAppearanceUI() {
+    // Theme swatches
+    document.querySelectorAll('.pj-theme-swatch').forEach(function(sw) {
+      sw.classList.toggle('selected', sw.getAttribute('data-theme-id') === _selectedThemeId);
+    });
+    // Color swatches
+    document.querySelectorAll('.project-color-swatch').forEach(function(s) {
+      s.classList.toggle('selected', s.getAttribute('data-color') === _selectedColor);
+    });
+    // Icon buttons
+    document.querySelectorAll('.pj-icon-btn').forEach(function(b) {
+      b.classList.toggle('selected', b.getAttribute('data-icon') === _selectedIcon);
+    });
+    var emojiInput = document.getElementById('pj-emoji-input');
+    if (emojiInput) emojiInput.value = _selectedEmoji || '';
+    // Segmented controls
+    var segMap = {
+      'pj-banner-style': { val: _selectedBannerStyle, attr: 'data-banner-style' },
+      'pj-pattern':      { val: _selectedPattern,     attr: 'data-pattern' },
+      'pj-density':      { val: _selectedDensity,     attr: 'data-density' },
+      'pj-shape':        { val: _selectedShape,       attr: 'data-shape' },
+      'pj-font':         { val: _selectedFont,        attr: 'data-font' }
+    };
+    Object.keys(segMap).forEach(function(id) {
+      var c = document.getElementById(id);
+      if (!c) return;
+      var info = segMap[id];
+      c.querySelectorAll('button').forEach(function(btn) {
+        btn.classList.toggle('active', btn.getAttribute(info.attr) === info.val);
+      });
+    });
+  }
+
+
   function openModal(projectId) {
     _editingProjectId = projectId;
     var title = document.getElementById('project-modal-title');
@@ -3307,7 +3584,7 @@
     var deadlineInput = document.getElementById('project-modal-deadline');
     var saveBtn = document.getElementById('project-modal-save');
 
-    if (projectId) {
+     if (projectId) {
       // Edit mode
       var project = _projects.find(function(p) { return p.id === projectId; });
       if (!project) return;
@@ -3317,6 +3594,14 @@
       descInput.value = project.description || '';
       deadlineInput.value = project.deadline || '';
       _selectedColor = getCanonicalColor(project.color);
+      _selectedThemeId   = project.themeId    || null;
+      _selectedIcon      = project.icon       || null;
+      _selectedEmoji     = project.emoji      || null;
+      _selectedBannerStyle = project.bannerStyle || 'gradient';
+      _selectedPattern   = project.pattern    || 'none';
+      _selectedDensity   = project.density    || 'comfy';
+      _selectedShape     = project.cardShape  || 'rounded';
+      _selectedFont      = project.fontFamily || 'sans';
       initProjectSharingSection(project);
     } else {
       // Create mode
@@ -3326,6 +3611,14 @@
       descInput.value = '';
       deadlineInput.value = '';
       _selectedColor = COLORS[0].light;
+      _selectedThemeId = 'default';
+      _selectedIcon = 'folder';
+      _selectedEmoji = null;
+      _selectedBannerStyle = 'gradient';
+      _selectedPattern = 'none';
+      _selectedDensity = 'comfy';
+      _selectedShape = 'rounded';
+      _selectedFont = 'sans';
       cleanupProjectSharingSection();
     }
 
@@ -3333,6 +3626,7 @@
     document.querySelectorAll('.project-color-swatch').forEach(function(s) {
       s.classList.toggle('selected', s.getAttribute('data-color') === _selectedColor);
     });
+    refreshAppearanceUI();
 
     modalOverlay.classList.add('active');
     setTimeout(function() { nameInput.focus(); }, 50);
@@ -3504,11 +3798,21 @@
       return;
     }
 
-    var data = {
+     var data = {
       name: name,
       description: descInput.value.trim(),
       color: _selectedColor,
-      deadline: deadlineInput.value || null
+      deadline: deadlineInput.value || null,
+      themeId: _selectedThemeId,
+      icon: _selectedIcon,
+      emoji: _selectedEmoji,
+      accent: _selectedColor,
+      accent2: themeAccent2For(_selectedThemeId, _selectedColor),
+      bannerStyle: _selectedBannerStyle,
+      pattern: _selectedPattern,
+      density: _selectedDensity,
+      cardShape: _selectedShape,
+      fontFamily: _selectedFont
     };
 
     var promise;

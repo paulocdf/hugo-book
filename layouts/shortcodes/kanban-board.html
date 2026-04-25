@@ -2773,6 +2773,8 @@
     }
 
     var html = '<div class="kanban-card' + (isDone ? ' kanban-card--done' : '') + '" data-todo-id="' + todo.id + '"';
+    if (todo.borderStyle) html += ' data-border-style="' + escapeHtml(todo.borderStyle) + '"';
+    if (todo.priority) html += ' data-priority="' + escapeHtml(todo.priority) + '"';
     // Task color background tint or accent
     if (todo.color) {
       var accentColor = todo.color;
@@ -2791,6 +2793,14 @@
     html += '<div class="kanban-card-body">';
     html += '<div class="kanban-card-header">';
     html += bujoIcon;
+    if (todo.priority) {
+      html += '<span class="todo-priority-dot priority-' + escapeHtml(todo.priority) + '" aria-hidden="true"></span>';
+    }
+    if (todo.emoji) {
+      html += '<span class="todo-item-icon todo-item-emoji" aria-hidden="true">' + escapeHtml(todo.emoji) + '</span>';
+    } else if (todo.icon) {
+      html += '<span class="todo-item-icon" aria-hidden="true"><svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24"><use href="/digital-memory/icons/sprite.svg#icon-' + escapeHtml(todo.icon) + '"/></svg></span>';
+    }
     html += '<span class="kanban-card-title">' + title + '</span>';
     // Inline pomodoro start/pause/stop buttons (only for undone tasks)
     if (!isDone && (todo.bujoType === 'task' || !todo.bujoType)) {
@@ -2817,6 +2827,13 @@
     html += '</div>';
     if (metaParts.length > 0) {
       html += '<div class="kanban-card-meta">' + metaParts.join('') + '</div>';
+    }
+    if (todo.labels && todo.labels.length) {
+      html += '<div class="todo-labels">';
+      for (var _li = 0; _li < todo.labels.length; _li++) {
+        html += '<span class="todo-label-chip">' + escapeHtml(String(todo.labels[_li])) + '</span>';
+      }
+      html += '</div>';
     }
     html += '</div>'; // close card-body
     html += '</div>'; // close card
@@ -2846,6 +2863,18 @@
         if (_kanbanFilterProjectIds.has('__none__') && !t.projectId) return true;
         return t.projectId && _kanbanFilterProjectIds.has(t.projectId);
       });
+    }
+
+    // Apply project theme when exactly one project is selected
+    var kanbanContainer = document.getElementById('kanban');
+    if (kanbanContainer && window.dmApplyProjectTheme) {
+      var _selIds = Array.from(_kanbanFilterProjectIds).filter(function(id) { return id !== '__none__'; });
+      if (_selIds.length === 1) {
+        var _themeProj = _kanbanProjectMap[_selIds[0]];
+        window.dmApplyProjectTheme(kanbanContainer, _themeProj || null);
+      } else {
+        window.dmApplyProjectTheme(kanbanContainer, null);
+      }
     }
 
     // Backfill kanbanStatus for legacy tasks
@@ -3770,7 +3799,7 @@
     var projectsPromise = window.dmSync.getAllProjects().then(function(projects) {
       _kanbanProjectMap = {};
       projects.forEach(function(p) {
-        _kanbanProjectMap[p.id] = { name: p.name, color: p.color || '', collaborators: p.collaborators || [] };
+        _kanbanProjectMap[p.id] = p;
       });
       // Restore saved filter from IDB/Firestore before rendering
       return window.dmSync.getPageFilterProjectIds('kanban').then(function(saved) {
