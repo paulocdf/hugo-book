@@ -1398,6 +1398,51 @@ aside nav ul a:hover {
     }
   }
 
+  // ---- Sidebar: per-project entries (Phase 8) ----
+  .sidebar-project-item {
+    > a {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding-left: 1.25rem;
+      font-size: 0.85rem;
+      line-height: 1.4;
+      transition: color 0.15s, background 0.15s;
+    }
+
+    .sidebar-project-glyph {
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex: 0 0 auto;
+      opacity: 0.85;
+    }
+
+    .sidebar-project-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) inset;
+    }
+
+    .sidebar-project-name {
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
+    &.active > a {
+      font-weight: 600;
+      color: var(--color-accent);
+    }
+  }
+
   // ---- Settings: bottom-pinned footer panel ----
   .sidebar-settings-footer {
     padding: 0.5rem 0.75rem;

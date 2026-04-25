@@ -1861,6 +1861,19 @@
       else if (listView.style.display !== 'none') renderList();
     });
 
+    // Phase 8: hash-based deep linking
+    window.addEventListener('hashchange', function() {
+      if (!_projects || !_projects.length) return;
+      var hashId = parseProjectHash();
+      if (hashId) {
+        if (hashId === _currentProjectId) return;
+        var p = _projects.find(function(p) { return p.id === hashId; });
+        if (p) { showDetail(hashId); return; }
+      }
+      // No project hash → ensure list view is shown
+      if (_currentProjectId) showList();
+    });
+
     if (window.dmAuthReady) {
       window.dmAuthReady.then(function() {
         if (window.dmAuth) window.dmAuth.onAuthStateChanged(checkAuth);
@@ -1911,13 +1924,26 @@
   // ─── Data Loading ───
   function loadData() {
     var method = _showArchived ? 'getAllProjectsIncludingArchived' : 'getAllProjects';
-    window.dmSync[method]().then(function(projects) {
+    return window.dmSync[method]().then(function(projects) {
       _projects = projects;
       return loadTodoCounts();
     }).then(function() {
       loadingEl.style.display = 'none';
-      showList();
+      // Phase 8: honor URL hash for deep-link to project detail
+      var hashId = parseProjectHash();
+      if (hashId && _projects.find(function(p) { return p.id === hashId; })) {
+        showDetail(hashId);
+      } else {
+        showList();
+      }
     });
+  }
+
+  function parseProjectHash() {
+    var h = window.location.hash || '';
+    var m = h.match(/^#project-(.+)$/);
+    if (!m) return null;
+    try { return decodeURIComponent(m[1]); } catch (e) { return m[1]; }
   }
 
   function loadTodoCounts() {
@@ -1939,6 +1965,10 @@
     detailView.classList.remove('active');
     if (window.dmApplyProjectTheme) window.dmApplyProjectTheme(detailView, null);
     listView.style.display = '';
+    // Phase 8: clear project hash if present (don't trample other anchors)
+    if (/^#project-/.test(window.location.hash)) {
+      try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch (e) {}
+    }
     renderList();
   }
 
@@ -2061,6 +2091,11 @@
     _currentProjectId = projectId;
     listView.style.display = 'none';
     detailView.classList.add('active');
+    // Phase 8: write hash for deep-linkable URL (only if not already set)
+    var desired = '#project-' + encodeURIComponent(projectId);
+    if (window.location.hash !== desired) {
+      try { history.replaceState(null, '', window.location.pathname + window.location.search + desired); } catch (e) {}
+    }
     renderDetail(projectId);
   }
 

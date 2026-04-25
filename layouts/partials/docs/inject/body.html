@@ -3338,6 +3338,56 @@
 
   var SIDEBAR_MAX = 10;
 
+  // Cache of active projects for sidebar rendering (Phase 8)
+  var _sidebarProjects = null;
+
+  function buildProjectsChildren(projects) {
+    if (!projects || !projects.length) return '';
+    var hash = window.location.hash || '';
+    var html = '';
+    projects.forEach(function(p) {
+      if (!p || p.archived || p.deletedAt) return;
+      // Resolve effective accent: project override → theme preset → legacy color → fallback
+      var themePreset = (window.dmGetProjectTheme && p.themeId) ? window.dmGetProjectTheme(p.themeId) : null;
+      var accent = p.accent || (themePreset && themePreset.accent) || p.color || '#888';
+      var iconName = p.icon || (themePreset && themePreset.icon) || null;
+      var glyph = '';
+      if (p.emoji) {
+        glyph = '<span class="sidebar-project-glyph">' + escapeHtml(p.emoji) + '</span>';
+      } else if (iconName) {
+        glyph = '<span class="sidebar-project-glyph"><svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + escapeHtml(iconName) + '"/></svg></span>';
+      }
+      var isActive = hash === '#project-' + p.id;
+      var activeClass = isActive ? ' active' : '';
+      html += '<li class="sidebar-item sidebar-project-item' + activeClass + '" data-project-id="' + escapeHtml(p.id) + '">' +
+        '<a href="' + sectionUrl('projects') + '#project-' + encodeURIComponent(p.id) + '">' +
+          glyph +
+          '<span class="sidebar-project-dot" style="background:' + escapeHtml(accent) + '"></span>' +
+          '<span class="sidebar-project-name">' + escapeHtml(p.name || 'Untitled') + '</span>' +
+        '</a>' +
+        '</li>';
+    });
+    return html;
+  }
+
+  function refreshSidebarProjects() {
+    if (!window.dmSync || !window.dmSync.getAllProjects) return Promise.resolve([]);
+    return window.dmSync.getAllProjects().then(function(projects) {
+      var filtered = (projects || []).filter(function(p) {
+        return p && !p.archived && !p.deletedAt;
+      });
+      filtered.sort(function(a, b) {
+        var ao = a.order; var bo = b.order;
+        if (typeof ao !== 'number') ao = Number.POSITIVE_INFINITY;
+        if (typeof bo !== 'number') bo = Number.POSITIVE_INFINITY;
+        if (ao !== bo) return ao - bo;
+        return (b.createdAt || 0) - (a.createdAt || 0);
+      });
+      _sidebarProjects = filtered;
+      return filtered;
+    }).catch(function() { return []; });
+  }
+
   function renderDynamicSidebar(allNotes, user) {
     var menuNav = document.querySelector('.book-menu-content nav');
     if (!menuNav) return;
@@ -3430,11 +3480,12 @@
     html += '<li class="sidebar-item" data-section="board">' +
       '<a href="' + sectionUrl('board') + '"' + boardActive + '>' + ICONS.board + 'Board</a>' +
       '</li>';
-    // Projects — static entry with color dots loaded async
-    var projectsActive = window.location.pathname.indexOf('/docs/projects') !== -1 ? ' class="active"' : '';
-    html += '<li class="sidebar-item sidebar-projects" data-section="projects">' +
-      '<a href="' + sectionUrl('projects') + '"' + projectsActive + '>' + ICONS.projects + 'Projects</a>' +
-      '</li>';
+    // Projects — collapsible section listing all active projects (Phase 8)
+    var projectsChildren = buildProjectsChildren(_sidebarProjects || []);
+    var projectsHash = window.location.hash || '';
+    var projectsOnPage = window.location.pathname.indexOf('/docs/projects') !== -1;
+    var projectsOpen = projectsOnPage || /^#project-/.test(projectsHash);
+    html += buildSectionHtml('Projects', ICONS.projects, sectionUrl('projects'), projectsChildren, projectsOpen);
     // Calendar — month/week calendar view
     var calendarActive = window.location.pathname.indexOf('/docs/calendar') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item" data-section="calendar">' +
@@ -4779,6 +4830,10 @@
       '</li>';
     html += buildSectionHtml('Snippets', ICONS.snippets, sectionUrl('snippets'), '', false);
 
+    // Projects — static empty section header (Phase 8)
+    var projectsOpen3 = window.location.pathname.indexOf('/docs/projects') !== -1;
+    html += buildSectionHtml('Projects', ICONS.projects, sectionUrl('projects'), '', projectsOpen3);
+
     var tagsActive = window.location.pathname.indexOf('/docs/tags') !== -1 ? ' class="active"' : '';
     html += '<li class="sidebar-item" data-section="tags">' +
       '<a href="' + sectionUrl('tags') + '"' + tagsActive + '>' + ICONS.tags + 'Tags</a>' +
@@ -4828,10 +4883,40 @@
   var _sidebarUser = null; // cached user for re-renders
   window.addEventListener('dm-sync-complete', function() {
     if (!window.dmSync) return;
-    window.dmSync.getAllNotes().then(function(notes) {
-      if (notes.length > 0) {
+    Promise.all([
+      window.dmSync.getAllNotes(),
+      refreshSidebarProjects()
+    ]).then(function(results) {
+      var notes = results[0];
+      if (notes.length > 0 || _sidebarUser) {
         renderDynamicSidebar(notes, _sidebarUser);
       }
+    });
+  });
+
+  // Re-render sidebar when projects change (debounced, Phase 8)
+  var _projectsRerenderTimer = null;
+  window.addEventListener('dm-projects-updated', function() {
+    if (!_sidebarUser || !window.dmSync) return;
+    if (_projectsRerenderTimer) clearTimeout(_projectsRerenderTimer);
+    _projectsRerenderTimer = setTimeout(function() {
+      _projectsRerenderTimer = null;
+      refreshSidebarProjects().then(function() {
+        return window.dmSync.getAllNotes();
+      }).then(function(notes) {
+        renderDynamicSidebar(notes || [], _sidebarUser);
+      });
+    }, 200);
+  });
+
+  // Re-render sidebar on hash change so the active project highlight updates (Phase 8)
+  window.addEventListener('hashchange', function() {
+    if (!_sidebarUser) return;
+    // Only re-render if we have project entries that could change active state
+    if (!_sidebarProjects || !_sidebarProjects.length) return;
+    if (!window.dmSync) return;
+    window.dmSync.getAllNotes().then(function(notes) {
+      renderDynamicSidebar(notes || [], _sidebarUser);
     });
   });
 
@@ -4843,7 +4928,11 @@
           _sidebarUser = user;
           // Try to render from cache immediately
           if (window.dmSync) {
-            window.dmSync.getAllNotes().then(function(notes) {
+            Promise.all([
+              window.dmSync.getAllNotes(),
+              refreshSidebarProjects()
+            ]).then(function(results) {
+              var notes = results[0];
               // Always render sidebar for authenticated users (even with 0 notes)
               // so settings footer trigger and modal are initialized
               renderDynamicSidebar(notes, user);
@@ -4852,6 +4941,7 @@
           }
         } else {
           _sidebarUser = null;
+          _sidebarProjects = null;
           renderAuthPrompt();
         }
       });
