@@ -6733,6 +6733,199 @@
       });
     },
 
+    // ── Insights (Phase 3 Slice E) ──
+    // Returns { month, insights: [{ id, kind, severity, title, body, data }], generatedAt }.
+    // Kinds: 'overspend' | 'pace' | 'first-payee' | 'drift'. Filtered against the
+    // dismissed-IDs list in localStorage; pass { includeDismissed: true } to bypass.
+    _getDismissedInsights: function() {
+      try {
+        var raw = localStorage.getItem('dm-insights-dismissed');
+        if (!raw) return [];
+        var arr = JSON.parse(raw);
+        return Array.isArray(arr) ? arr : [];
+      } catch (e) { return []; }
+    },
+    _setDismissedInsights: function(arr) {
+      try { localStorage.setItem('dm-insights-dismissed', JSON.stringify(arr || [])); }
+      catch (e) {}
+    },
+    dismissInsight: function(id) {
+      if (!id) return;
+      var api = window.dmBudget;
+      var arr = api._getDismissedInsights();
+      if (arr.indexOf(id) === -1) {
+        arr.push(id);
+        api._setDismissedInsights(arr);
+      }
+      window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+    },
+    resetDismissedInsights: function() {
+      window.dmBudget._setDismissedInsights([]);
+      window.dispatchEvent(new CustomEvent('dm-budget-updated'));
+    },
+    computeInsights: function(args) {
+      args = args || {};
+      var api = window.dmBudget;
+      var month = args.month || _currentMonth();
+      var includeDismissed = !!args.includeDismissed;
+      function fmt(d) {
+        return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+      }
+      var todayStr = args.today || fmt(new Date());
+      // Day-of-month within `month` (clamped if today is in a different month)
+      var monthYear = parseInt(month.substr(0,4), 10);
+      var monthMonth = parseInt(month.substr(5,2), 10);
+      var todayYear = parseInt(todayStr.substr(0,4), 10);
+      var todayMonth = parseInt(todayStr.substr(5,2), 10);
+      var daysInMonth = new Date(monthYear, monthMonth, 0).getDate();
+      var dayOfMonth;
+      if (todayYear === monthYear && todayMonth === monthMonth) {
+        dayOfMonth = parseInt(todayStr.substr(8,2), 10);
+      } else if (todayYear > monthYear || (todayYear === monthYear && todayMonth > monthMonth)) {
+        dayOfMonth = daysInMonth; // viewing a past month — treat as fully elapsed
+      } else {
+        dayOfMonth = 0; // future month
+      }
+
+      return Promise.all([
+        api.getMonthSummary(month),
+        idbGetAll(STORE_TRANSACTIONS),
+        api.getRecurring()
+      ]).then(function(r) {
+        var summary = r[0];
+        var allTxs = (r[1] || []).filter(function(t) { return !t.deletedAt; });
+        var rules = r[2] || [];
+        var dismissed = api._getDismissedInsights();
+        var dismissedSet = {};
+        dismissed.forEach(function(id) { dismissedSet[id] = true; });
+        var insights = [];
+
+        // 1. Overspend
+        summary.categories.forEach(function(row) {
+          if (row.kind === 'income') return;
+          if (row.effectiveAllocated <= 0) return;
+          if (row.spent > row.effectiveAllocated) {
+            var over = row.spent - row.effectiveAllocated;
+            insights.push({
+              id: 'overspend-' + row.id + '-' + month,
+              kind: 'overspend',
+              severity: 'alert',
+              title: row.name + ' is over budget',
+              body: 'Spent ' + api.formatMoney(row.spent) + ' of '
+                  + api.formatMoney(row.effectiveAllocated) + ' — '
+                  + api.formatMoney(over) + ' over.',
+              data: { categoryId: row.id, spent: row.spent, allocated: row.effectiveAllocated, overCents: over }
+            });
+          }
+        });
+
+        // 2. Pace (only mid-month onward, only if not already over)
+        if (dayOfMonth >= 5 && dayOfMonth < daysInMonth) {
+          summary.categories.forEach(function(row) {
+            if (row.kind === 'income') return;
+            if (row.effectiveAllocated <= 0) return;
+            if (row.spent > row.effectiveAllocated) return; // already overspend insight
+            if (row.spent <= 0) return;
+            var projected = Math.round((row.spent / dayOfMonth) * daysInMonth);
+            if (projected > row.effectiveAllocated) {
+              insights.push({
+                id: 'pace-' + row.id + '-' + month,
+                kind: 'pace',
+                severity: 'warn',
+                title: row.name + ' is on pace to overspend',
+                body: 'At current pace, projected month-end is '
+                    + api.formatMoney(projected) + ' vs '
+                    + api.formatMoney(row.effectiveAllocated) + ' allocated.',
+                data: { categoryId: row.id, projectedCents: projected, allocated: row.effectiveAllocated, dayOfMonth: dayOfMonth, daysInMonth: daysInMonth }
+              });
+            }
+          });
+        }
+
+        // 3. First-time payee — payees seen this month but never before
+        var seenBefore = {};
+        var seenThisMonth = {}; // payeeNorm → most recent date string
+        allTxs.forEach(function(t) {
+          if (!t.payee || !t.date) return;
+          if (t.amount >= 0) return; // expense-only
+          var norm = String(t.payee).trim().toLowerCase();
+          if (!norm) return;
+          var m = t.date.substr(0, 7);
+          if (m < month) {
+            seenBefore[norm] = true;
+          } else if (m === month) {
+            if (!seenThisMonth[norm] || t.date > seenThisMonth[norm].date) {
+              seenThisMonth[norm] = { date: t.date, payee: t.payee };
+            }
+          }
+        });
+        var firstTimePayees = [];
+        Object.keys(seenThisMonth).forEach(function(norm) {
+          if (!seenBefore[norm]) {
+            firstTimePayees.push({
+              norm: norm,
+              date: seenThisMonth[norm].date,
+              payee: seenThisMonth[norm].payee
+            });
+          }
+        });
+        firstTimePayees.sort(function(a, b) { return b.date < a.date ? -1 : 1; });
+        firstTimePayees.slice(0, 5).forEach(function(p) {
+          insights.push({
+            id: 'first-payee-' + p.norm + '-' + month,
+            kind: 'first-payee',
+            severity: 'info',
+            title: 'First time at ' + p.payee,
+            body: 'First seen on ' + p.date + ' — make sure this is expected.',
+            data: { payee: p.payee, date: p.date }
+          });
+        });
+
+        // 4. Subscription drift — recurring rule's actual tx this month differs >5% (and ≥100¢)
+        rules.forEach(function(rule) {
+          if (!rule.id || !rule.amount) return;
+          var matches = allTxs.filter(function(t) {
+            return t.recurringId === rule.id && t.date && t.date.substr(0,7) === month;
+          });
+          if (!matches.length) return;
+          // Sum (in case of multiple posts in a month, e.g. weekly)
+          var actual = matches.reduce(function(s, t) { return s + (t.amount || 0); }, 0);
+          var expected = rule.amount;
+          if (matches.length > 1 && rule.frequency !== 'monthly' && rule.frequency !== 'yearly') {
+            // For weekly/daily rules, scale expected by event count to compare
+            expected = rule.amount * matches.length;
+          }
+          var diff = actual - expected;
+          var diffMag = Math.abs(diff);
+          var pct = Math.abs(expected) > 0 ? diffMag / Math.abs(expected) : 0;
+          if (diffMag >= 100 && pct > 0.05) {
+            var direction = (Math.abs(actual) > Math.abs(expected)) ? 'up' : 'down';
+            insights.push({
+              id: 'drift-' + rule.id + '-' + month,
+              kind: 'drift',
+              severity: 'warn',
+              title: (rule.name || 'Recurring rule') + ' amount drifted ' + direction,
+              body: 'Expected ' + api.formatMoney(expected)
+                  + ', actual ' + api.formatMoney(actual)
+                  + ' (' + (direction === 'up' ? '+' : '-') + Math.round(pct * 100) + '%).',
+              data: { recurringId: rule.id, expectedCents: expected, actualCents: actual, direction: direction }
+            });
+          }
+        });
+
+        if (!includeDismissed) {
+          insights = insights.filter(function(i) { return !dismissedSet[i.id]; });
+        }
+        return {
+          month: month,
+          insights: insights,
+          generatedAt: Date.now(),
+          dayOfMonth: dayOfMonth,
+          daysInMonth: daysInMonth
+        };
+      });
+    },
+
     // ── Recurring rules (Phase 2a) ──
     // Fields (see serializeRecurring): name, accountId, categoryId, amount (cents, signed),
     // frequency ('daily'|'weekly'|'monthly'|'yearly'), interval, byDayOfMonth, byDayOfWeek,

@@ -392,6 +392,47 @@
   .dm-rpt-cf-empty {
     padding: 28px; text-align: center; opacity: 0.6; font-size: 0.85rem;
   }
+
+  /* Insights (Slice E) */
+  .dm-rpt-insights-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+  .dm-rpt-insight-card {
+    position: relative;
+    background: var(--body-background);
+    border: 1px solid var(--gray-200);
+    border-left: 4px solid var(--gray-400);
+    border-radius: 8px;
+    padding: 12px 32px 12px 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  }
+  .dm-rpt-insight-card[data-severity="alert"] { border-left-color: #c62828; }
+  .dm-rpt-insight-card[data-severity="warn"]  { border-left-color: #f9a825; }
+  .dm-rpt-insight-card[data-severity="info"]  { border-left-color: #1976d2; }
+  .dm-rpt-insight-title {
+    font-weight: 600; font-size: 0.92rem; margin-bottom: 4px;
+  }
+  .dm-rpt-insight-body {
+    font-size: 0.82rem; opacity: 0.8; line-height: 1.4;
+  }
+  .dm-rpt-insight-dismiss {
+    position: absolute; top: 6px; right: 6px;
+    background: transparent; border: none; cursor: pointer;
+    width: 24px; height: 24px; border-radius: 4px;
+    color: var(--body-font-color); opacity: 0.5;
+    font-size: 1.1rem; line-height: 1; padding: 0;
+  }
+  .dm-rpt-insight-dismiss:hover { opacity: 1; background: var(--gray-100); }
+  .dm-rpt-insight-empty {
+    padding: 18px; text-align: center; opacity: 0.6; font-size: 0.85rem;
+  }
+  .dm-rpt-insight-footer {
+    margin-top: 10px; font-size: 0.78rem; opacity: 0.65;
+  }
+  .dm-rpt-insight-footer a {
+    color: var(--color-accent); cursor: pointer; text-decoration: underline;
+  }
 </style>
 
 <div class="dm-rpt-wrap" id="dm-rpt-root">
@@ -416,6 +457,15 @@
     </span>
     <span class="label-suffix" id="dm-rpt-range-label"></span>
   </div>
+
+  <section class="dm-rpt-section" id="dm-rpt-insights-section">
+    <h3>
+      <span>Insights</span>
+      <span class="total" id="dm-rpt-insights-count"></span>
+    </h3>
+    <div class="dm-rpt-insights-grid" id="dm-rpt-insights-grid"></div>
+    <div class="dm-rpt-insight-footer" id="dm-rpt-insights-footer"></div>
+  </section>
 
   <section class="dm-rpt-section" id="dm-rpt-cat-section">
     <h3>
@@ -537,6 +587,11 @@
   var $cfStats = document.getElementById('dm-rpt-cf-stats');
   var $cfTooltip = document.getElementById('dm-rpt-cf-tooltip');
   var $cfCaption = document.getElementById('dm-rpt-cf-caption');
+
+  var $insSection = document.getElementById('dm-rpt-insights-section');
+  var $insGrid = document.getElementById('dm-rpt-insights-grid');
+  var $insCount = document.getElementById('dm-rpt-insights-count');
+  var $insFooter = document.getElementById('dm-rpt-insights-footer');
 
   var _state = {
     preset: 'this-month',
@@ -1200,6 +1255,94 @@
     });
   }
 
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function renderInsights(result, opts) {
+    opts = opts || {};
+    var insights = (result && result.insights) || [];
+    if (!insights.length) {
+      $insGrid.innerHTML = '<div class="dm-rpt-insight-empty">'
+        + (opts.showingDismissed ? 'No dismissed insights to show.' : 'No insights for this month — nice work.')
+        + '</div>';
+      $insCount.textContent = '';
+    } else {
+      $insGrid.innerHTML = insights.map(function(i) {
+        return '<div class="dm-rpt-insight-card" data-severity="' + escapeHtml(i.severity) + '" data-id="' + escapeHtml(i.id) + '">'
+          + '<button class="dm-rpt-insight-dismiss" type="button" aria-label="Dismiss" data-id="' + escapeHtml(i.id) + '">×</button>'
+          + '<div class="dm-rpt-insight-title">' + escapeHtml(i.title) + '</div>'
+          + '<div class="dm-rpt-insight-body">' + escapeHtml(i.body) + '</div>'
+          + '</div>';
+      }).join('');
+      $insCount.textContent = insights.length + (insights.length === 1 ? ' insight' : ' insights');
+    }
+
+    // Footer: "Show dismissed" link if any dismissed exist
+    var dismissed = (window.dmBudget._getDismissedInsights && window.dmBudget._getDismissedInsights()) || [];
+    if (opts.showingDismissed) {
+      $insFooter.innerHTML = '<a id="dm-rpt-insights-clear-dismissed">Restore all dismissed insights</a> · '
+        + '<a id="dm-rpt-insights-show-active">Back to active insights</a>';
+    } else if (dismissed.length) {
+      $insFooter.innerHTML = '<a id="dm-rpt-insights-show-dismissed">Show ' + dismissed.length + ' dismissed</a>';
+    } else {
+      $insFooter.innerHTML = '';
+    }
+  }
+
+  function refreshInsights() {
+    if (!window.dmBudget || !window.dmBudget.computeInsights) return;
+    // Insights are inherently a current-month concept — only show when range is "this-month"
+    if (_state.preset !== 'this-month') {
+      $insSection.style.display = 'none';
+      return;
+    }
+    $insSection.style.display = '';
+    var month = window.dmBudget.currentMonth();
+    window.dmBudget.computeInsights({ month: month }).then(function(result) {
+      renderInsights(result, { showingDismissed: false });
+    }).catch(function(err) {
+      console.warn('[reports] computeInsights failed', err);
+      $insGrid.innerHTML = '<div class="dm-rpt-insight-empty">Failed to compute insights.</div>';
+    });
+  }
+
+  // Insights interactions (event delegation)
+  if ($insGrid) {
+    $insGrid.addEventListener('click', function(e) {
+      var btn = e.target.closest('.dm-rpt-insight-dismiss');
+      if (!btn) return;
+      var id = btn.getAttribute('data-id');
+      if (id && window.dmBudget && window.dmBudget.dismissInsight) {
+        window.dmBudget.dismissInsight(id);
+        refreshInsights();
+      }
+    });
+  }
+  if ($insFooter) {
+    $insFooter.addEventListener('click', function(e) {
+      var t = e.target;
+      if (!t || !t.id) return;
+      if (t.id === 'dm-rpt-insights-show-dismissed') {
+        var month = window.dmBudget.currentMonth();
+        window.dmBudget.computeInsights({ month: month, includeDismissed: true }).then(function(result) {
+          // Filter to only the dismissed ones for the "show dismissed" view
+          var dismissedSet = {};
+          (window.dmBudget._getDismissedInsights() || []).forEach(function(id) { dismissedSet[id] = true; });
+          result.insights = result.insights.filter(function(i) { return dismissedSet[i.id]; });
+          renderInsights(result, { showingDismissed: true });
+        });
+      } else if (t.id === 'dm-rpt-insights-show-active') {
+        refreshInsights();
+      } else if (t.id === 'dm-rpt-insights-clear-dismissed') {
+        window.dmBudget.resetDismissedInsights();
+        refreshInsights();
+      }
+    });
+  }
+
   function refresh() {
     if (!window.dmBudget || !window.dmBudget.getCategorySpend) return;
     var rangeArg;
@@ -1227,6 +1370,7 @@
     refreshHeat();
     refreshNetWorth();
     refreshCashflow();
+    refreshInsights();
   }
 
   // ── Wiring ─────────────────────────────────────────────────────────
