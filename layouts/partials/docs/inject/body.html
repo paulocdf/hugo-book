@@ -3353,16 +3353,16 @@
       var iconName = p.icon || (themePreset && themePreset.icon) || null;
       var glyph = '';
       if (p.emoji) {
-        glyph = '<span class="sidebar-project-glyph">' + escapeHtml(p.emoji) + '</span>';
+        glyph = '<span class="sidebar-project-glyph" aria-hidden="true">' + escapeHtml(p.emoji) + '</span>';
       } else if (iconName) {
-        glyph = '<span class="sidebar-project-glyph"><svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + escapeHtml(iconName) + '"/></svg></span>';
+        glyph = '<span class="sidebar-project-glyph" aria-hidden="true"><svg class="dm-icon" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + escapeHtml(iconName) + '"/></svg></span>';
       }
       var isActive = hash === '#project-' + p.id;
       var activeClass = isActive ? ' active' : '';
       html += '<li class="sidebar-item sidebar-project-item' + activeClass + '" data-project-id="' + escapeHtml(p.id) + '">' +
         '<a href="' + sectionUrl('projects') + '#project-' + encodeURIComponent(p.id) + '">' +
           glyph +
-          '<span class="sidebar-project-dot" style="background:' + escapeHtml(accent) + '"></span>' +
+          '<span class="sidebar-project-dot" aria-hidden="true" style="background:' + escapeHtml(accent) + '"></span>' +
           '<span class="sidebar-project-name">' + escapeHtml(p.name || 'Untitled') + '</span>' +
         '</a>' +
         '</li>';

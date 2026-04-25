@@ -6801,3 +6801,20 @@ body.dm-img-resizing {
   min-width: 120px;
 }
 
+/* Phase 10 a11y: defensive :focus-visible baseline for project visual-identity pickers.
+   Guarantees a visible focus ring on Neon/Terminal/dark themes regardless of the
+   swatch background. Uses outline + box-shadow halo so it survives transparent/
+   gradient backgrounds. */
+.pj-theme-swatch:focus-visible,
+.pj-icon-btn:focus-visible,
+.pj-banner-style button:focus-visible,
+.pj-pattern button:focus-visible,
+.pj-density button:focus-visible,
+.pj-shape button:focus-visible,
+.pj-font button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-accent) 25%, transparent);
+  z-index: 1;
+}
+

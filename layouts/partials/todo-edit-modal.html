@@ -1946,6 +1946,7 @@
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = '×';
+      btn.setAttribute('aria-label', 'Remove label ' + lbl.name);
       btn.addEventListener('click', function() {
         _editLabels = _editLabels.filter(function(l) { return l.id !== lbl.id; });
         renderLabelChips();

@@ -2129,7 +2129,7 @@
       else bannerEl.removeAttribute('data-pj-pattern');
       var iconHtml = '';
       if (project.emoji) {
-        iconHtml = '<span class="pj-banner-emoji">' + escapeHtml(project.emoji) + '</span>';
+        iconHtml = '<span class="pj-banner-emoji" aria-hidden="true">' + escapeHtml(project.emoji) + '</span>';
       } else if (project.icon) {
         iconHtml = '<svg class="dm-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + project.icon + '"/></svg>';
       } else {
@@ -3563,21 +3563,52 @@
     return color; // fall back to same color → solid feel
   }
 
+  // Phase 10 a11y: arrow-key/Home/End navigation across a list of focusable radio-role items.
+  // Caller passes the container and an item selector. On activation (Space/Enter), runs onActivate(item).
+  function wireRadioGroupKeys(container, itemSelector, onActivate) {
+    if (!container) return;
+    container.addEventListener('keydown', function(e) {
+      var items = Array.prototype.slice.call(container.querySelectorAll(itemSelector));
+      if (!items.length) return;
+      var idx = items.indexOf(document.activeElement);
+      var next = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (idx + 1 + items.length) % items.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (idx - 1 + items.length) % items.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = items.length - 1;
+      else if ((e.key === ' ' || e.key === 'Enter') && idx >= 0) {
+        e.preventDefault();
+        onActivate(items[idx]);
+        return;
+      }
+      if (next >= 0) {
+        e.preventDefault();
+        items[next].focus();
+        onActivate(items[next]);
+      }
+    });
+  }
+
   function buildThemePicker() {
     var picker = document.getElementById('pj-theme-picker');
     if (!picker) return;
+    picker.setAttribute('role', 'radiogroup');
+    picker.setAttribute('aria-label', 'Project theme');
     var themes = getThemes();
     var html = '';
     Object.keys(themes).forEach(function(id) {
       var t = themes[id];
       var bg = 'linear-gradient(135deg,' + t.accent + ' 0%,' + t.accent2 + ' 100%)';
-      html += '<div class="pj-theme-swatch" data-theme-id="' + id + '" style="background:' + bg + ';" title="' + t.name + '">' + t.name + '</div>';
+      html += '<div class="pj-theme-swatch" role="radio" aria-checked="false" tabindex="-1" data-theme-id="' + id + '" style="background:' + bg + ';" title="' + t.name + '" aria-label="Theme: ' + t.name + '">' + t.name + '</div>';
     });
     picker.innerHTML = html;
     picker.querySelectorAll('.pj-theme-swatch').forEach(function(sw) {
       sw.addEventListener('click', function() {
         applyThemeToForm(sw.getAttribute('data-theme-id'));
       });
+    });
+    wireRadioGroupKeys(picker, '.pj-theme-swatch', function(item) {
+      applyThemeToForm(item.getAttribute('data-theme-id'));
     });
   }
 
@@ -3598,9 +3629,11 @@
   function buildIconGrid() {
     var grid = document.getElementById('pj-icon-grid');
     if (!grid) return;
+    grid.setAttribute('role', 'radiogroup');
+    grid.setAttribute('aria-label', 'Project icon');
     var html = '';
     THEME_ICON_OPTIONS.forEach(function(name) {
-      html += '<button type="button" class="pj-icon-btn" data-icon="' + name + '" title="' + name + '">' +
+      html += '<button type="button" class="pj-icon-btn" role="radio" aria-checked="false" tabindex="-1" data-icon="' + name + '" title="' + name + '" aria-label="Icon: ' + name + '">' +
         '<svg class="dm-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + name + '"/></svg>' +
         '</button>';
     });
@@ -3611,6 +3644,11 @@
         _selectedThemeId = null; // user diverged from theme
         refreshAppearanceUI();
       });
+    });
+    wireRadioGroupKeys(grid, '.pj-icon-btn', function(item) {
+      _selectedIcon = item.getAttribute('data-icon');
+      _selectedThemeId = null;
+      refreshAppearanceUI();
     });
     var emojiInput = document.getElementById('pj-emoji-input');
     if (emojiInput) {
@@ -3623,22 +3661,29 @@
 
    function bindAppearanceSegments() {
     var groups = [
-      { id: 'pj-banner-style', attr: 'data-banner-style', set: function(v){ _selectedBannerStyle = v; } },
-      { id: 'pj-pattern',      attr: 'data-pattern',      set: function(v){ _selectedPattern = v; } },
-      { id: 'pj-density',      attr: 'data-density',      set: function(v){ _selectedDensity = v; } },
-      { id: 'pj-shape',        attr: 'data-shape',        set: function(v){ _selectedShape = v; } },
-      { id: 'pj-font',         attr: 'data-font',         set: function(v){ _selectedFont = v; } }
+      { id: 'pj-banner-style', attr: 'data-banner-style', label: 'Banner style', set: function(v){ _selectedBannerStyle = v; } },
+      { id: 'pj-pattern',      attr: 'data-pattern',      label: 'Pattern',      set: function(v){ _selectedPattern = v; } },
+      { id: 'pj-density',      attr: 'data-density',      label: 'Density',      set: function(v){ _selectedDensity = v; } },
+      { id: 'pj-shape',        attr: 'data-shape',        label: 'Card shape',   set: function(v){ _selectedShape = v; } },
+      { id: 'pj-font',         attr: 'data-font',         label: 'Font family',  set: function(v){ _selectedFont = v; } }
     ];
     groups.forEach(function(g) {
       var container = document.getElementById(g.id);
       if (!container) return;
+      container.setAttribute('role', 'group');
+      container.setAttribute('aria-label', g.label);
       container.querySelectorAll('button').forEach(function(btn) {
+        if (!btn.hasAttribute('aria-pressed')) btn.setAttribute('aria-pressed', 'false');
         btn.addEventListener('click', function() {
           var val = btn.getAttribute(g.attr);
           g.set(val);
           _selectedThemeId = null;
-          container.querySelectorAll('button').forEach(function(b) { b.classList.remove('active'); });
+          container.querySelectorAll('button').forEach(function(b) {
+            b.classList.remove('active');
+            b.setAttribute('aria-pressed', 'false');
+          });
           btn.classList.add('active');
+          btn.setAttribute('aria-pressed', 'true');
         });
       });
     });
@@ -3647,16 +3692,33 @@
    function refreshAppearanceUI() {
     // Theme swatches
     document.querySelectorAll('.pj-theme-swatch').forEach(function(sw) {
-      sw.classList.toggle('selected', sw.getAttribute('data-theme-id') === _selectedThemeId);
+      var sel = sw.getAttribute('data-theme-id') === _selectedThemeId;
+      sw.classList.toggle('selected', sel);
+      sw.setAttribute('aria-checked', sel ? 'true' : 'false');
+      sw.setAttribute('tabindex', sel ? '0' : '-1');
     });
+    // If nothing selected, make first swatch tabbable so keyboard users can enter the group
+    var picker = document.getElementById('pj-theme-picker');
+    if (picker && !picker.querySelector('.pj-theme-swatch[tabindex="0"]')) {
+      var firstSw = picker.querySelector('.pj-theme-swatch');
+      if (firstSw) firstSw.setAttribute('tabindex', '0');
+    }
     // Color swatches
     document.querySelectorAll('.project-color-swatch').forEach(function(s) {
       s.classList.toggle('selected', s.getAttribute('data-color') === _selectedColor);
     });
     // Icon buttons
     document.querySelectorAll('.pj-icon-btn').forEach(function(b) {
-      b.classList.toggle('selected', b.getAttribute('data-icon') === _selectedIcon);
+      var sel = b.getAttribute('data-icon') === _selectedIcon;
+      b.classList.toggle('selected', sel);
+      b.setAttribute('aria-checked', sel ? 'true' : 'false');
+      b.setAttribute('tabindex', sel ? '0' : '-1');
     });
+    var iconGrid = document.getElementById('pj-icon-grid');
+    if (iconGrid && !iconGrid.querySelector('.pj-icon-btn[tabindex="0"]')) {
+      var firstIc = iconGrid.querySelector('.pj-icon-btn');
+      if (firstIc) firstIc.setAttribute('tabindex', '0');
+    }
     var emojiInput = document.getElementById('pj-emoji-input');
     if (emojiInput) emojiInput.value = _selectedEmoji || '';
     // Segmented controls
@@ -3672,7 +3734,9 @@
       if (!c) return;
       var info = segMap[id];
       c.querySelectorAll('button').forEach(function(btn) {
-        btn.classList.toggle('active', btn.getAttribute(info.attr) === info.val);
+        var sel = btn.getAttribute(info.attr) === info.val;
+        btn.classList.toggle('active', sel);
+        btn.setAttribute('aria-pressed', sel ? 'true' : 'false');
       });
     });
   }
