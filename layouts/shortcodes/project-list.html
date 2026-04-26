@@ -273,49 +273,7 @@
 .project-detail-back:hover { text-decoration: underline; }
 .project-detail-back svg { width: 14px; height: 14px; }
 
-.project-detail-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 1.5rem;
-  padding: 14px;
-  border-radius: 10px;
-  transition: background 0.3s;
-}
-.project-detail-color {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  margin-top: 4px;
-}
-.project-detail-info {
-  flex: 1;
-  min-width: 0;
-}
-.project-detail-name {
-  font-size: 1.2rem;
-  font-weight: 600;
-  margin: 0 0 4px;
-  word-break: break-word;
-}
-.project-detail-desc {
-  font-size: 0.88rem;
-  color: var(--gray-500);
-  margin: 0 0 8px;
-  word-break: break-word;
-}
-.project-detail-meta {
-  display: flex;
-  gap: 16px;
-  font-size: 0.8rem;
-  color: var(--gray-500);
-}
-.project-detail-meta span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
+/* .project-detail-header styles moved to _custom.scss for theme integration */
 .project-detail-actions {
   display: flex;
   gap: 6px;
@@ -1478,14 +1436,8 @@
       <svg class="dm-icon dm-icon--chevron-left" width="2" height="2" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-chevron-left"/></svg>
       Back to Projects
     </button>
-    <div class="pj-banner" id="pj-detail-banner" style="display:none;">
-      <div class="pj-banner-inner">
-        <div class="pj-banner-icon" id="pj-detail-banner-icon"></div>
-        <h2 class="pj-banner-title" id="pj-detail-banner-title"></h2>
-      </div>
-    </div>
     <div class="project-detail-header">
-      <div class="project-detail-color" id="project-detail-color"></div>
+      <div class="project-detail-glyph" id="project-detail-glyph"></div>
       <div class="project-detail-info">
         <h2 class="project-detail-name" id="project-detail-name"></h2>
         <p class="project-detail-desc" id="project-detail-desc"></p>
@@ -2110,7 +2062,6 @@
     }
 
      var color = getColor(project.color);
-    document.getElementById('project-detail-color').style.background = color;
     document.getElementById('project-detail-name').textContent = project.name;
     document.getElementById('project-detail-desc').textContent = project.description || '';
     document.getElementById('project-detail-desc').style.display = project.description ? '' : 'none';
@@ -2120,33 +2071,36 @@
       window.dmApplyProjectTheme(detailView, project);
     }
 
-    // Render the banner
-    var bannerEl = document.getElementById('pj-detail-banner');
-    var bannerIconEl = document.getElementById('pj-detail-banner-icon');
-    var bannerTitleEl = document.getElementById('pj-detail-banner-title');
-    if (bannerEl) {
-      var bs = project.bannerStyle || 'gradient';
-      bannerEl.setAttribute('data-banner-style', bs);
-      if (project.pattern && project.pattern !== 'none') bannerEl.setAttribute('data-pj-pattern', project.pattern);
-      else bannerEl.removeAttribute('data-pj-pattern');
-      var iconHtml = '';
+    // Render the project glyph (emoji > icon > color dot fallback)
+    var glyphEl = document.getElementById('project-detail-glyph');
+    if (glyphEl) {
       if (project.emoji) {
-        iconHtml = '<span class="pj-banner-emoji" aria-hidden="true">' + escapeHtml(project.emoji) + '</span>';
+        glyphEl.innerHTML = '<span class="pj-glyph-emoji" aria-hidden="true">' + escapeHtml(project.emoji) + '</span>';
+        glyphEl.setAttribute('data-glyph-kind', 'emoji');
+        glyphEl.style.removeProperty('background');
       } else if (project.icon) {
-        iconHtml = '<svg class="dm-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + project.icon + '"/></svg>';
+        glyphEl.innerHTML = '<svg class="dm-icon" width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + project.icon + '"/></svg>';
+        glyphEl.setAttribute('data-glyph-kind', 'icon');
+        glyphEl.style.removeProperty('background');
       } else {
-        iconHtml = '<svg class="dm-icon" width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-folder"/></svg>';
+        glyphEl.innerHTML = '';
+        glyphEl.setAttribute('data-glyph-kind', 'dot');
+        glyphEl.style.background = color;
       }
-      if (bannerIconEl) bannerIconEl.innerHTML = iconHtml;
-      if (bannerTitleEl) bannerTitleEl.textContent = project.name;
-      bannerEl.style.display = (bs === 'none') ? 'none' : '';
     }
 
-    // Tint detail header with project color (J — project color theme)
+    // Apply theme attributes to the inner header itself (banner-style + pattern)
     var headerEl = document.querySelector('.project-detail-header');
     if (headerEl) {
-      headerEl.style.background = 'linear-gradient(135deg, ' + color + '12 0%, transparent 60%)';
-      headerEl.style.borderLeft = '3px solid ' + color;
+      headerEl.setAttribute('data-banner-style', project.bannerStyle || 'gradient');
+      if (project.pattern && project.pattern !== 'none') {
+        headerEl.setAttribute('data-pj-pattern', project.pattern);
+      } else {
+        headerEl.removeAttribute('data-pj-pattern');
+      }
+      // Clear any legacy inline tint (older sessions may have left these)
+      headerEl.style.removeProperty('background');
+      headerEl.style.removeProperty('border-left');
     }
 
     // Meta
