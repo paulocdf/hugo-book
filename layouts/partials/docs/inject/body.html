@@ -1473,6 +1473,7 @@
   function setMode(mode) {
     if (mode === currentMode) return;
     currentMode = mode;
+    if (!qcEditorBox) qcEditorBox = document.getElementById('qc-editor-box');
     modeButtons.forEach(function(b) { b.classList.remove('active'); });
     modeButtons.forEach(function(b) {
       if (b.getAttribute('data-mode') === mode) b.classList.add('active');
@@ -1492,7 +1493,7 @@
     var isAiMode = mode === 'ai';
     var isEditorMode = mode === 'note' || mode === 'code';
     titleInput.style.display = isAiMode ? 'none' : '';
-    document.getElementById('qc-editor-box').style.display = isAiMode ? 'none' : '';
+    if (qcEditorBox) qcEditorBox.style.display = isAiMode ? 'none' : '';
     // Show attachments gallery only in note/code modes if there are pending attachments
     if (qcAttachments) {
       qcAttachments.style.display = (isEditorMode && _qcPendingAttachments.length > 0) ? '' : 'none';
@@ -1518,13 +1519,13 @@
       dialog.classList.remove('ai-mode');
       input.placeholder = 'Paste or type your code here...';
       titleInput.style.display = '';
-      document.getElementById('qc-editor-box').style.display = '';
+      if (qcEditorBox) qcEditorBox.style.display = '';
       updatePreview();
     } else if (mode === 'todo') {
       if (todoFieldsEl) todoFieldsEl.style.display = '';
       if (toolbar) toolbar.style.display = 'none';
       titleInput.style.display = 'none';
-      document.getElementById('qc-editor-box').style.display = 'none';
+      if (qcEditorBox) qcEditorBox.style.display = 'none';
       input.classList.remove('code-mode');
       dialog.classList.remove('code-mode');
       dialog.classList.remove('ai-mode');
@@ -1532,7 +1533,7 @@
       if (expenseFieldsEl) expenseFieldsEl.style.display = '';
       if (toolbar) toolbar.style.display = 'none';
       titleInput.style.display = 'none';
-      document.getElementById('qc-editor-box').style.display = 'none';
+      if (qcEditorBox) qcEditorBox.style.display = 'none';
       input.classList.remove('code-mode');
       dialog.classList.remove('code-mode');
       dialog.classList.remove('ai-mode');
@@ -1548,7 +1549,7 @@
       dialog.classList.remove('ai-mode');
       input.placeholder = "What's on your mind?";
       titleInput.style.display = '';
-      document.getElementById('qc-editor-box').style.display = '';
+      if (qcEditorBox) qcEditorBox.style.display = '';
       updateNotePreview();
     }
 
@@ -1813,6 +1814,7 @@
     var mode = startMode || 'ai';
     // Reset state
     currentMode = mode;
+    if (!qcEditorBox) qcEditorBox = document.getElementById('qc-editor-box');
     selectedLang = 'kotlin';
     // Reset attachment state (clean up any leftover uploads)
     _qcPendingAttachments = [];
@@ -1862,7 +1864,7 @@
     // Show/hide elements based on mode
     var isAiMode = mode === 'ai';
     titleInput.style.display = isAiMode ? 'none' : (mode === 'todo' ? 'none' : '');
-    document.getElementById('qc-editor-box').style.display = isAiMode ? 'none' : (mode === 'todo' ? 'none' : '');
+    if (qcEditorBox) qcEditorBox.style.display = isAiMode ? 'none' : (mode === 'todo' ? 'none' : '');
     var actionsEl = modal.querySelector('.quick-capture-actions');
     if (actionsEl) actionsEl.style.display = isAiMode ? 'none' : '';
     if (isAiMode) dialog.classList.add('ai-mode');
