@@ -163,10 +163,15 @@
     color: var(--body-font-color);
   }
 
-  /* ==== Skins: scoped CSS variable overrides on <html data-skin="..."> ==== */
+  /* ==== Skins: scoped CSS variable overrides on <html data-skin="..."> ====
+     Selectors are prefixed with :root so they reach (0,2,0) specificity, on
+     par with :root[data-theme="..."] from _auto.scss. Without that prefix
+     the theme-light/theme-dark mixin overrides every skin token in light
+     mode (and ties — but loses on source order — in dark). Each skin
+     defines a base block (light) and a [data-theme="dark"] override. */
 
   /* Minimal — monochrome, flat. */
-  [data-skin="minimal"] {
+  :root[data-skin="minimal"] {
     --color-accent: #111111;
     --color-accent-hover: #000;
     --color-accent-contrast: #fff;
@@ -176,7 +181,7 @@
     --heading-to-alt: #222;
     --radius-base: 0;
   }
-  [data-skin="minimal"][data-theme="dark"] {
+  :root[data-skin="minimal"][data-theme="dark"] {
     --color-accent: #f5f5f5;
     --color-accent-hover: #fff;
     --color-accent-contrast: #111;
@@ -187,7 +192,7 @@
   }
 
   /* Warm Paper — cream bg, brown accent, soft shadows. */
-  [data-skin="warm-paper"] {
+  :root[data-skin="warm-paper"] {
     --body-background: #fbf7ef;
     --sidebar-bg: #f4ece0;
     --color-accent: #b5651d;
@@ -198,7 +203,7 @@
     --heading-to-alt: #8b5a2b;
     --radius-base: 0.5rem;
   }
-  [data-skin="warm-paper"][data-theme="dark"] {
+  :root[data-skin="warm-paper"][data-theme="dark"] {
     --body-background: #231c14;
     --sidebar-bg: #1b1510;
     --color-accent: #d89a5c;
@@ -209,8 +214,30 @@
     --heading-to-alt: #d8c4a0;
   }
 
-  /* Terminal — dark green-on-black, mono feel. */
-  [data-skin="terminal"] {
+  /* Terminal — green-on-paper (light) / green-on-black (dark), mono feel. */
+  :root[data-skin="terminal"] {
+    --body-background: #f3f7f0;
+    --sidebar-bg: #e7efe2;
+    --body-font-color: #1f3a23;
+    --color-accent: #00875a;
+    --color-accent-hover: #006c47;
+    --color-accent-contrast: #ffffff;
+    --color-accent-soft: rgba(0,135,90,0.12);
+    --text-muted: rgba(31,58,35,0.55);
+    --text-faint: rgba(31,58,35,0.35);
+    --text-secondary: rgba(31,58,35,0.78);
+    --heading-from: #006c47;
+    --heading-to: #00875a;
+    --heading-to-alt: #2f7d32;
+    --heading-h3: #1f3a23;
+    --surface-1: rgba(0,135,90,0.04);
+    --surface-2: rgba(0,135,90,0.07);
+    --surface-3: rgba(0,135,90,0.11);
+    --border-subtle: rgba(0,135,90,0.16);
+    --border-medium: rgba(0,135,90,0.28);
+    --radius-base: 0.15rem;
+  }
+  :root[data-skin="terminal"][data-theme="dark"] {
     --body-background: #0b0e0b;
     --sidebar-bg: #070a07;
     --body-font-color: #c6e4c6;
@@ -230,11 +257,22 @@
     --surface-3: rgba(255,255,255,0.08);
     --border-subtle: rgba(0,215,135,0.12);
     --border-medium: rgba(0,215,135,0.22);
-    --radius-base: 0.15rem;
   }
 
-  /* Neon — saturated pink on dark, with glow. */
-  [data-skin="neon"] {
+  /* Neon — saturated pink + glow. Light: hot-pink on near-white. Dark: on near-black. */
+  :root[data-skin="neon"] {
+    --body-background: #fff5fa;
+    --sidebar-bg: #ffe4ef;
+    --color-accent: #db2777;
+    --color-accent-hover: #be185d;
+    --color-accent-contrast: #fff;
+    --color-accent-soft: rgba(219,39,119,0.18);
+    --heading-from: #db2777;
+    --heading-to: #7c3aed;
+    --heading-to-alt: #0891b2;
+    --radius-base: 0.75rem;
+  }
+  :root[data-skin="neon"][data-theme="dark"] {
     --body-background: #0f0d1a;
     --sidebar-bg: #0a0815;
     --color-accent: #ec4899;
@@ -244,16 +282,15 @@
     --heading-from: #ec4899;
     --heading-to: #8b5cf6;
     --heading-to-alt: #06b6d4;
-    --radius-base: 0.75rem;
   }
-  [data-skin="neon"] .btn,
-  [data-skin="neon"] button[data-appearance-glow],
-  [data-skin="neon"] .dm-icon[data-glow] {
+  :root[data-skin="neon"] .btn,
+  :root[data-skin="neon"] button[data-appearance-glow],
+  :root[data-skin="neon"] .dm-icon[data-glow] {
     box-shadow: 0 0 14px var(--color-accent-soft);
   }
 
   /* Solarized */
-  [data-skin="solarized"] {
+  :root[data-skin="solarized"] {
     --body-background: #fdf6e3;
     --sidebar-bg: #eee8d5;
     --body-font-color: #586e75;
@@ -265,7 +302,7 @@
     --heading-to-alt: #859900;
     --heading-h3: #073642;
   }
-  [data-skin="solarized"][data-theme="dark"] {
+  :root[data-skin="solarized"][data-theme="dark"] {
     --body-background: #002b36;
     --sidebar-bg: #073642;
     --body-font-color: #93a1a1;
