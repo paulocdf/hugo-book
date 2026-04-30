@@ -161,7 +161,7 @@
   'use strict';
 
    var DB_NAME = 'dm-notes';
-   var DB_VERSION = 20;
+   var DB_VERSION = 21;
   var STORE_NOTES = 'notes';
   var STORE_TODOS = 'todos';
   var STORE_META = 'meta';
@@ -184,6 +184,8 @@
   var STORE_SHEETS = 'sheets';
   // v20: Auto-categorization rules (Phase 3 Slice F)
   var STORE_CATEGORY_RULES = 'categoryRules';
+  // v21: Configurable note sections (rename built-ins + user-defined flat sections)
+  var STORE_NOTE_SECTIONS = 'noteSections';
   // Budget: local-only mode (user opt-in to skip Firestore sync for financial data)
   var BUDGET_LOCAL_ONLY_KEY = 'dm-budget-local-only';
   function isBudgetLocalOnly() {
@@ -404,6 +406,16 @@
           ruleStore.createIndex('userId', 'userId', { unique: false });
           ruleStore.createIndex('priority', 'priority', { unique: false });
           ruleStore.createIndex('deletedAt', 'deletedAt', { unique: false });
+        }
+        // Note sections store (v21) — configurable sections (rename built-ins + user-defined flat sections)
+        if (!db.objectStoreNames.contains(STORE_NOTE_SECTIONS)) {
+          var secStore = db.createObjectStore(STORE_NOTE_SECTIONS, { keyPath: 'id' });
+          secStore.createIndex('userId', 'userId', { unique: false });
+          secStore.createIndex('slug', 'slug', { unique: false });
+          secStore.createIndex('archived', 'archived', { unique: false });
+          secStore.createIndex('order', 'order', { unique: false });
+          secStore.createIndex('deletedAt', 'deletedAt', { unique: false });
+          secStore.createIndex('builtinKey', 'builtinKey', { unique: false });
         }
       };
       req.onblocked = function() {
@@ -1167,6 +1179,30 @@
     };
   }
 
+  // Note section serializer (v21). Field whitelist for configurable note
+  // sections (rename built-ins + user-defined flat sections). Built-in rows
+  // (`builtin: true`) carry a stable id like `builtin-topic` and a non-empty
+  // `builtinKey` ('inbox' | 'topic' | 'book-note' | 'snippets'). Custom rows
+  // carry generated ids and an empty `builtinKey`.
+  function serializeNoteSection(doc) {
+    var data = doc.data();
+    return {
+      id: doc.id,
+      userId: data.userId || '',
+      name: data.name || '',
+      slug: data.slug || '',
+      icon: data.icon || '',
+      emoji: data.emoji || '',
+      order: typeof data.order === 'number' ? data.order : 0,
+      archived: !!data.archived,
+      builtin: !!data.builtin,
+      builtinKey: data.builtinKey || '',
+      deletedAt: data.deletedAt ? (data.deletedAt.toMillis ? data.deletedAt.toMillis() : data.deletedAt) : null,
+      createdAt: data.createdAt ? (data.createdAt.toMillis ? data.createdAt.toMillis() : data.createdAt) : 0,
+      updatedAt: data.updatedAt ? (data.updatedAt.toMillis ? data.updatedAt.toMillis() : data.updatedAt) : 0
+    };
+  }
+
   // Sheets serializer (Phase F1 foundation). Field whitelist — anything not
   // listed here is silently dropped during Firestore-to-IDB sync. The cell
   // payload is stored as a JSON-stringified `cellsJson` blob so HyperFormula
@@ -1693,6 +1729,48 @@
     });
   }
 
+  // Sync the noteSections collection from Firestore to IDB. Mirrors
+  // syncOneBudgetStore but lives outside the budget pipeline (note sections
+  // are not finance data and are not affected by the local-only flag).
+  function syncNoteSections(userId) {
+    if (!window.dmDb) return Promise.resolve();
+    return window.dmDb.collection('noteSections')
+      .where('userId', '==', userId)
+      .get()
+      .then(function(snapshot) {
+        var remote = [];
+        snapshot.forEach(function(doc) { remote.push(serializeNoteSection(doc)); });
+        return idbGetAll(STORE_NOTE_SECTIONS).then(function(local) {
+          return getAllQueued().then(function(queue) {
+            var pending = {};
+            queue.forEach(function(q) {
+              if (q.collection === 'noteSections') pending[q.docId] = true;
+            });
+            var localMap = {};
+            local.forEach(function(x) { localMap[x.id] = x; });
+            var remoteMap = {};
+            remote.forEach(function(x) { remoteMap[x.id] = x; });
+            var toUpsert = [];
+            remote.forEach(function(r) {
+              var l = localMap[r.id];
+              if (!l || l.updatedAt !== r.updatedAt) toUpsert.push(r);
+            });
+            var toDelete = [];
+            local.forEach(function(l) {
+              if (!remoteMap[l.id] && !pending[l.id]) toDelete.push(l.id);
+            });
+            var promises = [];
+            if (toUpsert.length > 0) promises.push(idbPutBatch(STORE_NOTE_SECTIONS, toUpsert));
+            toDelete.forEach(function(id) { promises.push(idbDelete(STORE_NOTE_SECTIONS, id)); });
+            return Promise.all(promises).then(function() {
+              window.dispatchEvent(new CustomEvent('dm-note-sections-updated'));
+              return { upserted: toUpsert.length, deleted: toDelete.length };
+            });
+          });
+        });
+      });
+  }
+
   function syncAll(userId) {
     if (_syncing) return Promise.resolve();
     if (isInQuotaCooldown()) {
@@ -1706,6 +1784,7 @@
       .then(function() { return syncTodos(userId); })
       .then(function() { return syncProjects(userId); })
       .then(function() { return syncKanbanColumns(userId); })
+      .then(function() { return syncNoteSections(userId); })
       .then(function() { return syncVersions(userId); })
       .then(function() { return syncAttachments(userId); })
       .then(function() { return syncReviewCards(userId); })
@@ -4695,6 +4774,41 @@
     if (project.accent2) rootEl.style.setProperty('--pj-accent2', project.accent2); else rootEl.style.removeProperty('--pj-accent2');
   };
 
+  // ─── Note section helpers (v21) ───
+  // Default labels/slugs for the four built-in destinations. Used as the
+  // ultimate fallback when no overlay row exists in IDB yet (e.g. first
+  // load before seedBuiltinNoteSections completes).
+  function dmDefaultBuiltinName(key) {
+    if (key === 'inbox') return 'Inbox';
+    if (key === 'topic') return 'Topics';
+    if (key === 'book-note') return 'Books';
+    if (key === 'snippets') return 'Snippets';
+    return key || '';
+  }
+  function dmDefaultBuiltinSlug(key) {
+    if (key === 'inbox') return 'inbox';
+    if (key === 'topic') return 'topics';
+    if (key === 'book-note') return 'books';
+    if (key === 'snippets') return 'snippets';
+    return key || '';
+  }
+  // URL-friendly slug. Strips diacritics best-effort, lowercases, replaces
+  // non-alphanumerics with hyphens, collapses repeats, trims edges.
+  function dmSlugify(text) {
+    var s = String(text || '');
+    if (s.normalize) {
+      try { s = s.normalize('NFKD').replace(/[\u0300-\u036f]/g, ''); } catch (e) {}
+    }
+    return s.toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/-{2,}/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+  // Expose helpers globally so non-dm-sync callers can use them
+  window.dmSlugify = dmSlugify;
+  window.dmDefaultBuiltinName = dmDefaultBuiltinName;
+  window.dmDefaultBuiltinSlug = dmDefaultBuiltinSlug;
+
   window.dmSync = {
     // IndexedDB operations — Notes
     getNote: function(id) {
@@ -5286,6 +5400,198 @@
       }
     },
 
+    // ─── Note Sections (v21) ───
+    // User-configurable note sections. Built-ins (inbox/topic/book-note/snippets)
+    // are seeded as overlay rows so users can rename/archive them. Custom rows
+    // (builtin: false) belong to user-defined flat sections referenced by notes
+    // via destination = 'section:<id>'.
+    getNoteSections: function(opts) {
+      opts = opts || {};
+      return idbGetAll(STORE_NOTE_SECTIONS).then(function(items) {
+        var filtered = items.filter(function(s) {
+          if (s.deletedAt && !opts.includeDeleted) return false;
+          if (s.archived && !opts.includeArchived) return false;
+          return true;
+        });
+        return filtered.sort(function(a, b) {
+          var ao = typeof a.order === 'number' ? a.order : 0;
+          var bo = typeof b.order === 'number' ? b.order : 0;
+          if (ao !== bo) return ao - bo;
+          return (a.createdAt || 0) - (b.createdAt || 0);
+        });
+      });
+    },
+    getNoteSection: function(id) { return idbGet(STORE_NOTE_SECTIONS, id); },
+    getNoteSectionBySlug: function(slug) {
+      return idbGetAll(STORE_NOTE_SECTIONS).then(function(items) {
+        for (var i = 0; i < items.length; i++) {
+          if (!items[i].deletedAt && items[i].slug === slug) return items[i];
+        }
+        return null;
+      });
+    },
+    getNoteSectionByBuiltinKey: function(key) {
+      return idbGetAll(STORE_NOTE_SECTIONS).then(function(items) {
+        for (var i = 0; i < items.length; i++) {
+          if (items[i].builtinKey === key && !items[i].deletedAt) return items[i];
+        }
+        return null;
+      });
+    },
+    // Resolve the section row a note belongs to. Returns the row from IDB
+    // when present; falls back to a synthetic descriptor for legacy notes
+    // whose destination is one of the four built-in keys but no overlay row
+    // has been seeded yet (first load before seed completes).
+    resolveSectionForNote: function(note) {
+      if (!note) return Promise.resolve(null);
+      var dest = note.destination || '';
+      if (dest.indexOf('section:') === 0) {
+        var id = dest.slice('section:'.length);
+        return idbGet(STORE_NOTE_SECTIONS, id);
+      }
+      // Legacy built-in destination
+      return window.dmSync.getNoteSectionByBuiltinKey(dest).then(function(row) {
+        if (row) return row;
+        // Synthesize a fallback so callers always get something to render
+        return {
+          id: 'builtin-' + dest,
+          name: dmDefaultBuiltinName(dest),
+          slug: dmDefaultBuiltinSlug(dest),
+          builtin: true,
+          builtinKey: dest,
+          archived: false
+        };
+      });
+    },
+    createNoteSection: function(data) {
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      var uid = (user && user.uid) || ((_demoActive() && window.dmDemo) ? window.dmDemo.userId : null);
+      if (!uid) return Promise.reject(new Error('Not authenticated'));
+      var now = Date.now();
+      var id = data.id || (uid + '_sec_' + now + '_' + Math.random().toString(36).substr(2, 6));
+      var name = (data.name || '').trim() || 'Untitled section';
+      var slug = (data.slug || '').trim() || dmSlugify(name);
+      var section = {
+        id: id, userId: uid, name: name, slug: slug,
+        icon: data.icon || '', emoji: data.emoji || '',
+        order: typeof data.order === 'number' ? data.order : now,
+        archived: !!data.archived,
+        builtin: !!data.builtin,
+        builtinKey: data.builtinKey || '',
+        deletedAt: null,
+        createdAt: now, updatedAt: now
+      };
+      var fs = {
+        userId: uid, name: section.name, slug: section.slug,
+        icon: section.icon, emoji: section.emoji,
+        order: section.order, archived: section.archived,
+        builtin: section.builtin, builtinKey: section.builtinKey,
+        deletedAt: null,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return firestoreWrite({
+        collection: 'noteSections', docId: id, op: 'set', data: fs,
+        localOp: function() { return idbPut(STORE_NOTE_SECTIONS, section); }
+      }).then(function() {
+        var p = (window.dmSections && window.dmSections.hydrate) ? window.dmSections.hydrate() : Promise.resolve();
+        return p.then(function() {
+          window.dispatchEvent(new CustomEvent('dm-note-sections-updated'));
+          return section;
+        });
+      });
+    },
+    updateNoteSection: function(id, updates) {
+      return idbGet(STORE_NOTE_SECTIONS, id).then(function(sec) {
+        if (!sec) return Promise.reject(new Error('Section not found'));
+        var fs = { updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+        var allowed = ['name','slug','icon','emoji','order','archived'];
+        // Built-ins can have label/icon/order/archived edited but not slug
+        if (sec.builtin) {
+          allowed = allowed.filter(function(k) { return k !== 'slug'; });
+        }
+        allowed.forEach(function(k) {
+          if (updates[k] !== undefined) { sec[k] = updates[k]; fs[k] = updates[k]; }
+        });
+        sec.updatedAt = Date.now();
+        return firestoreWrite({
+          collection: 'noteSections', docId: id, op: 'update', data: fs,
+          localOp: function() { return idbPut(STORE_NOTE_SECTIONS, sec); }
+        }).then(function() {
+          var p = (window.dmSections && window.dmSections.hydrate) ? window.dmSections.hydrate() : Promise.resolve();
+          return p.then(function() {
+            window.dispatchEvent(new CustomEvent('dm-note-sections-updated'));
+            return sec;
+          });
+        });
+      });
+    },
+    deleteNoteSection: function(id) {
+      return idbGet(STORE_NOTE_SECTIONS, id).then(function(sec) {
+        if (!sec) return;
+        if (sec.builtin) return Promise.reject(new Error('Cannot delete built-in sections; archive instead'));
+        sec.deletedAt = Date.now();
+        sec.updatedAt = Date.now();
+        var fs = {
+          deletedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        return firestoreWrite({
+          collection: 'noteSections', docId: id, op: 'update', data: fs,
+          localOp: function() { return idbPut(STORE_NOTE_SECTIONS, sec); }
+        }).then(function() {
+          var p = (window.dmSections && window.dmSections.hydrate) ? window.dmSections.hydrate() : Promise.resolve();
+          return p.then(function() {
+            window.dispatchEvent(new CustomEvent('dm-note-sections-updated'));
+          });
+        });
+      });
+    },
+    archiveNoteSection: function(id) {
+      return window.dmSync.updateNoteSection(id, { archived: true });
+    },
+    unarchiveNoteSection: function(id) {
+      return window.dmSync.updateNoteSection(id, { archived: false });
+    },
+    // Idempotent. Seeds the four built-in overlay rows on first sign-in so the
+    // user can rename them without touching note data. Existing rows are
+    // detected by builtinKey to avoid duplicates across reloads/devices.
+    seedBuiltinNoteSections: function() {
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      var uid = (user && user.uid) || ((_demoActive() && window.dmDemo) ? window.dmDemo.userId : null);
+      if (!uid) return Promise.resolve([]);
+      var DEFAULTS = [
+        { key: 'inbox',     name: 'Inbox',    slug: 'inbox',    icon: 'inbox',     order: 0 },
+        { key: 'topic',     name: 'Topics',   slug: 'topics',   icon: 'star',      order: 1 },
+        { key: 'book-note', name: 'Books',    slug: 'books',    icon: 'book-open', order: 2 },
+        { key: 'snippets',  name: 'Snippets', slug: 'snippets', icon: 'code',      order: 3 }
+      ];
+      return idbGetAll(STORE_NOTE_SECTIONS).then(function(existing) {
+        var byKey = {};
+        existing.forEach(function(s) {
+          if (s.builtinKey) byKey[s.builtinKey] = s;
+        });
+        var toCreate = DEFAULTS.filter(function(d) { return !byKey[d.key]; });
+        if (toCreate.length === 0) return existing;
+        return Promise.all(toCreate.map(function(d) {
+          return window.dmSync.createNoteSection({
+            id: 'builtin-' + d.key,
+            name: d.name,
+            slug: d.slug,
+            icon: d.icon,
+            order: d.order,
+            builtin: true,
+            builtinKey: d.key
+          }).catch(function(err) {
+            console.warn('[dm-sync] seedBuiltinNoteSections: failed to create ' + d.key, err);
+            return null;
+          });
+        })).then(function() {
+          return idbGetAll(STORE_NOTE_SECTIONS);
+        });
+      });
+    },
+
     setReminder: function(todoId, reminderAtMs) {
       return idbGet(STORE_TODOS, todoId).then(function(todo) {
         if (!todo) return;
@@ -5444,6 +5750,7 @@
     syncTodos: function(userId) { return syncTodos(userId); },
     syncProjects: function(userId) { return syncProjects(userId); },
     syncKanbanColumns: function(userId) { return syncKanbanColumns(userId); },
+    syncNoteSections: function(userId) { return syncNoteSections(userId); },
     startBackgroundSync: startBackgroundSync,
     stopBackgroundSync: stopBackgroundSync,
 
@@ -5469,6 +5776,7 @@
         idbClear(STORE_PROJECT_SHARES),
         idbClear(STORE_PROJECTS),
         idbClear(STORE_KANBAN_COLUMNS),
+        idbClear(STORE_NOTE_SECTIONS),
         clearQueue()
       ]).then(function() {
         window.dispatchEvent(new CustomEvent('dm-sync-complete'));
@@ -5698,6 +6006,118 @@
       });
     }
   };
+
+  // ─── Synchronous note-section registry (window.dmSections) ───
+  // Lightweight in-memory cache of noteSections, hydrated from IDB and
+  // refreshed on `dm-note-sections-updated` / `dm-sync-complete`. Provides
+  // synchronous label/icon/url lookups for renderers that can't await IDB
+  // (sidebar, garden, note-viewer, tag-cloud, trash, export). Falls back
+  // to hard-coded defaults when no overlay row exists yet (e.g. first paint
+  // before seedBuiltinNoteSections has run), so existing UI keeps working.
+  window.dmSections = (function() {
+    var byId = {};
+    var byBuiltin = {};
+    var loaded = false;
+    var BUILTIN_DEFAULT_ICONS = {
+      'inbox': 'inbox',
+      'topic': 'star',
+      'book-note': 'book-open',
+      'snippets': 'code'
+    };
+
+    function hydrate() {
+      if (!window.dmSync || !window.dmSync.getNoteSections) return Promise.resolve([]);
+      return window.dmSync.getNoteSections({ includeArchived: true }).then(function(rows) {
+        var nextById = {}, nextByBuiltin = {};
+        (rows || []).forEach(function(r) {
+          if (!r || !r.id) return;
+          nextById[r.id] = r;
+          if (r.builtinKey) nextByBuiltin[r.builtinKey] = r;
+        });
+        byId = nextById;
+        byBuiltin = nextByBuiltin;
+        loaded = true;
+        return rows || [];
+      }).catch(function(err) {
+        console.warn('[dm-sections] hydrate failed:', err);
+        return [];
+      });
+    }
+
+    function destinationToBuiltinKey(dest) {
+      if (dest === 'inbox' || dest === 'topic' || dest === 'book-note' || dest === 'snippets') return dest;
+      return null;
+    }
+
+    function getRowFromDestination(dest) {
+      if (!dest || typeof dest !== 'string') return null;
+      if (dest.indexOf('section:') === 0) {
+        return byId[dest.slice('section:'.length)] || null;
+      }
+      var key = destinationToBuiltinKey(dest);
+      if (key) return byBuiltin[key] || null;
+      return null;
+    }
+
+    function labelForDestination(dest) {
+      var row = getRowFromDestination(dest);
+      if (row && row.name) return row.name;
+      var key = destinationToBuiltinKey(dest);
+      if (key) return dmDefaultBuiltinName(key);
+      return '';
+    }
+
+    function labelForBuiltin(key) {
+      var row = byBuiltin[key];
+      if (row && row.name) return row.name;
+      return dmDefaultBuiltinName(key);
+    }
+
+    function iconForBuiltin(key) {
+      var row = byBuiltin[key];
+      if (row && row.icon) return row.icon;
+      return BUILTIN_DEFAULT_ICONS[key] || 'book-open';
+    }
+
+    function iconForDestination(dest) {
+      var row = getRowFromDestination(dest);
+      if (row && row.icon) return row.icon;
+      var key = destinationToBuiltinKey(dest);
+      if (key) return BUILTIN_DEFAULT_ICONS[key] || 'book-open';
+      return 'book-open';
+    }
+
+    function getBuiltin(key) { return byBuiltin[key] || null; }
+    function getById(id) { return byId[id] || null; }
+    function getAll() {
+      var arr = [];
+      Object.keys(byId).forEach(function(k) { arr.push(byId[k]); });
+      arr.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      return arr;
+    }
+    function getActive() {
+      return getAll().filter(function(r) { return !r.archived && !r.deletedAt; });
+    }
+
+    // Refresh on data changes
+    window.addEventListener('dm-note-sections-updated', hydrate);
+    window.addEventListener('dm-sync-complete', hydrate);
+
+    return {
+      hydrate: hydrate,
+      isLoaded: function() { return loaded; },
+      labelForDestination: labelForDestination,
+      labelForBuiltin: labelForBuiltin,
+      iconForDestination: iconForDestination,
+      iconForBuiltin: iconForBuiltin,
+      getRowFromDestination: getRowFromDestination,
+      destinationToBuiltinKey: destinationToBuiltinKey,
+      getBuiltin: getBuiltin,
+      getById: getById,
+      getAll: getAll,
+      getActive: getActive
+    };
+  })();
 
   // ─── Budget / Finance Public API (window.dmBudget) ───
   // All money amounts are integer cents. Single currency per user
@@ -7572,7 +7992,7 @@
             : (function() {
                 // Different user — clear backup to prevent data leak
                 try { localStorage.removeItem('dm-closedDays-backup'); } catch(e) {}
-                return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_NOTE_SHARES), idbClear(STORE_PROJECT_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), clearQueue()]);
+          return Promise.all([idbClear(STORE_NOTES), idbClear(STORE_TODOS), idbClear(STORE_META), idbClear(STORE_VERSIONS), idbClear(STORE_ATTACHMENTS), idbClear(STORE_REVIEW_CARDS), idbClear(STORE_TASK_SHARES), idbClear(STORE_NOTE_SHARES), idbClear(STORE_PROJECT_SHARES), idbClear(STORE_PROJECTS), idbClear(STORE_KANBAN_COLUMNS), idbClear(STORE_NOTE_SECTIONS), clearQueue()]);
               })();
 
           return proceed.then(function() {
@@ -7583,6 +8003,13 @@
           }).then(function() {
             return syncAll(user.uid);
           }).then(function() {
+            // Seed built-in note section overlay rows on first sign-in.
+            // Idempotent — checks builtinKey before inserting. Non-blocking.
+            if (window.dmSync && window.dmSync.seedBuiltinNoteSections) {
+              window.dmSync.seedBuiltinNoteSections().catch(function(err) {
+                console.warn('[dm-sync] seedBuiltinNoteSections error:', err);
+              });
+            }
             // Run one-time dedup migration after sync (non-blocking)
             migrateDeduplicateKanbanColumns(user.uid).catch(function(err) {
               console.warn('[dm-sync] Dedup migration error:', err);

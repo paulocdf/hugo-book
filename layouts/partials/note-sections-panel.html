@@ -1,0 +1,222 @@
+<!--
+  Note Sections settings panel — Slice B of "Configurable note sections".
+  Mounted into #settings-modal-sections by body.html on first settings open
+  via window.dmSectionsBuildPanel(containerEl).
+
+  Phase scope: rename built-ins only. Custom-section CRUD is Slice C.
+-->
+<style>
+.dm-sections-panel { display: flex; flex-direction: column; gap: 6px; }
+.dm-sections-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  background: var(--body-background);
+}
+.dm-sections-row__icon {
+  width: 24px; height: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+  color: var(--color-accent);
+  flex: none;
+}
+.dm-sections-row__input {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 0.9rem;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--body-font-color);
+  border-radius: 4px;
+}
+.dm-sections-row__input:hover,
+.dm-sections-row__input:focus {
+  border-color: var(--gray-200);
+  background: var(--gray-100);
+  outline: none;
+}
+.dm-sections-row__input:focus {
+  border-color: var(--color-accent);
+}
+.dm-sections-row__reset {
+  font-size: 0.75rem;
+  color: var(--gray-500);
+  background: none;
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  padding: 3px 8px;
+  cursor: pointer;
+  flex: none;
+}
+.dm-sections-row__reset:hover { color: var(--body-font-color); border-color: var(--gray-400); }
+.dm-sections-row__reset[disabled] { opacity: 0.4; cursor: default; }
+.dm-sections-empty {
+  font-size: 0.85rem; color: var(--gray-500);
+  padding: 6px 8px;
+}
+</style>
+
+<script>
+(function() {
+  // Defaults map — used to compute "is the user using the default name?"
+  // and to drive the "Reset" button.
+  var BUILTIN_DEFAULTS = {
+    'inbox':     { name: 'Inbox',    icon: 'inbox' },
+    'topic':     { name: 'Topics',   icon: 'star' },
+    'book-note': { name: 'Books',    icon: 'book-open' },
+    'snippets':  { name: 'Snippets', icon: 'code' }
+  };
+  var ORDER = ['inbox', 'topic', 'book-note', 'snippets'];
+
+  function iconHtml(name) {
+    if (typeof window.dmIcon === 'function') return window.dmIcon(name, 18);
+    // Fallback: empty span
+    return '<span aria-hidden="true"></span>';
+  }
+
+  function escAttr(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function buildPanel(container) {
+    if (!container) return;
+    container.classList.add('dm-sections-panel');
+
+    function render() {
+      // Pull current rows from the synchronous registry (always populated
+      // with defaults via the cache fallback path even before hydration).
+      var rows = ORDER.map(function(key) {
+        var row = (window.dmSections && window.dmSections.getBuiltin(key)) || null;
+        var def = BUILTIN_DEFAULTS[key];
+        return {
+          key: key,
+          id: row ? row.id : 'builtin-' + key,
+          name: (row && row.name) ? row.name : def.name,
+          icon: (row && row.icon) ? row.icon : def.icon,
+          exists: !!row
+        };
+      });
+
+      var html = rows.map(function(r) {
+        var isDefault = (r.name === BUILTIN_DEFAULTS[r.key].name);
+        return ''
+          + '<div class="dm-sections-row" data-section-id="' + escAttr(r.id) + '" data-builtin-key="' + escAttr(r.key) + '">'
+          +   '<span class="dm-sections-row__icon">' + iconHtml(r.icon) + '</span>'
+          +   '<input type="text" class="dm-sections-row__input" data-role="name"'
+          +        ' value="' + escAttr(r.name) + '"'
+          +        ' aria-label="Rename ' + escAttr(BUILTIN_DEFAULTS[r.key].name) + '"'
+          +        ' maxlength="64">'
+          +   '<button type="button" class="dm-sections-row__reset" data-role="reset"'
+          +        (isDefault ? ' disabled' : '') + '>Reset</button>'
+          + '</div>';
+      }).join('');
+
+      container.innerHTML = html;
+    }
+
+    function persist(rowEl) {
+      var id = rowEl.getAttribute('data-section-id');
+      var key = rowEl.getAttribute('data-builtin-key');
+      var input = rowEl.querySelector('input[data-role="name"]');
+      var resetBtn = rowEl.querySelector('button[data-role="reset"]');
+      if (!input) return;
+      var newName = (input.value || '').trim();
+      if (!newName) {
+        // Refuse empty — revert
+        var existing = window.dmSections && window.dmSections.getBuiltin(key);
+        input.value = (existing && existing.name) || BUILTIN_DEFAULTS[key].name;
+        return;
+      }
+      var existing = window.dmSections && window.dmSections.getBuiltin(key);
+      var currentName = existing ? existing.name : BUILTIN_DEFAULTS[key].name;
+      if (newName === currentName) {
+        // No-op — but still update reset button state
+        if (resetBtn) resetBtn.disabled = (newName === BUILTIN_DEFAULTS[key].name);
+        return;
+      }
+
+      if (!window.dmSync) return;
+
+      // Disable while saving
+      input.disabled = true;
+      var promise;
+      if (existing) {
+        promise = window.dmSync.updateNoteSection(existing.id, { name: newName });
+      } else {
+        // Edge case: builtin row not yet seeded (e.g. just-signed-in pre-seed).
+        // Trigger a seed and then update.
+        promise = window.dmSync.seedBuiltinNoteSections().then(function() {
+          var nowExisting = window.dmSections && window.dmSections.getBuiltin(key);
+          if (nowExisting) return window.dmSync.updateNoteSection(nowExisting.id, { name: newName });
+          return null;
+        });
+      }
+      promise.then(function() {
+        input.disabled = false;
+        if (resetBtn) resetBtn.disabled = (newName === BUILTIN_DEFAULTS[key].name);
+        // dm-note-sections-updated fires from updateNoteSection — sidebar/etc rerender.
+      }).catch(function(err) {
+        console.warn('[sections] rename failed:', err);
+        input.disabled = false;
+        // Revert
+        input.value = currentName;
+      });
+    }
+
+    function resetRow(rowEl) {
+      var key = rowEl.getAttribute('data-builtin-key');
+      var input = rowEl.querySelector('input[data-role="name"]');
+      if (!input) return;
+      input.value = BUILTIN_DEFAULTS[key].name;
+      persist(rowEl);
+    }
+
+    // Event delegation
+    container.addEventListener('change', function(e) {
+      var input = e.target.closest('input[data-role="name"]');
+      if (!input) return;
+      var rowEl = input.closest('.dm-sections-row');
+      if (rowEl) persist(rowEl);
+    });
+    container.addEventListener('keydown', function(e) {
+      if (e.key !== 'Enter') return;
+      var input = e.target.closest('input[data-role="name"]');
+      if (!input) return;
+      e.preventDefault();
+      input.blur(); // triggers change -> persist
+    });
+    container.addEventListener('click', function(e) {
+      var btn = e.target.closest('button[data-role="reset"]');
+      if (!btn || btn.disabled) return;
+      var rowEl = btn.closest('.dm-sections-row');
+      if (rowEl) resetRow(rowEl);
+    });
+
+    // Re-render when sections change (covers seed completion, external updates)
+    window.addEventListener('dm-note-sections-updated', function() {
+      // Don't blow away in-flight edits: only re-render if no input is focused
+      var active = document.activeElement;
+      if (active && container.contains(active) && active.tagName === 'INPUT') return;
+      render();
+    });
+
+    render();
+
+    // Kick a hydrate + ensure built-ins are seeded so the panel is meaningful
+    // even on first open before sync completes.
+    if (window.dmSections && window.dmSections.hydrate) {
+      window.dmSections.hydrate().then(function() {
+        if (window.dmSync && window.dmSync.seedBuiltinNoteSections) {
+          return window.dmSync.seedBuiltinNoteSections().catch(function() {});
+        }
+      }).then(function() {
+        if (window.dmSections && window.dmSections.hydrate) window.dmSections.hydrate();
+      }).then(function() { render(); });
+    }
+  }
+
+  window.dmSectionsBuildPanel = buildPanel;
+})();
+</script>

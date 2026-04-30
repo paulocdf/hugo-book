@@ -454,11 +454,34 @@
   var printContainer = document.getElementById('export-print-container');
 
   // ─── Modal open/close ───
+  function relabelScopeButtons() {
+    if (!window.dmSections) return;
+    var scopeToBuiltin = { books: 'book-note', topics: 'topic', snippets: 'snippets', inbox: 'inbox' };
+    var btns = scopeGrid.querySelectorAll('.export-scope-btn');
+    btns.forEach(function(btn) {
+      var key = scopeToBuiltin[btn.dataset.scope];
+      if (!key) return;
+      var lbl = window.dmSections.labelForBuiltin(key);
+      if (!lbl) return;
+      // Replace text node only (preserve the leading <svg> icon).
+      var nodes = btn.childNodes;
+      for (var i = nodes.length - 1; i >= 0; i--) {
+        if (nodes[i].nodeType === Node.TEXT_NODE) {
+          nodes[i].textContent = ' ' + lbl;
+          return;
+        }
+      }
+      // Fallback: append text if none found
+      btn.appendChild(document.createTextNode(' ' + lbl));
+    });
+  }
+
   function openModal(presetScope) {
     if (presetScope) {
       state.scope = presetScope;
       updateScopeButtons();
     }
+    relabelScopeButtons();
     modal.style.display = '';
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
@@ -753,6 +776,10 @@
 
   // ─── Helpers ───
   function destinationLabel(dest) {
+    if (window.dmSections) {
+      var lbl = window.dmSections.labelForDestination(dest);
+      if (lbl) return lbl;
+    }
     var labels = { 'book-note': 'Books', 'topic': 'Topics', 'inbox': 'Inbox', 'snippets': 'Snippets' };
     return labels[dest] || dest;
   }

@@ -2,19 +2,19 @@
 <div class="garden-sections">
 
 <div class="section-card card-inbox">
-<h3><a href="{{ "docs/inbox/" | relURL }}">Inbox</a></h3>
+<h3><a href="{{ "docs/inbox/" | relURL }}" id="garden-link-inbox">Inbox</a></h3>
 <p>Quick notes and ideas waiting to be organized.</p>
 <div id="garden-section-inbox"><em>Loading...</em></div>
 </div>
 
 <div class="section-card card-books">
-<h3><a href="{{ "docs/books/" | relURL }}">Books</a></h3>
+<h3><a href="{{ "docs/books/" | relURL }}" id="garden-link-books">Books</a></h3>
 <p>Notes and highlights from books I've read.</p>
 <ul id="garden-section-books"><li><em>Loading...</em></li></ul>
 </div>
 
 <div class="section-card card-topics">
-<h3><a href="{{ "docs/topics/" | relURL }}">Topics</a></h3>
+<h3><a href="{{ "docs/topics/" | relURL }}" id="garden-link-topics">Topics</a></h3>
 <p>Technical topics, concepts, and reference material.</p>
 <ul id="garden-section-topics"><li><em>Loading...</em></li></ul>
 </div>
@@ -48,6 +48,21 @@
   function updateSections() {
     if (!window.dmSync) return;
     var baseUrl = getBaseUrl();
+
+    // Apply user-renamed labels to section headings
+    if (window.dmSections) {
+      var pairs = [
+        { id: 'garden-link-inbox', key: 'inbox' },
+        { id: 'garden-link-books', key: 'book-note' },
+        { id: 'garden-link-topics', key: 'topic' }
+      ];
+      pairs.forEach(function(p) {
+        var el = document.getElementById(p.id);
+        if (!el) return;
+        var lbl = window.dmSections.labelForBuiltin(p.key);
+        if (lbl) el.textContent = lbl;
+      });
+    }
 
     window.dmSync.getAllNotes().then(function(notes) {
       if (!notes) return;
@@ -133,6 +148,7 @@
   }
 
   window.addEventListener('dm-sync-complete', updateSections);
+  window.addEventListener('dm-note-sections-updated', updateSections);
 
   if (window.dmAuth) {
     function subscribeGardenSectionsAuth() {

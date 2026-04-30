@@ -80,13 +80,20 @@
 
   var deleteIcon = '<svg class="dm-icon dm-icon--trash" width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-trash"/></svg>';
 
-  // ── Destination labels ──
+  // ── Destination labels (fallback when registry not yet loaded) ──
   var destLabels = {
     'inbox': 'Inbox',
     'topic': 'Topics',
     'book-note': 'Books',
     'snippets': 'Snippets'
   };
+  function destLabelFor(dest) {
+    if (window.dmSections) {
+      var lbl = window.dmSections.labelForDestination(dest);
+      if (lbl) return lbl;
+    }
+    return destLabels[dest] || dest || '';
+  }
 
   // ── Render tag pills ──
   function renderTags(tags) {
@@ -170,7 +177,7 @@
         });
       }
 
-      var destLabel = destLabels[note.destination] || note.destination || '';
+      var destLabel = destLabelFor(note.destination);
       if (destLabel) {
         tagsHtml = '<span class="section-notes-tag tag-cloud-dest">' + escapeHtml(destLabel) + '</span>' + tagsHtml;
       }

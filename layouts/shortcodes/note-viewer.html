@@ -500,9 +500,14 @@
   function getDestinationLabel(note) {
     if (note.destination === 'book-note' && note.bookTitle) return note.bookTitle;
     if (note.destination === 'snippets' && note.language) return note.language + ' snippet';
+    if (window.dmSections) {
+      var label = window.dmSections.labelForDestination(note.destination);
+      if (label) return label;
+    }
     if (note.destination === 'inbox') return 'Inbox';
     if (note.destination === 'topic') return 'Topics';
     if (note.destination === 'book-note') return 'Books';
+    if (note.destination === 'snippets') return 'Snippets';
     return note.destination || '';
   }
 
@@ -602,20 +607,24 @@
     var items = '<li><a href="' + base + '/">Home</a></li>';
 
     if (note.destination === 'book-note') {
-      items += '<li><a href="' + base + '/docs/books/">Books</a></li>';
+      var booksLabel = (window.dmSections && window.dmSections.labelForBuiltin('book-note')) || 'Books';
+      items += '<li><a href="' + base + '/docs/books/">' + booksLabel + '</a></li>';
       if (note.bookTitle) {
         items += '<li><span>' + note.bookTitle + '</span></li>';
       }
     } else if (note.destination === 'snippets') {
-      items += '<li><a href="' + base + '/docs/snippets/">Snippets</a></li>';
+      var snipLabel = (window.dmSections && window.dmSections.labelForBuiltin('snippets')) || 'Snippets';
+      items += '<li><a href="' + base + '/docs/snippets/">' + snipLabel + '</a></li>';
       if (note.language) {
         var lang = note.language.charAt(0).toUpperCase() + note.language.slice(1);
         items += '<li><span>' + lang + '</span></li>';
       }
     } else if (note.destination === 'inbox') {
-      items += '<li><a href="' + base + '/docs/inbox/">Inbox</a></li>';
+      var inboxLabel = (window.dmSections && window.dmSections.labelForBuiltin('inbox')) || 'Inbox';
+      items += '<li><a href="' + base + '/docs/inbox/">' + inboxLabel + '</a></li>';
     } else if (note.destination === 'topic') {
-      items += '<li><a href="' + base + '/docs/topics/">Topics</a></li>';
+      var topicsLabel = (window.dmSections && window.dmSections.labelForBuiltin('topic')) || 'Topics';
+      items += '<li><a href="' + base + '/docs/topics/">' + topicsLabel + '</a></li>';
     }
 
     items += '<li aria-current="page"><span>' + (note.title || 'Untitled') + '</span></li>';

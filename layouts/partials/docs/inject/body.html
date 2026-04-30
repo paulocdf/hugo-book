@@ -656,6 +656,8 @@
 
 {{ partial "appearance.html" . }}
 
+{{ partial "note-sections-panel.html" . }}
+
 <!-- Quick Capture modal logic -->
 <script>
 (function() {
@@ -3477,8 +3479,9 @@
     // Build the full sidebar HTML
     var html = '';
     // Inbox first — accented, single page, no sub-entries
+    var inboxLabel = (window.dmSections && window.dmSections.labelForBuiltin('inbox')) || 'Inbox';
     html += '<li class="sidebar-item sidebar-inbox" data-section="inbox">' +
-      '<a href="' + sectionUrl('inbox') + '"' + inboxActive + '>' + ICONS.inbox + 'Inbox</a>' +
+      '<a href="' + sectionUrl('inbox') + '"' + inboxActive + '>' + ICONS.inbox + inboxLabel + '</a>' +
       '</li>';
     // Board — kanban board view
     var boardActive = window.location.pathname.indexOf('/docs/board') !== -1 ? ' class="active"' : '';
@@ -3496,9 +3499,15 @@
     html += '<li class="sidebar-item" data-section="calendar">' +
       '<a href="' + sectionUrl('calendar') + '"' + calendarActive + '>' + ICONS.calendar + 'Calendar</a>' +
       '</li>';
-    html += buildSectionHtml('Books', ICONS.books, sectionUrl('books'), booksChildren, booksOpen);
-    html += buildSectionHtml('Topics', ICONS.topics, sectionUrl('topics'), topicsChildren, topicsOpen);
-    html += buildSectionHtml('Snippets', ICONS.snippets, sectionUrl('snippets'), snippetsChildren, snippetsOpen);
+    html += buildSectionHtml(
+      (window.dmSections && window.dmSections.labelForBuiltin('book-note')) || 'Books',
+      ICONS.books, sectionUrl('books'), booksChildren, booksOpen);
+    html += buildSectionHtml(
+      (window.dmSections && window.dmSections.labelForBuiltin('topic')) || 'Topics',
+      ICONS.topics, sectionUrl('topics'), topicsChildren, topicsOpen);
+    html += buildSectionHtml(
+      (window.dmSections && window.dmSections.labelForBuiltin('snippets')) || 'Snippets',
+      ICONS.snippets, sectionUrl('snippets'), snippetsChildren, snippetsOpen);
 
     // Add Tags entry (static)
     var tagsActive = window.location.pathname.indexOf('/docs/tags') !== -1 ? ' class="active"' : '';
@@ -3854,6 +3863,13 @@
           '<div class="settings-modal-section">' +
             '<div class="settings-modal-section-label">Appearance</div>' +
             '<div id="settings-modal-appearance"></div>' +
+          '</div>' +
+
+          // ── Sections (note destinations) ──
+          '<div class="settings-modal-section">' +
+            '<div class="settings-modal-section-label">Sections</div>' +
+            '<div class="settings-modal-section-hint" style="font-size:0.8rem;color:var(--gray-500);margin-bottom:8px;">Rename your built-in sections. Custom sections coming soon.</div>' +
+            '<div id="settings-modal-sections"></div>' +
           '</div>' +
 
           // ── Pomodoro section ──
@@ -4216,6 +4232,14 @@
         window.dmAppearanceBuildPanel(_appearanceMount);
       }
     } catch (e) { console.warn('[appearance] build panel failed:', e); }
+
+    // ─── Sections panel (built on first open, idempotent) ───
+    try {
+      var _sectionsMount = _settingsModalOverlay.querySelector('#settings-modal-sections');
+      if (_sectionsMount && typeof window.dmSectionsBuildPanel === 'function') {
+        window.dmSectionsBuildPanel(_sectionsMount);
+      }
+    } catch (e) { console.warn('[sections] build panel failed:', e); }
 
     // ─── Bind close handlers ───
     var backdrop = _settingsModalOverlay.querySelector('.settings-modal-backdrop');
@@ -4829,13 +4853,20 @@
     var html = '';
 
     // Show section headers without children
-    html += buildSectionHtml('Books', ICONS.books, sectionUrl('books'), '', false);
-    html += buildSectionHtml('Topics', ICONS.topics, sectionUrl('topics'), '', false);
+    html += buildSectionHtml(
+      (window.dmSections && window.dmSections.labelForBuiltin('book-note')) || 'Books',
+      ICONS.books, sectionUrl('books'), '', false);
+    html += buildSectionHtml(
+      (window.dmSections && window.dmSections.labelForBuiltin('topic')) || 'Topics',
+      ICONS.topics, sectionUrl('topics'), '', false);
     // Inbox: simple link, no sub-entries
+    var inboxLabelOut = (window.dmSections && window.dmSections.labelForBuiltin('inbox')) || 'Inbox';
     html += '<li class="sidebar-item" data-section="inbox">' +
-      '<a href="' + sectionUrl('inbox') + '">' + ICONS.inbox + 'Inbox</a>' +
+      '<a href="' + sectionUrl('inbox') + '">' + ICONS.inbox + inboxLabelOut + '</a>' +
       '</li>';
-    html += buildSectionHtml('Snippets', ICONS.snippets, sectionUrl('snippets'), '', false);
+    html += buildSectionHtml(
+      (window.dmSections && window.dmSections.labelForBuiltin('snippets')) || 'Snippets',
+      ICONS.snippets, sectionUrl('snippets'), '', false);
 
     // Projects — static empty section header (Phase 8)
     var projectsOpen3 = window.location.pathname.indexOf('/docs/projects') !== -1;
@@ -4932,6 +4963,21 @@
     window.dmSync.getAllNotes().then(function(notes) {
       renderDynamicSidebar(notes || [], _sidebarUser);
     });
+  });
+
+  // Re-render sidebar when sections are renamed/added/archived (Slice B)
+  var _sectionsRerenderTimer = null;
+  window.addEventListener('dm-note-sections-updated', function() {
+    if (!_sidebarUser || !window.dmSync) return;
+    if (_sectionsRerenderTimer) clearTimeout(_sectionsRerenderTimer);
+    _sectionsRerenderTimer = setTimeout(function() {
+      _sectionsRerenderTimer = null;
+      // Bust cache so labels update
+      try { sessionStorage.removeItem(SIDEBAR_CACHE_KEY); } catch (e) {}
+      window.dmSync.getAllNotes().then(function(notes) {
+        renderDynamicSidebar(notes || [], _sidebarUser);
+      });
+    }, 100);
   });
 
   // Auth state change

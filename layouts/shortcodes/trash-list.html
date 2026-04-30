@@ -315,6 +315,10 @@
   }
 
   function destLabel(dest) {
+    if (window.dmSections) {
+      var lbl = window.dmSections.labelForDestination(dest);
+      if (lbl) return lbl;
+    }
     if (dest === 'book-note') return 'Book';
     if (dest === 'snippets') return 'Snippet';
     if (dest === 'topic') return 'Topic';

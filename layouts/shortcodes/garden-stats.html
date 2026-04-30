@@ -3,7 +3,7 @@
   <div class="stat-card">
     <span class="stat-icon icon-books">B</span>
     <div class="stat-content">
-      <span class="stat-label">Books</span>
+      <span class="stat-label" id="stat-label-books">Books</span>
       <span class="stat-value" id="stat-books">--</span>
     </div>
   </div>
@@ -34,6 +34,12 @@
 (function() {
   function updateStats() {
     if (!window.dmSync) return;
+    // Update label from section registry (in case user renamed Books)
+    var booksLabelEl = document.getElementById('stat-label-books');
+    if (booksLabelEl && window.dmSections) {
+      var lbl = window.dmSections.labelForBuiltin('book-note');
+      if (lbl) booksLabelEl.textContent = lbl;
+    }
     window.dmSync.getAllNotes().then(function(notes) {
       if (!notes) return;
       var books = 0, otherNotes = 0, tagSet = {};
@@ -61,6 +67,7 @@
   // Update on sync and on load
   window.addEventListener('dm-sync-complete', updateStats);
   window.addEventListener('dm-review-updated', updateStats);
+  window.addEventListener('dm-note-sections-updated', updateStats);
 
   if (window.dmAuth) {
     function subscribeGardenStatsAuth() {
