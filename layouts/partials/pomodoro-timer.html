@@ -746,6 +746,34 @@
   user-select: none;
   overflow: hidden;
 }
+/* Browser fullscreen: card fills the entire screen edge-to-edge. */
+/* Split into separate rulesets because an unknown pseudo-class invalidates the whole selector list. */
+:fullscreen .pomodoro-focus-card {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  padding: 0 0 16px;
+}
+:-webkit-full-screen .pomodoro-focus-card {
+  width: 100vw;
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  padding: 0 0 16px;
+}
+:fullscreen .pomodoro-focus-header-strip {
+  border-radius: 0;
+}
+:-webkit-full-screen .pomodoro-focus-header-strip {
+  border-radius: 0;
+}
 /* Header strip: visualizer canvas behind the header controls */
 .pomodoro-focus-header-strip {
   position: relative;
