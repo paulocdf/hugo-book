@@ -55,6 +55,10 @@
           <button type="button" class="pomodoro-focus-settings-btn" id="focus-settings-btn" title="Focus settings" aria-label="Focus settings" aria-haspopup="true" aria-expanded="false">
             <svg class="dm-icon dm-icon--settings" width="15" height="15" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-settings"/></svg>
           </button>
+          <button type="button" class="pomodoro-focus-fullscreen-btn" id="focus-fullscreen-btn" title="Enter full screen" aria-label="Enter full screen">
+            <svg class="dm-icon dm-icon--maximize" width="15" height="15" viewBox="0 0 24 24" id="focus-fullscreen-enter-icon" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-maximize"/></svg>
+            <svg class="dm-icon dm-icon--minimize" width="15" height="15" viewBox="0 0 24 24" id="focus-fullscreen-exit-icon" style="display:none;" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-minimize"/></svg>
+          </button>
           <button type="button" class="pomodoro-focus-collapse" id="focus-collapse" title="Exit focus mode" aria-label="Exit focus mode">
             <svg class="dm-icon dm-icon--minimize" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-minimize"/></svg>
           </button>
@@ -803,6 +807,20 @@
   transition: color 0.15s, background 0.15s;
 }
 .pomodoro-focus-collapse:hover {
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(255, 255, 255, 0.1);
+}
+.pomodoro-focus-fullscreen-btn {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  padding: 3px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.pomodoro-focus-fullscreen-btn:hover {
   color: rgba(255, 255, 255, 0.95);
   background: rgba(255, 255, 255, 0.1);
 }
@@ -1742,6 +1760,9 @@
   var focusBackdropEl = focusOverlay ? focusOverlay.querySelector('.pomodoro-focus-backdrop') : null;
   var expandBtn = document.getElementById('pomodoro-expand');
   var collapseBtn = document.getElementById('focus-collapse');
+  var focusFullscreenBtn = document.getElementById('focus-fullscreen-btn');
+  var focusFullscreenEnterIcon = document.getElementById('focus-fullscreen-enter-icon');
+  var focusFullscreenExitIcon = document.getElementById('focus-fullscreen-exit-icon');
   var focusCloseBtn = document.getElementById('focus-close');
   var focusPhaseEl = document.getElementById('focus-phase');
   var focusCategoryEl = document.getElementById('focus-category');
@@ -4728,6 +4749,33 @@
     focusOverlay.style.display = 'none';
     timerEl.style.display = '';
     vizStop();
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    }
+  }
+
+  // ── Browser fullscreen helpers ──
+  function _syncFullscreenButton() {
+    var inFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    if (focusFullscreenEnterIcon) focusFullscreenEnterIcon.style.display = inFs ? 'none' : '';
+    if (focusFullscreenExitIcon)  focusFullscreenExitIcon.style.display  = inFs ? '' : 'none';
+    if (focusFullscreenBtn) {
+      focusFullscreenBtn.title = inFs ? 'Exit full screen' : 'Enter full screen';
+      focusFullscreenBtn.setAttribute('aria-label', inFs ? 'Exit full screen' : 'Enter full screen');
+    }
+  }
+  document.addEventListener('fullscreenchange', _syncFullscreenButton);
+  document.addEventListener('webkitfullscreenchange', _syncFullscreenButton);
+
+  if (focusFullscreenBtn) {
+    focusFullscreenBtn.addEventListener('click', function() {
+      if (document.fullscreenElement || document.webkitFullscreenElement) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        var el = document.documentElement;
+        (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+      }
+    });
   }
 
   // ── Focus overlay button handlers ──
