@@ -47,6 +47,8 @@
     {{ $icon = `<svg class="dm-icon dm-icon--grid sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-grid"/></svg>` }}
   {{ else if eq $titleLower "ai" }}
     {{ $icon = `<svg class="dm-icon dm-icon--sparkles sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-sparkles"/></svg>` }}
+  {{ else if eq $titleLower "sheets" }}
+    {{ $icon = `<svg class="dm-icon dm-icon--table sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-table"/></svg>` }}
   {{ else if eq $titleLower "history" }}
     {{ $icon = `<svg class="dm-icon dm-icon--calendar sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-calendar"/></svg>` }}
   {{ else if eq $titleLower "calendar" }}

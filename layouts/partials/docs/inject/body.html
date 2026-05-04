@@ -3260,6 +3260,11 @@
     budget: '<svg class="dm-icon dm-icon--wallet sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-wallet"/></svg>'
   };
 
+  function iconSvg(name) {
+    var n = name || 'folder';
+    return '<svg class="dm-icon dm-icon--' + n + ' sidebar-icon" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><use href="/digital-memory/icons/sprite.svg#icon-' + n + '"/></svg>';
+  }
+
   function getBaseUrl() {
     var manifest = document.querySelector('link[rel="manifest"]');
     if (manifest) return manifest.getAttribute('href').replace('/manifest.json', '');
@@ -3508,6 +3513,21 @@
     html += buildSectionHtml(
       (window.dmSections && window.dmSections.labelForBuiltin('snippets')) || 'Snippets',
       ICONS.snippets, sectionUrl('snippets'), snippetsChildren, snippetsOpen);
+
+    // Custom sections (user-created)
+    if (window.dmSections && window.dmSections.getActive) {
+      var customSecs = window.dmSections.getActive().filter(function(s) { return !s.builtin; });
+      customSecs.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      var csParams = new URLSearchParams(window.location.search);
+      var csCurrentId = window.location.pathname.indexOf('/docs/sections') !== -1 ? csParams.get('id') : null;
+      customSecs.forEach(function(s) {
+        var csUrl = getBaseUrl() + '/docs/sections/?id=' + encodeURIComponent(s.id);
+        var csActive = (csCurrentId === s.id) ? ' class="active"' : '';
+        html += '<li class="sidebar-item" data-section="custom-' + escapeHtml(s.id) + '">' +
+          '<a href="' + csUrl + '"' + csActive + '>' + iconSvg(s.icon || 'folder') + escapeHtml(s.name || 'Section') + '</a>' +
+          '</li>';
+      });
+    }
 
     // Add Tags entry (static)
     var tagsActive = window.location.pathname.indexOf('/docs/tags') !== -1 ? ' class="active"' : '';
@@ -4867,6 +4887,21 @@
     html += buildSectionHtml(
       (window.dmSections && window.dmSections.labelForBuiltin('snippets')) || 'Snippets',
       ICONS.snippets, sectionUrl('snippets'), '', false);
+
+    // Custom sections (user-created) — empty children in logged-out state
+    if (window.dmSections && window.dmSections.getActive) {
+      var customSecs2 = window.dmSections.getActive().filter(function(s) { return !s.builtin; });
+      customSecs2.sort(function(a, b) { return (a.order || 0) - (b.order || 0); });
+      var csParams2 = new URLSearchParams(window.location.search);
+      var csCurrentId2 = window.location.pathname.indexOf('/docs/sections') !== -1 ? csParams2.get('id') : null;
+      customSecs2.forEach(function(s) {
+        var csUrl2 = getBaseUrl() + '/docs/sections/?id=' + encodeURIComponent(s.id);
+        var csActive2 = (csCurrentId2 === s.id) ? ' class="active"' : '';
+        html += '<li class="sidebar-item" data-section="custom-' + escapeHtml(s.id) + '">' +
+          '<a href="' + csUrl2 + '"' + csActive2 + '>' + iconSvg(s.icon || 'folder') + escapeHtml(s.name || 'Section') + '</a>' +
+          '</li>';
+      });
+    }
 
     // Projects — static empty section header (Phase 8)
     var projectsOpen3 = window.location.pathname.indexOf('/docs/projects') !== -1;

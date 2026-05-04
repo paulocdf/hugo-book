@@ -1,402 +1,1094 @@
-{{/* Spreadsheet workspace (Phase F1 foundation).
-     Loads HyperFormula from CDN for formula evaluation, renders a minimal
-     grid, and autosaves to IDB+Firestore via window.dmSync.{create,update}Sheet.
-     Single-sheet MVP — multi-sheet/named-ranges/shared workspaces are deferred. */}}
+{{/* Spreadsheet workspace — Phase 4 + 5.
+     DOM-virtualized grid, HyperFormula formula engine, multi-cell selection,
+     copy/paste, number formats, column resize, CSV import/export, charts. */}}
 
 <div id="dm-sheet-root" class="dm-sheet-root" data-state="loading">
+
   <div class="dm-sheet-toolbar">
     <input type="text" id="dm-sheet-title" class="dm-sheet-title-input" placeholder="Untitled sheet" aria-label="Sheet title">
     <span class="dm-sheet-status" id="dm-sheet-status" aria-live="polite"></span>
     <span class="dm-sheet-spacer"></span>
-    <button type="button" class="dm-sheet-btn" id="dm-sheet-new" title="New sheet">New</button>
+    <button type="button" class="dm-sheet-btn" id="dm-sheet-new">New</button>
+    <button type="button" class="dm-sheet-btn dm-sheet-btn-danger" id="dm-sheet-delete">Delete</button>
     <select class="dm-sheet-picker" id="dm-sheet-picker" aria-label="Open sheet"></select>
   </div>
-  <div class="dm-sheet-loading" id="dm-sheet-loading">Loading spreadsheet engine…</div>
-  <div class="dm-sheet-grid-wrap" id="dm-sheet-grid-wrap" hidden>
-    <table class="dm-sheet-grid" id="dm-sheet-grid" role="grid" aria-label="Spreadsheet grid"></table>
+
+  <div class="dm-sheet-fbar" id="dm-sheet-fbar-wrap" hidden>
+    <input type="text" id="dm-sheet-cellref" class="dm-sheet-cellref" value="A1" readonly aria-label="Cell reference">
+    <span class="dm-sheet-fx">fx</span>
+    <input type="text" id="dm-sheet-fbar" class="dm-sheet-fbar-input" placeholder="" aria-label="Formula bar">
   </div>
+
+  <div class="dm-sheet-formatbar" id="dm-sheet-formatbar" hidden>
+    <select id="dm-sheet-fmt-sel" class="dm-sheet-fmt-sel" title="Number format" aria-label="Number format">
+      <option value="">General</option>
+      <option value="number">Number</option>
+      <option value="currency">Currency</option>
+      <option value="percent">Percent</option>
+      <option value="date">Date</option>
+    </select>
+    <div class="dm-fbar-sep"></div>
+    <button type="button" class="dm-sheet-btn dm-sheet-btn-sm" id="dm-sheet-chart-bar" title="Insert bar chart" disabled>Bar</button>
+    <button type="button" class="dm-sheet-btn dm-sheet-btn-sm" id="dm-sheet-chart-line" title="Insert line chart" disabled>Line</button>
+    <button type="button" class="dm-sheet-btn dm-sheet-btn-sm" id="dm-sheet-chart-pie" title="Insert pie chart" disabled>Pie</button>
+    <div class="dm-fbar-sep"></div>
+    <button type="button" class="dm-sheet-btn dm-sheet-btn-sm" id="dm-sheet-csv-export">↓ CSV</button>
+    <label class="dm-sheet-btn dm-sheet-btn-sm dm-sheet-file-label" title="Import CSV from active cell">↑ CSV<input type="file" id="dm-sheet-csv-file" accept=".csv,.tsv,text/csv,text/tab-separated-values" style="display:none"></label>
+  </div>
+
+  <div class="dm-sheet-loading" id="dm-sheet-loading">Loading spreadsheet engine…</div>
+
+  <div class="dm-sheet-grid-wrap" id="dm-sheet-grid-wrap" hidden>
+    <table class="dm-sheet-grid" id="dm-sheet-grid" role="grid" aria-label="Spreadsheet">
+      <thead id="dm-sheet-thead"></thead>
+      <tbody id="dm-sheet-tbody">
+        <tr id="dm-vgrid-stop" class="dm-vgrid-spacer"><td id="dm-vgrid-stop-td" style="height:0;padding:0;border:none;background:transparent"></td></tr>
+        <tr id="dm-vgrid-sbot" class="dm-vgrid-spacer"><td id="dm-vgrid-sbot-td" style="height:0;padding:0;border:none;background:transparent"></td></tr>
+      </tbody>
+    </table>
+    <style id="dm-sheet-col-style"></style>
+  </div>
+
+  <div class="dm-sheet-charts" id="dm-sheet-charts"></div>
+
   <div class="dm-sheet-empty" id="dm-sheet-empty" hidden>
-    <p>Sign in to create spreadsheets. Your sheets are stored locally and synced to your account.</p>
+    <p>Sign in to create spreadsheets. Sheets are stored locally and synced to your account.</p>
   </div>
 </div>
 
 <style>
-  .dm-sheet-root { display: flex; flex-direction: column; gap: 12px; }
-  .dm-sheet-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .dm-sheet-title-input {
-    font-size: 1.1rem; font-weight: 600; padding: 6px 10px;
-    border: 1px solid transparent; border-radius: 6px; background: transparent;
-    color: var(--body-font-color); min-width: 240px;
-  }
-  .dm-sheet-title-input:hover, .dm-sheet-title-input:focus {
-    border-color: var(--gray-200); outline: none; background: var(--body-background);
-  }
-  .dm-sheet-status { font-size: 0.85rem; color: var(--gray-500); min-width: 80px; }
-  .dm-sheet-spacer { flex: 1; }
-  .dm-sheet-btn {
-    padding: 6px 12px; border: 1px solid var(--gray-200); border-radius: 6px;
-    background: var(--body-background); color: var(--body-font-color); cursor: pointer;
-    font-size: 0.9rem;
-  }
-  .dm-sheet-btn:hover { background: var(--gray-100); }
-  .dm-sheet-picker {
-    padding: 6px 10px; border: 1px solid var(--gray-200); border-radius: 6px;
-    background: var(--body-background); color: var(--body-font-color); font-size: 0.9rem;
-    max-width: 240px;
-  }
-  .dm-sheet-loading, .dm-sheet-empty {
-    padding: 32px; text-align: center; color: var(--gray-500);
-    border: 1px dashed var(--gray-200); border-radius: 8px;
-  }
-  .dm-sheet-grid-wrap {
-    overflow: auto; max-height: 70vh; border: 1px solid var(--gray-200); border-radius: 6px;
-  }
-  .dm-sheet-grid { border-collapse: collapse; font-family: var(--mono-font, monospace); font-size: 0.9rem; }
-  .dm-sheet-grid th, .dm-sheet-grid td {
-    border: 1px solid var(--gray-200); padding: 0; min-width: 90px; height: 28px;
-    background: var(--body-background); position: relative;
-  }
-  .dm-sheet-grid th {
-    background: var(--gray-100); font-weight: 600; text-align: center;
-    position: sticky; top: 0; z-index: 1; min-width: 40px;
-    color: var(--gray-500);
-  }
-  .dm-sheet-grid th.dm-sheet-row-head {
-    left: 0; z-index: 2; min-width: 40px;
-  }
-  .dm-sheet-grid td.dm-sheet-cell {
-    cursor: cell;
-  }
-  .dm-sheet-grid td.dm-sheet-cell.is-active {
-    outline: 2px solid var(--color-accent, #1976d2); outline-offset: -2px;
-  }
-  .dm-sheet-cell-display {
-    padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    line-height: 20px;
-  }
-  .dm-sheet-cell-display.num { text-align: right; }
-  .dm-sheet-cell-display.err { color: #d32f2f; }
-  .dm-sheet-cell-input {
-    width: 100%; height: 100%; border: none; outline: none; padding: 4px 8px;
-    font-family: inherit; font-size: inherit; background: var(--body-background);
-    color: var(--body-font-color);
-  }
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+.dm-sheet-root { display:flex; flex-direction:column; gap:8px; }
+
+/* ── Toolbar ────────────────────────────────────────────────────────────── */
+.dm-sheet-toolbar { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.dm-sheet-title-input {
+  font-size:1.1rem; font-weight:600; padding:5px 10px;
+  border:1px solid transparent; border-radius:6px; background:transparent;
+  color:var(--body-font-color); min-width:200px;
+}
+.dm-sheet-title-input:hover,.dm-sheet-title-input:focus {
+  border-color:var(--gray-200); outline:none; background:var(--body-background);
+}
+.dm-sheet-status { font-size:0.82rem; color:var(--gray-500); min-width:70px; }
+.dm-sheet-spacer { flex:1; }
+.dm-sheet-btn {
+  padding:5px 12px; border:1px solid var(--gray-200); border-radius:6px;
+  background:var(--body-background); color:var(--body-font-color);
+  cursor:pointer; font-size:0.88rem; white-space:nowrap; display:inline-flex;
+  align-items:center; gap:4px;
+}
+.dm-sheet-btn:hover:not(:disabled) { background:var(--gray-100); }
+.dm-sheet-btn:disabled { opacity:0.4; cursor:default; }
+.dm-sheet-btn-sm { padding:3px 8px; font-size:0.82rem; }
+.dm-sheet-btn-danger { color:#c62828; border-color:#c62828; }
+.dm-sheet-btn-danger:hover { background:color-mix(in srgb,#c62828 10%,transparent); }
+.dm-sheet-file-label { cursor:pointer; }
+.dm-sheet-picker {
+  padding:5px 10px; border:1px solid var(--gray-200); border-radius:6px;
+  background:var(--body-background); color:var(--body-font-color); font-size:0.88rem; max-width:220px;
+}
+
+/* ── Formula bar ────────────────────────────────────────────────────────── */
+.dm-sheet-fbar {
+  display:flex; align-items:center; height:30px;
+  border:1px solid var(--gray-200); border-radius:6px; overflow:hidden;
+}
+.dm-sheet-cellref {
+  width:64px; flex-shrink:0; text-align:center;
+  font-family:var(--mono-font,monospace); font-size:0.82rem; padding:0 6px;
+  border:none; border-right:1px solid var(--gray-200);
+  background:var(--gray-100); color:var(--body-font-color); cursor:default; outline:none;
+}
+.dm-sheet-fx {
+  padding:0 8px; font-size:0.78rem; color:var(--gray-500); font-style:italic;
+  border-right:1px solid var(--gray-200); height:100%; line-height:30px;
+  background:var(--gray-100); flex-shrink:0;
+}
+.dm-sheet-fbar-input {
+  flex:1; border:none; outline:none; padding:0 10px;
+  font-family:var(--mono-font,monospace); font-size:0.88rem;
+  background:var(--body-background); color:var(--body-font-color); height:100%;
+}
+
+/* ── Format bar ─────────────────────────────────────────────────────────── */
+.dm-sheet-formatbar { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.dm-sheet-fmt-sel {
+  padding:3px 8px; border:1px solid var(--gray-200); border-radius:6px;
+  background:var(--body-background); color:var(--body-font-color); font-size:0.82rem;
+}
+.dm-fbar-sep { width:1px; height:18px; background:var(--gray-200); flex-shrink:0; }
+
+/* ── Grid wrapper ───────────────────────────────────────────────────────── */
+.dm-sheet-grid-wrap {
+  overflow:auto; height:68vh; min-height:300px;
+  border:1px solid var(--gray-200); border-radius:6px; position:relative;
+}
+.dm-sheet-grid {
+  border-collapse:collapse; font-family:var(--mono-font,monospace); font-size:0.88rem;
+  min-width:max-content;
+}
+
+/* ── Column headers (sticky top) ────────────────────────────────────────── */
+.dm-sheet-grid thead th {
+  position:sticky; top:0; z-index:3;
+  background:var(--gray-100); border:1px solid var(--gray-200);
+  height:28px; min-width:100px; padding:0 8px;
+  text-align:center; font-weight:600; color:var(--gray-500);
+  white-space:nowrap; user-select:none;
+}
+.dm-sheet-col-head { position:relative; }
+.dm-sheet-corner { min-width:44px !important; width:44px; }
+
+/* Column resize handle */
+.dm-col-resize-handle {
+  position:absolute; right:0; top:0; bottom:0; width:6px;
+  cursor:col-resize; z-index:1;
+}
+.dm-col-resize-handle:hover { background:var(--color-accent,#1976d2); opacity:0.5; }
+
+/* ── Row number column (sticky left) ───────────────────────────────────── */
+.dm-sheet-row-head {
+  position:sticky; left:0; z-index:2;
+  background:var(--gray-100); border:1px solid var(--gray-200);
+  width:44px; min-width:44px; padding:0 6px;
+  text-align:right; font-weight:400; font-size:0.78rem; color:var(--gray-500);
+  height:28px; white-space:nowrap; user-select:none;
+}
+.dm-sheet-grid thead .dm-sheet-row-head { z-index:4; }
+
+/* ── Data cells ─────────────────────────────────────────────────────────── */
+.dm-sheet-grid td.dm-sheet-cell {
+  border:1px solid var(--gray-200); height:28px; min-width:100px;
+  padding:0; cursor:cell; background:var(--body-background);
+}
+.dm-sheet-grid td.dm-sheet-cell.is-selected {
+  background:color-mix(in srgb,var(--color-accent,#1976d2) 10%,transparent);
+}
+.dm-sheet-grid td.dm-sheet-cell.is-active {
+  outline:2px solid var(--color-accent,#1976d2); outline-offset:-2px;
+  z-index:1; position:relative; background:var(--body-background) !important;
+}
+.dm-sheet-cell-val {
+  padding:3px 8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  line-height:22px; height:28px; box-sizing:border-box; display:block;
+}
+.dm-sheet-cell-val.num { text-align:right; }
+.dm-sheet-cell-val.err { color:#d32f2f; font-style:italic; }
+.dm-sheet-cell-input {
+  width:100%; height:28px; border:none; outline:none; padding:3px 8px;
+  font-family:inherit; font-size:inherit; background:var(--body-background);
+  color:var(--body-font-color); box-sizing:border-box; display:block;
+}
+
+/* ── Spacer rows ────────────────────────────────────────────────────────── */
+.dm-vgrid-spacer td { padding:0; border:none; }
+
+/* ── Charts ─────────────────────────────────────────────────────────────── */
+.dm-sheet-charts { display:flex; flex-wrap:wrap; gap:16px; }
+.dm-sheet-chart-card {
+  border:1px solid var(--gray-200); border-radius:8px;
+  padding:12px; background:var(--body-background);
+  min-width:300px; flex:1; max-width:520px; position:relative;
+}
+.dm-sheet-chart-card h4 {
+  margin:0 0 8px; font-size:0.88rem; color:var(--gray-500);
+  font-weight:600; padding-right:24px;
+}
+.dm-sheet-chart-card svg { display:block; width:100%; height:auto; }
+.dm-sheet-chart-del {
+  position:absolute; top:8px; right:8px; background:none; border:none;
+  cursor:pointer; color:var(--gray-500); font-size:1rem; padding:2px 6px;
+  border-radius:4px;
+}
+.dm-sheet-chart-del:hover { background:var(--gray-100); color:#c62828; }
+
+/* ── Loading / empty ────────────────────────────────────────────────────── */
+.dm-sheet-loading,.dm-sheet-empty {
+  padding:32px; text-align:center; color:var(--gray-500);
+  border:1px dashed var(--gray-200); border-radius:8px;
+}
 </style>
 
 <script>
-(function() {
+(function () {
   'use strict';
 
-  var HF_CDN = 'https://cdn.jsdelivr.net/npm/hyperformula@2.7.1/dist/hyperformula.full.min.js';
-  var ROWS = 50;
-  var COLS = 26;
-  var AUTOSAVE_DEBOUNCE_MS = 800;
+  var HF_CDN  = 'https://cdn.jsdelivr.net/npm/hyperformula@2.7.1/dist/hyperformula.full.min.js';
+  var ROWS    = 500;
+  var COLS    = 26;
+  var ROW_H   = 28;
+  var COL_W   = 100;
+  var BUFFER  = 15;
+  var SAVE_DELAY   = 800;
+  var SCROLL_DELAY = 16;
+
+  var CHART_COLORS = ['#1976d2','#43a047','#fb8c00','#e53935','#8e24aa','#00acc1','#f4511e','#039be5'];
 
   var state = {
-    hf: null,            // HyperFormula instance
-    sheetId: null,       // current sheet doc id
-    title: 'Untitled sheet',
-    activeCell: { r: 0, c: 0 },
-    saveTimer: null,
-    sheets: [],          // list of all sheets for picker
-    ready: false
+    hf: null, hfSid: 0, sheetId: null, title: 'Untitled sheet',
+    active:    { r: 0, c: 0 },
+    selAnchor: { r: 0, c: 0 },
+    sel:       { r1: 0, c1: 0, r2: 0, c2: 0 },
+    editing:   null,      // null | 'inline' | 'fbar'
+    fmts:      {},        // {"r,c": 'currency'|'percent'|'number'|'date'}
+    colWidths: {},        // {c: px}
+    charts:    [],        // [{id,type,r1,c1,r2,c2,title}]
+    viewport:  { first: -1, last: -1 },
+    sheets:    [],
+    saveTimer: null, scrollTimer: null,
+    resizing:  null,      // {c, startX, startWidth}
+    ready:     false
   };
 
-  function $(id) { return document.getElementById(id); }
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  function $(id)    { return document.getElementById(id); }
+  function qs(sel)  { return document.querySelector(sel); }
+
   function setStatus(msg) { var el = $('dm-sheet-status'); if (el) el.textContent = msg || ''; }
 
   function colLetter(c) {
-    var s = '';
-    c = c + 1;
+    var s = ''; c += 1;
     while (c > 0) { var m = (c - 1) % 26; s = String.fromCharCode(65 + m) + s; c = Math.floor((c - 1) / 26); }
     return s;
   }
+  function cellRef(r, c) { return colLetter(c) + (r + 1); }
+  function hfAddr(r, c)  { return { sheet: state.hfSid, row: r, col: c }; }
+  function getColWidth(c) { return state.colWidths[c] || COL_W; }
+  function fmtKey(r, c)  { return r + ',' + c; }
 
-  function loadHyperFormula() {
-    return new Promise(function(resolve, reject) {
+  // ── HyperFormula ──────────────────────────────────────────────────────────
+
+  function loadHF() {
+    return new Promise(function (resolve, reject) {
       if (window.HyperFormula) return resolve(window.HyperFormula);
       var s = document.createElement('script');
       s.src = HF_CDN;
-      s.onload = function() { resolve(window.HyperFormula); };
-      s.onerror = function() { reject(new Error('Failed to load HyperFormula')); };
+      s.onload  = function () { resolve(window.HyperFormula); };
+      s.onerror = function () { reject(new Error('Failed to load HyperFormula')); };
       document.head.appendChild(s);
     });
   }
 
-  function newHf(cellsJson) {
-    var data;
-    try { data = JSON.parse(cellsJson || '[]'); } catch (e) { data = []; }
-    // Normalize to 2D array of strings.
+  function parseSheetData(cellsJson) {
+    // Returns {cells:{}, fmts:{}, colWidths:{}, charts:[]}
+    var raw;
+    try { raw = JSON.parse(cellsJson || 'null'); } catch (e) { raw = null; }
+    if (!raw) return { cells: {}, fmts: {}, colWidths: {}, charts: [] };
+    // New format: has a 'cells' key
+    if (raw.cells && typeof raw.cells === 'object' && !Array.isArray(raw.cells)) {
+      return {
+        cells:     raw.cells     || {},
+        fmts:      raw.fmts      || {},
+        colWidths: raw.colWidths || {},
+        charts:    raw.charts    || []
+      };
+    }
+    // Legacy array format: [[v,...],...]
+    if (Array.isArray(raw)) {
+      var cells = {};
+      raw.forEach(function (row, r) {
+        if (!Array.isArray(row)) return;
+        row.forEach(function (v, c) { if (v != null && v !== '') cells[fmtKey(r, c)] = v; });
+      });
+      return { cells: cells, fmts: {}, colWidths: {}, charts: [] };
+    }
+    // Legacy flat sparse object format: {"r,c": value}
+    return { cells: raw, fmts: {}, colWidths: {}, charts: [] };
+  }
+
+  function newHf(cells) {
     var grid = [];
     for (var r = 0; r < ROWS; r++) {
       var row = [];
       for (var c = 0; c < COLS; c++) {
-        row.push((data[r] && data[r][c] != null) ? data[r][c] : null);
+        var v = cells[fmtKey(r, c)];
+        row.push(v != null ? v : null);
       }
       grid.push(row);
     }
     return window.HyperFormula.buildFromArray(grid, { licenseKey: 'gpl-v3' });
   }
 
-  function serializeCells() {
-    if (!state.hf) return '[]';
-    var sheetId = state.hf.getSheetId('Sheet1');
-    if (sheetId == null) return '[]';
-    var out = [];
+  function serializeSheet() {
+    var cells = {};
     for (var r = 0; r < ROWS; r++) {
-      var row = [];
-      var hasContent = false;
       for (var c = 0; c < COLS; c++) {
-        var formula = state.hf.getCellFormula({ sheet: sheetId, row: r, col: c });
-        var raw = formula != null ? formula : state.hf.getCellSerialized({ sheet: sheetId, row: r, col: c });
-        if (raw != null && raw !== '') hasContent = true;
-        row.push(raw == null ? null : raw);
+        var a = hfAddr(r, c);
+        var f = state.hf.getCellFormula(a);
+        var v = f != null ? f : state.hf.getCellSerialized(a);
+        if (v != null && v !== '') cells[fmtKey(r, c)] = v;
       }
-      out.push(row);
     }
-    // Trim trailing empty rows for compactness.
-    while (out.length > 1) {
-      var last = out[out.length - 1];
-      var empty = last.every(function(v) { return v == null || v === ''; });
-      if (empty) out.pop(); else break;
-    }
-    return JSON.stringify(out);
+    return JSON.stringify({ cells: cells, fmts: state.fmts, colWidths: state.colWidths, charts: state.charts });
   }
 
-  function renderGrid() {
-    var table = $('dm-sheet-grid');
-    if (!table || !state.hf) return;
-    var sheetId = state.hf.getSheetId('Sheet1');
-    var html = '<thead><tr><th class="dm-sheet-row-head"></th>';
-    for (var c = 0; c < COLS; c++) html += '<th>' + colLetter(c) + '</th>';
-    html += '</tr></thead><tbody>';
-    for (var r = 0; r < ROWS; r++) {
-      html += '<tr><th class="dm-sheet-row-head">' + (r + 1) + '</th>';
-      for (var cc = 0; cc < COLS; cc++) {
-        var addr = { sheet: sheetId, row: r, col: cc };
-        var val = state.hf.getCellValue(addr);
-        var display = val;
-        var cls = 'dm-sheet-cell-display';
-        if (val && typeof val === 'object' && val.type === 'ERROR') {
-          display = '#' + (val.value || 'ERR');
-          cls += ' err';
-        } else if (typeof val === 'number') {
-          cls += ' num';
-        } else if (val == null) {
-          display = '';
+  function getCellRaw(r, c) {
+    if (!state.hf) return '';
+    var f = state.hf.getCellFormula(hfAddr(r, c));
+    if (f != null) return f;
+    var v = state.hf.getCellSerialized(hfAddr(r, c));
+    return v == null ? '' : String(v);
+  }
+
+  // ── Number formatting ─────────────────────────────────────────────────────
+
+  function formatValue(val, fmt) {
+    if (val == null) return { text: '', cls: '' };
+    if (typeof val === 'object' && val.type === 'ERROR') {
+      return { text: '#' + (val.value || 'ERR'), cls: 'err' };
+    }
+    switch (fmt) {
+      case 'currency':
+        if (typeof val === 'number') {
+          var cur = (typeof localStorage !== 'undefined' && localStorage.getItem('dm-budget-currency')) || 'USD';
+          try { return { text: new Intl.NumberFormat(undefined, { style: 'currency', currency: cur }).format(val), cls: 'num' }; }
+          catch (e) { return { text: '$' + val.toFixed(2), cls: 'num' }; }
         }
-        var active = (state.activeCell.r === r && state.activeCell.c === cc) ? ' is-active' : '';
-        html += '<td class="dm-sheet-cell' + active + '" data-r="' + r + '" data-c="' + cc + '" tabindex="-1">' +
-                '<div class="' + cls + '">' + escapeHtml(String(display == null ? '' : display)) + '</div></td>';
-      }
-      html += '</tr>';
+        break;
+      case 'percent':
+        if (typeof val === 'number') return { text: (val * 100).toFixed(2) + '%', cls: 'num' };
+        break;
+      case 'number':
+        if (typeof val === 'number') return { text: val.toLocaleString(undefined, { maximumFractionDigits: 4 }), cls: 'num' };
+        break;
+      case 'date':
+        if (typeof val === 'number') {
+          try { return { text: new Date((val - 25569) * 86400000).toLocaleDateString(), cls: '' }; }
+          catch (e) { break; }
+        }
+        break;
     }
-    html += '</tbody>';
-    table.innerHTML = html;
+    if (typeof val === 'number') return { text: String(val), cls: 'num' };
+    return { text: String(val), cls: '' };
   }
 
-  function escapeHtml(s) {
-    return s.replace(/[&<>"']/g, function(c) {
-      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+  function getCellDisplay(r, c) {
+    if (!state.hf) return { text: '', cls: '' };
+    var val = state.hf.getCellValue(hfAddr(r, c));
+    if (val == null) return { text: '', cls: '' };
+    return formatValue(val, state.fmts[fmtKey(r, c)] || '');
+  }
+
+  // ── Column widths ─────────────────────────────────────────────────────────
+
+  function applyColWidths() {
+    var css = '';
+    Object.keys(state.colWidths).forEach(function (c) {
+      var w = state.colWidths[c] + 'px';
+      css += '.dm-sheet-grid th[data-c="' + c + '"]{min-width:' + w + ';width:' + w + '}';
+      css += '.dm-sheet-grid td[data-c="' + c + '"]{min-width:' + w + ';width:' + w + '}';
     });
+    $('dm-sheet-col-style').textContent = css;
+  }
+
+  // ── Grid rendering ────────────────────────────────────────────────────────
+
+  function renderHeader() {
+    var html = '<tr><th class="dm-sheet-corner dm-sheet-row-head"></th>';
+    for (var c = 0; c < COLS; c++) {
+      html += '<th class="dm-sheet-col-head" data-c="' + c + '">'
+            + colLetter(c)
+            + '<div class="dm-col-resize-handle" data-c="' + c + '"></div></th>';
+    }
+    html += '</tr>';
+    $('dm-sheet-thead').innerHTML = html;
+    $('dm-vgrid-stop-td').colSpan = COLS + 1;
+    $('dm-vgrid-sbot-td').colSpan = COLS + 1;
+    applyColWidths();
+  }
+
+  function buildCell(r, c) {
+    var ac  = state.active;
+    var sel = state.sel;
+    var isActive   = (ac.r === r && ac.c === c);
+    var isSelected = (r >= sel.r1 && r <= sel.r2 && c >= sel.c1 && c <= sel.c2);
+    var td = document.createElement('td');
+    td.className = 'dm-sheet-cell'
+      + (isActive   ? ' is-active'   : '')
+      + (isSelected && !isActive ? ' is-selected' : '');
+    td.dataset.r = r; td.dataset.c = c; td.tabIndex = -1;
+    var d = getCellDisplay(r, c);
+    var span = document.createElement('span');
+    span.className = 'dm-sheet-cell-val' + (d.cls ? ' ' + d.cls : '');
+    span.textContent = d.text;
+    td.appendChild(span);
+    return td;
+  }
+
+  function buildRow(r) {
+    var tr = document.createElement('tr');
+    tr.dataset.r = r;
+    var th = document.createElement('th');
+    th.className = 'dm-sheet-row-head';
+    th.textContent = r + 1;
+    tr.appendChild(th);
+    for (var c = 0; c < COLS; c++) tr.appendChild(buildCell(r, c));
+    return tr;
+  }
+
+  function renderViewport(force) {
+    if (state.editing === 'inline') return;
+    var wrap  = $('dm-sheet-grid-wrap');
+    var tbody = $('dm-sheet-tbody');
+    if (!wrap || !tbody || !state.hf) return;
+
+    var st = wrap.scrollTop, ch = wrap.clientHeight;
+    var first = Math.max(0,       Math.floor(st / ROW_H) - BUFFER);
+    var last  = Math.min(ROWS - 1, Math.ceil((st + ch) / ROW_H) + BUFFER);
+
+    if (!force && state.viewport.first === first && state.viewport.last === last) return;
+    state.viewport = { first: first, last: last };
+
+    $('dm-vgrid-stop-td').style.height = (first * ROW_H) + 'px';
+    $('dm-vgrid-sbot-td').style.height = ((ROWS - last - 1) * ROW_H) + 'px';
+
+    var stopEl = $('dm-vgrid-stop'), sbotEl = $('dm-vgrid-sbot');
+    var node = stopEl.nextSibling;
+    while (node && node !== sbotEl) { var next = node.nextSibling; tbody.removeChild(node); node = next; }
+
+    var frag = document.createDocumentFragment();
+    for (var r = first; r <= last; r++) frag.appendChild(buildRow(r));
+    tbody.insertBefore(frag, sbotEl);
+  }
+
+  // ── Active cell & selection ───────────────────────────────────────────────
+
+  function updateFbar() {
+    var ac = state.active;
+    var refEl = $('dm-sheet-cellref'), fbarEl = $('dm-sheet-fbar');
+    if (refEl) refEl.value = cellRef(ac.r, ac.c);
+    if (fbarEl && state.editing !== 'fbar') fbarEl.value = getCellRaw(ac.r, ac.c);
+    // Sync format picker
+    var fmtSel = $('dm-sheet-fmt-sel');
+    if (fmtSel) fmtSel.value = state.fmts[fmtKey(ac.r, ac.c)] || '';
+    // Update chart buttons
+    updateChartButtons();
+  }
+
+  function updateChartButtons() {
+    var sel = state.sel;
+    var multi = (sel.r2 > sel.r1 || sel.c2 > sel.c1);
+    ['dm-sheet-chart-bar','dm-sheet-chart-line','dm-sheet-chart-pie'].forEach(function (id) {
+      var btn = $(id);
+      if (btn) btn.disabled = !multi;
+    });
+  }
+
+  function normSel(r1, c1, r2, c2) {
+    return { r1: Math.min(r1,r2), c1: Math.min(c1,c2), r2: Math.max(r1,r2), c2: Math.max(c1,c2) };
   }
 
   function setActive(r, c) {
-    state.activeCell = { r: Math.max(0, Math.min(ROWS - 1, r)), c: Math.max(0, Math.min(COLS - 1, c)) };
-    renderGrid();
-    var td = document.querySelector('.dm-sheet-cell.is-active');
-    if (td) td.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    if (state.editing === 'inline') return;
+    r = Math.max(0, Math.min(ROWS - 1, r));
+    c = Math.max(0, Math.min(COLS - 1, c));
+    state.active    = { r: r, c: c };
+    state.selAnchor = { r: r, c: c };
+    state.sel       = { r1: r, c1: c, r2: r, c2: c };
+    syncActiveDOM(r, c);
+    updateFbar();
   }
 
-  function startEdit(r, c) {
-    var td = document.querySelector('.dm-sheet-cell[data-r="' + r + '"][data-c="' + c + '"]');
-    if (!td) return;
-    var sheetId = state.hf.getSheetId('Sheet1');
-    var formula = state.hf.getCellFormula({ sheet: sheetId, row: r, col: c });
-    var raw = formula != null ? formula : state.hf.getCellSerialized({ sheet: sheetId, row: r, col: c });
-    var initial = raw == null ? '' : String(raw);
-    td.innerHTML = '<input class="dm-sheet-cell-input" type="text" value="' + escapeHtml(initial) + '">';
-    var input = td.querySelector('input');
-    input.focus();
-    input.select();
-    function commit(advance) {
-      var v = input.value;
-      var parsed = v;
-      if (v !== '' && !v.startsWith('=') && !isNaN(Number(v))) parsed = Number(v);
-      else if (v === '') parsed = null;
-      state.hf.setCellContents({ sheet: sheetId, row: r, col: c }, [[parsed]]);
-      scheduleSave();
-      renderGrid();
-      if (advance) setActive(r + 1, c);
+  function extendSel(r, c) {
+    if (state.editing === 'inline') return;
+    r = Math.max(0, Math.min(ROWS - 1, r));
+    c = Math.max(0, Math.min(COLS - 1, c));
+    var a = state.selAnchor;
+    state.sel    = normSel(a.r, a.c, r, c);
+    state.active = { r: r, c: c };
+    renderViewport(true);
+    updateFbar();
+  }
+
+  function syncActiveDOM(r, c) {
+    var oldTd = qs('.dm-sheet-cell.is-active');
+    if (oldTd) { oldTd.classList.remove('is-active'); oldTd.classList.remove('is-selected'); }
+    // Clear stale selection highlights
+    document.querySelectorAll('.dm-sheet-cell.is-selected').forEach(function (td) {
+      td.classList.remove('is-selected');
+    });
+    var newTd = qs('.dm-sheet-cell[data-r="' + r + '"][data-c="' + c + '"]');
+    if (newTd) {
+      newTd.classList.add('is-active');
+      newTd.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    } else {
+      var wrap = $('dm-sheet-grid-wrap');
+      var rowTop = r * ROW_H, rowBot = rowTop + ROW_H;
+      if (rowTop < wrap.scrollTop) wrap.scrollTop = rowTop;
+      else if (rowBot > wrap.scrollTop + wrap.clientHeight) wrap.scrollTop = rowBot - wrap.clientHeight + ROW_H;
+      renderViewport(true);
+      var td2 = qs('.dm-sheet-cell[data-r="' + r + '"][data-c="' + c + '"]');
+      if (td2) td2.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
-    input.addEventListener('blur', function() { commit(false); });
-    input.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') { e.preventDefault(); commit(true); }
-      else if (e.key === 'Escape') { e.preventDefault(); renderGrid(); }
-      else if (e.key === 'Tab') { e.preventDefault(); commit(false); setActive(r, c + (e.shiftKey ? -1 : 1)); }
+  }
+
+  // ── Inline cell editing ───────────────────────────────────────────────────
+
+  function startInlineEdit(r, c, initialChar) {
+    var td = qs('.dm-sheet-cell[data-r="' + r + '"][data-c="' + c + '"]');
+    if (!td) { setActive(r, c); return; }
+    state.editing = 'inline';
+    var startVal = initialChar != null ? initialChar : getCellRaw(r, c);
+    td.innerHTML = '';
+    var inp = document.createElement('input');
+    inp.className = 'dm-sheet-cell-input'; inp.type = 'text'; inp.value = startVal;
+    td.appendChild(inp); inp.focus();
+    if (initialChar == null) inp.select(); else inp.setSelectionRange(startVal.length, startVal.length);
+    inp.addEventListener('input', function () { var fb = $('dm-sheet-fbar'); if (fb) fb.value = inp.value; });
+    function commit(dr, dc) {
+      var v = inp.value;
+      var parsed = v === '' ? null : (!v.startsWith('=') && !isNaN(Number(v)) ? Number(v) : v);
+      state.hf.setCellContents(hfAddr(r, c), [[parsed]]);
+      state.editing = null;
+      scheduleSave(); renderViewport(true); updateFbar(); renderCharts();
+      if (dr || dc) setActive(r + dr, c + dc);
+    }
+    inp.addEventListener('blur', function () { if (state.editing === 'inline') commit(0, 0); });
+    inp.addEventListener('keydown', function (e) {
+      if      (e.key === 'Enter')  { e.preventDefault(); commit(1, 0); }
+      else if (e.key === 'Escape') { e.preventDefault(); state.editing = null; renderViewport(true); updateFbar(); }
+      else if (e.key === 'Tab')    { e.preventDefault(); commit(0, e.shiftKey ? -1 : 1); }
     });
   }
+
+  function commitFbar(advanceRow) {
+    var fbarEl = $('dm-sheet-fbar'); if (!fbarEl) return;
+    var v = fbarEl.value;
+    var parsed = v === '' ? null : (!v.startsWith('=') && !isNaN(Number(v)) ? Number(v) : v);
+    var ac = state.active;
+    state.hf.setCellContents(hfAddr(ac.r, ac.c), [[parsed]]);
+    state.editing = null;
+    scheduleSave(); renderViewport(true); updateFbar(); renderCharts();
+    if (advanceRow) setActive(ac.r + 1, ac.c);
+  }
+
+  // ── Copy / paste ──────────────────────────────────────────────────────────
+
+  function getSelText() {
+    var sel = state.sel, lines = [];
+    for (var r = sel.r1; r <= sel.r2; r++) {
+      var row = [];
+      for (var c = sel.c1; c <= sel.c2; c++) row.push(getCellRaw(r, c));
+      lines.push(row.join('\t'));
+    }
+    return lines.join('\n');
+  }
+
+  function pasteCells(text) {
+    var rows = text.split('\n');
+    var ac = state.active;
+    rows.forEach(function (line, ri) {
+      line.split('\t').forEach(function (val, ci) {
+        var r = ac.r + ri, c = ac.c + ci;
+        if (r >= ROWS || c >= COLS) return;
+        var parsed = val === '' ? null : (!val.startsWith('=') && !isNaN(Number(val)) ? Number(val) : val);
+        state.hf.setCellContents(hfAddr(r, c), [[parsed]]);
+      });
+    });
+    scheduleSave(); renderViewport(true); updateFbar(); renderCharts();
+  }
+
+  // ── CSV export / import ───────────────────────────────────────────────────
+
+  function exportCSV() {
+    if (!state.hf) return;
+    var rows = [], maxR = 0, maxC = 0;
+    for (var r = 0; r < ROWS; r++) {
+      for (var c = 0; c < COLS; c++) {
+        var v = state.hf.getCellValue(hfAddr(r, c));
+        if (v != null && v !== '') { maxR = Math.max(maxR, r); maxC = Math.max(maxC, c); }
+      }
+    }
+    for (var r = 0; r <= maxR; r++) {
+      var row = [];
+      for (var c = 0; c <= maxC; c++) {
+        var v = state.hf.getCellValue(hfAddr(r, c));
+        var s = (v == null) ? '' : String(typeof v === 'object' ? '#ERR' : v);
+        row.push(s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g, '""') + '"' : s);
+      }
+      rows.push(row.join(','));
+    }
+    var blob = new Blob([rows.join('\r\n')], { type: 'text/csv' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = (state.title || 'sheet') + '.csv';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function importCSV(text) {
+    var rows = text.split(/\r?\n/);
+    var ac = state.active;
+    rows.forEach(function (line, ri) {
+      if (!line.trim()) return;
+      parseCsvRow(line).forEach(function (val, ci) {
+        var r = ac.r + ri, c = ac.c + ci;
+        if (r >= ROWS || c >= COLS) return;
+        var parsed = val === '' ? null : (!isNaN(Number(val)) ? Number(val) : val);
+        state.hf.setCellContents(hfAddr(r, c), [[parsed]]);
+      });
+    });
+    scheduleSave(); renderViewport(true); updateFbar(); renderCharts();
+  }
+
+  function parseCsvRow(line) {
+    var cols = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+      var ch = line[i];
+      if (ch === '"') {
+        if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ;
+      } else if (ch === ',' && !inQ) { cols.push(cur); cur = ''; }
+      else cur += ch;
+    }
+    cols.push(cur);
+    return cols;
+  }
+
+  // ── Charts ────────────────────────────────────────────────────────────────
+
+  function extractChartData(r1, c1, r2, c2) {
+    var labels = [], series = [];
+    var firstColText = false;
+    if (c2 > c1) {
+      firstColText = true;
+      for (var r = r1; r <= r2; r++) {
+        if (typeof state.hf.getCellValue(hfAddr(r, c1)) === 'number') { firstColText = false; break; }
+      }
+    }
+    var dc1 = firstColText ? c1 + 1 : c1;
+    for (var r = r1; r <= r2; r++) {
+      labels.push(firstColText ? String(state.hf.getCellValue(hfAddr(r, c1)) || r - r1 + 1) : String(r - r1 + 1));
+    }
+    for (var c = dc1; c <= c2; c++) {
+      var col = [];
+      for (var r = r1; r <= r2; r++) {
+        var v = state.hf.getCellValue(hfAddr(r, c));
+        col.push(typeof v === 'number' ? v : 0);
+      }
+      series.push({ name: colLetter(c), data: col });
+    }
+    if (!series.length) series = [{ name: 'A', data: labels.map(function () { return 0; }) }];
+    return { labels: labels, series: series };
+  }
+
+  var CW = 460, CH = 240, CPT = 24, CPR = 16, CPB = 44, CPL = 52;
+
+  function svgBar(data) {
+    var pw = CW - CPL - CPR, ph = CH - CPT - CPB;
+    var vals = data.series[0].data, n = vals.length;
+    if (!n) return '<text x="' + CW/2 + '" y="' + CH/2 + '" text-anchor="middle" fill="#999" font-size="13">No data</text>';
+    var max = Math.max.apply(null, vals.concat([0]));
+    var min = Math.min.apply(null, [0].concat(vals));
+    var range = max - min || 1;
+    var bw = Math.max(2, pw / n * 0.6), gap = pw / n;
+    var out = axesSvg(min, max, data.labels, pw, ph);
+    vals.forEach(function (v, i) {
+      var x = CPL + i * gap + (gap - bw) / 2;
+      var barH = Math.abs(v - Math.min(v, 0)) / range * ph;
+      var y = CPT + (max - Math.max(v, 0)) / range * ph;
+      out += '<rect x="' + x.toFixed(1) + '" y="' + y.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + barH.toFixed(1) + '" fill="' + CHART_COLORS[i % CHART_COLORS.length] + '" rx="2"/>';
+    });
+    return out;
+  }
+
+  function svgLine(data) {
+    var pw = CW - CPL - CPR, ph = CH - CPT - CPB;
+    var out = '';
+    data.series.forEach(function (ser, si) {
+      var vals = ser.data, n = vals.length; if (!n) return;
+      var max = Math.max.apply(null, vals.concat([0]));
+      var min = Math.min.apply(null, [0].concat(vals));
+      var range = max - min || 1;
+      if (si === 0) out += axesSvg(min, max, data.labels, pw, ph);
+      var pts = vals.map(function (v, i) {
+        return (CPL + i * (pw / Math.max(n - 1, 1))).toFixed(1) + ',' + (CPT + (max - v) / range * ph).toFixed(1);
+      }).join(' ');
+      var color = CHART_COLORS[si % CHART_COLORS.length];
+      out += '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="2"/>';
+      vals.forEach(function (v, i) {
+        var x = CPL + i * (pw / Math.max(n - 1, 1)), y = CPT + (max - v) / range * ph;
+        out += '<circle cx="' + x.toFixed(1) + '" cy="' + y.toFixed(1) + '" r="3" fill="' + color + '"/>';
+      });
+    });
+    return out;
+  }
+
+  function svgPie(data) {
+    var vals = data.series[0].data, n = vals.length;
+    if (!n) return '<text x="' + CW/2 + '" y="' + CH/2 + '" text-anchor="middle" fill="#999" font-size="13">No data</text>';
+    var total = vals.reduce(function (s, v) { return s + Math.abs(v); }, 0) || 1;
+    var cx = CW / 2, cy = CH / 2, r = Math.min(CW, CH) / 2 - 16;
+    var out = '', angle = -Math.PI / 2;
+    vals.forEach(function (v, i) {
+      var slice = Math.abs(v) / total * 2 * Math.PI;
+      var x1 = cx + r * Math.cos(angle), y1 = cy + r * Math.sin(angle);
+      angle += slice;
+      var x2 = cx + r * Math.cos(angle), y2 = cy + r * Math.sin(angle);
+      var large = slice > Math.PI ? 1 : 0;
+      var color = CHART_COLORS[i % CHART_COLORS.length];
+      out += '<path d="M' + cx + ',' + cy + ' L' + x1.toFixed(1) + ',' + y1.toFixed(1)
+           + ' A' + r + ',' + r + ' 0 ' + large + ',1 ' + x2.toFixed(1) + ',' + y2.toFixed(1) + ' Z"'
+           + ' fill="' + color + '" stroke="var(--body-background)" stroke-width="1.5"/>';
+      // Label in slice midpoint
+      var midA = angle - slice / 2, lx = cx + r * 0.65 * Math.cos(midA), ly = cy + r * 0.65 * Math.sin(midA);
+      var pct = (Math.abs(v) / total * 100).toFixed(0);
+      if (slice > 0.3) out += '<text x="' + lx.toFixed(1) + '" y="' + (ly + 4).toFixed(1) + '" text-anchor="middle" fill="#fff" font-size="11" font-weight="600">' + pct + '%</text>';
+    });
+    return out;
+  }
+
+  function axesSvg(min, max, labels, pw, ph) {
+    var out = '', range = max - min || 1;
+    // Y gridlines + labels
+    var ticks = 4;
+    for (var i = 0; i <= ticks; i++) {
+      var v = min + (max - min) * i / ticks;
+      var y = CPT + ph - (v - min) / range * ph;
+      out += '<line x1="' + CPL + '" x2="' + (CPL + pw) + '" y1="' + y.toFixed(1) + '" y2="' + y.toFixed(1) + '" stroke="var(--gray-200)" stroke-width="1"/>';
+      out += '<text x="' + (CPL - 4) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end" fill="var(--gray-500)" font-size="10">' + (Math.abs(v) < 0.001 && v !== 0 ? v.toExponential(1) : v.toFixed(v % 1 !== 0 ? 1 : 0)) + '</text>';
+    }
+    // X axis labels
+    var n = labels.length;
+    labels.forEach(function (lbl, i) {
+      var x = CPL + (n <= 1 ? pw / 2 : i * pw / (n - 1));
+      out += '<text x="' + x.toFixed(1) + '" y="' + (CPT + ph + 16) + '" text-anchor="middle" fill="var(--gray-500)" font-size="10">' + String(lbl).slice(0, 10) + '</text>';
+    });
+    return out;
+  }
+
+  function renderCharts() {
+    var panel = $('dm-sheet-charts');
+    if (!panel) return;
+    panel.innerHTML = '';
+    if (!state.charts.length || !state.hf) return;
+    state.charts.forEach(function (chart) {
+      var data = extractChartData(chart.r1, chart.c1, chart.r2, chart.c2);
+      var body;
+      if      (chart.type === 'bar')  body = svgBar(data);
+      else if (chart.type === 'line') body = svgLine(data);
+      else                             body = svgPie(data);
+      var div = document.createElement('div');
+      div.className = 'dm-sheet-chart-card';
+      div.innerHTML = '<h4>' + (chart.title || chart.type + ' chart') + '</h4>'
+        + '<svg viewBox="0 0 ' + CW + ' ' + CH + '" xmlns="http://www.w3.org/2000/svg">' + body + '</svg>'
+        + '<button class="dm-sheet-chart-del" data-id="' + chart.id + '" title="Remove chart">×</button>';
+      panel.appendChild(div);
+    });
+  }
+
+  function insertChart(type) {
+    var sel = state.sel;
+    var id  = 'chart-' + Date.now();
+    var r1 = sel.r1, c1 = sel.c1, r2 = sel.r2, c2 = sel.c2;
+    var title = type.charAt(0).toUpperCase() + type.slice(1) + ' — ' + cellRef(r1, c1) + ':' + cellRef(r2, c2);
+    state.charts.push({ id: id, type: type, r1: r1, c1: c1, r2: r2, c2: c2, title: title });
+    scheduleSave(); renderCharts();
+  }
+
+  // ── Save / load ───────────────────────────────────────────────────────────
 
   function scheduleSave() {
     if (state.saveTimer) clearTimeout(state.saveTimer);
     setStatus('Saving…');
-    state.saveTimer = setTimeout(saveNow, AUTOSAVE_DEBOUNCE_MS);
+    state.saveTimer = setTimeout(saveNow, SAVE_DELAY);
   }
 
   function saveNow() {
     if (!state.sheetId || !window.dmSync) return;
-    var cellsJson = serializeCells();
-    window.dmSync.updateSheet(state.sheetId, {
-      title: state.title,
-      cellsJson: cellsJson
-    }).then(function() { setStatus('Saved'); setTimeout(function() { setStatus(''); }, 1200); })
-      .catch(function(err) { console.error('[dm-sheet] save failed', err); setStatus('Save failed'); });
+    window.dmSync.updateSheet(state.sheetId, { title: state.title, cellsJson: serializeSheet() })
+      .then(function () { setStatus('Saved'); setTimeout(function () { setStatus(''); }, 1200); })
+      .catch(function (e) { console.error('[dm-sheet] save', e); setStatus('Save failed'); });
   }
 
   function loadSheet(sheet) {
     if (state.hf) { try { state.hf.destroy(); } catch (e) {} state.hf = null; }
-    state.sheetId = sheet.id;
-    state.title = sheet.title || 'Untitled sheet';
+    var data = parseSheetData(sheet.cellsJson);
+    state.sheetId   = sheet.id;
+    state.title     = sheet.title || 'Untitled sheet';
+    state.fmts      = data.fmts      || {};
+    state.colWidths = data.colWidths || {};
+    state.charts    = data.charts    || [];
     $('dm-sheet-title').value = state.title;
-    state.hf = newHf(sheet.cellsJson);
-    state.activeCell = { r: 0, c: 0 };
-    renderGrid();
+    state.hf     = newHf(data.cells);
+    state.hfSid  = state.hf.getSheetId('Sheet1');
+    state.active = state.selAnchor = { r: 0, c: 0 };
+    state.sel    = { r1: 0, c1: 0, r2: 0, c2: 0 };
+    state.editing = null;
+    state.viewport = { first: -1, last: -1 };
+    applyColWidths();
+    renderViewport(true);
+    updateFbar();
+    renderCharts();
     setStatus('');
   }
 
   function refreshPicker() {
     if (!window.dmSync) return Promise.resolve();
-    return window.dmSync.getAllSheets().then(function(sheets) {
+    return window.dmSync.getAllSheets().then(function (sheets) {
       state.sheets = sheets;
       var sel = $('dm-sheet-picker');
       sel.innerHTML = '';
       if (!sheets.length) {
-        var opt = document.createElement('option');
-        opt.textContent = '(no sheets)'; opt.disabled = true;
-        sel.appendChild(opt);
+        var o = document.createElement('option'); o.textContent = '(no sheets)'; o.disabled = true; sel.appendChild(o);
       } else {
-        sheets.forEach(function(s) {
-          var opt = document.createElement('option');
-          opt.value = s.id;
-          opt.textContent = s.title || 'Untitled';
-          if (s.id === state.sheetId) opt.selected = true;
-          sel.appendChild(opt);
+        sheets.forEach(function (s) {
+          var o = document.createElement('option'); o.value = s.id; o.textContent = s.title || 'Untitled';
+          if (s.id === state.sheetId) o.selected = true;
+          sel.appendChild(o);
         });
       }
     });
   }
 
   function createNewSheet() {
-    if (!window.dmSync) return;
-    return window.dmSync.createSheet({ title: 'Untitled sheet' }).then(function(sheet) {
-      loadSheet(sheet);
-      return refreshPicker();
+    if (!window.dmSync) return Promise.resolve();
+    return window.dmSync.createSheet({ title: 'Untitled sheet' }).then(function (sheet) {
+      loadSheet(sheet); return refreshPicker();
     });
   }
 
-  function init() {
-    var root = $('dm-sheet-root');
-    var loading = $('dm-sheet-loading');
-    var wrap = $('dm-sheet-grid-wrap');
-    var empty = $('dm-sheet-empty');
-
-    function showAuthRequired() {
-      loading.hidden = true; wrap.hidden = true; empty.hidden = false;
-      root.dataset.state = 'auth-required';
-    }
-
-    if (!window.dmAuthReady) { showAuthRequired(); return; }
-
-    window.dmAuthReady.then(function() {
-      var user = window.dmAuth && window.dmAuth.currentUser;
-      var demo = window.dmDemo && window.dmDemo.isActive();
-      if (!user && !demo) { showAuthRequired(); return; }
-
-      loadHyperFormula().then(function() {
-        return refreshPicker();
-      }).then(function() {
-        if (state.sheets.length) {
-          loadSheet(state.sheets[0]);
-        } else {
-          return createNewSheet();
-        }
-      }).then(function() {
-        loading.hidden = true;
-        wrap.hidden = false;
-        root.dataset.state = 'ready';
-        state.ready = true;
-        wireEvents();
-      }).catch(function(err) {
-        console.error('[dm-sheet] init failed', err);
-        loading.textContent = 'Failed to load: ' + (err && err.message ? err.message : 'unknown error');
-      });
-    });
-  }
+  // ── Event wiring ──────────────────────────────────────────────────────────
 
   function wireEvents() {
     var grid = $('dm-sheet-grid');
-    grid.addEventListener('click', function(e) {
+    var wrap = $('dm-sheet-grid-wrap');
+    var thead = $('dm-sheet-thead');
+
+    // ── Grid clicks ──
+    grid.addEventListener('click', function (e) {
+      if (state.editing === 'inline') return;
       var td = e.target.closest('.dm-sheet-cell');
       if (!td) return;
-      var r = parseInt(td.dataset.r, 10);
-      var c = parseInt(td.dataset.c, 10);
-      setActive(r, c);
+      if (e.shiftKey) extendSel(+td.dataset.r, +td.dataset.c);
+      else setActive(+td.dataset.r, +td.dataset.c);
     });
-    grid.addEventListener('dblclick', function(e) {
+    grid.addEventListener('dblclick', function (e) {
       var td = e.target.closest('.dm-sheet-cell');
       if (!td) return;
-      startEdit(parseInt(td.dataset.r, 10), parseInt(td.dataset.c, 10));
+      setActive(+td.dataset.r, +td.dataset.c);
+      startInlineEdit(+td.dataset.r, +td.dataset.c);
     });
 
-    document.addEventListener('keydown', function(e) {
+    // ── Scroll → virtualize ──
+    wrap.addEventListener('scroll', function () {
+      if (state.scrollTimer) clearTimeout(state.scrollTimer);
+      state.scrollTimer = setTimeout(function () { renderViewport(false); }, SCROLL_DELAY);
+    });
+
+    // ── Column resize ──
+    thead.addEventListener('mousedown', function (e) {
+      var handle = e.target.closest('.dm-col-resize-handle');
+      if (!handle) return;
+      e.preventDefault();
+      var c = +handle.dataset.c;
+      state.resizing = { c: c, startX: e.clientX, startWidth: getColWidth(c) };
+    });
+    document.addEventListener('mousemove', function (e) {
+      if (!state.resizing) return;
+      var delta = e.clientX - state.resizing.startX;
+      var w = Math.max(40, state.resizing.startWidth + delta);
+      state.colWidths[state.resizing.c] = w;
+      applyColWidths();
+    });
+    document.addEventListener('mouseup', function () {
+      if (state.resizing) { state.resizing = null; scheduleSave(); }
+    });
+
+    // ── Keyboard ──
+    document.addEventListener('keydown', function (e) {
       if (!state.ready) return;
-      if (document.activeElement && document.activeElement.tagName === 'INPUT') return;
-      var ac = state.activeCell;
-      if (e.key === 'ArrowUp')      { e.preventDefault(); setActive(ac.r - 1, ac.c); }
-      else if (e.key === 'ArrowDown')  { e.preventDefault(); setActive(ac.r + 1, ac.c); }
-      else if (e.key === 'ArrowLeft')  { e.preventDefault(); setActive(ac.r, ac.c - 1); }
-      else if (e.key === 'ArrowRight') { e.preventDefault(); setActive(ac.r, ac.c + 1); }
-      else if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startEdit(ac.r, ac.c); }
-      else if (e.key === 'Delete' || e.key === 'Backspace') {
+      var el  = document.activeElement;
+      var tag = el && el.tagName;
+
+      // Formula-bar shortcuts
+      if (el && el.id === 'dm-sheet-fbar') {
+        if      (e.key === 'Enter')  { e.preventDefault(); commitFbar(true); }
+        else if (e.key === 'Escape') { e.preventDefault(); state.editing = null; updateFbar(); }
+        else if (e.key === 'Tab')    { e.preventDefault(); commitFbar(false); setActive(state.active.r, state.active.c + (e.shiftKey ? -1 : 1)); }
+        return;
+      }
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      var ac = state.active;
+
+      // Navigation (arrow keys move or extend selection)
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
-        var sheetId = state.hf.getSheetId('Sheet1');
-        state.hf.setCellContents({ sheet: sheetId, row: ac.r, col: ac.c }, [[null]]);
-        scheduleSave();
-        renderGrid();
-      } else if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
-        startEdit(ac.r, ac.c);
-        // Replace existing content with the typed character.
-        setTimeout(function() {
-          var input = document.querySelector('.dm-sheet-cell-input');
-          if (input) { input.value = e.key; input.setSelectionRange(1, 1); }
-        }, 0);
+        var dr = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+        var dc = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
+        if (e.shiftKey) extendSel(ac.r + dr, ac.c + dc);
+        else setActive(ac.r + dr, ac.c + dc);
+        return;
+      }
+
+      if (e.key === 'Tab')   { e.preventDefault(); setActive(ac.r, ac.c + (e.shiftKey ? -1 : 1)); return; }
+      if (e.key === 'Enter' || e.key === 'F2') { e.preventDefault(); startInlineEdit(ac.r, ac.c); return; }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        // Clear entire selection
+        var sel = state.sel;
+        for (var r = sel.r1; r <= sel.r2; r++)
+          for (var c = sel.c1; c <= sel.c2; c++)
+            state.hf.setCellContents(hfAddr(r, c), [[null]]);
+        scheduleSave(); renderViewport(true); updateFbar(); renderCharts(); return;
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (state.hf.isItPossibleToUndoOperation()) { state.hf.undo(); renderViewport(true); updateFbar(); scheduleSave(); renderCharts(); } return;
+      }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        if (state.hf.isItPossibleToRedoOperation()) { state.hf.redo(); renderViewport(true); updateFbar(); scheduleSave(); renderCharts(); } return;
+      }
+      if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key.length === 1) {
+        startInlineEdit(ac.r, ac.c, e.key);
       }
     });
 
-    $('dm-sheet-title').addEventListener('input', function(e) {
-      state.title = e.target.value || 'Untitled sheet';
-      scheduleSave();
+    // ── Copy / paste via clipboard events ──
+    document.addEventListener('copy', function (e) {
+      if (!state.ready || state.editing) return;
+      e.preventDefault();
+      e.clipboardData.setData('text/plain', getSelText());
+    });
+    document.addEventListener('paste', function (e) {
+      if (!state.ready || state.editing) return;
+      var el = document.activeElement;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return;
+      e.preventDefault();
+      pasteCells(e.clipboardData.getData('text/plain'));
     });
 
-    $('dm-sheet-new').addEventListener('click', function() {
-      createNewSheet();
+    // ── Formula bar ──
+    var fbarEl = $('dm-sheet-fbar');
+    if (fbarEl) {
+      fbarEl.addEventListener('focus', function () { state.editing = 'fbar'; });
+      fbarEl.addEventListener('blur',  function () { if (state.editing === 'fbar') commitFbar(false); });
+    }
+
+    // ── Number format picker ──
+    var fmtSel = $('dm-sheet-fmt-sel');
+    if (fmtSel) {
+      fmtSel.addEventListener('change', function (e) {
+        var sel = state.sel, fmt = e.target.value;
+        for (var r = sel.r1; r <= sel.r2; r++)
+          for (var c = sel.c1; c <= sel.c2; c++) {
+            if (fmt) state.fmts[fmtKey(r, c)] = fmt;
+            else     delete state.fmts[fmtKey(r, c)];
+          }
+        scheduleSave(); renderViewport(true);
+      });
+    }
+
+    // ── Chart buttons ──
+    ['bar','line','pie'].forEach(function (type) {
+      var btn = $('dm-sheet-chart-' + type);
+      if (btn) btn.addEventListener('click', function () { insertChart(type); });
     });
 
-    $('dm-sheet-picker').addEventListener('change', function(e) {
-      var id = e.target.value;
-      var sheet = state.sheets.find(function(s) { return s.id === id; });
+    // ── Chart delete ──
+    $('dm-sheet-charts').addEventListener('click', function (e) {
+      var btn = e.target.closest('.dm-sheet-chart-del');
+      if (!btn) return;
+      var id = btn.dataset.id;
+      state.charts = state.charts.filter(function (ch) { return ch.id !== id; });
+      scheduleSave(); renderCharts();
+    });
+
+    // ── CSV export ──
+    $('dm-sheet-csv-export').addEventListener('click', exportCSV);
+
+    // ── CSV import ──
+    $('dm-sheet-csv-file').addEventListener('change', function (e) {
+      var file = e.target.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (ev) { importCSV(ev.target.result); };
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+
+    // ── Title ──
+    $('dm-sheet-title').addEventListener('input', function (e) {
+      state.title = e.target.value || 'Untitled sheet'; scheduleSave();
+    });
+
+    // ── New / Delete / Picker ──
+    $('dm-sheet-new').addEventListener('click', createNewSheet);
+    $('dm-sheet-delete').addEventListener('click', function () {
+      if (!state.sheetId || !window.dmSync) return;
+      if (!confirm('Delete "' + state.title + '"? This cannot be undone.')) return;
+      window.dmSync.deleteSheet(state.sheetId).then(function () {
+        state.sheetId = null;
+        if (state.hf) { try { state.hf.destroy(); } catch (e) {} state.hf = null; }
+        return refreshPicker();
+      }).then(function () {
+        if (state.sheets.length) { loadSheet(state.sheets[0]); $('dm-sheet-picker').value = state.sheetId; }
+        else createNewSheet();
+      });
+    });
+    $('dm-sheet-picker').addEventListener('change', function (e) {
+      var sheet = state.sheets.find(function (s) { return s.id === e.target.value; });
       if (sheet) loadSheet(sheet);
     });
 
-    window.addEventListener('beforeunload', function() {
+    window.addEventListener('beforeunload', function () {
       if (state.saveTimer) { clearTimeout(state.saveTimer); saveNow(); }
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
+  // ── Init ──────────────────────────────────────────────────────────────────
+
+  function init() {
+    var loading   = $('dm-sheet-loading');
+    var wrap      = $('dm-sheet-grid-wrap');
+    var empty     = $('dm-sheet-empty');
+    var fbarWrap  = $('dm-sheet-fbar-wrap');
+    var formatbar = $('dm-sheet-formatbar');
+    var root      = $('dm-sheet-root');
+
+    function showAuth() {
+      loading.hidden = true; wrap.hidden = true; empty.hidden = false;
+      if (fbarWrap)  fbarWrap.hidden  = true;
+      if (formatbar) formatbar.hidden = true;
+      root.dataset.state = 'auth-required';
+    }
+
+    if (!window.dmAuthReady) { showAuth(); return; }
+
+    window.dmAuthReady.then(function () {
+      var user = window.dmAuth && window.dmAuth.currentUser;
+      var demo = window.dmDemo && window.dmDemo.isActive();
+      if (!user && !demo) { showAuth(); return; }
+
+      loadHF()
+        .then(function () { renderHeader(); return refreshPicker(); })
+        .then(function () {
+          if (state.sheets.length) {
+            loadSheet(state.sheets[0]);
+            $('dm-sheet-picker').value = state.sheetId;
+          } else {
+            return createNewSheet();
+          }
+        })
+        .then(function () {
+          loading.hidden = false; loading.hidden = true;
+          if (fbarWrap)  fbarWrap.hidden  = false;
+          if (formatbar) formatbar.hidden = false;
+          wrap.hidden = false;
+          root.dataset.state = 'ready';
+          state.ready = true;
+          wireEvents();
+        })
+        .catch(function (e) {
+          console.error('[dm-sheet] init', e);
+          loading.textContent = 'Failed to load: ' + (e && e.message || 'unknown error');
+        });
+    });
   }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
 })();
 </script>
