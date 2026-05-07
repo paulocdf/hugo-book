@@ -671,17 +671,37 @@
     window.dmSignIn();
   });
 
-  // Edit button — opens shared edit modal
+  // Edit button — opens inline editor by default; the inline editor exposes
+  // an "Open in full editor" escape hatch that delegates to dmEditModal for
+  // sharing / version history / attachments.
   editBtn.addEventListener('click', function() {
     if (!currentNote) return;
-    if (window.dmEditModal) {
-      window.dmEditModal.open(currentNote, {
+    var openInModal = function(noteToOpen) {
+      if (!window.dmEditModal) return;
+      window.dmEditModal.open(noteToOpen, {
         onSave: function(updatedNote) {
           selfTriggeredSync = true;
           renderNote(updatedNote);
           setTimeout(function() { selfTriggeredSync = false; }, 200);
         }
       });
+    };
+
+    if (window.dmInlineEditor && bodyEl) {
+      window.dmInlineEditor.open(bodyEl, currentNote, {
+        onSave: function(updatedNote) {
+          // Re-render so checkboxes/diagrams/wikilinks pick up new content
+          // when the user closes the inline editor.
+          selfTriggeredSync = true;
+          renderNote(updatedNote);
+          setTimeout(function() { selfTriggeredSync = false; }, 200);
+        },
+        onSwitchToFullEditor: function(noteRef) {
+          openInModal(noteRef);
+        }
+      });
+    } else {
+      openInModal(currentNote);
     }
   });
 

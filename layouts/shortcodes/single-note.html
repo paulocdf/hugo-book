@@ -612,13 +612,29 @@
     if (editBtn) {
       editBtn.addEventListener('click', function() {
         if (!currentNote || !window.dmEditModal) return;
-        window.dmEditModal.open(currentNote, {
-          onSave: function(updatedNote) {
-            selfTriggeredSync = true;
-            renderNote(updatedNote);
-            setTimeout(function() { selfTriggeredSync = false; }, 200);
-          }
-        });
+        var openInModal = function(noteToOpen) {
+          window.dmEditModal.open(noteToOpen, {
+            onSave: function(updatedNote) {
+              selfTriggeredSync = true;
+              renderNote(updatedNote);
+              setTimeout(function() { selfTriggeredSync = false; }, 200);
+            }
+          });
+        };
+        if (window.dmInlineEditor && bodyEl) {
+          window.dmInlineEditor.open(bodyEl, currentNote, {
+            onSave: function(updatedNote) {
+              selfTriggeredSync = true;
+              renderNote(updatedNote);
+              setTimeout(function() { selfTriggeredSync = false; }, 200);
+            },
+            onSwitchToFullEditor: function(noteRef) {
+              openInModal(noteRef);
+            }
+          });
+        } else {
+          openInModal(currentNote);
+        }
       });
     }
 

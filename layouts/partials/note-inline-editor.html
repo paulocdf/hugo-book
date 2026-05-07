@@ -1,0 +1,544 @@
+{{/*
+  Inline note editor (Phase B of the editing UX rework).
+
+  Replaces a rendered note body element with a markdown textarea + minimal
+  toolbar in place. Designed to be the lightweight "quick edit" path. The
+  full edit modal (`note-edit-modal.html`) remains the home for sharing,
+  attachments, version history, and side-by-side preview.
+
+  Public API (window.dmInlineEditor):
+    open(bodyEl, note, options) — replaces bodyEl with the editor.
+        options:
+          onSave({note})           fired AFTER successful save (silent or final)
+          onCancel()               fired when the user discards changes / Escape
+          onClose()                fired on any close (after save/cancel)
+          onSwitchToFullEditor()   fired when "Open in full editor" is clicked
+                                   (the caller is responsible for opening the
+                                    modal; this partial only collapses itself)
+    close()                       collapse without committing (caller-driven;
+                                    autosave still flushes if dirty)
+    isActive()                    true if currently open
+
+  Save semantics (mirror the modal):
+    - Autosaves on a 2s idle debounce (one consolidated firestoreWrite each)
+    - At most ONE noteVersions snapshot per editing session (coalesced)
+    - On close (Save / Esc / switch to modal), flushes any pending autosave
+    - All writes go through dmSync.firestoreWrite() — IDB-first, queued offline
+*/}}
+<style>
+.dm-inline-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0.5rem 0 1rem;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--gray-300, #e1e4e8);
+  border-radius: 8px;
+  background: var(--body-background, #fff);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.dm-inline-editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--gray-200, #f0f0f0);
+}
+
+.dm-inline-editor-toolbar button.dm-ie-tool {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--body-font-color);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.dm-inline-editor-toolbar button.dm-ie-tool:hover {
+  background: var(--gray-100, #f6f8fa);
+  border-color: var(--gray-200, #eee);
+}
+.dm-inline-editor-toolbar button.dm-ie-tool[data-icon] {
+  font-weight: 600;
+}
+.dm-inline-editor-toolbar .dm-ie-spacer {
+  flex: 1 1 auto;
+}
+.dm-inline-editor-toolbar .dm-ie-status {
+  font-size: 0.76rem;
+  font-style: italic;
+  color: var(--gray-500, #888);
+  min-width: 1px;
+  transition: color 0.15s ease;
+}
+.dm-inline-editor-toolbar .dm-ie-status[data-state="saving"] { color: var(--color-accent, #1976d2); }
+.dm-inline-editor-toolbar .dm-ie-status[data-state="saved"]  { font-style: normal; color: var(--gray-500, #888); }
+.dm-inline-editor-toolbar .dm-ie-status[data-state="error"]  { color: #d33; font-style: normal; }
+.dm-inline-editor-toolbar .dm-ie-status[data-state="idle"],
+.dm-inline-editor-toolbar .dm-ie-status[data-state=""]       { visibility: hidden; }
+
+.dm-inline-editor-textarea {
+  width: 100%;
+  min-height: 280px;
+  padding: 12px;
+  border: 1px solid var(--gray-200, #eaeaea);
+  border-radius: 6px;
+  background: var(--body-background, #fff);
+  color: var(--body-font-color);
+  font-family: var(--font-family-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+.dm-inline-editor-textarea:focus {
+  border-color: var(--color-accent, #1976d2);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent, #1976d2) 18%, transparent);
+}
+
+.dm-inline-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dm-inline-editor-actions .dm-ie-hint {
+  font-size: 0.74rem;
+  color: var(--gray-500, #888);
+}
+.dm-inline-editor-actions .dm-ie-hint kbd {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid var(--gray-300, #d0d7de);
+  border-radius: 3px;
+  background: var(--gray-100, #f6f8fa);
+  font-family: var(--font-family-mono, ui-monospace, monospace);
+  font-size: 0.72rem;
+  line-height: 1.3;
+}
+.dm-inline-editor-actions .dm-ie-btn-group {
+  display: inline-flex;
+  gap: 6px;
+}
+.dm-inline-editor-actions button {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--gray-300, #d0d7de);
+  background: var(--body-background, #fff);
+  color: var(--body-font-color);
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+}
+.dm-inline-editor-actions button:hover {
+  background: var(--gray-100, #f6f8fa);
+}
+.dm-inline-editor-actions button.dm-ie-primary {
+  background: var(--color-accent, #1976d2);
+  border-color: var(--color-accent, #1976d2);
+  color: #fff;
+}
+.dm-inline-editor-actions button.dm-ie-primary:hover {
+  background: var(--color-accent-hover, #1565c0);
+  border-color: var(--color-accent-hover, #1565c0);
+}
+.dm-inline-editor-actions button.dm-ie-link {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-accent, #1976d2);
+  padding: 6px 8px;
+}
+.dm-inline-editor-actions button.dm-ie-link:hover {
+  background: color-mix(in srgb, var(--color-accent, #1976d2) 10%, transparent);
+}
+
+@media (max-width: 600px) {
+  .dm-inline-editor-actions .dm-ie-hint { display: none; }
+  .dm-inline-editor-textarea { min-height: 360px; font-size: 1rem; }
+}
+</style>
+
+<script>
+(function() {
+  'use strict';
+
+  // ── Module-level session state ─────────────────────────────────────────────
+  // We support exactly one inline editor at a time. Opening a second collapses
+  // the first (with a flush of any pending autosave). This mirrors how the
+  // inline TODO edit panel works.
+  var _activeBodyEl = null;        // original rendered body element (hidden while editing)
+  var _activeEditorEl = null;      // the editor wrapper we injected
+  var _activeNote = null;          // currentNote being edited
+  var _activeOptions = null;       // { onSave, onCancel, onClose, onSwitchToFullEditor }
+
+  var _autosaveTimer = null;
+  var _autosaveInFlight = false;
+  var _explicitSaveInFlight = false;
+  var _versionTakenThisSession = false;
+  var _initialContent = '';
+  var AUTOSAVE_IDLE_MS = 2000;
+  var _statusEl = null;
+  var _textarea = null;
+
+  // ── Public API ─────────────────────────────────────────────────────────────
+  window.dmInlineEditor = {
+    open: openInline,
+    close: function() { closeInline({ commit: true }); },
+    isActive: function() { return !!_activeNote; }
+  };
+
+  function openInline(bodyEl, note, options) {
+    if (!bodyEl || !note) return;
+    // If an editor is already open elsewhere, collapse it first (flushes save).
+    if (_activeNote) closeInline({ commit: true });
+
+    _activeBodyEl = bodyEl;
+    _activeNote = note;
+    _activeOptions = options || {};
+    _initialContent = note.content || '';
+    _versionTakenThisSession = false;
+    _autosaveInFlight = false;
+    _explicitSaveInFlight = false;
+    if (_autosaveTimer) { clearTimeout(_autosaveTimer); _autosaveTimer = null; }
+
+    // Build the editor and insert it AFTER the rendered body. We hide the body
+    // (rather than replace) so we can restore the rendered content cheaply on
+    // close — and the caller still owns the body element for re-rendering.
+    var wrapper = buildEditorDom(_initialContent);
+    bodyEl.style.display = 'none';
+    bodyEl.parentNode.insertBefore(wrapper, bodyEl.nextSibling);
+    _activeEditorEl = wrapper;
+
+    // Focus shortly after insertion so layout settles first.
+    setTimeout(function() {
+      if (_textarea) {
+        _textarea.focus();
+        // Place cursor at end (less jarring than selecting all)
+        try { _textarea.setSelectionRange(_textarea.value.length, _textarea.value.length); } catch (e) {}
+      }
+    }, 30);
+  }
+
+  function closeInline(opts) {
+    if (!_activeNote) return;
+    opts = opts || {};
+    var commit = opts.commit !== false;
+
+    // Flush any pending autosave and any in-flight unsaved changes.
+    if (_autosaveTimer) { clearTimeout(_autosaveTimer); _autosaveTimer = null; }
+    var flushPromise = Promise.resolve();
+    if (commit && _textarea && _textarea.value !== _initialContent) {
+      flushPromise = commitSave({ silent: false }).catch(function() {});
+    }
+
+    var bodyEl = _activeBodyEl;
+    var editorEl = _activeEditorEl;
+    var noteRef = _activeNote;
+    var opts2 = _activeOptions || {};
+
+    // Tear down DOM immediately for a snappy close; the flush continues in bg.
+    if (editorEl && editorEl.parentNode) editorEl.parentNode.removeChild(editorEl);
+    if (bodyEl) bodyEl.style.display = '';
+
+    _activeBodyEl = null;
+    _activeEditorEl = null;
+    _activeNote = null;
+    _activeOptions = null;
+    _statusEl = null;
+    _textarea = null;
+    _autosaveInFlight = false;
+    _explicitSaveInFlight = false;
+    _versionTakenThisSession = false;
+
+    flushPromise.then(function() {
+      if (typeof opts2.onClose === 'function') {
+        try { opts2.onClose(noteRef); } catch (e) { /* non-fatal */ }
+      }
+    });
+  }
+
+  // ── Build editor DOM ──────────────────────────────────────────────────────
+  function buildEditorDom(initialValue) {
+    var wrapper = document.createElement('div');
+    wrapper.className = 'dm-inline-editor';
+    wrapper.setAttribute('role', 'group');
+    wrapper.setAttribute('aria-label', 'Inline note editor');
+
+    // Toolbar
+    var toolbar = document.createElement('div');
+    toolbar.className = 'dm-inline-editor-toolbar';
+    toolbar.setAttribute('role', 'toolbar');
+
+    function tool(label, title, fn, opts) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'dm-ie-tool';
+      b.textContent = label;
+      b.title = title;
+      b.setAttribute('aria-label', title);
+      if (opts && opts.bold)   b.style.fontWeight = '700';
+      if (opts && opts.italic) b.style.fontStyle = 'italic';
+      if (opts && opts.mono)   b.style.fontFamily = 'var(--font-family-mono, monospace)';
+      b.addEventListener('click', function(e) {
+        e.preventDefault();
+        fn();
+        if (_textarea) _textarea.focus();
+      });
+      return b;
+    }
+
+    toolbar.appendChild(tool('B', 'Bold (Cmd/Ctrl+B)', function() { wrapSelection('**', '**'); }, { bold: true }));
+    toolbar.appendChild(tool('I', 'Italic (Cmd/Ctrl+I)', function() { wrapSelection('_', '_'); }, { italic: true }));
+    toolbar.appendChild(tool('</>', 'Inline code (Cmd/Ctrl+E)', function() { wrapSelection('`', '`'); }, { mono: true }));
+    toolbar.appendChild(tool('H', 'Heading', function() { prefixLine('## '); }));
+    toolbar.appendChild(tool('•', 'Bullet list', function() { prefixLine('- '); }));
+    toolbar.appendChild(tool('☐', 'Task', function() { prefixLine('- [ ] '); }));
+    toolbar.appendChild(tool('🔗', 'Link', function() { wrapSelection('[', '](url)'); }));
+
+    var spacer = document.createElement('span');
+    spacer.className = 'dm-ie-spacer';
+    toolbar.appendChild(spacer);
+
+    _statusEl = document.createElement('span');
+    _statusEl.className = 'dm-ie-status';
+    _statusEl.dataset.state = 'idle';
+    _statusEl.setAttribute('aria-live', 'polite');
+    toolbar.appendChild(_statusEl);
+
+    wrapper.appendChild(toolbar);
+
+    // Textarea
+    _textarea = document.createElement('textarea');
+    _textarea.className = 'dm-inline-editor-textarea';
+    _textarea.value = initialValue || '';
+    _textarea.spellcheck = true;
+    _textarea.setAttribute('aria-label', 'Note content');
+    _textarea.addEventListener('input', scheduleAutosave);
+    _textarea.addEventListener('keydown', onKeydown);
+    wrapper.appendChild(_textarea);
+
+    // Action row
+    var actions = document.createElement('div');
+    actions.className = 'dm-inline-editor-actions';
+
+    var hint = document.createElement('div');
+    hint.className = 'dm-ie-hint';
+    hint.innerHTML = '<kbd>Esc</kbd> close · <kbd>Cmd</kbd>+<kbd>Enter</kbd> save · <kbd>Cmd</kbd>+<kbd>B</kbd>/<kbd>I</kbd>/<kbd>E</kbd>';
+    actions.appendChild(hint);
+
+    var btnGroup = document.createElement('div');
+    btnGroup.className = 'dm-ie-btn-group';
+
+    var fullBtn = document.createElement('button');
+    fullBtn.type = 'button';
+    fullBtn.className = 'dm-ie-link';
+    fullBtn.textContent = 'Open in full editor';
+    fullBtn.addEventListener('click', function() {
+      var noteRef = _activeNote;
+      var opts2 = _activeOptions || {};
+      // Flush pending autosave first so the modal opens with up-to-date content
+      var flush = Promise.resolve();
+      if (_textarea && _textarea.value !== _initialContent) {
+        flush = commitSave({ silent: true }).catch(function() {});
+      }
+      flush.then(function() {
+        closeInline({ commit: false }); // we already saved (or tried)
+        if (typeof opts2.onSwitchToFullEditor === 'function') {
+          try { opts2.onSwitchToFullEditor(noteRef); } catch (e) { console.error(e); }
+        }
+      });
+    });
+    btnGroup.appendChild(fullBtn);
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.addEventListener('click', function() {
+      // Cancel = discard any unsaved typing. Since autosave fires on idle,
+      // this only discards the last <2s of changes.
+      if (_autosaveTimer) { clearTimeout(_autosaveTimer); _autosaveTimer = null; }
+      var opts2 = _activeOptions || {};
+      closeInline({ commit: false });
+      if (typeof opts2.onCancel === 'function') {
+        try { opts2.onCancel(); } catch (e) { /* non-fatal */ }
+      }
+    });
+    btnGroup.appendChild(cancelBtn);
+
+    var saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.className = 'dm-ie-primary';
+    saveBtn.textContent = 'Save';
+    saveBtn.addEventListener('click', function() {
+      if (_autosaveTimer) { clearTimeout(_autosaveTimer); _autosaveTimer = null; }
+      commitSave({ silent: false }).then(function(ok) {
+        if (ok !== false) closeInline({ commit: false });
+      });
+    });
+    btnGroup.appendChild(saveBtn);
+
+    actions.appendChild(btnGroup);
+    wrapper.appendChild(actions);
+
+    return wrapper;
+  }
+
+  // ── Toolbar helpers ───────────────────────────────────────────────────────
+  function wrapSelection(before, after) {
+    if (!_textarea) return;
+    var t = _textarea;
+    var start = t.selectionStart;
+    var end = t.selectionEnd;
+    var selected = t.value.substring(start, end);
+    var newText = before + selected + after;
+    t.value = t.value.substring(0, start) + newText + t.value.substring(end);
+    var cursorStart = start + before.length;
+    var cursorEnd = cursorStart + selected.length;
+    t.selectionStart = cursorStart;
+    t.selectionEnd = cursorEnd;
+    scheduleAutosave();
+  }
+
+  function prefixLine(prefix) {
+    if (!_textarea) return;
+    var t = _textarea;
+    var start = t.selectionStart;
+    var lineStart = t.value.lastIndexOf('\n', start - 1) + 1;
+    t.value = t.value.substring(0, lineStart) + prefix + t.value.substring(lineStart);
+    t.selectionStart = t.selectionEnd = start + prefix.length;
+    scheduleAutosave();
+  }
+
+  // ── Keyboard ──────────────────────────────────────────────────────────────
+  function onKeydown(e) {
+    var meta = e.metaKey || e.ctrlKey;
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      // Esc = save and close (matches the modal). Idle-debounce content is
+      // flushed by closeInline({commit:true}).
+      closeInline({ commit: true });
+      return;
+    }
+    if (meta && e.key === 'Enter') {
+      e.preventDefault();
+      if (_autosaveTimer) { clearTimeout(_autosaveTimer); _autosaveTimer = null; }
+      commitSave({ silent: false }).then(function(ok) {
+        if (ok !== false) closeInline({ commit: false });
+      });
+      return;
+    }
+    if (meta && (e.key === 'b' || e.key === 'B')) { e.preventDefault(); wrapSelection('**', '**'); return; }
+    if (meta && (e.key === 'i' || e.key === 'I')) { e.preventDefault(); wrapSelection('_', '_'); return; }
+    if (meta && (e.key === 'e' || e.key === 'E')) { e.preventDefault(); wrapSelection('`', '`'); return; }
+  }
+
+  // ── Save path ─────────────────────────────────────────────────────────────
+  function commitSave(opts) {
+    opts = opts || {};
+    var silent = !!opts.silent;
+    if (!_activeNote || !_textarea) return Promise.resolve(false);
+    if (!window.dmSync || !window.dmAuth || !window.dmAuth.currentUser) {
+      if (silent) setStatus('error');
+      return Promise.resolve(false);
+    }
+
+    var newContent = silent ? _textarea.value : _textarea.value;
+    if (!newContent.trim() && !silent) {
+      // Don't allow explicit save of an empty note from inline.
+      return Promise.resolve(false);
+    }
+    if (newContent === (_activeNote.content || '')) {
+      if (silent) setStatus('saved');
+      return Promise.resolve(false);
+    }
+
+    var note = _activeNote;
+    var needsSnapshot = !_versionTakenThisSession && newContent !== _initialContent;
+
+    if (silent) { _autosaveInFlight = true; setStatus('saving'); }
+    else        { _explicitSaveInFlight = true; setStatus('saving'); }
+
+    var snapshotPromise = (needsSnapshot && window.dmSync.saveNoteVersion)
+      ? window.dmSync.saveNoteVersion(note).then(function() {
+          _versionTakenThisSession = true;
+        }).catch(function(err) {
+          console.warn('[inline-editor] saveNoteVersion failed:', err);
+        })
+      : Promise.resolve();
+
+    return snapshotPromise.then(function() {
+      var updateData = {
+        content: newContent,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      return window.dmSync.firestoreWrite({
+        collection: 'notes',
+        docId: note.id,
+        op: 'update',
+        data: updateData,
+        localOp: function() {
+          note.content = newContent;
+          note.updatedAt = Date.now();
+          return window.dmSync.putNote(note);
+        }
+      });
+    }).then(function() {
+      // Fire sync event with our source tag so viewers can ignore self-writes.
+      window.dispatchEvent(new CustomEvent('dm-sync-complete', {
+        detail: { source: 'inline-edit', noteId: note.id }
+      }));
+      var opts2 = _activeOptions || {};
+      if (typeof opts2.onSave === 'function') {
+        try { opts2.onSave(note); } catch (e) { console.error(e); }
+      }
+      if (silent) { _autosaveInFlight = false; setStatus('saved'); }
+      else        { _explicitSaveInFlight = false; setStatus('saved'); }
+      return true;
+    }).catch(function(err) {
+      console.error('[inline-editor] save failed:', err);
+      if (silent) { _autosaveInFlight = false; setStatus('error'); }
+      else        { _explicitSaveInFlight = false; setStatus('error'); }
+      return false;
+    });
+  }
+
+  function scheduleAutosave() {
+    if (!_activeNote) return;
+    if (_explicitSaveInFlight) return;
+    if (_autosaveTimer) clearTimeout(_autosaveTimer);
+    setStatus('dirty');
+    _autosaveTimer = setTimeout(function() {
+      _autosaveTimer = null;
+      if (_autosaveInFlight || _explicitSaveInFlight) {
+        scheduleAutosave();
+        return;
+      }
+      commitSave({ silent: true });
+    }, AUTOSAVE_IDLE_MS);
+  }
+
+  function setStatus(state) {
+    if (!_statusEl) return;
+    var label;
+    switch (state) {
+      case 'saving': label = 'Saving…'; break;
+      case 'saved':  label = 'Saved'; break;
+      case 'dirty':  label = 'Editing…'; break;
+      case 'error':  label = 'Save failed'; break;
+      default:       label = '';
+    }
+    _statusEl.textContent = label;
+    _statusEl.dataset.state = state || 'idle';
+  }
+})();
+</script>

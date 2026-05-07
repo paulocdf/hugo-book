@@ -104,6 +104,7 @@
     </div>
 
     <div class="note-edit-actions">
+      <span class="note-edit-autosave-status" id="note-edit-autosave-status" data-state="idle" aria-live="polite"></span>
       <button type="button" class="note-edit-btn-cancel" id="note-edit-cancel">Cancel</button>
       <button type="button" class="note-edit-btn-save" id="note-edit-save">Save Changes</button>
     </div>
@@ -376,9 +377,23 @@
 .note-edit-actions {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 12px;
   margin-top: 1rem;
 }
+.note-edit-autosave-status {
+  margin-right: auto;
+  font-size: 0.78rem;
+  color: var(--gray-500, #888);
+  font-style: italic;
+  min-height: 1em;
+  transition: color 0.15s ease;
+}
+.note-edit-autosave-status[data-state="saving"] { color: var(--color-accent, #1976d2); }
+.note-edit-autosave-status[data-state="saved"]  { color: var(--gray-500, #888); font-style: normal; }
+.note-edit-autosave-status[data-state="dirty"]  { color: var(--gray-500, #888); }
+.note-edit-autosave-status[data-state="error"]  { color: #d33; font-style: normal; }
+.note-edit-autosave-status[data-state="idle"]   { visibility: hidden; }
 .note-edit-btn-cancel,
 .note-edit-btn-save {
   display: inline-flex;
@@ -768,6 +783,7 @@
   var editPreviewPanel = document.getElementById('note-edit-preview-panel');
   var editEditorPreviewRow = document.getElementById('note-edit-editor-preview-row');
   var editFeedback = document.getElementById('note-edit-feedback');
+  var editAutosaveStatus = document.getElementById('note-edit-autosave-status');
 
   // Sharing section DOM refs
   var sharingSectionEl = document.getElementById('note-edit-sharing-section');
@@ -785,6 +801,19 @@
   var previewTimer = null;
   var onSaveCallback = null;
   var _shareFeedbackTimer = null;
+
+  // ── Autosave state (per editing session) ──
+  // Coalescing rule: take exactly one noteVersions snapshot per session
+  // (on the first save that actually changes content), to avoid blowing
+  // past MAX_VERSIONS_PER_NOTE (50) during a long editing session.
+  var _autosaveTimer = null;
+  var _autosaveInFlight = false;
+  var _explicitSaveInFlight = false;
+  var _versionTakenThisSession = false;
+  var _initialContent = '';
+  var _initialTitle = '';
+  var _initialTags = [];
+  var AUTOSAVE_IDLE_MS = 2000;
 
   // ============================
   // Toolbar helpers
@@ -868,6 +897,10 @@
   // ============================
   // Live preview
   // ============================
+  // Render diagrams (mermaid/PlantUML/etc.) and apply syntax highlighting so
+  // the preview matches the view path. We deliberately skip dmEnableCheckboxes
+  // and dmEnableImageResize: those mutate note.content and trigger writes,
+  // which would race with the edit textarea (the source of truth here).
   function updateEditPreview() {
     if (!previewVisible) return;
     var content = editContentInput.value || '';
@@ -878,6 +911,12 @@
           hljs.highlightElement(block);
         }
       });
+      // Render diagrams so users see the actual rendered form.
+      // dmRenderDiagrams operates on placeholder <div class="dm-diagram"> nodes
+      // injected by the marked code renderer; safe to call multiple times.
+      if (window.dmRenderDiagrams) {
+        try { window.dmRenderDiagrams(editPreviewPanel); } catch (e) { /* non-fatal */ }
+      }
     } else {
       editPreviewPanel.textContent = content;
     }
@@ -918,6 +957,7 @@
       removeBtn.addEventListener('click', function() {
         editTags.splice(idx, 1);
         renderEditTags();
+        if (typeof scheduleAutosave === 'function') scheduleAutosave();
       });
       chip.appendChild(removeBtn);
       editTagsList.appendChild(chip);
@@ -931,12 +971,14 @@
       if (val && editTags.indexOf(val) === -1) {
         editTags.push(val);
         renderEditTags();
+        if (typeof scheduleAutosave === 'function') scheduleAutosave();
       }
       editTagInput.value = '';
     }
     if (e.key === 'Backspace' && !editTagInput.value && editTags.length > 0) {
       editTags.pop();
       renderEditTags();
+      if (typeof scheduleAutosave === 'function') scheduleAutosave();
     }
   });
 
@@ -1147,6 +1189,15 @@
     // Initialize tags
     editTags = (note.tags && note.tags.length) ? note.tags.slice() : [];
     renderEditTags();
+    // Reset autosave session state — must happen BEFORE any input listener fires
+    if (_autosaveTimer) { clearTimeout(_autosaveTimer); _autosaveTimer = null; }
+    _autosaveInFlight = false;
+    _explicitSaveInFlight = false;
+    _versionTakenThisSession = false;
+    _initialContent = note.content || '';
+    _initialTitle = note.title || '';
+    _initialTags = editTags.slice();
+    setAutosaveStatus('idle');
     // Enable preview by default
     previewVisible = true;
     editPreviewWrapper.style.display = '';
@@ -1170,6 +1221,17 @@
   }
 
   function closeEditModal() {
+    // Flush any pending autosave synchronously so we don't lose the last
+    // few keystrokes. commitSave returns a Promise but the IDB write fires
+    // immediately; the Firestore round-trip can finish in the background.
+    if (_autosaveTimer) {
+      clearTimeout(_autosaveTimer);
+      _autosaveTimer = null;
+      if (currentNote && !_explicitSaveInFlight) {
+        try { commitSave({ silent: true }); } catch (e) { /* non-fatal */ }
+      }
+    }
+    setAutosaveStatus('idle');
     editModal.style.display = 'none';
     editSave.disabled = false;
     editSave.textContent = 'Save Changes';
@@ -1188,25 +1250,71 @@
   editClose.addEventListener('click', closeEditModal);
   editCancel.addEventListener('click', closeEditModal);
 
-  editSave.addEventListener('click', function() {
-    if (!currentNote || !window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) return;
+  // ============================
+  // Save (explicit + autosave share this path)
+  // ============================
+  // commitSave({ silent }) returns a Promise.
+  //   silent === true  => autosave: no feedback overlay, no modal close, no
+  //                       Save-button text twiddling; updates a subtle status
+  //                       indicator instead.
+  //   silent === false => explicit Save click / Cmd+Enter: full UX (button
+  //                       state, success overlay, then close).
+  //
+  // We coalesce noteVersions snapshots: at most one per editing session, on
+  // the first commit that actually changes content. Subsequent autosaves
+  // skip the snapshot to avoid filling the 50-version cap.
+  function commitSave(opts) {
+    opts = opts || {};
+    var silent = !!opts.silent;
+
+    if (!currentNote || !window.dmDb || !window.dmAuth || !window.dmAuth.currentUser) {
+      return Promise.resolve(false);
+    }
 
     var newTitle = editTitleInput.value.trim();
-    var newContent = editContentInput.value.trim();
-    if (!newContent) return;
+    var newContent = editContentInput.value;
+    if (!silent) newContent = newContent.trim();
 
-    // Skip version save if content hasn't actually changed
-    var contentChanged = newContent !== (currentNote.content || '') || newTitle !== (currentNote.title || '');
+    // Don't write empty content. Explicit save is a no-op; autosave just
+    // waits for the next idle-debounce.
+    if (!newContent.trim()) {
+      if (silent) setAutosaveStatus('idle');
+      return Promise.resolve(false);
+    }
 
-    editSave.disabled = true;
-    editSave.textContent = 'Saving...';
+    var contentChanged = newContent !== (currentNote.content || '')
+      || newTitle !== (currentNote.title || '')
+      || !arraysEqual(editTags, currentNote.tags || []);
 
-    // Save a version snapshot of the CURRENT state before applying edits
-    var versionPromise = (contentChanged && window.dmSync && window.dmSync.saveNoteVersion)
-      ? window.dmSync.saveNoteVersion(currentNote)
+    if (!contentChanged) {
+      if (silent) setAutosaveStatus('saved');
+      return Promise.resolve(false);
+    }
+
+    // Take a version snapshot on the FIRST commit that changes content
+    // since the modal opened. _versionTakenThisSession resets in openEditModal.
+    var needsSnapshot = !_versionTakenThisSession
+      && (newContent !== _initialContent || newTitle !== _initialTitle);
+
+    if (silent) {
+      _autosaveInFlight = true;
+      setAutosaveStatus('saving');
+    } else {
+      _explicitSaveInFlight = true;
+      editSave.disabled = true;
+      editSave.textContent = 'Saving...';
+    }
+
+    var snapshotPromise = (needsSnapshot && window.dmSync && window.dmSync.saveNoteVersion)
+      ? window.dmSync.saveNoteVersion(currentNote).then(function() {
+          _versionTakenThisSession = true;
+        }).catch(function(err) {
+          // Don't block the save itself if snapshotting fails
+          console.warn('saveNoteVersion failed:', err);
+        })
       : Promise.resolve();
 
-    versionPromise.then(function() {
+    return snapshotPromise.then(function() {
       var updateData = {
         title: newTitle,
         content: newContent,
@@ -1227,25 +1335,81 @@
           return window.dmSync.putNote(currentNote);
         }
       });
-    })
-      .then(function() {
-        // Call the onSave callback with the updated note
-        if (onSaveCallback) {
-          onSaveCallback(currentNote);
-        }
-        // Fire sync event so sidebar and search re-index
-        window.dispatchEvent(new CustomEvent('dm-sync-complete', { detail: { source: 'edit-modal' } }));
-        // Show success feedback
+    }).then(function() {
+      if (onSaveCallback) onSaveCallback(currentNote);
+      window.dispatchEvent(new CustomEvent('dm-sync-complete', { detail: { source: 'edit-modal' } }));
+
+      if (silent) {
+        _autosaveInFlight = false;
+        setAutosaveStatus('saved');
+      } else {
+        _explicitSaveInFlight = false;
         showEditFeedback('success', 'Changes saved!');
         editSave.disabled = false;
         editSave.textContent = 'Save Changes';
-      })
-      .catch(function(err) {
-        console.error('Error updating note:', err);
+      }
+      return true;
+    }).catch(function(err) {
+      console.error('Error updating note:', err);
+      if (silent) {
+        _autosaveInFlight = false;
+        setAutosaveStatus('error');
+      } else {
+        _explicitSaveInFlight = false;
         editSave.disabled = false;
         editSave.textContent = 'Save Changes';
         showEditFeedback('error', 'Failed to save. Please try again.');
-      });
+      }
+      return false;
+    });
+  }
+
+  function arraysEqual(a, b) {
+    if (a === b) return true;
+    if (!a || !b || a.length !== b.length) return false;
+    for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    return true;
+  }
+
+  // ── Autosave debounce ──
+  function scheduleAutosave() {
+    if (!currentNote) return;
+    if (_explicitSaveInFlight) return;
+    if (_autosaveTimer) clearTimeout(_autosaveTimer);
+    setAutosaveStatus('dirty');
+    _autosaveTimer = setTimeout(function() {
+      _autosaveTimer = null;
+      if (_autosaveInFlight || _explicitSaveInFlight) {
+        // re-arm; we'll save on the next idle window
+        scheduleAutosave();
+        return;
+      }
+      commitSave({ silent: true });
+    }, AUTOSAVE_IDLE_MS);
+  }
+
+  function setAutosaveStatus(state) {
+    if (!editAutosaveStatus) return;
+    var label;
+    switch (state) {
+      case 'saving': label = 'Saving…'; break;
+      case 'saved':  label = 'Saved'; break;
+      case 'dirty':  label = 'Editing…'; break;
+      case 'error':  label = 'Save failed'; break;
+      default:       label = '';
+    }
+    editAutosaveStatus.textContent = label;
+    editAutosaveStatus.dataset.state = state || 'idle';
+  }
+
+  // Wire input listeners for autosave (alongside preview scheduling).
+  editContentInput.addEventListener('input', scheduleAutosave);
+  editTitleInput.addEventListener('input', scheduleAutosave);
+
+  editSave.addEventListener('click', function() {
+    // Cancel any pending autosave so it doesn't double-fire after explicit save
+    if (_autosaveTimer) { clearTimeout(_autosaveTimer); _autosaveTimer = null; }
+    commitSave({ silent: false });
   });
 
   // History button — opens version history modal
